@@ -9,7 +9,7 @@ from app.db.base import Base
 
 TEST_URL = os.getenv(
     "DATABASE_URL_TEST",
-    "postgresql+psycopg://vendelo:vendelo@localhost:5433/vendelo_test",
+    "postgresql+psycopg://vendelo:vendelo@localhost:5434/vendelo_test",
 )
 
 
