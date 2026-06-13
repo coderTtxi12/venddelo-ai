@@ -1,6 +1,20 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def normalize_db_url(url: str) -> str:
+    """Force the psycopg v3 driver (psycopg2 is not installed).
+
+    Supabase connection strings use the bare ``postgresql://`` scheme, which
+    SQLAlchemy maps to psycopg2 by default. Rewrite it to ``postgresql+psycopg://``.
+    """
+    if url.startswith("postgresql+"):
+        return url
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://") :]
+    return url
 
 
 class Settings(BaseSettings):
@@ -14,8 +28,18 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_v1_prefix: str = "/api/v1"
     app_version: str = "0.1.0"
-    database_url: str = "postgresql+psycopg://vendelo:vendelo@localhost:5433/vendelo"
+    database_url: str = "postgresql+psycopg://vendelo:vendelo@localhost:5434/vendelo"
     database_url_test: str | None = None
+    supabase_url: str | None = None
+    supabase_service_role_key: str | None = None
+    supabase_storage_bucket: str = "assets"
+
+    @field_validator("database_url", "database_url_test")
+    @classmethod
+    def _normalize_db_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_db_url(value)
 
 
 @lru_cache
