@@ -1,13 +1,25 @@
+import uuid
+from datetime import UTC, datetime
+
 from app.core.pagination import (
     CursorPage,
     PaginationParams,
     decode_cursor,
+    decode_keyset_cursor,
     encode_cursor,
+    encode_keyset_cursor,
 )
 
 
 def test_cursor_roundtrip():
     assert decode_cursor(encode_cursor("id_123")) == "id_123"
+
+
+def test_keyset_cursor_roundtrip():
+    created_at = datetime.now(UTC)
+    id = uuid.uuid4()
+    decoded = decode_keyset_cursor(encode_keyset_cursor(created_at, id))
+    assert decoded == (created_at, id)
 
 
 def test_pagination_params_defaults():
