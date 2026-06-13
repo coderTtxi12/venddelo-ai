@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_v1_prefix: str = "/api/v1"
     app_version: str = "0.1.0"
+    database_url: str = "postgresql+psycopg://vendelo:vendelo@localhost:5433/vendelo"
+    database_url_test: str | None = None
 
 
 @lru_cache
