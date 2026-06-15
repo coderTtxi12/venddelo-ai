@@ -1,13 +1,10 @@
 import uuid
-from collections.abc import Iterator
 
-import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
 from app.api.deps import get_auth
 from app.core.security import AuthenticatedUser, AuthPort
-from app.db.uow import SqlAlchemyUnitOfWork, get_uow
+from app.db.uow import SqlAlchemyUnitOfWork
 from app.main import app
 from app.modules.menu.schemas import (
     CategoryCreate,
@@ -33,23 +30,6 @@ class FakeAuth(AuthPort):
 
             raise UnauthorizedError("Invalid token")
         return AuthenticatedUser(id=self._user_id, email="test@example.com")
-
-
-@requires_db
-@pytest.fixture
-def client(engine):
-    factory = sessionmaker(bind=engine, expire_on_commit=False)
-
-    def override_uow() -> Iterator[SqlAlchemyUnitOfWork]:
-        with SqlAlchemyUnitOfWork(factory) as uow:
-            yield uow
-            uow.commit()
-
-    app.dependency_overrides[get_uow] = override_uow
-    app.dependency_overrides[get_auth] = lambda: FakeAuth()
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
 
 
 AUTH = {"Authorization": "Bearer valid-token"}
@@ -126,7 +106,8 @@ def test_public_menu_and_order(client, engine):
         "payment_method": "cash",
         "items": [{"product_id": menu_resp.json()["products"][0]["id"], "quantity": 2}],
     }
-    headers = {"Idempotency-Key": "key-1"}
+    idempotency_key = str(uuid.uuid4())
+    headers = {"Idempotency-Key": idempotency_key}
     o1 = client.post(
         "/api/v1/public/menu/pubmenu/orders",
         json=order_body,

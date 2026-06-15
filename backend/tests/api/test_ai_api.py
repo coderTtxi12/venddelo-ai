@@ -1,42 +1,14 @@
 import uuid
 from io import BytesIO
 
-import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
-from app.api.deps import get_auth
-from app.core.security import AuthenticatedUser, AuthPort
-from app.db.uow import SqlAlchemyUnitOfWork, get_uow
-from app.main import app
+from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.menu.schemas import CategoryCreate, ProductCreate
 from app.modules.restaurants.schemas import RestaurantCreate
 from tests.conftest import requires_db
 
 OWNER = uuid.UUID("11111111-1111-1111-1111-111111111111")
-
-
-class FakeAuth(AuthPort):
-    def verify_token(self, token: str) -> AuthenticatedUser:
-        return AuthenticatedUser(id=OWNER, email="test@example.com")
-
-
-@requires_db
-@pytest.fixture
-def client(engine):
-    factory = sessionmaker(bind=engine, expire_on_commit=False)
-
-    def override_uow():
-        with SqlAlchemyUnitOfWork(factory) as uow:
-            yield uow
-            uow.commit()
-
-    app.dependency_overrides[get_uow] = override_uow
-    app.dependency_overrides[get_auth] = lambda: FakeAuth()
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
-
 
 AUTH = {"Authorization": "Bearer valid-token"}
 
