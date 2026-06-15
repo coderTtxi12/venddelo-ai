@@ -4,7 +4,13 @@ import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAccessToken } from "@/hooks/use-access-token";
 import { listOrders, updateOrderStatus } from "@/lib/api/orders";
-import { Button, Card } from "@/components/ui/primitives";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+} from "@/components/ui/primitives";
 import { formatMoney } from "@/lib/utils";
 
 const NEXT_STATUS: Record<string, string> = {
@@ -12,6 +18,22 @@ const NEXT_STATUS: Record<string, string> = {
   confirmed: "preparing",
   preparing: "ready",
   ready: "delivered",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pendiente",
+  confirmed: "Confirmado",
+  preparing: "Preparando",
+  ready: "Listo",
+  delivered: "Entregado",
+};
+
+const STATUS_TONE: Record<string, "neutral" | "warning" | "brand" | "success"> = {
+  pending: "warning",
+  confirmed: "brand",
+  preparing: "brand",
+  ready: "success",
+  delivered: "neutral",
 };
 
 export default function OrdersPage() {
@@ -38,31 +60,42 @@ export default function OrdersPage() {
   const todayTotal = orders.reduce((s, o) => s + o.total_cents, 0);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Pedidos</h1>
-        <p className="text-sm text-zinc-600">
-          Actualización automática cada 10s · Total listado: {formatMoney(todayTotal)}
-        </p>
-      </div>
+    <div className="mx-auto max-w-3xl">
+      <PageHeader
+        title="Pedidos"
+        description={`Actualización automática cada 10s · Total listado: ${formatMoney(todayTotal)}`}
+      />
+
       {isLoading && <Card>Cargando…</Card>}
+
+      {!isLoading && orders.length === 0 && (
+        <EmptyState
+          title="No hay pedidos aún"
+          description="Cuando los clientes ordenen desde tu menú público, aparecerán aquí."
+        />
+      )}
+
       <div className="grid gap-3">
         {orders.map((o) => (
-          <Card key={o.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Card key={o.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-medium">{o.customer_name}</p>
-              <p className="text-sm text-zinc-500">
-                {o.type} · {o.status} · {formatMoney(o.total_cents)}
+              <p className="mt-1 text-sm text-[var(--text-muted)]">
+                {o.type === "delivery" ? "Delivery" : "Take out"} · {formatMoney(o.total_cents)}
               </p>
+              <div className="mt-2">
+                <Badge tone={STATUS_TONE[o.status] ?? "neutral"}>
+                  {STATUS_LABELS[o.status] ?? o.status}
+                </Badge>
+              </div>
             </div>
             {NEXT_STATUS[o.status] && (
-              <Button variant="secondary" onClick={() => advance(o.id, o.status)}>
-                → {NEXT_STATUS[o.status]}
+              <Button variant="secondary" size="sm" onClick={() => advance(o.id, o.status)}>
+                → {STATUS_LABELS[NEXT_STATUS[o.status]] ?? NEXT_STATUS[o.status]}
               </Button>
             )}
           </Card>
         ))}
-        {!isLoading && orders.length === 0 && <Card>No hay pedidos aún.</Card>}
       </div>
     </div>
   );
