@@ -18,6 +18,7 @@ from app.modules.orders.adapters import SqlAlchemyOrderRepository
 from app.modules.promotions.adapters import SqlAlchemyPromotionRepository
 from app.modules.restaurants.adapters import SqlAlchemyRestaurantRepository
 from app.modules.translations.adapters import SqlAlchemyTranslationRepository
+from app.modules.users.adapters import SqlAlchemyUserRepository
 
 
 class UnitOfWork(ABC):
@@ -49,6 +50,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         cache = build_cache(settings)
         db_idempotency = SqlAlchemyIdempotencyRepository(self.session)
         self.restaurants = SqlAlchemyRestaurantRepository(self.session)
+        self.users = SqlAlchemyUserRepository(self.session)
         self.menu = SqlAlchemyMenuRepository(self.session)
         self.orders = SqlAlchemyOrderRepository(self.session)
         self.promotions = SqlAlchemyPromotionRepository(self.session)

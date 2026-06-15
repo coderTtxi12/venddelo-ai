@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, status
 
 from app.api.deps import (
-    get_current_user,
+    get_synced_user,
     pagination_params,
     require_owned_restaurant,
 )
 from app.core.pagination import CursorPage, PaginationParams
-from app.core.security import AuthenticatedUser
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.modules.restaurants.schemas import (
     PaymentMethodCreate,
@@ -16,6 +15,7 @@ from app.modules.restaurants.schemas import (
     ScheduleCreate,
 )
 from app.modules.restaurants.service import RestaurantService
+from app.modules.users.schemas import UserDTO
 
 router = APIRouter(prefix="/restaurants", tags=["restaurants"])
 
@@ -27,7 +27,7 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> RestaurantService:
 @router.post("", response_model=RestaurantDTO, status_code=status.HTTP_201_CREATED)
 def create_restaurant(
     data: RestaurantCreate,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: UserDTO = Depends(get_synced_user),
     service: RestaurantService = Depends(_service),
 ) -> RestaurantDTO:
     return service.create(user.id, data)
@@ -36,7 +36,7 @@ def create_restaurant(
 @router.get("", response_model=CursorPage[RestaurantDTO])
 def list_my_restaurants(
     params: PaginationParams = Depends(pagination_params),
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: UserDTO = Depends(get_synced_user),
     service: RestaurantService = Depends(_service),
 ) -> CursorPage[RestaurantDTO]:
     return service.list_for_owner(user.id, params)

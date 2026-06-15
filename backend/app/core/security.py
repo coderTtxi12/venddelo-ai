@@ -7,6 +7,8 @@ from pydantic import BaseModel
 class AuthenticatedUser(BaseModel):
     id: uuid.UUID
     email: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
     role: str | None = None
 
 

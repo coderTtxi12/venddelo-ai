@@ -11,6 +11,8 @@ from app.core.security import AuthenticatedUser, AuthPort
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.infra.auth.supabase_jwt import SupabaseJwtAuth
 from app.modules.restaurants.schemas import RestaurantDTO
+from app.modules.users.schemas import UserDTO
+from app.modules.users.service import UserService
 
 
 def get_auth(settings: Settings = Depends(get_settings)) -> AuthPort:
@@ -27,6 +29,14 @@ def get_current_user(
     if not token:
         raise UnauthorizedError("Missing bearer token")
     return auth.verify_token(token)
+
+
+def get_synced_user(
+    auth: AuthenticatedUser = Depends(get_current_user),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> UserDTO:
+    """Verify JWT and upsert the app user profile (Supabase id → users table)."""
+    return UserService(uow.users).sync_from_auth(auth)
 
 
 def pagination_params(

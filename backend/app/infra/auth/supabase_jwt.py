@@ -11,6 +11,18 @@ from app.core.exceptions import UnauthorizedError
 from app.core.security import AuthenticatedUser, AuthPort
 
 
+def _profile_from_payload(payload: dict) -> tuple[str | None, str | None]:
+    meta = payload.get("user_metadata") or {}
+    display_name = meta.get("full_name") or meta.get("name")
+    avatar_url = meta.get("avatar_url") or meta.get("picture")
+    return display_name, avatar_url
+
+
+def _role_from_payload(payload: dict) -> str | None:
+    app_meta = payload.get("app_metadata") or {}
+    return app_meta.get("role") or payload.get("role")
+
+
 class SupabaseJwtAuth(AuthPort):
     def __init__(self, settings: Settings) -> None:
         self._secret = settings.supabase_jwt_secret
@@ -35,10 +47,15 @@ class SupabaseJwtAuth(AuthPort):
         if exp is not None and datetime.fromtimestamp(exp, tz=UTC) < datetime.now(UTC):
             raise UnauthorizedError("Token expired")
 
+        display_name, avatar_url = _profile_from_payload(payload)
+        role = _role_from_payload(payload)
+
         return AuthenticatedUser(
             id=user_id,
             email=payload.get("email"),
-            role=payload.get("role"),
+            display_name=display_name,
+            avatar_url=avatar_url,
+            role=role,
         )
 
     def _decode_payload(self, token: str) -> dict:
