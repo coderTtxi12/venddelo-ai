@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { MapPin, Clock, CreditCard, ImageIcon, FileText, Sparkles } from "lucide-react";
 import { useAccessToken } from "@/hooks/use-access-token";
+import { createClient } from "@/lib/auth/client";
 import { createRestaurant, setPaymentMethods, setSchedules, updateRestaurant } from "@/lib/api/restaurants";
 import { startExtractMenu } from "@/lib/api/ai";
+import { ApiError } from "@/lib/api/types";
 import { Button, Card, Input, Label, StepIndicator } from "@/components/ui/primitives";
 import { draftSubdomain } from "@/lib/utils";
 
@@ -35,13 +37,20 @@ export default function OnboardingPage() {
     setLoading(true);
     setError(null);
     try {
-      const restaurant = await createRestaurant(token, {
+      const supabase = createClient();
+      const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
+      const activeToken = sessionData.session?.access_token ?? token;
+      if (sessionError || !activeToken) {
+        throw new Error("Tu sesión expiró. Vuelve a iniciar sesión.");
+      }
+
+      const restaurant = await createRestaurant(activeToken, {
         name,
         subdomain: draftSubdomain(),
         status: "draft",
       });
 
-      await updateRestaurant(token, restaurant.id, {
+      await updateRestaurant(activeToken, restaurant.id, {
         address: address || null,
         whatsapp_phone: whatsappPhone || null,
         logo_path: logoFile ? `restaurants/${restaurant.id}/logo` : null,
@@ -57,22 +66,26 @@ export default function OnboardingPage() {
         ? [schedule, { ...schedule, service_type: "delivery" as const }]
         : [schedule];
 
-      await setSchedules(token, restaurant.id, schedules);
+      await setSchedules(activeToken, restaurant.id, schedules);
 
       const methods = PAYMENT_METHODS.flatMap((method) => [
         { method, service_type: "takeout" as const, enabled: true },
         { method, service_type: "delivery" as const, enabled: true },
       ]);
-      await setPaymentMethods(token, restaurant.id, methods);
+      await setPaymentMethods(activeToken, restaurant.id, methods);
 
-      const extractJob = await startExtractMenu(token, restaurant.id, menuFile);
+      const extractJob = await startExtractMenu(activeToken, restaurant.id, menuFile);
       sessionStorage.setItem(
         `onboarding:${restaurant.id}`,
         JSON.stringify({ extractJobId: extractJob.id }),
       );
       router.push(`/onboarding/processing?restaurantId=${restaurant.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error en onboarding");
+      if (e instanceof ApiError && e.httpStatus === 401) {
+        setError("Tu sesión expiró. Cierra sesión y vuelve a entrar.");
+      } else {
+        setError(e instanceof Error ? e.message : "Error en onboarding");
+      }
       setLoading(false);
     }
   }
