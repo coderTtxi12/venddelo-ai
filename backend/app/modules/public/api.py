@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Header, Query, status
 
+from app.core.exceptions import NotFoundError
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.infra.ai.openai_gateway import build_ai_gateway
 from app.infra.cache.menu_cache import MenuCacheService
@@ -9,6 +10,7 @@ from app.modules.menu.schemas import FullMenuDTO
 from app.modules.menu.service import MenuService
 from app.modules.orders.schemas import OrderDTO, PublicOrderInput
 from app.modules.orders.service import OrderService
+from app.modules.public.schemas import PublicRestaurantDTO
 from app.modules.translations.service import TranslationService
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -40,6 +42,23 @@ def _order_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> OrderService
         uow.restaurants,
         uow.menu,
         uow.idempotency,
+    )
+
+
+@router.get("/restaurants/{subdomain}", response_model=PublicRestaurantDTO)
+def get_public_restaurant(
+    subdomain: str,
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> PublicRestaurantDTO:
+    restaurant = uow.restaurants.get_by_subdomain(subdomain)
+    if restaurant is None or restaurant.status != "published":
+        raise NotFoundError("Restaurant not found")
+    return PublicRestaurantDTO(
+        name=restaurant.name,
+        subdomain=restaurant.subdomain,
+        color_palette=restaurant.color_palette,
+        whatsapp_phone=restaurant.whatsapp_phone,
+        original_language=restaurant.original_language,
     )
 
 
