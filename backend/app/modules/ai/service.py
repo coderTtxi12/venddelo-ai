@@ -289,9 +289,7 @@ class AIService:
             logger.exception("pick_palette job failed")
             self._set_job_status(job_id, status="failed", error_message=str(exc))
 
-    def revert_artifact(
-        self, restaurant_id: uuid.UUID, artifact_id: uuid.UUID
-    ) -> AIArtifactDTO:
+    def revert_artifact(self, restaurant_id: uuid.UUID, artifact_id: uuid.UUID) -> AIArtifactDTO:
         artifact = self._artifacts.get(restaurant_id, artifact_id)
         if artifact is None:
             raise NotFoundError("Artifact not found")
