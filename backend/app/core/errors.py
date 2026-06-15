@@ -3,6 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.exceptions import DomainError
 from app.core.request_context import get_request_id
 
 
@@ -32,6 +33,14 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
     )
 
 
+async def domain_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, DomainError)
+    return JSONResponse(
+        status_code=exc.http_status,
+        content=_error_body(exc.code, exc.message),
+    )
+
+
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(
         status_code=500,
@@ -40,6 +49,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(DomainError, domain_exception_handler)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
