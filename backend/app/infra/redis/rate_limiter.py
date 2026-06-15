@@ -33,6 +33,6 @@ class RedisRateLimiterAdapter(RateLimiterPort):
         return int(count) <= limit
 
     def remaining(self, key: str, *, limit: int, window_seconds: int) -> int:
-        raw = self._client.get(key)
+        raw = cast(str | None, self._client.get(key))
         current = int(raw) if raw else 0
         return max(0, limit - current)
