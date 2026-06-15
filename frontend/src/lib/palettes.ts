@@ -1,43 +1,69 @@
 import type { CSSProperties } from "react";
 
-export const PALETTES = ["sunset", "ocean", "forest", "classic", "midnight"] as const;
+/** Restaurant-facing palettes — all light theme */
+export const PALETTES = ["sunset", "ocean", "forest", "classic", "terracotta"] as const;
 
 export type Palette = (typeof PALETTES)[number];
 
+/** Maps legacy backend value to light equivalent */
+export function normalizePaletteKey(palette: string | null | undefined): Palette {
+  if (palette === "midnight") return "terracotta";
+  if (PALETTES.includes(palette as Palette)) return palette as Palette;
+  return "sunset";
+}
+
 export const PALETTE_VARS: Record<Palette, Record<string, string>> = {
   sunset: {
-    "--brand": "#e85d4c",
-    "--brand-muted": "#f4a261",
-    "--surface": "#fff8f5",
-    "--text": "#2d1b1b",
+    "--brand": "#dc2626",
+    "--brand-muted": "#f87171",
+    "--brand-soft": "#fef2f2",
+    "--surface": "#fffbfb",
+    "--text": "#450a0a",
+    "--border": "#fecaca",
   },
   ocean: {
-    "--brand": "#1d6fb8",
-    "--brand-muted": "#48cae4",
-    "--surface": "#f0f9ff",
-    "--text": "#0f172a",
+    "--brand": "#0369a1",
+    "--brand-muted": "#38bdf8",
+    "--brand-soft": "#f0f9ff",
+    "--surface": "#f8fcff",
+    "--text": "#0c4a6e",
+    "--border": "#bae6fd",
   },
   forest: {
-    "--brand": "#2d6a4f",
-    "--brand-muted": "#95d5b2",
-    "--surface": "#f1faee",
-    "--text": "#1b4332",
+    "--brand": "#15803d",
+    "--brand-muted": "#4ade80",
+    "--brand-soft": "#f0fdf4",
+    "--surface": "#f7fef9",
+    "--text": "#14532d",
+    "--border": "#bbf7d0",
   },
   classic: {
-    "--brand": "#1a1a1a",
-    "--brand-muted": "#6b7280",
-    "--surface": "#fafafa",
-    "--text": "#111827",
+    "--brand": "#44403c",
+    "--brand-muted": "#a8a29e",
+    "--brand-soft": "#fafaf9",
+    "--surface": "#ffffff",
+    "--text": "#1c1917",
+    "--border": "#e7e5e4",
   },
-  midnight: {
-    "--brand": "#6366f1",
-    "--brand-muted": "#a5b4fc",
-    "--surface": "#0f172a",
-    "--text": "#f8fafc",
+  terracotta: {
+    "--brand": "#c2410c",
+    "--brand-muted": "#fb923c",
+    "--brand-soft": "#fff7ed",
+    "--surface": "#fffcf9",
+    "--text": "#431407",
+    "--border": "#fed7aa",
   },
 };
 
+export const PALETTE_LABELS: Record<Palette, string> = {
+  sunset: "Sunset",
+  ocean: "Ocean",
+  forest: "Forest",
+  classic: "Classic",
+  terracotta: "Terracotta",
+};
+
 export function paletteStyle(palette: string | null | undefined): CSSProperties {
-  const key = (PALETTES.includes(palette as Palette) ? palette : "classic") as Palette;
+  const key = normalizePaletteKey(palette);
   return PALETTE_VARS[key] as CSSProperties;
 }
