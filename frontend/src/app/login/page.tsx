@@ -2,6 +2,8 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/auth/client";
 import { Button, Card } from "@/components/ui/primitives";
 
@@ -31,24 +33,37 @@ function LoginForm() {
   }
 
   return (
-    <Card className="w-full space-y-4">
-      <h1 className="text-2xl font-bold">Iniciar sesión</h1>
-      <p className="text-sm text-zinc-600">Usa tu cuenta de Google para administrar tu restaurante.</p>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button className="w-full" onClick={signInWithGoogle} disabled={loading}>
+    <Card elevated className="w-full max-w-md space-y-6">
+      <div className="text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
+          <Sparkles className="h-6 w-6" aria-hidden />
+        </div>
+        <h1 className="font-display text-2xl font-semibold">Bienvenido de nuevo</h1>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">
+          Accede con Google para gestionar tu menú digital.
+        </p>
+      </div>
+      {error && (
+        <p className="rounded-[var(--radius)] bg-red-50 px-3 py-2 text-center text-sm text-red-800">
+          {error}
+        </p>
+      )}
+      <Button className="w-full" size="lg" onClick={signInWithGoogle} disabled={loading}>
         {loading ? "Redirigiendo…" : "Continuar con Google"}
       </Button>
-      <Button variant="ghost" className="w-full" onClick={() => router.push("/")}>
-        Volver
-      </Button>
+      <p className="text-center text-xs text-[var(--text-subtle)]">
+        <Link href="/" className="cursor-pointer underline-offset-2 hover:underline">
+          Volver al inicio
+        </Link>
+      </p>
     </Card>
   );
 }
 
 export default function LoginPage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-md items-center px-6">
-      <Suspense fallback={<Card className="w-full p-6">Cargando…</Card>}>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--background)] px-4 pattern-dots">
+      <Suspense fallback={<Card className="w-full max-w-md p-8">Cargando…</Card>}>
         <LoginForm />
       </Suspense>
     </main>
