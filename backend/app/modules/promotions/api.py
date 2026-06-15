@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 
+from app.api.cache_helpers import invalidate_restaurant_menu_cache
 from app.api.deps import pagination_params, require_owned_restaurant
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
@@ -30,8 +31,11 @@ def create_promotion(
     data: PromotionCreate,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: PromotionService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> PromotionDTO:
-    return service.create(restaurant.id, data)
+    dto = service.create(restaurant.id, data)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+    return dto
 
 
 @router.get(
@@ -55,8 +59,11 @@ def update_promotion(
     data: PromotionUpdate,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: PromotionService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> PromotionDTO:
-    return service.update(restaurant.id, promotion_id, data)
+    dto = service.update(restaurant.id, promotion_id, data)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+    return dto
 
 
 @router.delete(
@@ -67,8 +74,10 @@ def delete_promotion(
     promotion_id: uuid.UUID,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: PromotionService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
     service.delete(restaurant.id, promotion_id)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
 
 
 @router.put(
@@ -80,8 +89,10 @@ def set_promotion_products(
     body: IdListBody,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: PromotionService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
     service.set_products(restaurant.id, promotion_id, body.ids)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
 
 
 @router.put(
@@ -93,5 +104,7 @@ def set_promotion_categories(
     body: IdListBody,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: PromotionService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
     service.set_categories(restaurant.id, promotion_id, body.ids)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)

@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 
+from app.api.cache_helpers import invalidate_restaurant_menu_cache
 from app.api.deps import pagination_params, require_owned_restaurant
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
@@ -43,8 +44,11 @@ def create_category(
     data: CategoryCreate,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> CategoryDTO:
-    return service.create_category(data.model_copy(update={"restaurant_id": restaurant.id}))
+    dto = service.create_category(data.model_copy(update={"restaurant_id": restaurant.id}))
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+    return dto
 
 
 @router.get("/restaurants/{restaurant_id}/categories", response_model=CursorPage[CategoryDTO])
@@ -65,8 +69,11 @@ def update_category(
     data: CategoryUpdate,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> CategoryDTO:
-    return service.update_category(restaurant.id, category_id, data)
+    dto = service.update_category(restaurant.id, category_id, data)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+    return dto
 
 
 @router.delete(
@@ -77,8 +84,10 @@ def delete_category(
     category_id: uuid.UUID,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
     service.delete_category(restaurant.id, category_id)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
 
 
 # Products
@@ -91,8 +100,11 @@ def create_product(
     data: ProductCreate,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> ProductDTO:
-    return service.create_product(restaurant.id, data)
+    dto = service.create_product(restaurant.id, data)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+    return dto
 
 
 @router.get("/restaurants/{restaurant_id}/products", response_model=CursorPage[ProductDTO])
@@ -122,8 +134,11 @@ def update_product(
     data: ProductUpdate,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> ProductDTO:
-    return service.update_product(restaurant.id, product_id, data)
+    dto = service.update_product(restaurant.id, product_id, data)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+    return dto
 
 
 @router.delete(
@@ -134,8 +149,10 @@ def delete_product(
     product_id: uuid.UUID,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
     service.delete_product(restaurant.id, product_id)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
 
 
 @router.post(
@@ -147,8 +164,11 @@ def set_product_approval(
     body: ApprovalBody,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> ProductDTO:
-    return service.set_approval(restaurant.id, product_id, body.status)
+    dto = service.set_approval(restaurant.id, product_id, body.status)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+    return dto
 
 
 @router.post(
@@ -159,8 +179,11 @@ def publish_product(
     product_id: uuid.UUID,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> ProductDTO:
-    return service.publish(restaurant.id, product_id)
+    dto = service.publish(restaurant.id, product_id)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+    return dto
 
 
 # Option groups
@@ -174,8 +197,11 @@ def create_option_group(
     data: OptionGroupCreate,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> OptionGroupDTO:
-    return service.add_option_group(restaurant.id, product_id, data)
+    dto = service.add_option_group(restaurant.id, product_id, data)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+    return dto
 
 
 @router.patch(
@@ -188,8 +214,11 @@ def update_option_group(
     data: OptionGroupUpdate,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> OptionGroupDTO:
-    return service.update_option_group(restaurant.id, product_id, group_id, data)
+    dto = service.update_option_group(restaurant.id, product_id, group_id, data)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+    return dto
 
 
 @router.delete(
@@ -201,8 +230,10 @@ def delete_option_group(
     group_id: uuid.UUID,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
     service.delete_option_group(restaurant.id, product_id, group_id)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
 
 
 @router.post(
@@ -216,8 +247,11 @@ def create_option_item(
     data: OptionItemCreate,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> OptionItemDTO:
-    return service.add_option_item(restaurant.id, product_id, group_id, data)
+    dto = service.add_option_item(restaurant.id, product_id, group_id, data)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+    return dto
 
 
 @router.delete(
@@ -230,5 +264,7 @@ def delete_option_item(
     item_id: uuid.UUID,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
     service.delete_option_item(restaurant.id, product_id, group_id, item_id)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
