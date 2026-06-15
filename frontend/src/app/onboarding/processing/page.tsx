@@ -2,13 +2,20 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2, Sparkles } from "lucide-react";
 import { useAccessToken } from "@/hooks/use-access-token";
 import { getAIJob, startOptimizeMenu, startPickPalette } from "@/lib/api/ai";
 import { Button, Card } from "@/components/ui/primitives";
 
 export default function ProcessingPage() {
   return (
-    <Suspense fallback={<main className="p-8">Cargando…</main>}>
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center p-8 pattern-dots">
+          <Card>Cargando…</Card>
+        </main>
+      }
+    >
       <ProcessingContent />
     </Suspense>
   );
@@ -56,13 +63,31 @@ function ProcessingContent() {
     };
   }, [token, restaurantId, router]);
 
+  const isFailed = status === "failed";
+  const isDone = message.startsWith("¡Listo");
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-md items-center px-6">
-      <Card className="w-full space-y-3 text-center">
-        <h1 className="text-xl font-bold">Procesando con IA</h1>
-        <p className="text-sm text-zinc-600">{message}</p>
-        <p className="text-xs uppercase tracking-wide text-zinc-400">{status}</p>
-        {status === "failed" && restaurantId && (
+    <main className="flex min-h-screen items-center justify-center px-6 pattern-dots">
+      <Card elevated className="w-full max-w-md space-y-6 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--primary-soft)]">
+          {isFailed ? (
+            <Sparkles className="h-7 w-7 text-[var(--text-muted)]" aria-hidden />
+          ) : isDone ? (
+            <Sparkles className="h-7 w-7 text-[var(--primary)]" aria-hidden />
+          ) : (
+            <Loader2 className="h-7 w-7 animate-spin text-[var(--primary)]" aria-hidden />
+          )}
+        </div>
+        <div>
+          <h1 className="font-display text-2xl font-semibold">Procesando con IA</h1>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">{message}</p>
+        </div>
+        {!isFailed && !isDone && (
+          <div className="mx-auto h-1.5 w-48 overflow-hidden rounded-full bg-[var(--border-subtle)]">
+            <div className="h-full w-1/3 animate-pulse rounded-full bg-[var(--primary)]" />
+          </div>
+        )}
+        {isFailed && restaurantId && (
           <Button onClick={() => router.push(`/dashboard/${restaurantId}/menu`)}>
             Ir al dashboard
           </Button>
