@@ -26,3 +26,6 @@ class StoragePort(ABC):
 
     @abstractmethod
     def create_signed_url(self, path: str, expires_in: int) -> str: ...
+
+    @abstractmethod
+    def read(self, path: str) -> bytes: ...

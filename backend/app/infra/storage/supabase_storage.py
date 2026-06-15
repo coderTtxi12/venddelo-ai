@@ -48,3 +48,12 @@ class SupabaseStorageAdapter(StoragePort):
         except Exception as exc:
             raise StorageError(str(exc)) from exc
         return str(res["signedURL"])
+
+    def read(self, path: str) -> bytes:
+        try:
+            data = self._store().download(path)
+        except Exception as exc:
+            raise StorageError(str(exc)) from exc
+        if isinstance(data, bytes):
+            return data
+        return bytes(data)
