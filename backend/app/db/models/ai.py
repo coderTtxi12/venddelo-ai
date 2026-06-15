@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
@@ -8,6 +9,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -36,6 +38,33 @@ class AIArtifact(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ),
         CheckConstraint("status IN ('applied','reverted')", name="ai_artifact_status_allowed"),
         Index("ix_ai_artifacts_entity", "restaurant_id", "entity_type", "entity_id"),
+    )
+
+
+class AIJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "ai_jobs"
+
+    restaurant_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("restaurants.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    job_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, server_default="pending")
+    input_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "job_type IN ('extract_menu','optimize_menu','pick_palette')",
+            name="ai_job_type_allowed",
+        ),
+        CheckConstraint(
+            "status IN ('pending','processing','completed','failed')",
+            name="ai_job_status_allowed",
+        ),
+        Index("ix_ai_jobs_restaurant", "restaurant_id", "created_at"),
     )
 
 

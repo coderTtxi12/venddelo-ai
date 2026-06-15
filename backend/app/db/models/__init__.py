@@ -1,5 +1,5 @@
 from app.db.base import Base
-from app.db.models.ai import AIArtifact, MenuTranslation
+from app.db.models.ai import AIArtifact, AIJob, MenuTranslation
 from app.db.models.menu import (
     Category,
     OptionGroup,
@@ -36,6 +36,7 @@ __all__ = [
     "Order",
     "OrderItem",
     "AIArtifact",
+    "AIJob",
     "MenuTranslation",
     "IdempotencyKey",
     "AuditLog",
