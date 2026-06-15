@@ -42,7 +42,7 @@ export default function Sidebar() {
   return (
     <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}>
       <div className={styles.headerRow}>
-        <div className={styles.logo}>Vendelo AI</div>
+        <div className={styles.logo}>Venddelo AI</div>
         <button
           type="button"
           className={styles.toggleButton}

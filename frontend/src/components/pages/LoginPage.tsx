@@ -6,7 +6,7 @@ import styles from './LoginPage.module.css';
 function BrandLogo({ className }: { className?: string }) {
   return (
     <div className={`${styles.logo} ${className ?? ''}`.trim()}>
-      <span>Vendelo AI</span>
+      <span>Venddelo AI</span>
     </div>
   );
 }
@@ -19,18 +19,18 @@ export default function LoginPage() {
     <div className={styles.container}>
       <div className={styles.imagePanel}>
         <BrandLogo className={styles.logoLight} />
-        <img src="/assets/portada2.jpg" alt="Vendelo AI" className={styles.coverImage} />
+        <img src="/assets/portada2.jpg" alt="Venddelo AI" className={styles.coverImage} />
         <div className={styles.imageOverlay}>
           <p className={styles.quote}>
             &quot;La plataforma que necesitas para gestionar tu menú digital.&quot;
           </p>
-          <span className={styles.author}>Vendelo AI Team</span>
+          <span className={styles.author}>Venddelo AI Team</span>
         </div>
       </div>
 
       <div className={styles.formPanel}>
         <div className={styles.formContent}>
-          <h1 className={styles.title}>Bienvenido a Vendelo AI</h1>
+          <h1 className={styles.title}>Bienvenido a Venddelo AI</h1>
 
           <p className={styles.subtitle}>
             Genera reportes, revisa tus estadísticas, agrega categorías, productos y mucho más

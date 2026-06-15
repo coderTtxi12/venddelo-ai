@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Vendelo AI',
+  title: 'Venddelo AI',
   description: 'Panel de administración para restaurantes',
   icons: {
     icon: '/favicon.svg',
