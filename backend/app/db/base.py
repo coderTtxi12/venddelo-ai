@@ -22,6 +22,7 @@ class UUIDPrimaryKeyMixin:
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         primary_key=True,
+        default=uuid.uuid4,
         server_default=func.gen_random_uuid(),
     )
 

@@ -20,7 +20,7 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "ai_jobs",
-        sa.Column("id", sa.UUID(), nullable=False),
+        sa.Column("id", sa.UUID(), server_default=sa.text("gen_random_uuid()"), nullable=False),
         sa.Column("restaurant_id", sa.UUID(), nullable=False),
         sa.Column("job_type", sa.String(length=50), nullable=False),
         sa.Column("status", sa.String(), server_default="pending", nullable=False),
