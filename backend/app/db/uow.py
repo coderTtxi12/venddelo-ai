@@ -6,7 +6,10 @@ from types import TracebackType
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.core.config import get_settings
 from app.db.session import SessionLocal
+from app.infra.redis.composite_idempotency import CompositeIdempotencyRepository
+from app.infra.redis.factory import build_cache
 from app.infra.repositories.idempotency import SqlAlchemyIdempotencyRepository
 from app.modules.ai.adapters import SqlAlchemyAIArtifactRepository
 from app.modules.menu.adapters import SqlAlchemyMenuRepository
@@ -41,13 +44,20 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
 
     def __enter__(self) -> SqlAlchemyUnitOfWork:
         self.session = self._session_factory()
+        settings = get_settings()
+        cache = build_cache(settings)
+        db_idempotency = SqlAlchemyIdempotencyRepository(self.session)
         self.restaurants = SqlAlchemyRestaurantRepository(self.session)
         self.menu = SqlAlchemyMenuRepository(self.session)
         self.orders = SqlAlchemyOrderRepository(self.session)
         self.promotions = SqlAlchemyPromotionRepository(self.session)
         self.translations = SqlAlchemyTranslationRepository(self.session)
         self.ai_artifacts = SqlAlchemyAIArtifactRepository(self.session)
-        self.idempotency = SqlAlchemyIdempotencyRepository(self.session)
+        self.idempotency = CompositeIdempotencyRepository(
+            cache,
+            db_idempotency,
+            redis_ttl_seconds=settings.order_idempotency_ttl_seconds,
+        )
         return self
 
     def __exit__(
