@@ -59,3 +59,23 @@ class OrderDTO(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: list[OrderItemDTO] = []
+
+
+class PublicOrderItemInput(BaseModel):
+    product_id: uuid.UUID
+    quantity: int
+    selected_options: dict[str, Any] | None = None
+
+
+class PublicOrderInput(BaseModel):
+    type: str
+    customer_name: str
+    customer_phone: str
+    payment_method: str
+    delivery_address: str | None = None
+    note: str | None = None
+    items: list[PublicOrderItemInput]
+
+
+class OrderStatusUpdate(BaseModel):
+    status: str
