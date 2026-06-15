@@ -94,5 +94,5 @@ def test_pick_palette_job(client, engine):
         "ocean",
         "forest",
         "classic",
-        "midnight",
+        "terracotta",
     }

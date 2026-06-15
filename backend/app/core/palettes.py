@@ -3,7 +3,7 @@ AVAILABLE_PALETTES: list[str] = [
     "ocean",
     "forest",
     "classic",
-    "midnight",
+    "terracotta",
 ]
 
 SUPPORTED_LOCALES: set[str] = {"es", "en", "pt", "fr", "de"}
