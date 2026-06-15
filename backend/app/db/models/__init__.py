@@ -19,6 +19,7 @@ from app.db.models.restaurant import (
     RestaurantSchedule,
 )
 from app.db.models.system import AuditLog, IdempotencyKey
+from app.db.models.user import User
 
 __all__ = [
     "Base",
@@ -40,4 +41,5 @@ __all__ = [
     "MenuTranslation",
     "IdempotencyKey",
     "AuditLog",
+    "User",
 ]
