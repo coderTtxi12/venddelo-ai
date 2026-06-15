@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     menu_cache_ttl_seconds: int = 300
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
+    translation_cache_ttl_seconds: int = 3600
 
     @field_validator("database_url", "database_url_test")
     @classmethod
