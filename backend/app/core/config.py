@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str | None = None
     jwt_audience: str = "authenticated"
     order_idempotency_ttl_seconds: int = 86400
+    redis_url: str | None = None
+    menu_cache_ttl_seconds: int = 300
+    rate_limit_requests: int = 60
+    rate_limit_window_seconds: int = 60
 
     @field_validator("database_url", "database_url_test")
     @classmethod
