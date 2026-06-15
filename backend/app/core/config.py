@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
     translation_cache_ttl_seconds: int = 3600
+    cors_origins: str = "http://localhost:3000"
 
     @field_validator("database_url", "database_url_test")
     @classmethod
