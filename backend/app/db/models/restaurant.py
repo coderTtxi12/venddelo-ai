@@ -32,6 +32,7 @@ class Restaurant(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     color_palette: Mapped[str | None] = mapped_column(String(50), nullable=True)
     original_language: Mapped[str] = mapped_column(String(10), nullable=False, server_default="es")
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="draft")
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
     schedules: Mapped[list["RestaurantSchedule"]] = relationship(
         back_populates="restaurant", cascade="all, delete-orphan"
@@ -46,6 +47,7 @@ class Restaurant(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
             "status IN ('draft','published','suspended')",
             name="status_allowed",
         ),
+        Index("ix_restaurants_owner_id", "owner_id"),
     )
 
 

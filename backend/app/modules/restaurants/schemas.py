@@ -68,6 +68,7 @@ class RestaurantDTO(BaseModel):
     place_id: str | None = None
     logo_path: str | None = None
     color_palette: str | None = None
+    owner_id: uuid.UUID | None = None
     is_active: bool
     created_at: datetime
     updated_at: datetime

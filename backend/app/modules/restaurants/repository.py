@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from app.core.pagination import CursorPage, PaginationParams
 from app.modules.restaurants.schemas import (
     PaymentMethodCreate,
+    PaymentMethodDTO,
     RestaurantCreate,
     RestaurantDTO,
     RestaurantUpdate,
@@ -16,7 +17,9 @@ from app.modules.restaurants.schemas import (
 
 class RestaurantRepository(ABC):
     @abstractmethod
-    def add(self, data: RestaurantCreate) -> RestaurantDTO: ...
+    def add(
+        self, data: RestaurantCreate, *, owner_id: uuid.UUID | None = None
+    ) -> RestaurantDTO: ...
 
     @abstractmethod
     def get(self, id: uuid.UUID) -> RestaurantDTO | None: ...
@@ -26,6 +29,14 @@ class RestaurantRepository(ABC):
 
     @abstractmethod
     def list(self, params: PaginationParams) -> CursorPage[RestaurantDTO]: ...
+
+    @abstractmethod
+    def list_for_owner(
+        self, owner_id: uuid.UUID, params: PaginationParams
+    ) -> CursorPage[RestaurantDTO]: ...
+
+    @abstractmethod
+    def list_payment_methods(self, restaurant_id: uuid.UUID) -> Sequence[PaymentMethodDTO]: ...
 
     @abstractmethod
     def update(self, id: uuid.UUID, data: RestaurantUpdate) -> RestaurantDTO | None: ...

@@ -21,6 +21,7 @@ from app.db.models.restaurant import (
 from app.modules.restaurants.repository import RestaurantRepository
 from app.modules.restaurants.schemas import (
     PaymentMethodCreate,
+    PaymentMethodDTO,
     RestaurantCreate,
     RestaurantDTO,
     RestaurantUpdate,
@@ -32,8 +33,8 @@ class SqlAlchemyRestaurantRepository(RestaurantRepository):
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def add(self, data: RestaurantCreate) -> RestaurantDTO:
-        obj = Restaurant(**data.model_dump())
+    def add(self, data: RestaurantCreate, *, owner_id: uuid.UUID | None = None) -> RestaurantDTO:
+        obj = Restaurant(owner_id=owner_id, **data.model_dump())
         self._session.add(obj)
         self._session.flush()
         self._session.refresh(obj)
@@ -73,6 +74,39 @@ class SqlAlchemyRestaurantRepository(RestaurantRepository):
             next_cursor=next_cursor,
             has_more=has_more,
         )
+
+    def list_for_owner(
+        self, owner_id: uuid.UUID, params: PaginationParams
+    ) -> CursorPage[RestaurantDTO]:
+        stmt = (
+            select(Restaurant)
+            .where(
+                Restaurant.is_active.is_(True),
+                Restaurant.owner_id == owner_id,
+            )
+            .order_by(Restaurant.created_at, Restaurant.id)
+            .limit(params.limit + 1)
+        )
+        if params.cursor:
+            created_at, last_id = decode_keyset_cursor(params.cursor)
+            stmt = stmt.where(tuple_(Restaurant.created_at, Restaurant.id) > (created_at, last_id))
+        rows = list(self._session.scalars(stmt))
+        has_more = len(rows) > params.limit
+        rows = rows[: params.limit]
+        next_cursor = encode_keyset_cursor(rows[-1].created_at, rows[-1].id) if has_more else None
+        return CursorPage(
+            items=[RestaurantDTO.model_validate(r) for r in rows],
+            next_cursor=next_cursor,
+            has_more=has_more,
+        )
+
+    def list_payment_methods(self, restaurant_id: uuid.UUID) -> Sequence[PaymentMethodDTO]:
+        rows = self._session.scalars(
+            select(RestaurantPaymentMethod).where(
+                RestaurantPaymentMethod.restaurant_id == restaurant_id
+            )
+        )
+        return [PaymentMethodDTO.model_validate(r) for r in rows]
 
     def update(self, id: uuid.UUID, data: RestaurantUpdate) -> RestaurantDTO | None:
         obj = self._session.get(Restaurant, id)
