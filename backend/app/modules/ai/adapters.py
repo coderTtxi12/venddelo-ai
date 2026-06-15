@@ -62,3 +62,20 @@ class SqlAlchemyAIArtifactRepository(AIArtifactRepository):
         obj.status = "reverted"
         self._session.flush()
         return AIArtifactDTO.model_validate(obj)
+
+    def get(self, restaurant_id: uuid.UUID, artifact_id: uuid.UUID) -> AIArtifactDTO | None:
+        obj = self._session.scalar(
+            select(AIArtifact).where(
+                AIArtifact.id == artifact_id,
+                AIArtifact.restaurant_id == restaurant_id,
+            )
+        )
+        return AIArtifactDTO.model_validate(obj) if obj else None
+
+    def list_for_restaurant(self, restaurant_id: uuid.UUID) -> list[AIArtifactDTO]:
+        rows = self._session.scalars(
+            select(AIArtifact)
+            .where(AIArtifact.restaurant_id == restaurant_id)
+            .order_by(AIArtifact.created_at.desc())
+        )
+        return [AIArtifactDTO.model_validate(r) for r in rows]

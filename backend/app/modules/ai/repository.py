@@ -26,3 +26,9 @@ class AIArtifactRepository(ABC):
 
     @abstractmethod
     def mark_reverted(self, id: uuid.UUID) -> AIArtifactDTO | None: ...
+
+    @abstractmethod
+    def get(self, restaurant_id: uuid.UUID, artifact_id: uuid.UUID) -> AIArtifactDTO | None: ...
+
+    @abstractmethod
+    def list_for_restaurant(self, restaurant_id: uuid.UUID) -> list[AIArtifactDTO]: ...
