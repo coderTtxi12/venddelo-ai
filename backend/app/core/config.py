@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
     supabase_storage_bucket: str = "assets"
+    supabase_jwt_secret: str | None = None
+    jwt_audience: str = "authenticated"
+    order_idempotency_ttl_seconds: int = 86400
 
     @field_validator("database_url", "database_url_test")
     @classmethod
