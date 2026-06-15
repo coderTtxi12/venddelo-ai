@@ -4,8 +4,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import Popover from '@mui/material/Popover';
-import type { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
-import { db, storage } from '../services/firebase';
+import { legacyDb as db, legacyStorage as storage } from '../services/legacyDb';
 import { useAuth } from '../hooks/useAuth';
 import {
   CATEGORIES_PAGE_SIZE,
@@ -19,6 +18,7 @@ import {
   saveSupplierProduct,
   updateSupplierProductActive,
   updateSupplierProductReviewStatus,
+  type PageCursor,
 } from '../services/db';
 import type {
   ApprovalStatus,
@@ -284,7 +284,7 @@ export default function ProductsPage() {
   const [categoriesLoadingMore, setCategoriesLoadingMore] = useState(false);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [categoriesHasMore, setCategoriesHasMore] = useState(false);
-  const categoriesCursorRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const categoriesCursorRef = useRef<PageCursor>(null);
 
   async function loadCategoriesFirstPage() {
     if (!supplierId) return;
@@ -331,7 +331,7 @@ export default function ProductsPage() {
   const [productsLoadingMore, setProductsLoadingMore] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [productsHasMore, setProductsHasMore] = useState(false);
-  const productsCursorRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const productsCursorRef = useRef<PageCursor>(null);
 
   async function loadProductsFirstPage() {
     if (!supplierId) return;

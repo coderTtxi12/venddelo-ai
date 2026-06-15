@@ -9,10 +9,15 @@ import ReviewsPage from '../pages/ReviewsPage';
 import AnalyticsPage from '../pages/AnalyticsPage';
 import MarketingPage from '../pages/MarketingPage';
 import SettingsPage from '../pages/SettingsPage';
+import AuthCallbackPage from '../pages/AuthCallbackPage';
 import ProtectedRoute from './ProtectedRoute';
 import PublicRoute from './PublicRoute';
 
 const router = createBrowserRouter([
+  {
+    path: '/auth/callback',
+    element: <AuthCallbackPage />,
+  },
   {
     path: '/login',
     element: (

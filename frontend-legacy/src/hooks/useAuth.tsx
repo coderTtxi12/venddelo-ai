@@ -2,211 +2,119 @@ import {
   createContext,
   useContext,
   useEffect,
-  useRef,
   useState,
   type ReactNode,
 } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
-import { auth, db, googleProvider } from '../services/firebase';
-import { logAuditEventSafe, verifyPanelUserAccess } from '../services/db';
-
-/** Mensaje cuando el usuario de Google no tiene acceso activo en `suppliers`. */
-export const PANEL_ACCESS_DENIED_MESSAGE =
-  'No tienes permisos para acceder. Tu cuenta no tiene acceso activo en proveedores.';
-
-const VERIFY_ERROR_MESSAGE =
-  'No pudimos verificar tu acceso. Revisa tu conexión e inténtalo de nuevo en unos minutos.';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from '../services/supabase';
+import type { AppUser } from '../types/auth';
 
 interface AuthContextValue {
+  /** Usuario con sesión activa (perfil de app). */
+  user: AppUser | null;
   /**
-   * Usuario con acceso al panel (misma referencia que Firebase `User` tras validar Firestore).
-   * Null si no hay sesión o aún no pasó la verificación / fue rechazada.
+   * Alias histórico de la sesión (antes `firebaseUser`).
+   * Misma referencia que `user` cuando hay sesión válida.
    */
-  user: User | null;
-  /**
-   * Sesión de Firebase Auth (puede existir mientras `user` sigue null durante la verificación).
-   */
-  firebaseUser: User | null;
-  /**
-   * True hasta el primer callback de `onAuthStateChanged`.
-   */
+  firebaseUser: AppUser | null;
   loading: boolean;
-  /** True mientras se comprueba en Firestore el acceso al panel. */
+  /** Reservado; sin verificación Firestore. */
   isCheckingPanelAccess: boolean;
   loginRejectionMessage: string | null;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  /** Token de acceso para llamadas al API backend. */
+  accessToken: string | null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function mapSessionUser(session: Session): AppUser {
+  const u = session.user;
+  const meta = u.user_metadata ?? {};
+  return {
+    uid: u.id,
+    email: u.email ?? null,
+    displayName:
+      (typeof meta.full_name === 'string' && meta.full_name) ||
+      (typeof meta.name === 'string' && meta.name) ||
+      null,
+    photoURL:
+      (typeof meta.avatar_url === 'string' && meta.avatar_url) ||
+      (typeof meta.picture === 'string' && meta.picture) ||
+      null,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isCheckingPanelAccess, setIsCheckingPanelAccess] = useState(false);
   const [loginRejectionMessage, setLoginRejectionMessage] = useState<string | null>(null);
-  const cancelledRef = useRef(false);
 
   useEffect(() => {
-    cancelledRef.current = false;
+    let mounted = true;
 
-    const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
-      void (async () => {
-        setLoading(false);
-        setFirebaseUser(fbUser);
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      if (data.session) {
+        setUser(mapSessionUser(data.session));
+        setAccessToken(data.session.access_token);
+      }
+      setLoading(false);
+    });
 
-        if (!fbUser) {
-          if (!cancelledRef.current) {
-            setUser(null);
-            setIsCheckingPanelAccess(false);
-          }
-          return;
-        }
-
-        if (!cancelledRef.current) {
-          setUser(null);
-          setIsCheckingPanelAccess(true);
-        }
-
-        try {
-          const result = await verifyPanelUserAccess(db, fbUser.email);
-
-          if (cancelledRef.current) return;
-
-          if (!result.allowed) {
-            await logAuditEventSafe(db, {
-              action: 'login',
-              actor: {
-                uid: fbUser.uid,
-                email: fbUser.email,
-                displayName: fbUser.displayName,
-              },
-              target: {
-                collectionId: 'panel_access',
-                documentId: fbUser.uid,
-              },
-              summary: 'Intento de acceso al panel denegado',
-              metadata: {
-                outcome: 'denied',
-                reason: result.reason,
-                authEmail: fbUser.email?.toLowerCase() ?? null,
-              },
-            });
-
-            setLoginRejectionMessage(PANEL_ACCESS_DENIED_MESSAGE);
-            await signOut(auth);
-            return;
-          }
-
-          await logAuditEventSafe(db, {
-            action: 'login',
-            actor: {
-              uid: fbUser.uid,
-              email: fbUser.email,
-              displayName: fbUser.displayName,
-            },
-            target: {
-              collectionId: 'suppliers',
-              documentId: result.firestoreUserId,
-            },
-            summary: 'Acceso al panel concedido',
-            metadata: {
-              outcome: 'allowed',
-              role: result.role,
-              authUid: fbUser.uid,
-            },
-          });
-
-          if (!cancelledRef.current) {
-            setUser(fbUser);
-            setLoginRejectionMessage(null);
-          }
-        } catch (err) {
-          console.error(err);
-          if (!cancelledRef.current) {
-            await logAuditEventSafe(db, {
-              action: 'login',
-              actor: {
-                uid: fbUser.uid,
-                email: fbUser.email,
-                displayName: fbUser.displayName,
-              },
-              target: {
-                collectionId: 'panel_access',
-                documentId: fbUser.uid,
-              },
-              summary: 'Error al verificar acceso al panel',
-              metadata: {
-                outcome: 'error',
-                message: err instanceof Error ? err.message : String(err),
-              },
-            });
-            setLoginRejectionMessage(VERIFY_ERROR_MESSAGE);
-            await signOut(auth);
-          }
-        } finally {
-          if (!cancelledRef.current) setIsCheckingPanelAccess(false);
-        }
-      })();
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      if (session) {
+        setUser(mapSessionUser(session));
+        setAccessToken(session.access_token);
+        setLoginRejectionMessage(null);
+      } else {
+        setUser(null);
+        setAccessToken(null);
+      }
+      setLoading(false);
     });
 
     return () => {
-      cancelledRef.current = true;
-      unsubscribe();
+      mounted = false;
+      sub.subscription.unsubscribe();
     };
   }, []);
 
   const loginWithGoogle = async () => {
     setLoginRejectionMessage(null);
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (e: unknown) {
-      const code =
-        typeof e === 'object' && e !== null && 'code' in e
-          ? String((e as { code: string }).code)
-          : '';
-      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-        return;
-      }
-      console.error(e);
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo },
+    });
+    if (error) {
+      console.error(error);
       setLoginRejectionMessage(
-        'No se pudo completar el inicio de sesión con Google. Inténtalo de nuevo.'
+        'No se pudo completar el inicio de sesión con Google. Inténtalo de nuevo.',
       );
     }
   };
 
   const logout = async () => {
-    const u = auth.currentUser;
-    if (u) {
-      await logAuditEventSafe(db, {
-        action: 'logout',
-        actor: {
-          uid: u.uid,
-          email: u.email,
-          displayName: u.displayName,
-        },
-        target: {
-          collectionId: 'panel_access',
-          documentId: u.uid,
-        },
-        summary: 'Cierre de sesión en el panel',
-        metadata: { outcome: 'logout' },
-      });
-    }
-    await signOut(auth);
+    await supabase.auth.signOut();
+    setUser(null);
+    setAccessToken(null);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        firebaseUser,
+        firebaseUser: user,
         loading,
-        isCheckingPanelAccess,
+        isCheckingPanelAccess: false,
         loginRejectionMessage,
         loginWithGoogle,
         logout,
+        accessToken,
       }}
     >
       {children}

@@ -13,6 +13,7 @@ export {
   type PanelAccessDenyReason,
   type PanelAccessResult,
 } from './panelAccess';
+export type { PageCursor } from './firestoreTypes';
 export type {
   ApprovalStatus,
   CategoryDraft,
