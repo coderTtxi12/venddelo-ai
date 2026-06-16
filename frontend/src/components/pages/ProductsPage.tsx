@@ -1414,8 +1414,10 @@ export default function ProductsPage() {
                   supplierId={supplierId}
                   supplierIdError={supplierIdError}
                   onSave={async (payload) => {
-                    if (!supplierId) throw new Error(supplierIdError ?? 'supplierId no disponible.');
-                    await saveSupplierProduct(db, storage, supplierId, payload);
+                    if (!supplierId || !accessToken) {
+                      throw new Error(supplierIdError ?? 'No hay sesión o restaurante disponible.');
+                    }
+                    await saveSupplierProduct(accessToken, db, storage, supplierId, payload);
                     await loadProductsFirstPage();
                     setProductDrawerOpen(false);
                   }}

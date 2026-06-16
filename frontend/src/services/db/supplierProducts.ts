@@ -1,5 +1,14 @@
-import { listProducts } from '@/lib/api/menu';
+import {
+  createOptionGroup,
+  createProduct,
+  deleteOptionGroup,
+  getProduct,
+  listProducts,
+  updateProduct,
+  type OptionGroupCreateInput,
+} from '@/lib/api/menu';
 import { mapProductToDraft } from '@/lib/api/mappers';
+import { resolveImagePathForUpload } from '@/lib/storage/resolveImagePath';
 import type { LegacyDbClient, LegacyStorageClient } from '../legacyDb';
 import type {
   ImageDraft,
@@ -62,13 +71,102 @@ export type SaveSupplierProductPayload = {
   optionGroups: OptionGroupDraft[];
 };
 
+function priceCentsFromPayload(price: MoneyUSD, discountUsd: number): number {
+  const finalUsd = Math.max(0, price.amount - (discountUsd ?? 0));
+  return Math.round(finalUsd * 100);
+}
+
+function mapOptionGroupToCreate(group: OptionGroupDraft): OptionGroupCreateInput {
+  const items = group.items.filter((item) => item.isActive);
+  return {
+    title: group.title,
+    required: group.required,
+    selection: group.selection,
+    min_selections: group.required ? 1 : 0,
+    max_selections: group.selection === 'single' ? 1 : null,
+    sort_index: 0,
+    items: items.map((item, index) => ({
+      label: item.label,
+      price_delta_cents: Math.round(item.priceDeltaUsd * 100),
+      sort_index: index,
+    })),
+  };
+}
+
+async function syncProductOptionGroups(
+  accessToken: string,
+  restaurantId: string,
+  productId: string,
+  groups: OptionGroupDraft[],
+): Promise<void> {
+  const existing = await getProduct(accessToken, restaurantId, productId);
+  for (const group of existing.option_groups) {
+    await deleteOptionGroup(accessToken, restaurantId, productId, group.id);
+  }
+  for (const group of groups) {
+    await createOptionGroup(
+      accessToken,
+      restaurantId,
+      productId,
+      mapOptionGroupToCreate(group),
+    );
+  }
+}
+
 export async function saveSupplierProduct(
+  accessToken: string,
   _db: LegacyDbClient,
   _storage: LegacyStorageClient,
-  _supplierId: string,
-  _payload: SaveSupplierProductPayload,
+  restaurantId: string,
+  payload: SaveSupplierProductPayload,
 ): Promise<void> {
-  throw new Error('Guardado de productos pendiente de migración al API backend.');
+  const imagePath = await resolveImagePathForUpload(
+    accessToken,
+    restaurantId,
+    'products',
+    payload.image,
+  );
+  const description = payload.description.trim() || null;
+  const priceCents = priceCentsFromPayload(payload.price, payload.discountUsd);
+  const activeGroups = normalizeOptionGroups(payload.optionGroups).filter((g) => g.isActive);
+
+  if (payload.id) {
+    const body: {
+      name: string;
+      description: string | null;
+      price_cents: number;
+      category_ids: string[];
+      image_path?: string | null;
+    } = {
+      name: payload.name,
+      description,
+      price_cents: priceCents,
+      category_ids: payload.categoryIds,
+    };
+    if (imagePath !== undefined) {
+      body.image_path = imagePath;
+    }
+    await updateProduct(accessToken, restaurantId, payload.id, body);
+    await syncProductOptionGroups(accessToken, restaurantId, payload.id, activeGroups);
+    return;
+  }
+
+  const product = await createProduct(accessToken, restaurantId, {
+    name: payload.name,
+    description,
+    price_cents: priceCents,
+    category_ids: payload.categoryIds,
+    image_path: imagePath ?? null,
+  });
+
+  for (const group of activeGroups) {
+    await createOptionGroup(
+      accessToken,
+      restaurantId,
+      product.id,
+      mapOptionGroupToCreate(group),
+    );
+  }
 }
 
 export async function updateSupplierProductActive(
