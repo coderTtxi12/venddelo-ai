@@ -61,6 +61,7 @@ export function updateCategory(
     description?: string | null;
     image_path?: string | null;
     sort_index?: number;
+    is_active?: boolean;
   },
 ) {
   return apiRequest<Category>(

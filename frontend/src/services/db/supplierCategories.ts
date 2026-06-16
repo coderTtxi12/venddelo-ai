@@ -90,10 +90,11 @@ export async function saveSupplierCategory(
 }
 
 export async function updateSupplierCategoryActive(
+  accessToken: string,
   _db: LegacyDbClient,
-  _supplierId: string,
-  _categoryId: string,
-  _isActive: boolean,
+  restaurantId: string,
+  categoryId: string,
+  isActive: boolean,
 ): Promise<void> {
-  throw new Error('Actualización de categorías pendiente de migración al API backend.');
+  await updateCategory(accessToken, restaurantId, categoryId, { is_active: isActive });
 }

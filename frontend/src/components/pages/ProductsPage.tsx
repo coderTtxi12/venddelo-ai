@@ -676,7 +676,7 @@ export default function ProductsPage() {
                             setCategoryActiveError(null);
                             setCategoryActiveToggleId(c.id);
                             try {
-                              await updateSupplierCategoryActive(db, supplierId, c.id, false);
+                              await updateSupplierCategoryActive(accessToken, db, supplierId, c.id, false);
                               setCategories((prev) =>
                                 prev.map((x) =>
                                   x.id === c.id ? { ...x, isActive: false, updatedAt: nowIso() } : x
@@ -707,7 +707,7 @@ export default function ProductsPage() {
                             setCategoryActiveError(null);
                             setCategoryActiveToggleId(c.id);
                             try {
-                              await updateSupplierCategoryActive(db, supplierId, c.id, true);
+                              await updateSupplierCategoryActive(accessToken, db, supplierId, c.id, true);
                               setCategories((prev) =>
                                 prev.map((x) =>
                                   x.id === c.id ? { ...x, isActive: true, updatedAt: nowIso() } : x
