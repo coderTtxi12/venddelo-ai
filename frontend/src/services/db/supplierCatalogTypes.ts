@@ -19,7 +19,7 @@ export type CategoryDraft = {
 
 export type MoneyUSD = {
   amount: number;
-  currency: 'USD';
+  currency: string;
 };
 
 export type OptionItemDraft = {
@@ -34,6 +34,8 @@ export type OptionGroupDraft = {
   title: string;
   required: boolean;
   selection: 'single' | 'multi';
+  /** Solo aplica cuando selection === 'multi'. null = sin límite superior. */
+  maxSelections: number | null;
   items: OptionItemDraft[];
   isActive: boolean;
 };

@@ -46,4 +46,5 @@ export {
   type FetchSupplierProductsPageArgs,
   type FetchSupplierProductsPageResult,
   type SaveSupplierProductPayload,
+  type SaveSupplierProductResult,
 } from './supplierProducts';

@@ -1,13 +1,24 @@
 import {
   createOptionGroup,
+  createOptionItem,
   createProduct,
   deleteOptionGroup,
-  getProduct,
+  deleteOptionItem,
   listProducts,
+  updateOptionGroup,
   updateProduct,
   type OptionGroupCreateInput,
+  type OptionGroupUpdateInput,
 } from '@/lib/api/menu';
-import { mapProductToDraft } from '@/lib/api/mappers';
+import { mapOptionGroupToDraft, mapProductToDraft } from '@/lib/api/mappers';
+import type { Product } from '@/lib/api/types';
+import type { Promotion } from '@/lib/api/types';
+import {
+  buildProductCatalogDiscountMap,
+  discountUsdFromPromotion,
+  isCatalogProductDiscountPromotion,
+  syncProductCatalogDiscount,
+} from '@/lib/promotions/productCatalogDiscount';
 import { resolveImagePathForUpload } from '@/lib/storage/resolveImagePath';
 import type { LegacyDbClient, LegacyStorageClient } from '../legacyDb';
 import type {
@@ -20,10 +31,23 @@ import type { PageCursor } from './firestoreTypes';
 
 export const PRODUCTS_PAGE_SIZE = 20;
 
+const PERSISTED_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isPersistedId(id: string): boolean {
+  return PERSISTED_ID_RE.test(id);
+}
+
 export function normalizeOptionGroups(groups: OptionGroupDraft[]): OptionGroupDraft[] {
-  return groups.map((g) =>
-    g.required && g.selection !== 'single' ? { ...g, selection: 'single' } : g,
-  );
+  return groups.map((g) => {
+    const activeCount = g.items.filter((item) => item.isActive).length;
+    if (g.selection === 'single') {
+      return { ...g, maxSelections: 1 };
+    }
+    if (g.maxSelections == null) return g;
+    const cappedMax = activeCount > 0 ? Math.min(g.maxSelections, activeCount) : g.maxSelections;
+    return { ...g, maxSelections: Math.max(1, Math.round(cappedMax)) };
+  });
 }
 
 export function mapProductDoc(_snap: unknown): ProductDraft {
@@ -38,6 +62,7 @@ export type FetchSupplierProductsPageResult = {
   items: ProductDraft[];
   cursor: PageCursor;
   hasMore: boolean;
+  catalogPromotions: Promotion[];
 };
 
 export async function fetchSupplierProductsPage(
@@ -45,6 +70,7 @@ export async function fetchSupplierProductsPage(
   _db: LegacyDbClient,
   restaurantId: string,
   args: FetchSupplierProductsPageArgs,
+  catalogPromotions?: Promotion[],
 ): Promise<FetchSupplierProductsPageResult> {
   const page = await listProducts(
     accessToken,
@@ -53,10 +79,20 @@ export async function fetchSupplierProductsPage(
     args.cursor,
   );
 
+  const { discounts, promotions } = await buildProductCatalogDiscountMap(
+    accessToken,
+    restaurantId,
+    page.items,
+    catalogPromotions,
+  );
+
   return {
-    items: page.items.map(mapProductToDraft),
+    items: page.items.map((product) =>
+      mapProductToDraft(product, discounts.get(product.id) ?? 0),
+    ),
     cursor: page.next_cursor,
     hasMore: page.has_more,
+    catalogPromotions: promotions,
   };
 }
 
@@ -66,25 +102,66 @@ export type SaveSupplierProductPayload = {
   description: string;
   price: MoneyUSD;
   discountUsd: number;
+  discountMode: 'usd' | 'percent';
+  discountPercent: number;
   image: ImageDraft | null;
   categoryIds: string[];
   optionGroups: OptionGroupDraft[];
+  /** Estado previo de grupos al editar; evita un GET extra antes de sincronizar. */
+  existingOptionGroups?: OptionGroupDraft[];
+  catalogPromotions?: Promotion[];
 };
 
-function priceCentsFromPayload(price: MoneyUSD, discountUsd: number): number {
-  const finalUsd = Math.max(0, price.amount - (discountUsd ?? 0));
-  return Math.round(finalUsd * 100);
+export type SaveSupplierProductResult = {
+  catalogPromotions: Promotion[];
+  product: ProductDraft;
+};
+
+function basePriceCents(price: MoneyUSD): number {
+  return Math.round(Math.max(0, price.amount) * 100);
 }
 
-function mapOptionGroupToCreate(group: OptionGroupDraft): OptionGroupCreateInput {
+function mapOptionGroupToCreate(group: OptionGroupDraft, sortIndex: number): OptionGroupCreateInput {
   const items = group.items.filter((item) => item.isActive);
+  const activeCount = items.length;
+  const minSelections = group.required ? 1 : 0;
+
+  if (group.selection === 'single') {
+    return {
+      title: group.title,
+      required: group.required,
+      selection: 'single',
+      min_selections: minSelections,
+      max_selections: 1,
+      sort_index: sortIndex,
+      is_active: group.isActive,
+      items: items.map((item, index) => ({
+        label: item.label,
+        price_delta_cents: Math.round(item.priceDeltaUsd * 100),
+        sort_index: index,
+      })),
+    };
+  }
+
+  let maxSelections = group.maxSelections;
+  if (maxSelections != null) {
+    maxSelections = Math.max(1, Math.round(maxSelections));
+    if (activeCount > 0) {
+      maxSelections = Math.min(maxSelections, activeCount);
+    }
+    if (minSelections > maxSelections) {
+      maxSelections = minSelections;
+    }
+  }
+
   return {
     title: group.title,
     required: group.required,
-    selection: group.selection,
-    min_selections: group.required ? 1 : 0,
-    max_selections: group.selection === 'single' ? 1 : null,
-    sort_index: 0,
+    selection: 'multi',
+    min_selections: minSelections,
+    max_selections: maxSelections,
+    sort_index: sortIndex,
+    is_active: group.isActive,
     items: items.map((item, index) => ({
       label: item.label,
       price_delta_cents: Math.round(item.priceDeltaUsd * 100),
@@ -93,24 +170,191 @@ function mapOptionGroupToCreate(group: OptionGroupDraft): OptionGroupCreateInput
   };
 }
 
+function mapOptionGroupToUpdate(group: OptionGroupDraft, sortIndex: number): OptionGroupUpdateInput {
+  const { items: _items, ...meta } = mapOptionGroupToCreate(group, sortIndex);
+  return meta;
+}
+
+function groupMetaChanged(
+  group: OptionGroupDraft,
+  existing: OptionGroupDraft,
+  sortIndex: number,
+): boolean {
+  const next = mapOptionGroupToUpdate(group, sortIndex);
+  const prev = mapOptionGroupToUpdate(existing, sortIndex);
+  return (
+    next.title !== prev.title ||
+    next.required !== prev.required ||
+    next.selection !== prev.selection ||
+    next.min_selections !== prev.min_selections ||
+    next.max_selections !== prev.max_selections ||
+    next.sort_index !== prev.sort_index ||
+    next.is_active !== prev.is_active
+  );
+}
+
+function itemPayloadMatches(
+  label: string,
+  priceDeltaCents: number,
+  existing: { label: string; priceDeltaUsd: number },
+): boolean {
+  return existing.label === label && Math.round(existing.priceDeltaUsd * 100) === priceDeltaCents;
+}
+
+async function syncGroupItems(
+  accessToken: string,
+  restaurantId: string,
+  productId: string,
+  groupId: string,
+  group: OptionGroupDraft,
+  existing: OptionGroupDraft,
+): Promise<OptionGroupDraft> {
+  const activeItems = group.items.filter((item) => item.isActive);
+  const keptPersistedIds = new Set<string>();
+  const deleteIds: string[] = [];
+
+  for (const existingItem of existing.items) {
+    const draftItem = group.items.find((item) => item.id === existingItem.id);
+    if (!draftItem || !draftItem.isActive) {
+      deleteIds.push(existingItem.id);
+      continue;
+    }
+
+    const priceDeltaCents = Math.round(draftItem.priceDeltaUsd * 100);
+    if (itemPayloadMatches(draftItem.label, priceDeltaCents, existingItem)) {
+      keptPersistedIds.add(existingItem.id);
+      continue;
+    }
+
+    deleteIds.push(existingItem.id);
+  }
+
+  type PendingCreate = { label: string; price_delta_cents: number; sort_index: number; draftIndex: number };
+  const pendingCreates: PendingCreate[] = [];
+  for (const [index, item] of activeItems.entries()) {
+    const priceDeltaCents = Math.round(item.priceDeltaUsd * 100);
+    if (isPersistedId(item.id) && keptPersistedIds.has(item.id)) {
+      continue;
+    }
+    pendingCreates.push({
+      label: item.label,
+      price_delta_cents: priceDeltaCents,
+      sort_index: index,
+      draftIndex: index,
+    });
+  }
+
+  if (deleteIds.length === 0 && pendingCreates.length === 0) {
+    return group;
+  }
+
+  await Promise.all(
+    deleteIds.map((itemId) =>
+      deleteOptionItem(accessToken, restaurantId, productId, groupId, itemId),
+    ),
+  );
+
+  const createdItems = await Promise.all(
+    pendingCreates.map((item) =>
+      createOptionItem(accessToken, restaurantId, productId, groupId, {
+        label: item.label,
+        price_delta_cents: item.price_delta_cents,
+        sort_index: item.sort_index,
+      }),
+    ),
+  );
+
+  const inactiveItems = group.items.filter((item) => !item.isActive);
+  const rebuiltActive: OptionGroupDraft['items'] = [];
+  let createCursor = 0;
+
+  for (const item of activeItems) {
+    if (keptPersistedIds.has(item.id)) {
+      rebuiltActive.push(item);
+      continue;
+    }
+    const created = createdItems[createCursor++]!;
+    rebuiltActive.push({
+      id: created.id,
+      label: created.label,
+      priceDeltaUsd: created.price_delta_cents / 100,
+      isActive: true,
+    });
+  }
+
+  return {
+    ...group,
+    items: [...rebuiltActive, ...inactiveItems],
+  };
+}
+
 async function syncProductOptionGroups(
   accessToken: string,
   restaurantId: string,
   productId: string,
+  existingGroups: OptionGroupDraft[],
   groups: OptionGroupDraft[],
-): Promise<void> {
-  const existing = await getProduct(accessToken, restaurantId, productId);
-  for (const group of existing.option_groups) {
-    await deleteOptionGroup(accessToken, restaurantId, productId, group.id);
-  }
-  for (const group of groups) {
-    await createOptionGroup(
-      accessToken,
-      restaurantId,
-      productId,
-      mapOptionGroupToCreate(group),
-    );
-  }
+): Promise<OptionGroupDraft[]> {
+  const existingById = new Map(existingGroups.map((group) => [group.id, group]));
+  const payloadPersistedIds = new Set(
+    groups.filter((group) => isPersistedId(group.id)).map((group) => group.id),
+  );
+
+  const removedGroupIds = existingGroups
+    .filter((group) => isPersistedId(group.id) && !payloadPersistedIds.has(group.id))
+    .map((group) => group.id);
+
+  await Promise.all(
+    removedGroupIds.map((groupId) =>
+      deleteOptionGroup(accessToken, restaurantId, productId, groupId),
+    ),
+  );
+
+  return Promise.all(
+    groups.map(async (group, index) => {
+      if (isPersistedId(group.id) && existingById.has(group.id)) {
+        const existing = existingById.get(group.id)!;
+        if (groupMetaChanged(group, existing, index)) {
+          await updateOptionGroup(
+            accessToken,
+            restaurantId,
+            productId,
+            group.id,
+            mapOptionGroupToUpdate(group, index),
+          );
+        }
+        return syncGroupItems(accessToken, restaurantId, productId, group.id, group, existing);
+      }
+
+      const created = await createOptionGroup(
+        accessToken,
+        restaurantId,
+        productId,
+        mapOptionGroupToCreate(group, index),
+      );
+      return mapOptionGroupToDraft(created);
+    }),
+  );
+}
+
+function discountUsdForProduct(product: Product, promotions: Promotion[]): number {
+  const promo = promotions.find((p) => isCatalogProductDiscountPromotion(p, product.id)) ?? null;
+  if (!promo) return 0;
+  return discountUsdFromPromotion(promo, product.price_cents / 100);
+}
+
+function buildSavedProductDraft(
+  product: Product,
+  optionGroups: OptionGroupDraft[],
+  catalogPromotions: Promotion[],
+  image: ImageDraft | null,
+): ProductDraft {
+  const mapped = mapProductToDraft(product, discountUsdForProduct(product, catalogPromotions));
+  return {
+    ...mapped,
+    optionGroups,
+    image: image ?? mapped.image,
+  };
 }
 
 export async function saveSupplierProduct(
@@ -119,7 +363,7 @@ export async function saveSupplierProduct(
   _storage: LegacyStorageClient,
   restaurantId: string,
   payload: SaveSupplierProductPayload,
-): Promise<void> {
+): Promise<SaveSupplierProductResult> {
   const imagePath = await resolveImagePathForUpload(
     accessToken,
     restaurantId,
@@ -127,8 +371,13 @@ export async function saveSupplierProduct(
     payload.image,
   );
   const description = payload.description.trim() || null;
-  const priceCents = priceCentsFromPayload(payload.price, payload.discountUsd);
-  const activeGroups = normalizeOptionGroups(payload.optionGroups).filter((g) => g.isActive);
+  const priceCents = basePriceCents(payload.price);
+  const priceUsd = payload.price.amount;
+  const discountUsd = Math.max(0, payload.discountUsd ?? 0);
+  const discountMode = payload.discountMode === 'percent' ? 'percent' : 'amount';
+  const allGroups = normalizeOptionGroups(payload.optionGroups);
+  const existingGroups = payload.existingOptionGroups ?? [];
+  const cachedPromotions = payload.catalogPromotions;
 
   if (payload.id) {
     const body: {
@@ -146,9 +395,38 @@ export async function saveSupplierProduct(
     if (imagePath !== undefined) {
       body.image_path = imagePath;
     }
-    await updateProduct(accessToken, restaurantId, payload.id, body);
-    await syncProductOptionGroups(accessToken, restaurantId, payload.id, activeGroups);
-    return;
+
+    const [updatedProduct, syncedGroups, catalogPromotions] = await Promise.all([
+      updateProduct(accessToken, restaurantId, payload.id, body),
+      syncProductOptionGroups(
+        accessToken,
+        restaurantId,
+        payload.id,
+        existingGroups,
+        allGroups,
+      ),
+      syncProductCatalogDiscount(
+        accessToken,
+        restaurantId,
+        payload.id,
+        payload.name,
+        priceUsd,
+        discountUsd,
+        discountMode,
+        payload.discountPercent,
+        cachedPromotions,
+      ),
+    ]);
+
+    return {
+      catalogPromotions,
+      product: buildSavedProductDraft(
+        updatedProduct,
+        syncedGroups,
+        catalogPromotions,
+        payload.image,
+      ),
+    };
   }
 
   const product = await createProduct(accessToken, restaurantId, {
@@ -159,14 +437,34 @@ export async function saveSupplierProduct(
     image_path: imagePath ?? null,
   });
 
-  for (const group of activeGroups) {
-    await createOptionGroup(
+  const [syncedGroups, catalogPromotions] = await Promise.all([
+    Promise.all(
+      allGroups.map((group, index) =>
+        createOptionGroup(
+          accessToken,
+          restaurantId,
+          product.id,
+          mapOptionGroupToCreate(group, index),
+        ).then(mapOptionGroupToDraft),
+      ),
+    ),
+    syncProductCatalogDiscount(
       accessToken,
       restaurantId,
       product.id,
-      mapOptionGroupToCreate(group),
-    );
-  }
+      payload.name,
+      priceUsd,
+      discountUsd,
+      discountMode,
+      payload.discountPercent,
+      cachedPromotions,
+    ),
+  ]);
+
+  return {
+    catalogPromotions,
+    product: buildSavedProductDraft(product, syncedGroups, catalogPromotions, payload.image),
+  };
 }
 
 export async function updateSupplierProductActive(

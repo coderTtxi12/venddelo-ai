@@ -1,3 +1,4 @@
+import { DEFAULT_CURRENCY } from '@/lib/currency';
 import { apiRequest } from './client';
 import type { Category, CursorPage, Product } from './types';
 
@@ -93,9 +94,9 @@ export function createProduct(
     token,
     body: {
       restaurant_id: restaurantId,
-      currency: 'USD',
-      approval_status: 'draft',
-      is_published: false,
+      currency: DEFAULT_CURRENCY,
+      approval_status: 'approved',
+      is_published: true,
       ...data,
     },
   });
@@ -129,6 +130,7 @@ export type OptionGroupCreateInput = {
   min_selections?: number;
   max_selections?: number | null;
   sort_index?: number;
+  is_active?: boolean;
   items: { label: string; price_delta_cents: number; sort_index?: number }[];
 };
 
@@ -138,11 +140,37 @@ export function createOptionGroup(
   productId: string,
   data: OptionGroupCreateInput,
 ) {
-  return apiRequest(`/restaurants/${restaurantId}/products/${productId}/option-groups`, {
-    method: 'POST',
-    token,
-    body: data,
-  });
+  return apiRequest<Product['option_groups'][number]>(
+    `/restaurants/${restaurantId}/products/${productId}/option-groups`,
+    {
+      method: 'POST',
+      token,
+      body: data,
+    },
+  );
+}
+
+export type OptionGroupUpdateInput = {
+  title?: string;
+  required?: boolean;
+  selection?: 'single' | 'multi';
+  min_selections?: number;
+  max_selections?: number | null;
+  sort_index?: number;
+  is_active?: boolean;
+};
+
+export function updateOptionGroup(
+  token: string,
+  restaurantId: string,
+  productId: string,
+  groupId: string,
+  data: OptionGroupUpdateInput,
+) {
+  return apiRequest<Product['option_groups'][number]>(
+    `/restaurants/${restaurantId}/products/${productId}/option-groups/${groupId}`,
+    { method: 'PATCH', token, body: data },
+  );
 }
 
 export function deleteOptionGroup(
@@ -153,6 +181,32 @@ export function deleteOptionGroup(
 ) {
   return apiRequest<void>(
     `/restaurants/${restaurantId}/products/${productId}/option-groups/${groupId}`,
+    { method: 'DELETE', token },
+  );
+}
+
+export function createOptionItem(
+  token: string,
+  restaurantId: string,
+  productId: string,
+  groupId: string,
+  data: { label: string; price_delta_cents: number; sort_index?: number },
+) {
+  return apiRequest<Product['option_groups'][number]['items'][number]>(
+    `/restaurants/${restaurantId}/products/${productId}/option-groups/${groupId}/items`,
+    { method: 'POST', token, body: data },
+  );
+}
+
+export function deleteOptionItem(
+  token: string,
+  restaurantId: string,
+  productId: string,
+  groupId: string,
+  itemId: string,
+) {
+  return apiRequest<void>(
+    `/restaurants/${restaurantId}/products/${productId}/option-groups/${groupId}/items/${itemId}`,
     { method: 'DELETE', token },
   );
 }

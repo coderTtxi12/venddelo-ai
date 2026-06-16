@@ -13,19 +13,22 @@ function imageFromPath(path: string | null) {
   return { previewUrl };
 }
 
-function mapOptionGroup(group: OptionGroup): OptionGroupDraft {
+export function mapOptionGroupToDraft(group: OptionGroup): OptionGroupDraft {
   return {
     id: group.id,
     title: group.title,
     required: group.required,
     selection: group.selection,
+    maxSelections: group.selection === 'single' ? 1 : group.max_selections,
     isActive: group.is_active,
-    items: group.items.map((item) => ({
-      id: item.id,
-      label: item.label,
-      priceDeltaUsd: item.price_delta_cents / 100,
-      isActive: item.is_active,
-    })),
+    items: [...group.items]
+      .sort((a, b) => a.sort_index - b.sort_index)
+      .map((item) => ({
+        id: item.id,
+        label: item.label,
+        priceDeltaUsd: item.price_delta_cents / 100,
+        isActive: item.is_active,
+      })),
   };
 }
 
@@ -41,16 +44,18 @@ export function mapCategoryToDraft(category: Category): CategoryDraft {
   };
 }
 
-export function mapProductToDraft(product: Product): ProductDraft {
+export function mapProductToDraft(product: Product, discountUsd = 0): ProductDraft {
   return {
     id: product.id,
     name: product.name,
     description: product.description ?? '',
-    price: { amount: product.price_cents / 100, currency: 'USD' },
-    discountUsd: 0,
+    price: { amount: product.price_cents / 100, currency: product.currency },
+    discountUsd,
     image: imageFromPath(product.image_path),
     categoryIds: product.category_ids,
-    optionGroups: product.option_groups.map(mapOptionGroup),
+    optionGroups: [...product.option_groups]
+      .sort((a, b) => a.sort_index - b.sort_index)
+      .map(mapOptionGroupToDraft),
     approvalStatus: product.approval_status as ApprovalStatus,
     isPublished: product.is_published,
     isActive: product.is_active,
