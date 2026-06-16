@@ -17,6 +17,7 @@ class CategoryUpdate(BaseModel):
     description: str | None = None
     image_path: str | None = None
     sort_index: int | None = None
+    is_active: bool | None = None
 
 
 class CategoryDTO(BaseModel):

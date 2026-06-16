@@ -66,6 +66,9 @@ class FakeMenuRepo(MenuRepository):
     def get_category(self, id: uuid.UUID) -> CategoryDTO | None:
         return self.categories.get(id)
 
+    def get_category_by_id(self, id: uuid.UUID) -> CategoryDTO | None:
+        return self.categories.get(id)
+
     def list_categories(self, restaurant_id, params):
         return CursorPage(items=[])
 

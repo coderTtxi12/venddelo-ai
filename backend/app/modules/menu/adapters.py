@@ -55,15 +55,16 @@ class SqlAlchemyMenuRepository(MenuRepository):
             return None
         return CategoryDTO.model_validate(obj)
 
+    def get_category_by_id(self, id: uuid.UUID) -> CategoryDTO | None:
+        obj = self._session.get(Category, id)
+        return CategoryDTO.model_validate(obj) if obj else None
+
     def list_categories(
         self, restaurant_id: uuid.UUID, params: PaginationParams
     ) -> CursorPage[CategoryDTO]:
         stmt = (
             select(Category)
-            .where(
-                Category.restaurant_id == restaurant_id,
-                Category.is_active.is_(True),
-            )
+            .where(Category.restaurant_id == restaurant_id)
             .order_by(Category.created_at, Category.id)
             .limit(params.limit + 1)
         )
@@ -82,9 +83,14 @@ class SqlAlchemyMenuRepository(MenuRepository):
 
     def update_category(self, id: uuid.UUID, data: CategoryUpdate) -> CategoryDTO | None:
         obj = self._session.get(Category, id)
-        if obj is None or not obj.is_active:
+        if obj is None:
             return None
-        for field, value in data.model_dump(exclude_unset=True).items():
+        updates = data.model_dump(exclude_unset=True)
+        if updates.get("is_active") is True:
+            obj.deleted_at = None
+        elif updates.get("is_active") is False:
+            obj.deleted_at = datetime.now(UTC)
+        for field, value in updates.items():
             setattr(obj, field, value)
         self._session.flush()
         return CategoryDTO.model_validate(obj)

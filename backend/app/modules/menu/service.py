@@ -62,7 +62,9 @@ class MenuService:
     def update_category(
         self, restaurant_id: uuid.UUID, category_id: uuid.UUID, data: CategoryUpdate
     ) -> CategoryDTO:
-        self.get_category(restaurant_id, category_id)
+        cat = self._repo.get_category_by_id(category_id)
+        if cat is None or cat.restaurant_id != restaurant_id:
+            raise NotFoundError("Category not found")
         dto = self._repo.update_category(category_id, data)
         if dto is None:
             raise NotFoundError("Category not found")
