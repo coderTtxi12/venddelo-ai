@@ -1,3 +1,5 @@
+import { listProducts } from '@/lib/api/menu';
+import { mapProductToDraft } from '@/lib/api/mappers';
 import type { LegacyDbClient, LegacyStorageClient } from '../legacyDb';
 import type {
   ImageDraft,
@@ -30,11 +32,23 @@ export type FetchSupplierProductsPageResult = {
 };
 
 export async function fetchSupplierProductsPage(
+  accessToken: string,
   _db: LegacyDbClient,
-  _supplierId: string,
-  _args: FetchSupplierProductsPageArgs,
+  restaurantId: string,
+  args: FetchSupplierProductsPageArgs,
 ): Promise<FetchSupplierProductsPageResult> {
-  return { items: [], cursor: null, hasMore: false };
+  const page = await listProducts(
+    accessToken,
+    restaurantId,
+    PRODUCTS_PAGE_SIZE,
+    args.cursor,
+  );
+
+  return {
+    items: page.items.map(mapProductToDraft),
+    cursor: page.next_cursor,
+    hasMore: page.has_more,
+  };
 }
 
 export type SaveSupplierProductPayload = {

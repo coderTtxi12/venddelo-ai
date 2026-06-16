@@ -253,7 +253,7 @@ function EmptyState({
 }
 
 export default function ProductsPage() {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, accessToken } = useAuth();
   const [activeTab, setActiveTab] = useState<'categories' | 'products'>('products');
 
   // supplierId is the supplier doc id in `suppliers/`
@@ -266,7 +266,7 @@ export default function ProductsPage() {
       setSupplierId(null);
       setSupplierIdError(null);
       const email = firebaseUser?.email ?? '';
-      const result = await resolveSupplierIdByEmail(db, email);
+      const result = await resolveSupplierIdByEmail(db, email, accessToken);
       if (cancelled) return;
       if ('error' in result) {
         setSupplierIdError(result.error);
@@ -278,7 +278,7 @@ export default function ProductsPage() {
     return () => {
       cancelled = true;
     };
-  }, [firebaseUser?.email]);
+  }, [firebaseUser?.email, accessToken]);
 
   // Categorías desde Firestore (paginadas)
   const [categories, setCategories] = useState<CategoryDraft[]>([]);
@@ -289,12 +289,12 @@ export default function ProductsPage() {
   const categoriesCursorRef = useRef<PageCursor>(null);
 
   async function loadCategoriesFirstPage() {
-    if (!supplierId) return;
+    if (!supplierId || !accessToken) return;
     setCategoriesLoading(true);
     setCategoriesError(null);
     categoriesCursorRef.current = null;
     try {
-      const result = await fetchSupplierCategoriesPage(db, supplierId, { cursor: null });
+      const result = await fetchSupplierCategoriesPage(accessToken, db, supplierId, { cursor: null });
       categoriesCursorRef.current = result.cursor;
       setCategoriesHasMore(result.hasMore);
       setCategories(result.items);
@@ -309,11 +309,11 @@ export default function ProductsPage() {
   }
 
   async function loadCategoriesMore() {
-    if (!supplierId || !categoriesHasMore || categoriesLoadingMore || !categoriesCursorRef.current) return;
+    if (!supplierId || !accessToken || !categoriesHasMore || categoriesLoadingMore || !categoriesCursorRef.current) return;
     setCategoriesLoadingMore(true);
     setCategoriesError(null);
     try {
-      const result = await fetchSupplierCategoriesPage(db, supplierId, {
+      const result = await fetchSupplierCategoriesPage(accessToken, db, supplierId, {
         cursor: categoriesCursorRef.current,
       });
       categoriesCursorRef.current = result.cursor;
@@ -336,12 +336,12 @@ export default function ProductsPage() {
   const productsCursorRef = useRef<PageCursor>(null);
 
   async function loadProductsFirstPage() {
-    if (!supplierId) return;
+    if (!supplierId || !accessToken) return;
     setProductsLoading(true);
     setProductsError(null);
     productsCursorRef.current = null;
     try {
-      const result = await fetchSupplierProductsPage(db, supplierId, { cursor: null });
+      const result = await fetchSupplierProductsPage(accessToken, db, supplierId, { cursor: null });
       productsCursorRef.current = result.cursor;
       setProductsHasMore(result.hasMore);
       setProducts(result.items);
@@ -356,11 +356,11 @@ export default function ProductsPage() {
   }
 
   async function loadProductsMore() {
-    if (!supplierId || !productsHasMore || productsLoadingMore || !productsCursorRef.current) return;
+    if (!supplierId || !accessToken || !productsHasMore || productsLoadingMore || !productsCursorRef.current) return;
     setProductsLoadingMore(true);
     setProductsError(null);
     try {
-      const result = await fetchSupplierProductsPage(db, supplierId, {
+      const result = await fetchSupplierProductsPage(accessToken, db, supplierId, {
         cursor: productsCursorRef.current,
       });
       productsCursorRef.current = result.cursor;
@@ -671,7 +671,7 @@ export default function ProductsPage() {
                         disabled={categoryActiveToggleId === c.id || !supplierId}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (!supplierId) return;
+                          if (!supplierId || !accessToken) return;
                           void (async () => {
                             setCategoryActiveError(null);
                             setCategoryActiveToggleId(c.id);
@@ -702,7 +702,7 @@ export default function ProductsPage() {
                         disabled={categoryActiveToggleId === c.id || !supplierId}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (!supplierId) return;
+                          if (!supplierId || !accessToken) return;
                           void (async () => {
                             setCategoryActiveError(null);
                             setCategoryActiveToggleId(c.id);
@@ -764,8 +764,10 @@ export default function ProductsPage() {
               supplierId={supplierId}
               supplierIdError={supplierIdError}
               onSave={async (payload) => {
-                if (!supplierId) throw new Error(supplierIdError ?? 'supplierId no disponible.');
-                await saveSupplierCategory(db, storage, supplierId, payload);
+                if (!supplierId || !accessToken) {
+                  throw new Error(supplierIdError ?? 'No hay sesión o restaurante disponible.');
+                }
+                await saveSupplierCategory(accessToken, db, storage, supplierId, payload);
                 await loadCategoriesFirstPage();
                 setCategoryDrawerOpen(false);
               }}
@@ -1118,7 +1120,7 @@ export default function ProductsPage() {
                                       }
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        if (!supplierId) return;
+                                        if (!supplierId || !accessToken) return;
                                         void (async () => {
                                           setProductReviewError(null);
                                           setProductReviewToggleId(p.id);
@@ -1166,7 +1168,7 @@ export default function ProductsPage() {
                                       }
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        if (!supplierId) return;
+                                        if (!supplierId || !accessToken) return;
                                         void (async () => {
                                           setProductReviewError(null);
                                           setProductReviewToggleId(p.id);
@@ -1216,7 +1218,7 @@ export default function ProductsPage() {
                                   }
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (!supplierId) return;
+                                    if (!supplierId || !accessToken) return;
                                     void (async () => {
                                       setProductActiveError(null);
                                       setProductActiveToggleId(p.id);
@@ -1249,7 +1251,7 @@ export default function ProductsPage() {
                                   }
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (!supplierId) return;
+                                    if (!supplierId || !accessToken) return;
                                     void (async () => {
                                       setProductActiveError(null);
                                       setProductActiveToggleId(p.id);

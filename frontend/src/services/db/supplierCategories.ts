@@ -1,3 +1,6 @@
+import { createCategory, listCategories, updateCategory } from '@/lib/api/menu';
+import { mapCategoryToDraft } from '@/lib/api/mappers';
+import { uploadRestaurantAsset } from '@/lib/storage/upload';
 import type { LegacyDbClient, LegacyStorageClient } from '../legacyDb';
 import type { CategoryDraft, ImageDraft } from './supplierCatalogTypes';
 import type { PageCursor } from './firestoreTypes';
@@ -19,11 +22,23 @@ export function mapCategoryDoc(_snap: unknown): CategoryDraft {
 }
 
 export async function fetchSupplierCategoriesPage(
+  accessToken: string,
   _db: LegacyDbClient,
-  _supplierId: string,
-  _args: FetchSupplierCategoriesPageArgs,
+  restaurantId: string,
+  args: FetchSupplierCategoriesPageArgs,
 ): Promise<FetchSupplierCategoriesPageResult> {
-  return { items: [], cursor: null, hasMore: false };
+  const page = await listCategories(
+    accessToken,
+    restaurantId,
+    CATEGORIES_PAGE_SIZE,
+    args.cursor,
+  );
+
+  return {
+    items: page.items.map(mapCategoryToDraft),
+    cursor: page.next_cursor,
+    hasMore: page.has_more,
+  };
 }
 
 export type SaveSupplierCategoryPayload = {
@@ -33,13 +48,52 @@ export type SaveSupplierCategoryPayload = {
   image: ImageDraft | null;
 };
 
+async function resolveImagePath(
+  restaurantId: string,
+  image: ImageDraft | null,
+): Promise<string | null | undefined> {
+  if (!image) return null;
+  if (image.file) {
+    return uploadRestaurantAsset(restaurantId, 'categories', image.file);
+  }
+  const url = image.previewUrl;
+  if (url && !url.startsWith('blob:') && !url.startsWith('data:')) {
+    return url;
+  }
+  return undefined;
+}
+
 export async function saveSupplierCategory(
+  accessToken: string,
   _db: LegacyDbClient,
   _storage: LegacyStorageClient,
-  _supplierId: string,
-  _payload: SaveSupplierCategoryPayload,
+  restaurantId: string,
+  payload: SaveSupplierCategoryPayload,
 ): Promise<void> {
-  throw new Error('Guardado de categorías pendiente de migración al API backend.');
+  const imagePath = await resolveImagePath(restaurantId, payload.image);
+  const description = payload.description.trim() || null;
+
+  if (payload.id) {
+    const body: {
+      name: string;
+      description: string | null;
+      image_path?: string | null;
+    } = {
+      name: payload.name,
+      description,
+    };
+    if (imagePath !== undefined) {
+      body.image_path = imagePath;
+    }
+    await updateCategory(accessToken, restaurantId, payload.id, body);
+    return;
+  }
+
+  await createCategory(accessToken, restaurantId, {
+    name: payload.name,
+    description,
+    image_path: imagePath ?? null,
+  });
 }
 
 export async function updateSupplierCategoryActive(

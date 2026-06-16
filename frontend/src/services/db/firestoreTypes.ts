@@ -1,2 +1,2 @@
-/** Sustituto de cursores de Firestore; la capa de datos se migrará al API backend. */
-export type PageCursor = null;
+/** Cursor de paginación del API backend (keyset). */
+export type PageCursor = string | null;

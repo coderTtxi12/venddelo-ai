@@ -1,17 +1,29 @@
+import { listRestaurants } from '@/lib/api/restaurants';
 import type { LegacyDbClient } from '../legacyDb';
 
 export type ResolveSupplierResult = { supplierId: string } | { error: string };
 
-const PENDING_BACKEND =
-  'Los datos de proveedor se migrarán al API backend (Firebase desactivado).';
-
 export async function resolveSupplierIdByEmail(
   _db: LegacyDbClient,
-  email: string,
+  _email: string,
+  accessToken: string | null,
 ): Promise<ResolveSupplierResult> {
-  const emailLower = email.trim().toLowerCase();
-  if (!emailLower) {
-    return { error: 'No se pudo detectar tu correo de sesión.' };
+  if (!accessToken) {
+    return { error: 'No hay sesión activa. Inicia sesión de nuevo.' };
   }
-  return { error: PENDING_BACKEND };
+
+  try {
+    const page = await listRestaurants(accessToken, 1);
+    const restaurant = page.items[0];
+    if (!restaurant) {
+      return {
+        error:
+          'No tienes ningún restaurante asociado. Crea uno desde el onboarding para ver productos y categorías.',
+      };
+    }
+    return { supplierId: restaurant.id };
+  } catch (error) {
+    console.error(error);
+    return { error: 'No se pudo cargar tu restaurante. Verifica que el backend esté en marcha.' };
+  }
 }
