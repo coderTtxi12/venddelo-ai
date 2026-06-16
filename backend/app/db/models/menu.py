@@ -65,7 +65,7 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     price_cents: Mapped[int] = mapped_column(Integer, nullable=False)
-    currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="USD")
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="MXN")
     image_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     approval_status: Mapped[str] = mapped_column(String, nullable=False, server_default="draft")
     is_published: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
@@ -74,7 +74,9 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
         secondary=product_categories, back_populates="products"
     )
     option_groups: Mapped[list["OptionGroup"]] = relationship(
-        back_populates="product", cascade="all, delete-orphan"
+        back_populates="product",
+        cascade="all, delete-orphan",
+        order_by="OptionGroup.sort_index, OptionGroup.created_at",
     )
 
     __table_args__ = (
@@ -105,7 +107,9 @@ class OptionGroup(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     product: Mapped["Product"] = relationship(back_populates="option_groups")
     items: Mapped[list["OptionItem"]] = relationship(
-        back_populates="option_group", cascade="all, delete-orphan"
+        back_populates="option_group",
+        cascade="all, delete-orphan",
+        order_by="OptionItem.sort_index, OptionItem.created_at",
     )
 
     __table_args__ = (

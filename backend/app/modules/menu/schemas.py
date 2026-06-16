@@ -57,6 +57,7 @@ class OptionGroupCreate(BaseModel):
     min_selections: int = 0
     max_selections: int | None = None
     sort_index: int = 0
+    is_active: bool = True
     items: list[OptionItemCreate] = []
 
 
@@ -67,6 +68,7 @@ class OptionGroupUpdate(BaseModel):
     min_selections: int | None = None
     max_selections: int | None = None
     sort_index: int | None = None
+    is_active: bool | None = None
 
 
 class OptionGroupDTO(BaseModel):
@@ -89,7 +91,7 @@ class ProductCreate(BaseModel):
     name: str
     description: str | None = None
     price_cents: int
-    currency: str = "USD"
+    currency: str = "MXN"
     image_path: str | None = None
     approval_status: str = "draft"
     is_published: bool = False
