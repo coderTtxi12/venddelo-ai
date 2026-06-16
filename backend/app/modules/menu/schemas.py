@@ -129,3 +129,8 @@ class FullMenuDTO(BaseModel):
     restaurant_id: uuid.UUID
     categories: list[CategoryDTO]
     products: list[ProductDTO]
+
+
+class AssetUploadDTO(BaseModel):
+    path: str
+    public_url: str

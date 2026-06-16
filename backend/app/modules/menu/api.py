@@ -1,13 +1,16 @@
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from pydantic import BaseModel
 
 from app.api.cache_helpers import invalidate_restaurant_menu_cache
 from app.api.deps import pagination_params, require_owned_restaurant
+from app.core.exceptions import ValidationError
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
+from app.infra.storage.factory import build_storage
 from app.modules.menu.schemas import (
+    AssetUploadDTO,
     CategoryCreate,
     CategoryDTO,
     CategoryUpdate,
@@ -32,6 +35,38 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> MenuService:
 
 class ApprovalBody(BaseModel):
     status: str
+
+
+MAX_ASSET_BYTES = 2 * 1024 * 1024
+ALLOWED_ASSET_FOLDERS = frozenset({"categories", "products", "logo"})
+
+
+@router.post(
+    "/restaurants/{restaurant_id}/assets",
+    response_model=AssetUploadDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+def upload_restaurant_asset(
+    folder: str = Query(...),
+    file: UploadFile = File(...),
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+) -> AssetUploadDTO:
+    if folder not in ALLOWED_ASSET_FOLDERS:
+        raise ValidationError(
+            f"folder must be one of: {', '.join(sorted(ALLOWED_ASSET_FOLDERS))}"
+        )
+    content = file.file.read()
+    content_type = file.content_type or "application/octet-stream"
+    if not content_type.startswith("image/"):
+        raise ValidationError("Only image uploads are allowed")
+    if len(content) > MAX_ASSET_BYTES:
+        raise ValidationError("Image exceeds 2 MB limit")
+    ext = content_type.split("/")[-1]
+    if ext == "jpeg":
+        ext = "jpg"
+    path = f"restaurants/{restaurant.id}/{folder}/{uuid.uuid4()}.{ext}"
+    stored = build_storage().upload(path, content, content_type)
+    return AssetUploadDTO(path=stored.path, public_url=stored.public_url)
 
 
 # Categories
