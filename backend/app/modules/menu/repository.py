@@ -50,6 +50,9 @@ class MenuRepository(ABC):
     def get_product(self, id: uuid.UUID) -> ProductDTO | None: ...
 
     @abstractmethod
+    def get_product_by_id(self, id: uuid.UUID) -> ProductDTO | None: ...
+
+    @abstractmethod
     def list_products(
         self,
         restaurant_id: uuid.UUID,

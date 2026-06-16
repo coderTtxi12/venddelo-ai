@@ -97,7 +97,9 @@ class MenuService:
     def update_product(
         self, restaurant_id: uuid.UUID, product_id: uuid.UUID, data: ProductUpdate
     ) -> ProductDTO:
-        self.get_product(restaurant_id, product_id)
+        prod = self._repo.get_product_by_id(product_id)
+        if prod is None or prod.restaurant_id != restaurant_id:
+            raise NotFoundError("Product not found")
         if data.category_ids is not None:
             if len(data.category_ids) < 1:
                 raise ValidationError("Product must belong to at least one category")

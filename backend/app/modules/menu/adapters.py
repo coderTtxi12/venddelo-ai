@@ -125,6 +125,10 @@ class SqlAlchemyMenuRepository(MenuRepository):
             return None
         return _product_to_dto(obj)
 
+    def get_product_by_id(self, id: uuid.UUID) -> ProductDTO | None:
+        obj = self._session.get(Product, id)
+        return _product_to_dto(obj) if obj else None
+
     def list_products(
         self,
         restaurant_id: uuid.UUID,
@@ -134,10 +138,7 @@ class SqlAlchemyMenuRepository(MenuRepository):
     ) -> CursorPage[ProductDTO]:
         stmt = (
             select(Product)
-            .where(
-                Product.restaurant_id == restaurant_id,
-                Product.is_active.is_(True),
-            )
+            .where(Product.restaurant_id == restaurant_id)
             .order_by(Product.created_at, Product.id)
             .limit(params.limit + 1)
         )
@@ -161,9 +162,13 @@ class SqlAlchemyMenuRepository(MenuRepository):
 
     def update_product(self, id: uuid.UUID, data: ProductUpdate) -> ProductDTO | None:
         obj = self._session.get(Product, id)
-        if obj is None or not obj.is_active:
+        if obj is None:
             return None
         values = data.model_dump(exclude_unset=True)
+        if values.get("is_active") is True:
+            obj.deleted_at = None
+        elif values.get("is_active") is False:
+            obj.deleted_at = datetime.now(UTC)
         category_ids = values.pop("category_ids", None)
         for field, value in values.items():
             setattr(obj, field, value)

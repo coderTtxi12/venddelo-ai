@@ -106,6 +106,7 @@ class ProductUpdate(BaseModel):
     image_path: str | None = None
     approval_status: str | None = None
     is_published: bool | None = None
+    is_active: bool | None = None
     category_ids: list[uuid.UUID] | None = None
 
 

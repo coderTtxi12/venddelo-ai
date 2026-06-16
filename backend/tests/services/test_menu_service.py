@@ -86,6 +86,9 @@ class FakeMenuRepo(MenuRepository):
     def get_product(self, id: uuid.UUID) -> ProductDTO | None:
         return self.products.get(id)
 
+    def get_product_by_id(self, id: uuid.UUID) -> ProductDTO | None:
+        return self.products.get(id)
+
     def list_products(self, restaurant_id, params, *, published_only=False):
         return CursorPage(items=[])
 
@@ -97,6 +100,8 @@ class FakeMenuRepo(MenuRepository):
             p = p.model_copy(update={"is_published": data.is_published})
         if data.approval_status is not None:
             p = p.model_copy(update={"approval_status": data.approval_status})
+        if data.is_active is not None:
+            p = p.model_copy(update={"is_active": data.is_active})
         self.products[id] = p
         return p
 
