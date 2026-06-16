@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import cast
 
 from redis import Redis
 
 from app.core.rate_limit import RateLimiterPort
+
+logger = logging.getLogger(__name__)
 
 
 class NullRateLimiterAdapter(RateLimiterPort):
@@ -30,7 +33,15 @@ class RedisRateLimiterAdapter(RateLimiterPort):
         pipe.incr(key)
         pipe.expire(key, window_seconds, nx=True)
         count, _ = cast(tuple[int, bool], pipe.execute())  # type: ignore[no-untyped-call]
-        return int(count) <= limit
+        allowed = int(count) <= limit
+        logger.debug(
+            "redis rate limit key=%s count=%s limit=%s allowed=%s",
+            key,
+            count,
+            limit,
+            allowed,
+        )
+        return allowed
 
     def remaining(self, key: str, *, limit: int, window_seconds: int) -> int:
         raw = cast(str | None, self._client.get(key))

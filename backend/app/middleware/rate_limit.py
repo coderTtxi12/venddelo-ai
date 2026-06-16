@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Awaitable, Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -7,6 +8,8 @@ from starlette.responses import JSONResponse, Response
 from app.core.config import get_settings
 from app.core.request_context import get_request_id
 from app.infra.redis.factory import build_rate_limiter
+
+logger = logging.getLogger(__name__)
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -27,6 +30,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             limit=settings.rate_limit_requests,
             window_seconds=settings.rate_limit_window_seconds,
         ):
+            logger.warning(
+                "rate limit exceeded client_ip=%s path=%s limit=%s window_seconds=%s",
+                client_ip,
+                request.url.path,
+                settings.rate_limit_requests,
+                settings.rate_limit_window_seconds,
+            )
             return JSONResponse(
                 status_code=429,
                 content={

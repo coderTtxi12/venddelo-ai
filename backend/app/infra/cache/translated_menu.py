@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from app.core.cache import CachePort
 from app.core.config import get_settings
 from app.core.exceptions import NotFoundError
@@ -8,6 +10,8 @@ from app.infra.cache.menu_cache import MenuCacheService, menu_cache_key
 from app.modules.menu.schemas import FullMenuDTO
 from app.modules.restaurants.repository import RestaurantRepository
 from app.modules.translations.service import TranslationService
+
+logger = logging.getLogger(__name__)
 
 
 class TranslatedMenuService:
@@ -40,9 +44,25 @@ class TranslatedMenuService:
         key = menu_cache_key(subdomain, effective_locale)
         cached = self._cache.get(key)
         if cached is not None:
+            logger.info(
+                "translated menu cache hit subdomain=%s locale=%s",
+                subdomain,
+                effective_locale,
+            )
             return FullMenuDTO.model_validate_json(cached)
 
+        logger.info(
+            "translated menu cache miss subdomain=%s locale=%s",
+            subdomain,
+            effective_locale,
+        )
         base = self._menu_cache.get_public_menu(subdomain, "default")
         translated = self._translation.translate_menu(base, restaurant, effective_locale)
         self._cache.set(key, translated.model_dump_json(), self._ttl)
+        logger.info(
+            "translated menu cache populated subdomain=%s locale=%s ttl_seconds=%s",
+            subdomain,
+            effective_locale,
+            self._ttl,
+        )
         return translated
