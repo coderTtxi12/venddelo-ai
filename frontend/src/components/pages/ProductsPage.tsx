@@ -4,10 +4,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './ProductsPage.module.css';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import Popover from '@mui/material/Popover';
 import { legacyDb as db, legacyStorage as storage } from '@/services/legacyDb';
 import { useAuth } from '@/hooks/useAuth';
+import { DEFAULT_CURRENCY, formatMoney } from '@/lib/currency';
+import { arrayMove } from '@/lib/arrayMove';
+import { attachDragOverlay } from '@/lib/dragOverlay';
+import type { Promotion } from '@/lib/api/types';
 import {
   CATEGORIES_PAGE_SIZE,
   fetchSupplierCategoriesPage,
@@ -19,11 +24,9 @@ import {
   updateSupplierCategoryActive,
   saveSupplierProduct,
   updateSupplierProductActive,
-  updateSupplierProductReviewStatus,
   type PageCursor,
 } from '@/services/db';
 import type {
-  ApprovalStatus,
   CategoryDraft,
   Id,
   ImageDraft,
@@ -41,7 +44,7 @@ function uid(prefix = 'id'): string {
 }
 
 function money(amount: number): MoneyUSD {
-  return { amount, currency: 'USD' };
+  return { amount, currency: DEFAULT_CURRENCY };
 }
 
 function clampNumber(n: number, min: number, max: number): number {
@@ -49,7 +52,7 @@ function clampNumber(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
-/** Descuento efectivo en USD; en modo % se calcula desde precio y porcentaje (solo UI). */
+/** Descuento efectivo en moneda; en modo % se calcula desde precio y porcentaje (solo UI). */
 function effectiveProductDiscountUsd(
   mode: 'usd' | 'percent',
   price: number,
@@ -65,38 +68,29 @@ function effectiveProductDiscountUsd(
   return clampNumber(raw, 0, priceNorm);
 }
 
-function formatUsd(n: number): string {
-  const v = Number.isFinite(n) ? n : 0;
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
-}
-
-function productLineTotalUsd(p: { price: { amount: number }; discountUsd: number }): number {
+function productLineTotal(p: { price: { amount: number }; discountUsd: number }): number {
   const raw = p.price.amount - p.discountUsd;
   return raw > 0 ? raw : 0;
 }
-
-const APPROVAL_FILTER_ORDER: ApprovalStatus[] = ['draft', 'pending_review', 'approved', 'rejected'];
 
 type CatalogVisibilityFilter = 'active' | 'inactive';
 
 type ColumnSort = 'none' | 'asc' | 'desc';
 
-function badgeForApproval(status: ApprovalStatus): { label: string; tone: 'neutral' | 'info' | 'success' | 'danger' } {
-  switch (status) {
-    case 'pending_review':
-      return { label: 'Pendiente de revisión', tone: 'info' };
-    case 'approved':
-      return { label: 'Aprobado', tone: 'success' };
-    case 'rejected':
-      return { label: 'Rechazado', tone: 'danger' };
-    case 'draft':
-    default:
-      return { label: 'Borrador', tone: 'neutral' };
-  }
-}
-
 function toggleInList<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((x) => x !== value) : [...list, value];
+}
+
+function reorderActiveGroups(groups: OptionGroupDraft[], from: number, to: number): OptionGroupDraft[] {
+  const active = groups.filter((g) => g.isActive);
+  const inactive = groups.filter((g) => !g.isActive);
+  return [...arrayMove(active, from, to), ...inactive];
+}
+
+function reorderActiveItems(group: OptionGroupDraft, from: number, to: number): OptionGroupDraft {
+  const active = group.items.filter((item) => item.isActive);
+  const inactive = group.items.filter((item) => !item.isActive);
+  return { ...group, items: [...arrayMove(active, from, to), ...inactive] };
 }
 
 /** none → asc; asc ↔ desc */
@@ -334,14 +328,22 @@ export default function ProductsPage() {
   const [productsError, setProductsError] = useState<string | null>(null);
   const [productsHasMore, setProductsHasMore] = useState(false);
   const productsCursorRef = useRef<PageCursor>(null);
+  const catalogPromotionsRef = useRef<Promotion[] | null>(null);
 
-  async function loadProductsFirstPage() {
+  async function loadProductsFirstPage(catalogPromotions?: Promotion[]) {
     if (!supplierId || !accessToken) return;
     setProductsLoading(true);
     setProductsError(null);
     productsCursorRef.current = null;
     try {
-      const result = await fetchSupplierProductsPage(accessToken, db, supplierId, { cursor: null });
+      const result = await fetchSupplierProductsPage(
+        accessToken,
+        db,
+        supplierId,
+        { cursor: null },
+        catalogPromotions ?? catalogPromotionsRef.current ?? undefined,
+      );
+      catalogPromotionsRef.current = result.catalogPromotions;
       productsCursorRef.current = result.cursor;
       setProductsHasMore(result.hasMore);
       setProducts(result.items);
@@ -360,9 +362,14 @@ export default function ProductsPage() {
     setProductsLoadingMore(true);
     setProductsError(null);
     try {
-      const result = await fetchSupplierProductsPage(accessToken, db, supplierId, {
-        cursor: productsCursorRef.current,
-      });
+      const result = await fetchSupplierProductsPage(
+        accessToken,
+        db,
+        supplierId,
+        { cursor: productsCursorRef.current },
+        catalogPromotionsRef.current ?? undefined,
+      );
+      catalogPromotionsRef.current = result.catalogPromotions;
       productsCursorRef.current = result.cursor;
       setProductsHasMore(result.hasMore);
       setProducts((prev) => [...prev, ...result.items]);
@@ -392,12 +399,9 @@ export default function ProductsPage() {
   const [productPriceSort, setProductPriceSort] = useState<ColumnSort>('none');
   const [productDiscountSort, setProductDiscountSort] = useState<ColumnSort>('none');
   const [productTotalSort, setProductTotalSort] = useState<ColumnSort>('none');
-  const [productApprovalFilter, setProductApprovalFilter] = useState<ApprovalStatus[]>([]);
   const [productCatalogFilter, setProductCatalogFilter] = useState<CatalogVisibilityFilter[]>([]);
   const [productActiveToggleId, setProductActiveToggleId] = useState<Id | null>(null);
   const [productActiveError, setProductActiveError] = useState<string | null>(null);
-  const [productReviewToggleId, setProductReviewToggleId] = useState<Id | null>(null);
-  const [productReviewError, setProductReviewError] = useState<string | null>(null);
   const [categoryActiveToggleId, setCategoryActiveToggleId] = useState<Id | null>(null);
   const [categoryActiveError, setCategoryActiveError] = useState<string | null>(null);
 
@@ -419,7 +423,6 @@ export default function ProductsPage() {
       productPriceSort !== 'none' ||
       productDiscountSort !== 'none' ||
       productTotalSort !== 'none' ||
-      productApprovalFilter.length > 0 ||
       productCatalogFilter.length > 0
     );
   }, [
@@ -428,7 +431,6 @@ export default function ProductsPage() {
     productPriceSort,
     productDiscountSort,
     productTotalSort,
-    productApprovalFilter,
     productCatalogFilter,
   ]);
 
@@ -440,9 +442,6 @@ export default function ProductsPage() {
     }
     if (productCategoryFilterIds.length > 0) {
       rows = rows.filter((p) => p.categoryIds.some((id) => productCategoryFilterIds.includes(id)));
-    }
-    if (productApprovalFilter.length > 0) {
-      rows = rows.filter((p) => productApprovalFilter.includes(p.approvalStatus));
     }
     if (productCatalogFilter.length > 0) {
       rows = rows.filter((p) => {
@@ -464,8 +463,8 @@ export default function ProductsPage() {
         if (d !== 0) return d;
       }
       if (productTotalSort !== 'none') {
-        const ta = productLineTotalUsd(a);
-        const tb = productLineTotalUsd(b);
+        const ta = productLineTotal(a);
+        const tb = productLineTotal(b);
         const d = productTotalSort === 'asc' ? ta - tb : tb - ta;
         if (d !== 0) return d;
       }
@@ -476,7 +475,6 @@ export default function ProductsPage() {
     products,
     productNameFilter,
     productCategoryFilterIds,
-    productApprovalFilter,
     productCatalogFilter,
     productPriceSort,
     productDiscountSort,
@@ -489,7 +487,6 @@ export default function ProductsPage() {
     setProductPriceSort('none');
     setProductDiscountSort('none');
     setProductTotalSort('none');
-    setProductApprovalFilter([]);
     setProductCatalogFilter([]);
   }
 
@@ -504,23 +501,17 @@ export default function ProductsPage() {
 
   const selectedStatusTags = useMemo(() => {
     const tags: { key: string; label: string }[] = [];
-    for (const st of productApprovalFilter) {
-      tags.push({ key: `a:${st}`, label: badgeForApproval(st).label });
-    }
     if (productCatalogFilter.includes('active')) tags.push({ key: 'c:active', label: 'Activo' });
     if (productCatalogFilter.includes('inactive')) tags.push({ key: 'c:inactive', label: 'Inactivo' });
     return tags;
-  }, [productApprovalFilter, productCatalogFilter]);
+  }, [productCatalogFilter]);
 
   function removeCategoryFilter(id: Id) {
     setProductCategoryFilterIds((prev) => prev.filter((x) => x !== id));
   }
 
   function removeStatusTag(key: string) {
-    if (key.startsWith('a:')) {
-      const st = key.slice(2) as ApprovalStatus;
-      setProductApprovalFilter((prev) => prev.filter((x) => x !== st));
-    } else if (key === 'c:active') {
+    if (key === 'c:active') {
       setProductCatalogFilter((prev) => prev.filter((x) => x !== 'active'));
     } else if (key === 'c:inactive') {
       setProductCatalogFilter((prev) => prev.filter((x) => x !== 'inactive'));
@@ -569,7 +560,7 @@ export default function ProductsPage() {
         <div>
           <h1 className={styles.title}>Productos</h1>
           <p className={styles.subtitle}>
-            Administra tus categorías y productos. Los productos requieren aprobación del administrador antes de ser visibles en el marketplace móvil.
+            Administra tus categorías y productos. Los productos activos se muestran en el marketplace móvil.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -819,7 +810,7 @@ export default function ProductsPage() {
               {products.length === 0 ? (
                 <EmptyState
                   title="Aún no hay productos"
-                  subtitle="Crea tu primer producto y envíalo para aprobación del administrador."
+                  subtitle="Crea tu primer producto para empezar a vender en el marketplace móvil."
                   action={
                     <button type="button" className={styles.primaryBtn} onClick={openNewProduct}>
                       + Nuevo producto
@@ -830,9 +821,6 @@ export default function ProductsPage() {
                 <div className={styles.tableWrap}>
                   {productActiveError ? (
                     <div className={styles.errorBanner} role="alert">{productActiveError}</div>
-                  ) : null}
-                  {productReviewError ? (
-                    <div className={styles.errorBanner} role="alert">{productReviewError}</div>
                   ) : null}
                   <table className={styles.table}>
                     <thead>
@@ -1062,7 +1050,6 @@ export default function ProductsPage() {
                         </tr>
                       ) : null}
                       {displayedProducts.map((p) => {
-                        const approval = badgeForApproval(p.approvalStatus);
                         const catNames = p.categoryIds
                           .map((id) => categories.find((c) => c.id === id)?.name)
                           .filter(Boolean) as string[];
@@ -1095,126 +1082,23 @@ export default function ProductsPage() {
                                 {catNames.length > 0 ? catNames.map((n) => <span key={n} className={styles.chip}>{n}</span>) : <span className={styles.muted}>—</span>}
                               </div>
                             </td>
-                            <td className={styles.nowrap}>{formatUsd(p.price.amount)}</td>
-                            <td className={styles.nowrap}>{p.discountUsd > 0 ? `-${formatUsd(p.discountUsd)}` : '—'}</td>
-                            <td className={styles.nowrap}>{formatUsd(productLineTotalUsd(p))}</td>
+                            <td className={styles.nowrap}>{formatMoney(p.price.amount, p.price.currency)}</td>
+                            <td className={styles.nowrap}>{p.discountUsd > 0 ? `-${formatMoney(p.discountUsd, p.price.currency)}` : '—'}</td>
+                            <td className={styles.nowrap}>{formatMoney(productLineTotal(p), p.price.currency)}</td>
                             <td>
-                              <div className={styles.statusCol}>
-                                <Pill tone={approval.tone}>{approval.label}</Pill>
-                                <Pill tone={p.isActive ? 'success' : 'neutral'}>
-                                  {p.isActive ? 'Activo' : 'Inactivo'}
-                                </Pill>
-                              </div>
+                              <Pill tone={p.isActive ? 'success' : 'neutral'}>
+                                {p.isActive ? 'Activo' : 'Inactivo'}
+                              </Pill>
                             </td>
                             <td className={styles.actionsCell}>
                               <div className={styles.productRowActions}>
-                                {p.approvalStatus === 'draft' || p.approvalStatus === 'pending_review' ? (
-                                  p.approvalStatus === 'draft' ? (
-                                    <button
-                                      type="button"
-                                      className={styles.reviewFlowPrimaryBtn}
-                                      disabled={
-                                        !supplierId ||
-                                        productReviewToggleId === p.id ||
-                                        productActiveToggleId === p.id
-                                      }
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (!supplierId || !accessToken) return;
-                                        void (async () => {
-                                          setProductReviewError(null);
-                                          setProductReviewToggleId(p.id);
-                                          try {
-                                            await updateSupplierProductReviewStatus(
-                                              db,
-                                              supplierId,
-                                              p.id,
-                                              'pending_review'
-                                            );
-                                            setProducts((prev) =>
-                                              prev.map((x) =>
-                                                x.id === p.id
-                                                  ? {
-                                                      ...x,
-                                                      approvalStatus: 'pending_review',
-                                                      updatedAt: nowIso(),
-                                                    }
-                                                  : x
-                                              )
-                                            );
-                                          } catch (err) {
-                                            console.error(err);
-                                            setProductReviewError(
-                                              'No se pudo enviar el producto a revisión. Intenta de nuevo.'
-                                            );
-                                          } finally {
-                                            setProductReviewToggleId(null);
-                                          }
-                                        })();
-                                      }}
-                                    >
-                                      {productReviewToggleId === p.id
-                                        ? 'Enviando…'
-                                        : 'Enviar a revisión'}
-                                    </button>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      className={styles.reviewFlowSecondaryBtn}
-                                      disabled={
-                                        !supplierId ||
-                                        productReviewToggleId === p.id ||
-                                        productActiveToggleId === p.id
-                                      }
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (!supplierId || !accessToken) return;
-                                        void (async () => {
-                                          setProductReviewError(null);
-                                          setProductReviewToggleId(p.id);
-                                          try {
-                                            await updateSupplierProductReviewStatus(
-                                              db,
-                                              supplierId,
-                                              p.id,
-                                              'draft'
-                                            );
-                                            setProducts((prev) =>
-                                              prev.map((x) =>
-                                                x.id === p.id
-                                                  ? {
-                                                      ...x,
-                                                      approvalStatus: 'draft',
-                                                      updatedAt: nowIso(),
-                                                    }
-                                                  : x
-                                              )
-                                            );
-                                          } catch (err) {
-                                            console.error(err);
-                                            setProductReviewError(
-                                              'No se pudo volver a borrador. Intenta de nuevo.'
-                                            );
-                                          } finally {
-                                            setProductReviewToggleId(null);
-                                          }
-                                        })();
-                                      }}
-                                    >
-                                      {productReviewToggleId === p.id
-                                        ? 'Guardando…'
-                                        : 'Volver a borrador'}
-                                    </button>
-                                  )
-                                ) : null}
                                 {p.isActive ? (
                                 <button
                                   type="button"
                                   className={styles.dangerGhostBtn}
                                   disabled={
                                     productActiveToggleId === p.id ||
-                                    !supplierId ||
-                                    productReviewToggleId === p.id
+                                    !supplierId
                                   }
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1246,8 +1130,7 @@ export default function ProductsPage() {
                                   className={styles.secondaryBtn}
                                   disabled={
                                     productActiveToggleId === p.id ||
-                                    !supplierId ||
-                                    productReviewToggleId === p.id
+                                    !supplierId
                                   }
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1335,27 +1218,7 @@ export default function ProductsPage() {
                     }}
                   >
                     <div className={styles.filterPopoverBody}>
-                      <p className={styles.filterPopoverTitle}>Aprobación</p>
-                      <div className={styles.filterPopoverChips} role="group" aria-label="Estado de aprobación">
-                        {APPROVAL_FILTER_ORDER.map((st) => {
-                          const on = productApprovalFilter.includes(st);
-                          return (
-                            <button
-                              key={st}
-                              type="button"
-                              role="checkbox"
-                              aria-checked={on}
-                              className={`${styles.filterChip} ${on ? styles.filterChipOn : ''}`}
-                              onClick={() =>
-                                setProductApprovalFilter((prev) => toggleInList(prev, st))
-                              }
-                            >
-                              {badgeForApproval(st).label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <p className={styles.filterPopoverTitle}>En catálogo</p>
+                      <p className={styles.filterPopoverTitle}>Estado</p>
                       <div className={styles.filterPopoverChips} role="group" aria-label="Activo o inactivo">
                         {(
                           [
@@ -1417,8 +1280,27 @@ export default function ProductsPage() {
                     if (!supplierId || !accessToken) {
                       throw new Error(supplierIdError ?? 'No hay sesión o restaurante disponible.');
                     }
-                    await saveSupplierProduct(accessToken, db, storage, supplierId, payload);
-                    await loadProductsFirstPage();
+                    const { catalogPromotions, product } = await saveSupplierProduct(
+                      accessToken,
+                      db,
+                      storage,
+                      supplierId,
+                      {
+                        ...payload,
+                        existingOptionGroups: productDraft?.optionGroups,
+                        catalogPromotions: catalogPromotionsRef.current ?? undefined,
+                      },
+                    );
+                    catalogPromotionsRef.current = catalogPromotions;
+                    setProducts((prev) => {
+                      const index = prev.findIndex((item) => item.id === product.id);
+                      if (index >= 0) {
+                        const next = [...prev];
+                        next[index] = product;
+                        return next;
+                      }
+                      return [product, ...prev];
+                    });
                     setProductDrawerOpen(false);
                   }}
                 />
@@ -1545,6 +1427,8 @@ function ProductEditor({
     description: string;
     price: MoneyUSD;
     discountUsd: number;
+    discountMode: 'usd' | 'percent';
+    discountPercent: number;
     image: ImageDraft | null;
     categoryIds: Id[];
     optionGroups: OptionGroupDraft[];
@@ -1561,6 +1445,8 @@ function ProductEditor({
   const [image, setImage] = useState<ImageDraft | null>(initial?.image ?? null);
   const [categoryIds, setCategoryIds] = useState<Id[]>(initial?.categoryIds ?? []);
   const [optionGroups, setOptionGroups] = useState<OptionGroupDraft[]>(initial?.optionGroups ?? []);
+  const [dragGroupId, setDragGroupId] = useState<string | null>(null);
+  const [dropGroupId, setDropGroupId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -1576,6 +1462,8 @@ function ProductEditor({
     setImage(initial?.image ?? null);
     setCategoryIds(initial?.categoryIds ?? []);
     setOptionGroups(initial?.optionGroups ?? []);
+    setDragGroupId(null);
+    setDropGroupId(null);
     setError(null);
     setSaving(false);
   }, [initial]);
@@ -1598,7 +1486,17 @@ function ProductEditor({
   const canSave =
     name.trim().length > 0 && categoryIds.length > 0 && price >= 0 && discountLeavesPositiveFinal;
 
-  const approval = initial ? badgeForApproval(initial.approvalStatus) : badgeForApproval('draft');
+  const activeOptionGroups = optionGroups.filter((g) => g.isActive);
+
+  const handleGroupDrop = (targetGroupId: string) => {
+    if (!dragGroupId || dragGroupId === targetGroupId) return;
+    const from = activeOptionGroups.findIndex((g) => g.id === dragGroupId);
+    const to = activeOptionGroups.findIndex((g) => g.id === targetGroupId);
+    if (from < 0 || to < 0) return;
+    setOptionGroups((prev) => reorderActiveGroups(prev, from, to));
+    setDragGroupId(null);
+    setDropGroupId(null);
+  };
 
   return (
     <form
@@ -1638,6 +1536,8 @@ function ProductEditor({
               description: description.trim(),
               price: money(priceNorm),
               discountUsd: discountNorm,
+              discountMode,
+              discountPercent,
               image,
               categoryIds,
               optionGroups: normalizeOptionGroups(optionGroups),
@@ -1655,17 +1555,23 @@ function ProductEditor({
         })();
       }}
     >
-      <div className={styles.banner}>
-        <div className={styles.bannerLeft}>
-          <div className={styles.bannerTitle}>Visibilidad</div>
-          <div className={styles.bannerText}>
-            Este producto será visible en el marketplace móvil solo después de la aprobación del administrador.
+      {initial ? (
+        <div className={styles.banner}>
+          <div className={styles.bannerLeft}>
+            <div className={styles.bannerTitle}>Visibilidad en catálogo</div>
+            <div className={styles.bannerText}>
+              {initial.isActive
+                ? 'Este producto está activo y visible en el marketplace móvil.'
+                : 'Este producto está inactivo y no se muestra en el marketplace móvil.'}
+            </div>
+          </div>
+          <div className={styles.bannerRight}>
+            <Pill tone={initial.isActive ? 'success' : 'neutral'}>
+              {initial.isActive ? 'Activo' : 'Inactivo'}
+            </Pill>
           </div>
         </div>
-        <div className={styles.bannerRight}>
-          <Pill tone={approval.tone}>{approval.label}</Pill>
-        </div>
-      </div>
+      ) : null}
 
       <div className={styles.formGrid2}>
         <div className={styles.field}>
@@ -1710,7 +1616,7 @@ function ProductEditor({
       </div>
 
       <div className={styles.pricingGrid}>
-        <label className={`${styles.label} ${styles.pricingL1}`}>Precio (USD)</label>
+        <label className={`${styles.label} ${styles.pricingL1}`}>Precio (MXN)</label>
         <div className={styles.pricingL2}>
           <div className={styles.discountFieldTop}>
             <label className={styles.label} htmlFor="product-discount-input">
@@ -1792,7 +1698,7 @@ function ProductEditor({
             </div>
           ) : (
             <div className={`${styles.helpText} ${styles.pricingHelpLine}`}>
-              Equivale aprox. a <strong>{formatUsd(discountUsdEffective)}</strong> de descuento.
+              Equivale aprox. a <strong>{formatMoney(discountUsdEffective)}</strong> de descuento.
             </div>
           )}
           {priceNum > 0 && !discountLeavesPositiveFinal ? (
@@ -1802,7 +1708,7 @@ function ProductEditor({
           ) : null}
         </div>
         <div className={`${styles.readonlyBox} ${styles.pricingI3}`}>
-          {formatUsd(Math.max(0, Number(price || 0) - discountUsdEffective))}
+          {formatMoney(Math.max(0, Number(price || 0) - discountUsdEffective))}
         </div>
       </div>
 
@@ -1820,7 +1726,7 @@ function ProductEditor({
         <div>
           <h3 className={styles.h3}>Opciones</h3>
           <p className={styles.muted}>
-            Crea grupos obligatorios de una sola opción y complementos opcionales de varias selecciones. Los ítems pueden tener costo extra.
+            Crea grupos de una o varias opciones, obligatorios u opcionales. Puedes limitar cuántas opciones elige el cliente. Los ítems pueden tener costo extra.
           </p>
         </div>
         <button
@@ -1834,6 +1740,7 @@ function ProductEditor({
                 title: 'Nuevo grupo de opciones',
                 required: false,
                 selection: 'multi',
+                maxSelections: null,
                 isActive: true,
                 items: [{ id: uid('oi'), label: 'Nueva opción', priceDeltaUsd: 0, isActive: true }],
               },
@@ -1844,24 +1751,70 @@ function ProductEditor({
         </button>
       </div>
 
-      {optionGroups.filter((g) => g.isActive).length === 0 ? (
+      {activeOptionGroups.length === 0 ? (
         <div className={styles.miniEmpty}>
           Aún no hay grupos de opciones. Agrega uno si tu producto tiene variantes o complementos.
         </div>
       ) : (
         <div className={styles.optionGroups}>
-          {optionGroups
-            .filter((g) => g.isActive)
-            .map((g) => (
+          {activeOptionGroups.map((g) => (
+            <div
+              key={g.id}
+              className={`${styles.optionGroupSortable} ${
+                dragGroupId === g.id ? styles.optionGroupDragging : ''
+              } ${dropGroupId === g.id && dragGroupId !== g.id ? styles.optionGroupDropTarget : ''}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (dragGroupId && dragGroupId !== g.id) {
+                  setDropGroupId(g.id);
+                }
+              }}
+              onDragLeave={() => {
+                if (dropGroupId === g.id) setDropGroupId(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleGroupDrop(g.id);
+              }}
+            >
+              <button
+                type="button"
+                className={styles.dragHandle}
+                draggable
+                aria-label={`Reordenar grupo ${g.title || 'sin nombre'}`}
+                title="Arrastrar para reordenar"
+                onDragStart={(e) => {
+                  const container = (e.currentTarget as HTMLElement).closest(
+                    `.${styles.optionGroupSortable}`,
+                  );
+                  if (container instanceof HTMLElement) {
+                    attachDragOverlay(e, container, {
+                      offsetX: 24,
+                      offsetY: 28,
+                      overlayClassName: styles.dragOverlayClone,
+                      bodyDraggingClassName: styles.bodyDragging,
+                    });
+                  }
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', g.id);
+                  setDragGroupId(g.id);
+                }}
+                onDragEnd={() => {
+                  setDragGroupId(null);
+                  setDropGroupId(null);
+                }}
+              >
+                <DragIndicatorIcon sx={{ fontSize: 20 }} aria-hidden />
+              </button>
               <OptionGroupEditor
-                key={g.id}
                 group={g}
                 onChange={(next) =>
                   setOptionGroups((prev) => prev.map((x) => (x.id === g.id ? next : x)))
                 }
                 onDisable={() => setOptionGroups((prev) => prev.map((x) => (x.id === g.id ? { ...x, isActive: false } : x)))}
               />
-            ))}
+            </div>
+          ))}
         </div>
       )}
 
@@ -1882,7 +1835,11 @@ function ProductEditor({
                     <div className={styles.disabledName}>{g.title || 'Grupo sin nombre'}</div>
                     <div className={styles.disabledSub}>
                       {g.required ? 'Obligatorio' : 'Opcional'} ·{' '}
-                      {g.selection === 'single' ? 'Una opción' : 'Varias opciones'} ·{' '}
+                      {g.selection === 'single'
+                        ? 'Una opción'
+                        : g.maxSelections != null
+                          ? `Varias opciones (máx. ${g.maxSelections})`
+                          : 'Varias opciones'} ·{' '}
                       {g.items.filter((i) => i.isActive).length} ítems
                     </div>
                   </div>
@@ -1917,6 +1874,27 @@ function ProductEditor({
   );
 }
 
+function optionGroupMobileSummary(group: OptionGroupDraft, activeItemCount: number): string {
+  const requirement = group.required ? 'debe elegir' : 'puede omitir';
+  if (group.selection === 'single') {
+    return `En app móvil: ${requirement} • elige 1`;
+  }
+  const max = group.maxSelections;
+  if (group.required) {
+    if (max != null) {
+      return `En app móvil: ${requirement} • elige entre 1 y ${max}`;
+    }
+    return `En app móvil: ${requirement} • elige al menos 1`;
+  }
+  if (max != null) {
+    return `En app móvil: ${requirement} • elige hasta ${max}`;
+  }
+  if (activeItemCount > 0) {
+    return `En app móvil: ${requirement} • elige ninguno o varios (máx. ${activeItemCount})`;
+  }
+  return `En app móvil: ${requirement} • elige ninguno o varios`;
+}
+
 function OptionGroupEditor({
   group,
   onChange,
@@ -1927,6 +1905,20 @@ function OptionGroupEditor({
   onDisable: () => void;
 }) {
   const activeItems = group.items.filter((i) => i.isActive);
+  const maxSelectable = Math.max(1, activeItems.length);
+  const [dragItemId, setDragItemId] = useState<string | null>(null);
+  const [dropItemId, setDropItemId] = useState<string | null>(null);
+
+  const handleItemDrop = (targetItemId: string) => {
+    if (!dragItemId || dragItemId === targetItemId) return;
+    const from = activeItems.findIndex((item) => item.id === dragItemId);
+    const to = activeItems.findIndex((item) => item.id === targetItemId);
+    if (from < 0 || to < 0) return;
+    onChange(reorderActiveItems(group, from, to));
+    setDragItemId(null);
+    setDropItemId(null);
+  };
+
   return (
     <div className={styles.optionGroupCard}>
       <div className={styles.optionGroupHeader}>
@@ -1942,12 +1934,7 @@ function OptionGroupEditor({
               <input
                 type="checkbox"
                 checked={group.required}
-                onChange={(e) => {
-                  const required = e.target.checked;
-                  // Regla de UX: si es obligatorio, debe ser "Una opción" (no múltiples).
-                  const selection = required ? 'single' : group.selection;
-                  onChange({ ...group, required, selection });
-                }}
+                onChange={(e) => onChange({ ...group, required: e.target.checked })}
               />
               <span>Obligatorio</span>
             </label>
@@ -1955,20 +1942,48 @@ function OptionGroupEditor({
               <button
                 type="button"
                 className={`${styles.segmentBtn} ${group.selection === 'single' ? styles.segmentBtnActive : ''}`}
-                onClick={() => onChange({ ...group, selection: 'single' })}
+                onClick={() => onChange({ ...group, selection: 'single', maxSelections: 1 })}
               >
                 Una opción
               </button>
               <button
                 type="button"
                 className={`${styles.segmentBtn} ${group.selection === 'multi' ? styles.segmentBtnActive : ''}`}
-                onClick={() => onChange({ ...group, selection: 'multi' })}
-                disabled={group.required}
-                title={group.required ? 'Si es obligatorio, solo puede ser una opción.' : undefined}
+                onClick={() =>
+                  onChange({
+                    ...group,
+                    selection: 'multi',
+                    maxSelections: group.selection === 'multi' ? group.maxSelections : null,
+                  })
+                }
               >
                 Varias opciones
               </button>
             </div>
+            {group.selection === 'multi' ? (
+              <label className={styles.maxSelectionsField}>
+                <span>Máx. a elegir</span>
+                <input
+                  className={styles.input}
+                  type="number"
+                  min={1}
+                  max={maxSelectable}
+                  step={1}
+                  value={group.maxSelections ?? ''}
+                  placeholder="Sin límite"
+                  onChange={(e) => {
+                    const raw = e.target.value.trim();
+                    if (!raw) {
+                      onChange({ ...group, maxSelections: null });
+                      return;
+                    }
+                    const nextMax = clampNumber(Math.round(Number(raw)), 1, maxSelectable);
+                    onChange({ ...group, maxSelections: nextMax });
+                  }}
+                  aria-label="Cantidad máxima de opciones que puede elegir el cliente"
+                />
+              </label>
+            ) : null}
           </div>
         </div>
         <div className={styles.optionGroupRight}>
@@ -1998,7 +2013,52 @@ function OptionGroupEditor({
       ) : (
         <div className={styles.optionItems}>
           {activeItems.map((it) => (
-            <div key={it.id} className={styles.optionItemRow}>
+            <div
+              key={it.id}
+              className={`${styles.optionItemRow} ${
+                dragItemId === it.id ? styles.optionItemDragging : ''
+              } ${dropItemId === it.id && dragItemId !== it.id ? styles.optionItemDropTarget : ''}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (dragItemId && dragItemId !== it.id) {
+                  setDropItemId(it.id);
+                }
+              }}
+              onDragLeave={() => {
+                if (dropItemId === it.id) setDropItemId(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleItemDrop(it.id);
+              }}
+            >
+              <button
+                type="button"
+                className={styles.dragHandle}
+                draggable
+                aria-label={`Reordenar opción ${it.label || 'sin nombre'}`}
+                title="Arrastrar para reordenar"
+                onDragStart={(e) => {
+                  const row = (e.currentTarget as HTMLElement).closest(`.${styles.optionItemRow}`);
+                  if (row instanceof HTMLElement) {
+                    attachDragOverlay(e, row, {
+                      offsetX: 18,
+                      offsetY: 20,
+                      overlayClassName: styles.dragOverlayClone,
+                      bodyDraggingClassName: styles.bodyDragging,
+                    });
+                  }
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', it.id);
+                  setDragItemId(it.id);
+                }}
+                onDragEnd={() => {
+                  setDragItemId(null);
+                  setDropItemId(null);
+                }}
+              >
+                <DragIndicatorIcon sx={{ fontSize: 18 }} aria-hidden />
+              </button>
               <input
                 className={styles.input}
                 value={it.label}
@@ -2009,7 +2069,7 @@ function OptionGroupEditor({
                 placeholder="Nombre de la opción"
               />
               <div className={styles.priceDelta}>
-                <span className={styles.deltaPrefix}>+ USD</span>
+                <span className={styles.deltaPrefix}>+ MXN</span>
                 <input
                   className={styles.input}
                   type="number"
@@ -2021,7 +2081,7 @@ function OptionGroupEditor({
                     const nextItems = group.items.map((x) => (x.id === it.id ? { ...x, priceDeltaUsd: v } : x));
                     onChange({ ...group, items: nextItems });
                   }}
-                  aria-label="Costo extra en USD"
+                  aria-label="Costo extra en MXN"
                 />
               </div>
               <button
@@ -2040,7 +2100,7 @@ function OptionGroupEditor({
 
       <div className={styles.optionGroupFooter}>
         <span className={styles.muted}>
-          En app móvil: {group.required ? 'debe elegir' : 'puede omitir'} • {group.selection === 'single' ? 'elige 1' : 'elige ninguno o varios'}
+          {optionGroupMobileSummary(group, activeItems.length)}
         </span>
       </div>
     </div>
