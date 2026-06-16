@@ -5,10 +5,12 @@ import type {
   OptionGroupDraft,
   ProductDraft,
 } from '@/services/db/supplierCatalogTypes';
+import { storagePublicUrl } from '@/lib/storage/publicUrl';
 
 function imageFromPath(path: string | null) {
-  if (!path) return null;
-  return { previewUrl: path };
+  const previewUrl = storagePublicUrl(path);
+  if (!previewUrl) return null;
+  return { previewUrl };
 }
 
 function mapOptionGroup(group: OptionGroup): OptionGroupDraft {

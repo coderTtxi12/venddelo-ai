@@ -1,24 +1,26 @@
-import { createClient } from '@/lib/supabase/client';
+import { apiRequest } from '@/lib/api/client';
+import { prepareImageForUpload } from '@/lib/image/convertToWebp';
 
-const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ?? 'assets';
+export type AssetUpload = {
+  path: string;
+  public_url: string;
+};
 
 export async function uploadRestaurantAsset(
+  token: string,
   restaurantId: string,
   folder: string,
   file: File,
 ): Promise<string> {
-  const supabase = createClient();
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-  const path = `restaurants/${restaurantId}/${folder}/${crypto.randomUUID()}.${ext}`;
+  const optimized = await prepareImageForUpload(file);
 
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-    upsert: true,
-    contentType: file.type || undefined,
-  });
+  const form = new FormData();
+  form.append('file', optimized);
 
-  if (error) {
-    throw new Error(`No se pudo subir la imagen: ${error.message}`);
-  }
+  const result = await apiRequest<AssetUpload>(
+    `/restaurants/${restaurantId}/assets?folder=${encodeURIComponent(folder)}`,
+    { method: 'POST', token, body: form },
+  );
 
-  return path;
+  return result.path;
 }

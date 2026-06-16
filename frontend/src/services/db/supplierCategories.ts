@@ -1,6 +1,7 @@
 import { createCategory, listCategories, updateCategory } from '@/lib/api/menu';
 import { mapCategoryToDraft } from '@/lib/api/mappers';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
+import { storagePathFromUrl } from '@/lib/storage/publicUrl';
 import type { LegacyDbClient, LegacyStorageClient } from '../legacyDb';
 import type { CategoryDraft, ImageDraft } from './supplierCatalogTypes';
 import type { PageCursor } from './firestoreTypes';
@@ -49,16 +50,17 @@ export type SaveSupplierCategoryPayload = {
 };
 
 async function resolveImagePath(
+  accessToken: string,
   restaurantId: string,
   image: ImageDraft | null,
 ): Promise<string | null | undefined> {
   if (!image) return null;
   if (image.file) {
-    return uploadRestaurantAsset(restaurantId, 'categories', image.file);
+    return uploadRestaurantAsset(accessToken, restaurantId, 'categories', image.file);
   }
   const url = image.previewUrl;
   if (url && !url.startsWith('blob:') && !url.startsWith('data:')) {
-    return url;
+    return storagePathFromUrl(url);
   }
   return undefined;
 }
@@ -70,7 +72,7 @@ export async function saveSupplierCategory(
   restaurantId: string,
   payload: SaveSupplierCategoryPayload,
 ): Promise<void> {
-  const imagePath = await resolveImagePath(restaurantId, payload.image);
+  const imagePath = await resolveImagePath(accessToken, restaurantId, payload.image);
   const description = payload.description.trim() || null;
 
   if (payload.id) {
