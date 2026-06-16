@@ -1,7 +1,6 @@
 import { createCategory, listCategories, updateCategory } from '@/lib/api/menu';
 import { mapCategoryToDraft } from '@/lib/api/mappers';
-import { uploadRestaurantAsset } from '@/lib/storage/upload';
-import { storagePathFromUrl } from '@/lib/storage/publicUrl';
+import { resolveImagePathForUpload } from '@/lib/storage/resolveImagePath';
 import type { LegacyDbClient, LegacyStorageClient } from '../legacyDb';
 import type { CategoryDraft, ImageDraft } from './supplierCatalogTypes';
 import type { PageCursor } from './firestoreTypes';
@@ -54,15 +53,7 @@ async function resolveImagePath(
   restaurantId: string,
   image: ImageDraft | null,
 ): Promise<string | null | undefined> {
-  if (!image) return null;
-  if (image.file) {
-    return uploadRestaurantAsset(accessToken, restaurantId, 'categories', image.file);
-  }
-  const url = image.previewUrl;
-  if (url && !url.startsWith('blob:') && !url.startsWith('data:')) {
-    return storagePathFromUrl(url);
-  }
-  return undefined;
+  return resolveImagePathForUpload(accessToken, restaurantId, 'categories', image);
 }
 
 export async function saveSupplierCategory(
