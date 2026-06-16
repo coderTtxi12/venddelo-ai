@@ -114,6 +114,7 @@ export function updateProduct(
     image_path?: string | null;
     approval_status?: string;
     is_published?: boolean;
+    is_active?: boolean;
     category_ids?: string[];
   },
 ) {

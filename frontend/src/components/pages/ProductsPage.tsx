@@ -10,6 +10,10 @@ import Popover from '@mui/material/Popover';
 import { legacyDb as db, legacyStorage as storage } from '@/services/legacyDb';
 import { useAuth } from '@/hooks/useAuth';
 import { DEFAULT_CURRENCY, formatMoney } from '@/lib/currency';
+import {
+  cloneOptionGroupForProduct,
+  listCopyableOptionGroups,
+} from '@/lib/menu/copyableOptionGroups';
 import { arrayMove } from '@/lib/arrayMove';
 import { attachDragOverlay } from '@/lib/dragOverlay';
 import type { Promotion } from '@/lib/api/types';
@@ -1107,7 +1111,7 @@ export default function ProductsPage() {
                                       setProductActiveError(null);
                                       setProductActiveToggleId(p.id);
                                       try {
-                                        await updateSupplierProductActive(db, supplierId, p.id, false);
+                                        await updateSupplierProductActive(accessToken, db, supplierId, p.id, false);
                                         setProducts((prev) =>
                                           prev.map((x) =>
                                             x.id === p.id ? { ...x, isActive: false, updatedAt: nowIso() } : x
@@ -1139,7 +1143,7 @@ export default function ProductsPage() {
                                       setProductActiveError(null);
                                       setProductActiveToggleId(p.id);
                                       try {
-                                        await updateSupplierProductActive(db, supplierId, p.id, true);
+                                        await updateSupplierProductActive(accessToken, db, supplierId, p.id, true);
                                         setProducts((prev) =>
                                           prev.map((x) =>
                                             x.id === p.id ? { ...x, isActive: true, updatedAt: nowIso() } : x
@@ -1273,6 +1277,7 @@ export default function ProductsPage() {
                 <ProductEditor
                   initial={productDraft}
                   categories={activeCategories}
+                  restaurantProducts={products}
                   onCancel={() => setProductDrawerOpen(false)}
                   supplierId={supplierId}
                   supplierIdError={supplierIdError}
@@ -1413,6 +1418,7 @@ function CategoryEditor({
 function ProductEditor({
   initial,
   categories,
+  restaurantProducts,
   onCancel,
   onSave,
   supplierId,
@@ -1420,6 +1426,7 @@ function ProductEditor({
 }: {
   initial: ProductDraft | null;
   categories: CategoryDraft[];
+  restaurantProducts: ProductDraft[];
   onCancel: () => void;
   onSave: (payload: {
     id?: Id;
@@ -1487,6 +1494,16 @@ function ProductEditor({
     name.trim().length > 0 && categoryIds.length > 0 && price >= 0 && discountLeavesPositiveFinal;
 
   const activeOptionGroups = optionGroups.filter((g) => g.isActive);
+
+  const copyableOptionGroups = useMemo(
+    () =>
+      listCopyableOptionGroups(
+        restaurantProducts,
+        initial?.id ?? null,
+        optionGroups,
+      ),
+    [restaurantProducts, initial?.id, optionGroups],
+  );
 
   const handleGroupDrop = (targetGroupId: string) => {
     if (!dragGroupId || dragGroupId === targetGroupId) return;
@@ -1750,6 +1767,36 @@ function ProductEditor({
           + Agregar grupo
         </button>
       </div>
+
+      {copyableOptionGroups.length > 0 ? (
+        <div className={styles.copyGroupBar}>
+          <p className={styles.copyGroupBarText}>
+            Reutiliza un grupo activo de otro producto del restaurante.
+          </p>
+          <select
+              className={styles.copyGroupSelect}
+              aria-label="Copiar grupo existente de otro producto"
+              value=""
+              onChange={(e) => {
+                const key = e.target.value;
+                if (!key) return;
+                const entry = copyableOptionGroups.find((item) => item.key === key);
+                if (!entry) return;
+                setOptionGroups((prev) => [
+                  ...prev,
+                  cloneOptionGroupForProduct(entry.group, uid),
+                ]);
+              }}
+            >
+              <option value="">Elegir grupo para copiar…</option>
+              {copyableOptionGroups.map((entry) => (
+                <option key={entry.key} value={entry.key}>
+                  {entry.group.title} · {entry.sourceProductName}
+                </option>
+              ))}
+            </select>
+        </div>
+      ) : null}
 
       {activeOptionGroups.length === 0 ? (
         <div className={styles.miniEmpty}>

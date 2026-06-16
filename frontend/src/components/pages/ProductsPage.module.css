@@ -1141,6 +1141,39 @@
    justify-content: space-between;
    gap: 0.75rem;
  }
+
+ .copyGroupBar {
+   display: flex;
+   flex-wrap: wrap;
+   align-items: center;
+   justify-content: space-between;
+   gap: 0.75rem;
+   margin-bottom: 0.85rem;
+   padding: 0.75rem 0.9rem;
+   border: 1px solid var(--color-border);
+   border-radius: 14px;
+   background: rgba(79, 70, 229, 0.04);
+ }
+
+ .copyGroupBarText {
+   margin: 0;
+   flex: 1 1 220px;
+   font-size: 0.82rem;
+   color: var(--color-text-secondary);
+   font-weight: 600;
+ }
+
+ .copyGroupSelect {
+   flex: 1 1 240px;
+   max-width: 360px;
+   border: 1px solid var(--color-border);
+   background: var(--color-surface);
+   border-radius: 12px;
+   padding: 0.55rem 0.75rem;
+   color: var(--color-text);
+   font-weight: 700;
+   font-size: 0.82rem;
+ }
  
  .miniEmpty {
    border: 1px dashed var(--color-border);

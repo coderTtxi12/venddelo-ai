@@ -468,12 +468,13 @@ export async function saveSupplierProduct(
 }
 
 export async function updateSupplierProductActive(
+  accessToken: string,
   _db: LegacyDbClient,
-  _supplierId: string,
-  _productId: string,
-  _isActive: boolean,
+  restaurantId: string,
+  productId: string,
+  isActive: boolean,
 ): Promise<void> {
-  throw new Error('Actualización de productos pendiente de migración al API backend.');
+  await updateProduct(accessToken, restaurantId, productId, { is_active: isActive });
 }
 
 export async function updateSupplierProductReviewStatus(
