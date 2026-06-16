@@ -90,3 +90,21 @@ export type Product = {
   category_ids: string[];
   option_groups: OptionGroup[];
 };
+
+export type Promotion = {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  type: 'percent' | 'amount' | 'combo' | '2x1';
+  scope: 'product' | 'category' | 'order';
+  percent: number | null;
+  amount_cents: number | null;
+  min_order_cents: number | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  product_ids: string[];
+  category_ids: string[];
+};
