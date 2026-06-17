@@ -7,7 +7,7 @@ export const RESTAURANT_SERVICE_LABELS: Record<RestaurantServiceType, string> = 
   delivery: 'Entrega a domicilio',
 };
 
-export const RESTAURANT_SERVICE_ORDER: RestaurantServiceType[] = ['takeout', 'delivery'];
+export const RESTAURANT_SERVICE_ORDER: RestaurantServiceType[] = ['delivery', 'takeout'];
 
 function isServiceType(value: string): value is RestaurantServiceType {
   return value === 'takeout' || value === 'delivery';
