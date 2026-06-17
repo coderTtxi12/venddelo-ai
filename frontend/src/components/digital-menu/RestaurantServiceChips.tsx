@@ -13,13 +13,17 @@ const SERVICE_ICONS: Record<RestaurantServiceType, typeof StorefrontOutlinedIcon
 
 type RestaurantServiceChipsProps = {
   services: RestaurantServiceType[];
+  className?: string;
 };
 
-export function RestaurantServiceChips({ services }: RestaurantServiceChipsProps) {
+export function RestaurantServiceChips({ services, className }: RestaurantServiceChipsProps) {
   if (services.length === 0) return null;
 
   return (
-    <ul className={styles.serviceList} aria-label="Servicios disponibles">
+    <ul
+      className={[styles.serviceList, className].filter(Boolean).join(' ')}
+      aria-label="Servicios disponibles"
+    >
       {services.map((type) => {
         const Icon = SERVICE_ICONS[type];
         return (
