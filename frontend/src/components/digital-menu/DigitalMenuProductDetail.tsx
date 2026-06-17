@@ -18,6 +18,7 @@ import {
   reorderActiveOptionGroups,
   reorderActiveOptionItems,
 } from './optionGroupReorder';
+import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import {
   canAddProductToCart,
   computeLineTotal,
@@ -28,11 +29,20 @@ import {
   toggleOptionSelection,
   type OptionSelections,
 } from './productOptionSelection';
-import pageStyles from '../pages/DigitalMenuPage.module.css';
 import styles from './DigitalMenuProductDetail.module.css';
+import {
+  DIGITAL_MENU_COVER_HEIGHT_PX,
+  DIGITAL_MENU_PINNED_BAR_HEIGHT_PX,
+} from '@/lib/digital-menu/layout';
 
-export const PRODUCT_HERO_HEIGHT = 140;
-export const PRODUCT_PINNED_BAR_HEIGHT = 48;
+export const PRODUCT_HERO_HEIGHT = DIGITAL_MENU_COVER_HEIGHT_PX;
+export const PRODUCT_PINNED_BAR_HEIGHT = DIGITAL_MENU_PINNED_BAR_HEIGHT_PX;
+
+type AddToCartPayload = {
+  quantity: number;
+  selections: OptionSelections;
+  lineTotal: number;
+};
 
 type DigitalMenuProductDetailProps = {
   product: Product;
@@ -41,6 +51,9 @@ type DigitalMenuProductDetailProps = {
   onHeroCollapsedChange: (collapsed: boolean) => void;
   scrollRootRef: RefObject<HTMLDivElement | null>;
   onBack: () => void;
+  onAddToCart?: (payload: AddToCartPayload) => void;
+  hideHeroBackButton?: boolean;
+  isTabletLayout?: boolean;
   onReorderGroups?: (groups: OptionGroup[]) => Promise<void>;
   onReorderItems?: (groupId: string, group: OptionGroup) => Promise<void>;
 };
@@ -107,10 +120,14 @@ export function DigitalMenuProductDetail({
   onHeroCollapsedChange,
   scrollRootRef,
   onBack,
+  onAddToCart,
+  hideHeroBackButton = false,
+  isTabletLayout = false,
   onReorderGroups,
   onReorderItems,
 }: DigitalMenuProductDetailProps) {
   const heroSentinelRef = useRef<HTMLDivElement>(null);
+  const addFeedbackTimerRef = useRef<number | null>(null);
   const [dragGroupId, setDragGroupId] = useState<string | null>(null);
   const [dropGroupId, setDropGroupId] = useState<string | null>(null);
   const [dragItemId, setDragItemId] = useState<string | null>(null);
@@ -118,6 +135,7 @@ export function DigitalMenuProductDetail({
   const [quantity, setQuantity] = useState(1);
   const [selections, setSelections] = useState<OptionSelections>(createEmptySelections);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [justAdded, setJustAdded] = useState(false);
 
   const imageUrl = storagePublicUrl(product.image_path);
   const groups = activeOptionGroups(product);
@@ -137,7 +155,20 @@ export function DigitalMenuProductDetail({
     setQuantity(1);
     setSelections(createEmptySelections());
     setExpandedGroups({});
+    if (addFeedbackTimerRef.current != null) {
+      window.clearTimeout(addFeedbackTimerRef.current);
+      addFeedbackTimerRef.current = null;
+    }
   }, [product.id]);
+
+  useEffect(
+    () => () => {
+      if (addFeedbackTimerRef.current != null) {
+        window.clearTimeout(addFeedbackTimerRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     onHeroCollapsedChange(false);
@@ -199,9 +230,23 @@ export function DigitalMenuProductDetail({
 
   const isGroupExpanded = (groupId: string) => expandedGroups[groupId] !== false;
 
+  const handleAddToCart = () => {
+    if (!canAdd || !onAddToCart) return;
+
+    onAddToCart({ quantity, selections, lineTotal });
+    setJustAdded(true);
+    if (addFeedbackTimerRef.current != null) {
+      window.clearTimeout(addFeedbackTimerRef.current);
+    }
+    addFeedbackTimerRef.current = window.setTimeout(() => {
+      setJustAdded(false);
+      addFeedbackTimerRef.current = null;
+    }, 1600);
+  };
+
   return (
     <>
-      <div className={styles.detailRoot}>
+      <div className={`${styles.detailRoot} ${isTabletLayout ? menuStyles.publicTablet : ''}`}>
         <section className={styles.productHero} aria-label={product.name}>
           <div className={styles.productHeroWrap}>
             {imageUrl ? (
@@ -211,9 +256,10 @@ export function DigitalMenuProductDetail({
             )}
             <div
               className={styles.heroFloatBar}
-              data-visible={heroCollapsed ? 'false' : 'true'}
-              aria-hidden={heroCollapsed}
+              data-visible={hideHeroBackButton ? 'false' : heroCollapsed ? 'false' : 'true'}
+              aria-hidden={hideHeroBackButton || heroCollapsed}
             >
+              {!hideHeroBackButton ? (
               <button
                 type="button"
                 className={styles.heroFloatBack}
@@ -222,6 +268,7 @@ export function DigitalMenuProductDetail({
               >
                 <ArrowBackIcon fontSize="small" />
               </button>
+              ) : null}
             </div>
           </div>
           <div ref={heroSentinelRef} className={styles.heroSentinel} aria-hidden />
@@ -303,8 +350,8 @@ export function DigitalMenuProductDetail({
                           attachDragOverlay(e, container, {
                             offsetX: 24,
                             offsetY: 28,
-                            overlayClassName: pageStyles.dragOverlayClone,
-                            bodyDraggingClassName: pageStyles.bodyDragging,
+                            overlayClassName: menuStyles.dragOverlayClone,
+                            bodyDraggingClassName: menuStyles.bodyDragging,
                           });
                         }
                         e.dataTransfer.effectAllowed = 'move';
@@ -428,8 +475,8 @@ export function DigitalMenuProductDetail({
                                   attachDragOverlay(e, row, {
                                     offsetX: 18,
                                     offsetY: 20,
-                                    overlayClassName: pageStyles.dragOverlayClone,
-                                    bodyDraggingClassName: pageStyles.bodyDragging,
+                                    overlayClassName: menuStyles.dragOverlayClone,
+                                    bodyDraggingClassName: menuStyles.bodyDragging,
                                   });
                                 }
                                 e.dataTransfer.effectAllowed = 'move';
@@ -502,40 +549,50 @@ export function DigitalMenuProductDetail({
         </div>
       </div>
 
-      <footer className={styles.detailFooter}>
-        <div className={styles.qtyStepper} aria-label="Cantidad">
+      <footer
+        className={`${styles.detailFooter} ${isTabletLayout ? menuStyles.publicTablet : ''}`}
+      >
+        <div className={styles.detailFooterInner}>
+          <div className={styles.footerQtyBlock}>
+            <span className={styles.footerQtyLabel}>Cantidad</span>
+            <div className={styles.qtyStepper} aria-label="Cantidad">
+              <button
+                type="button"
+                className={styles.qtyBtn}
+                aria-label="Disminuir cantidad"
+                disabled={quantity <= 1}
+                onClick={() => setQuantity((value) => Math.max(1, value - 1))}
+              >
+                <RemoveIcon sx={{ fontSize: 20 }} />
+              </button>
+              <span className={styles.qtyValue} aria-live="polite">
+                {quantity}
+              </span>
+              <button
+                type="button"
+                className={styles.qtyBtn}
+                aria-label="Aumentar cantidad"
+                onClick={() => setQuantity((value) => value + 1)}
+              >
+                <AddIcon sx={{ fontSize: 20 }} />
+              </button>
+            </div>
+          </div>
           <button
             type="button"
-            className={styles.qtyBtn}
-            aria-label="Disminuir cantidad"
-            disabled={quantity <= 1}
-            onClick={() => setQuantity((value) => Math.max(1, value - 1))}
+            className={`${styles.addBtn} ${canAdd && onAddToCart ? styles.addBtnReady : ''} ${
+              justAdded ? styles.addBtnAdded : ''
+            }`}
+            disabled={!canAdd || !onAddToCart}
+            aria-disabled={!canAdd || !onAddToCart}
+            onClick={handleAddToCart}
           >
-            <RemoveIcon sx={{ fontSize: 20 }} />
-          </button>
-          <span className={styles.qtyValue} aria-live="polite">
-            {quantity}
-          </span>
-          <button
-            type="button"
-            className={styles.qtyBtn}
-            aria-label="Aumentar cantidad"
-            onClick={() => setQuantity((value) => value + 1)}
-          >
-            <AddIcon sx={{ fontSize: 20 }} />
+            <span className={styles.addBtnLabel}>{justAdded ? 'Agregado' : 'Agregar'}</span>
+            <span className={styles.addBtnPrice} aria-live="polite">
+              {formatMoney(lineTotal, product.currency)}
+            </span>
           </button>
         </div>
-        <button
-          type="button"
-          className={`${styles.addBtn} ${canAdd ? styles.addBtnReady : ''}`}
-          disabled={!canAdd}
-          aria-disabled={!canAdd}
-        >
-          <span className={styles.addBtnLabel}>Agregar</span>
-          <span className={styles.addBtnPrice} aria-live="polite">
-            {formatMoney(lineTotal, product.currency)}
-          </span>
-        </button>
       </footer>
     </>
   );
