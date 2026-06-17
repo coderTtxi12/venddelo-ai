@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isMenuPublicHost } from '@/lib/restaurantSubdomain';
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -28,8 +29,12 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+  const host = request.headers.get('host') ?? '';
   const isPublic =
-    pathname.startsWith('/login') || pathname.startsWith('/auth/callback');
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/auth/callback') ||
+    pathname.startsWith('/menu/') ||
+    isMenuPublicHost(host);
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

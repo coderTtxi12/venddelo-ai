@@ -1,0 +1,31 @@
+.statePage {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--color-bg, #f8fafc);
+}
+
+.stateText,
+.stateError {
+  margin: 0;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.stateText {
+  color: var(--color-text-secondary, #64748b);
+}
+
+.stateError {
+  color: #991b1b;
+}
+
+.viewport {
+  min-height: 100dvh;
+}
+
+.publicScroll {
+  min-height: 0;
+}
