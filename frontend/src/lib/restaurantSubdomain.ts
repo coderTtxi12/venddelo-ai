@@ -65,8 +65,14 @@ function menuAppBaseUrl(): string {
   }
 }
 
+/** Vercel deployment URLs (*.vercel.app) do not support tenant subdomains like wild-rooster.app.vercel.app. */
+export function shouldUseMenuPathRouting(): boolean {
+  if (process.env.NEXT_PUBLIC_MENU_USE_PATH === 'true') return true;
+  return MENU_PUBLIC_DOMAIN.endsWith('.vercel.app');
+}
+
 function buildLocalSubdomainUrl(subdomain: string, origin?: string): string {
-  const base = origin ?? devMenuBaseUrl();
+  const base = origin ?? menuAppBaseUrl();
   const url = new URL(base);
   const portSuffix = url.port ? `:${url.port}` : '';
   return `${url.protocol}//${subdomain}.localhost${portSuffix}`;
@@ -77,8 +83,8 @@ export function restaurantPublicMenuPath(subdomain: string): string {
 }
 
 export function restaurantPublicMenuUrl(subdomain: string): string {
-  if (process.env.NEXT_PUBLIC_MENU_USE_PATH === 'true') {
-    return `${devMenuBaseUrl()}${restaurantPublicMenuPath(subdomain)}`;
+  if (shouldUseMenuPathRouting()) {
+    return `${menuAppBaseUrl()}${restaurantPublicMenuPath(subdomain)}`;
   }
 
   if (typeof window !== 'undefined') {
