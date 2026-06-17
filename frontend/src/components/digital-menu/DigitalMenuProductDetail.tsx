@@ -19,6 +19,7 @@ import {
   reorderActiveOptionItems,
 } from './optionGroupReorder';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
+import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
 import {
   canAddProductToCart,
   computeLineTotal,
@@ -53,6 +54,7 @@ type DigitalMenuProductDetailProps = {
   onBack: () => void;
   onAddToCart?: (payload: AddToCartPayload) => void;
   hideHeroBackButton?: boolean;
+  enableHaptics?: boolean;
   isTabletLayout?: boolean;
   onReorderGroups?: (groups: OptionGroup[]) => Promise<void>;
   onReorderItems?: (groupId: string, group: OptionGroup) => Promise<void>;
@@ -122,6 +124,7 @@ export function DigitalMenuProductDetail({
   onBack,
   onAddToCart,
   hideHeroBackButton = false,
+  enableHaptics = false,
   isTabletLayout = false,
   onReorderGroups,
   onReorderItems,
@@ -218,14 +221,18 @@ export function DigitalMenuProductDetail({
   };
 
   const handleOptionToggle = (group: OptionGroup, itemId: string) => {
-    setSelections((prev) => {
-      const next = toggleOptionSelection(group, itemId, prev);
-      const selectedIds = getGroupSelection(next, group.id);
-      if (isGroupSelectionComplete(group, selectedIds)) {
-        setExpandedGroups((current) => ({ ...current, [group.id]: false }));
-      }
-      return next;
-    });
+    const wasSelected = isItemSelected(selections, group.id, itemId);
+    const next = toggleOptionSelection(group, itemId, selections);
+    const selectedIds = getGroupSelection(next, group.id);
+
+    setSelections(next);
+    if (isGroupSelectionComplete(group, selectedIds)) {
+      setExpandedGroups((current) => ({ ...current, [group.id]: false }));
+    }
+
+    if (enableHaptics && !wasSelected && isItemSelected(next, group.id, itemId)) {
+      triggerHaptic('selection');
+    }
   };
 
   const isGroupExpanded = (groupId: string) => expandedGroups[groupId] !== false;
@@ -233,6 +240,9 @@ export function DigitalMenuProductDetail({
   const handleAddToCart = () => {
     if (!canAdd || !onAddToCart) return;
 
+    if (enableHaptics) {
+      triggerHaptic('success');
+    }
     onAddToCart({ quantity, selections, lineTotal });
     setJustAdded(true);
     if (addFeedbackTimerRef.current != null) {
