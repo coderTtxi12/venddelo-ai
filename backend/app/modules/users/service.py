@@ -4,6 +4,14 @@ from app.core.security import AuthenticatedUser
 from app.modules.users.repository import UserRepository
 from app.modules.users.schemas import UserCreate, UserDTO, UserProfileUpdate, UserUpdate
 
+_APP_USER_ROLES = frozenset({"owner", "admin", "staff"})
+
+
+def _default_app_role(role: str | None) -> str:
+    if role in _APP_USER_ROLES:
+        return role
+    return "owner"
+
 
 class UserService:
     def __init__(self, repo: UserRepository) -> None:
@@ -22,7 +30,7 @@ class UserService:
                     email=auth.email,
                     display_name=auth.display_name,
                     avatar_url=auth.avatar_url,
-                    role=auth.role or "owner",
+                    role=_default_app_role(auth.role),
                 )
             )
 

@@ -18,9 +18,16 @@ def _profile_from_payload(payload: dict) -> tuple[str | None, str | None]:
     return display_name, avatar_url
 
 
+_APP_USER_ROLES = frozenset({"owner", "admin", "staff"})
+
+
 def _role_from_payload(payload: dict) -> str | None:
+    """Map JWT claims to an app role. Ignores Supabase auth roles (e.g. authenticated)."""
     app_meta = payload.get("app_metadata") or {}
-    return app_meta.get("role") or payload.get("role")
+    role = app_meta.get("role")
+    if role in _APP_USER_ROLES:
+        return role
+    return None
 
 
 class SupabaseJwtAuth(AuthPort):

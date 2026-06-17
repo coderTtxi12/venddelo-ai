@@ -47,6 +47,17 @@ def test_sync_updates_profile_from_token(session):
 
 
 @requires_db
+def test_sync_defaults_owner_for_supabase_auth_role(session):
+    user_id = uuid.uuid4()
+    svc = UserService(SqlAlchemyUserRepository(session))
+    user = svc.sync_from_auth(
+        AuthenticatedUser(id=user_id, email="new@example.com", role="authenticated")
+    )
+    session.commit()
+    assert user.role == "owner"
+
+
+@requires_db
 def test_sync_idempotent(session):
     user_id = uuid.uuid4()
     svc = UserService(SqlAlchemyUserRepository(session))

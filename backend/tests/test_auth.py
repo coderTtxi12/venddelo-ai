@@ -30,6 +30,43 @@ def test_verify_valid_token():
     assert user.email == "owner@example.com"
 
 
+def test_ignores_supabase_auth_role_claim():
+    auth = SupabaseJwtAuth(Settings(supabase_jwt_secret=SECRET))
+    now = datetime.now(UTC)
+    token = jwt.encode(
+        {
+            "sub": str(USER_ID),
+            "aud": "authenticated",
+            "role": "authenticated",
+            "exp": now + timedelta(hours=1),
+            "email": "new@example.com",
+        },
+        SECRET,
+        algorithm="HS256",
+    )
+    user = auth.verify_token(token)
+    assert user.role is None
+
+
+def test_uses_app_metadata_role():
+    auth = SupabaseJwtAuth(Settings(supabase_jwt_secret=SECRET))
+    now = datetime.now(UTC)
+    token = jwt.encode(
+        {
+            "sub": str(USER_ID),
+            "aud": "authenticated",
+            "role": "authenticated",
+            "app_metadata": {"role": "staff"},
+            "exp": now + timedelta(hours=1),
+            "email": "staff@example.com",
+        },
+        SECRET,
+        algorithm="HS256",
+    )
+    user = auth.verify_token(token)
+    assert user.role == "staff"
+
+
 def test_reject_expired_token():
     auth = SupabaseJwtAuth(Settings(supabase_jwt_secret=SECRET))
     with pytest.raises(UnauthorizedError):
