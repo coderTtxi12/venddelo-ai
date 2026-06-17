@@ -164,8 +164,7 @@ export function PublicDesktopMenuLayout({
                             onClick={() => onProductClick(product.id)}
                             aria-label={`Ver ${product.name}`}
                           >
-                            <ProductThumb product={product} className={styles.productCardImage} />
-                            <div className={styles.productCardBody}>
+                            <div className={styles.productBody}>
                               <span className={styles.productName}>{product.name}</span>
                               {product.description ? (
                                 <span className={styles.productDesc}>{product.description}</span>
@@ -177,6 +176,7 @@ export function PublicDesktopMenuLayout({
                                 />
                               </div>
                             </div>
+                            <ProductThumb product={product} className={styles.productThumb} />
                           </button>
                         ))}
                       </div>
