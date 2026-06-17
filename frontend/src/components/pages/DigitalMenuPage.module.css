@@ -44,13 +44,26 @@
   background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
 }
 
-.publicRoot {
+.phone.publicRoot {
   width: 100%;
   max-width: 100%;
-  height: auto;
+  height: 100dvh;
   min-height: 100dvh;
   max-height: none;
   border-radius: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Menú público: igual que desktop — sin fuente body global */
+  font-family: inherit;
+  font-weight: inherit;
+}
+
+.phone.publicRoot > .phoneScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
 }
 
 .restaurantNameStatic {
@@ -67,6 +80,12 @@
   font-size: 0.82rem;
   line-height: 1.4;
   color: var(--dm-text-secondary, #64748b);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  font-weight: var(--dm-font-body-weight, 400);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .title {
@@ -114,6 +133,7 @@
 }
 
 .phone {
+  --dm-cover-height: 168px;
   background: var(--dm-surface, #fff);
   color: var(--dm-text, #111827);
   font-family: var(--dm-font-body, system-ui, sans-serif);
@@ -271,7 +291,7 @@
 
 .coverWrap {
   position: relative;
-  height: 168px;
+  height: var(--dm-cover-height, 168px);
   overflow: hidden;
   background: linear-gradient(
     135deg,
@@ -495,6 +515,7 @@
   padding: 14px 12px 12px;
   font-size: 0.82rem;
   font-weight: 600;
+  font-family: var(--dm-font-body, system-ui, sans-serif);
   color: var(--dm-text-muted, #64748b);
   cursor: pointer;
   white-space: nowrap;
@@ -520,19 +541,26 @@
   display: none;
 }
 
-.phone[data-cat-tabs='pill'] .categoryTabActive {
-  background: color-mix(in srgb, var(--dm-primary, #111827) 12%, transparent);
-  border-radius: var(--dm-radius-ui, 12px);
-  margin-top: 4px;
-  margin-bottom: 4px;
-}
-
 .phone[data-cat-tabs='filled'] .categoryTabActive {
   background: var(--dm-primary, #111827);
   color: var(--dm-surface, #fff);
   border-radius: var(--dm-radius-ui, 12px);
   margin-top: 4px;
   margin-bottom: 4px;
+  padding: 10px 14px 8px;
+  font-family: var(--dm-font-heading, inherit);
+  font-weight: var(--dm-font-heading-weight, 700);
+}
+
+.phone[data-cat-tabs='pill'] .categoryTabActive {
+  background: color-mix(in srgb, var(--dm-primary, #111827) 12%, transparent);
+  border-radius: var(--dm-radius-ui, 12px);
+  margin-top: 4px;
+  margin-bottom: 4px;
+  padding: 10px 14px 8px;
+  font-family: var(--dm-font-heading, inherit);
+  font-weight: var(--dm-font-heading-weight, 700);
+  color: var(--dm-category-active, #111827);
 }
 
 .categoryTabDragging {
@@ -673,6 +701,8 @@
   font-size: 0.76rem;
   color: var(--dm-text-muted, #64748b);
   line-height: 1.35;
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  font-weight: var(--dm-font-body-weight, 400);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -762,12 +792,22 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  align-items: start;
+}
+
+.productCardG {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  height: 100%;
+  text-align: left;
 }
 
 .productCardG .productThumb {
   width: 100%;
   aspect-ratio: 1;
   height: auto;
+  display: block;
 }
 
 .productCardG .productName {
@@ -803,4 +843,138 @@
 
 .dragOverlayClone {
   border-radius: 12px !important;
+}
+
+/* Marker: applied only in tablet band (768–1023px) via JS */
+.publicTablet {
+  /* styles scoped in sibling modules via .publicTablet descendant selectors */
+}
+
+/* Tablet band — full-width layout (768–1023px, mobile branch only) */
+.phone.publicRoot.publicTablet {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  box-shadow: none;
+}
+
+.phone.publicRoot.publicTablet .menuHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  min-height: 220px;
+  border-bottom: 1px solid var(--dm-border, #eef2f7);
+}
+
+.phone.publicRoot.publicTablet .coverWrap {
+  height: 100%;
+  min-height: 220px;
+}
+
+.phone.publicRoot.publicTablet .restaurantHeader {
+  margin-top: 0;
+  padding: 20px 24px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.phone.publicRoot.publicTablet .logoRow {
+  align-items: center;
+}
+
+.phone.publicRoot.publicTablet .categoryBar {
+  padding: 0 24px;
+  gap: 4px;
+}
+
+.phone.publicRoot.publicTablet .section {
+  max-width: none;
+  margin: 0;
+  padding: 22px 24px 10px;
+}
+
+.phone.publicRoot.publicTablet .sectionTitle {
+  font-size: 1.12rem;
+}
+
+.phone.publicRoot.publicTablet .emptyCategories {
+  max-width: none;
+  margin: 0;
+  padding: 24px;
+}
+
+.productsTabletGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (min-width: 960px) {
+  .phone.publicRoot.publicTablet .productsTabletGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+.productCardTablet {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid var(--dm-border, #eef2f7);
+  border-radius: var(--dm-radius-card, 14px);
+  background: color-mix(in srgb, var(--dm-surface, #fff) 94%, var(--dm-bg, #fff));
+  overflow: hidden;
+  text-align: left;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .productCardTablet {
+    transition:
+      border-color 180ms ease,
+      transform 180ms ease;
+  }
+}
+
+.productCardTablet:hover {
+  border-color: color-mix(in srgb, var(--dm-primary, #111827) 35%, var(--dm-border, #eef2f7));
+}
+
+.productCardTablet:focus-visible {
+  border-color: var(--dm-primary, #111827);
+}
+
+.productCardTablet .productThumb {
+  width: 100%;
+  aspect-ratio: 1;
+  height: auto;
+  border-radius: 0;
+  background: var(--dm-product-thumb-bg, #f1f5f9);
+}
+
+.productCardTabletBody {
+  padding: 12px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+}
+
+.productCardTablet .productName {
+  font-size: 0.84rem;
+  line-height: 1.3;
+}
+
+.productCardTablet .productDesc {
+  font-size: 0.74rem;
+  -webkit-line-clamp: 2;
+}
+
+.phone.publicRoot.publicTablet .tabletInsetSection {
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.productCardTablet.productTapTarget:hover {
+  opacity: 1;
 }
