@@ -48,14 +48,15 @@ import {
 } from '@/lib/digital-menu/themes';
 import { resolveRestaurantServices, type RestaurantServiceType } from '@/lib/restaurantServices';
 import { restaurantPublicMenuUrl } from '@/lib/restaurantSubdomain';
+import { DIGITAL_MENU_COVER_HEIGHT_PX, DIGITAL_MENU_PINNED_BAR_HEIGHT_PX } from '@/lib/digital-menu/layout';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveSupplierIdByEmail } from '@/services/db';
 import { legacyDb as db } from '@/services/legacyDb';
 import styles from './DigitalMenuPage.module.css';
 
 const LAYOUTS: CategoryDisplayLayout[] = ['vertical', 'horizontal', 'grid'];
-const COVER_HEIGHT = 168;
-const PINNED_BAR_HEIGHT = 48;
+const COVER_HEIGHT = DIGITAL_MENU_COVER_HEIGHT_PX;
+const PINNED_BAR_HEIGHT = DIGITAL_MENU_PINNED_BAR_HEIGHT_PX;
 
 function pickRandomLayout(): CategoryDisplayLayout {
   return LAYOUTS[Math.floor(Math.random() * LAYOUTS.length)]!;
