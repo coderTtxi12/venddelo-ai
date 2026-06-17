@@ -11,21 +11,32 @@ import styles from './RestaurantLocationSection.module.css';
 
 type RestaurantLocationSectionProps = {
   restaurant: Pick<Restaurant, 'name' | 'address' | 'latitude' | 'longitude' | 'place_id'>;
+  className?: string;
+  variant?: 'default' | 'sidebar';
 };
 
-export function RestaurantLocationSection({ restaurant }: RestaurantLocationSectionProps) {
+export function RestaurantLocationSection({
+  restaurant,
+  className,
+  variant = 'default',
+}: RestaurantLocationSectionProps) {
   const embedUrl = buildGoogleMapsEmbedUrl(restaurant);
   const mapsLink = buildGoogleMapsLink(restaurant);
   const hasLocation = hasRestaurantLocation(restaurant);
   const addressText = restaurant.address?.trim();
 
   return (
-    <section className={styles.locationSection} aria-label="Ubicación del restaurante">
+    <section
+      className={`${styles.locationSection} ${variant === 'sidebar' ? styles.locationSectionSidebar : ''} ${className ?? ''}`.trim()}
+      aria-label="Ubicación del restaurante"
+    >
       <div className={styles.locationHeader}>
         <LocationOnOutlinedIcon className={styles.locationIcon} aria-hidden />
         <div className={styles.locationHeading}>
           <h2 className={styles.locationTitle}>Ubicación</h2>
-          <p className={styles.locationHint}>Encuéntranos en el mapa</p>
+          {variant === 'default' ? (
+            <p className={styles.locationHint}>Encuéntranos en el mapa</p>
+          ) : null}
         </div>
       </div>
 

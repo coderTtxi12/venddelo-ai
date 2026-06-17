@@ -5,6 +5,33 @@
   background: var(--dm-surface, #fff);
 }
 
+.locationSectionSidebar {
+  margin-top: 0;
+  padding: 0 16px 20px;
+  border-top: none;
+  background: transparent;
+}
+
+.locationSectionSidebar .locationHeader {
+  margin-bottom: 8px;
+}
+
+.locationSectionSidebar .locationTitle {
+  font-size: 0.88rem;
+}
+
+.locationSectionSidebar .mapFrame {
+  height: 140px;
+}
+
+.locationSectionSidebar .addressText {
+  font-size: 0.74rem;
+}
+
+.locationSectionSidebar .mapsLink {
+  font-size: 0.74rem;
+}
+
 .locationHeader {
   display: flex;
   align-items: flex-start;

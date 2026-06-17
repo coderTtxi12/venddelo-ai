@@ -11,6 +11,8 @@ import styles from './RestaurantHoursFooter.module.css';
 type RestaurantHoursDisplayProps = {
   schedules: RestaurantSchedule[];
   serviceTypes?: RestaurantServiceType[];
+  className?: string;
+  variant?: 'default' | 'sidebar';
 };
 
 function DayHoursReadout({ day }: { day: ServiceHoursBlock['days'][number] }) {
@@ -87,22 +89,29 @@ function ServiceHoursReadout({
 export function RestaurantHoursDisplay({
   schedules,
   serviceTypes,
+  className,
+  variant = 'default',
 }: RestaurantHoursDisplayProps) {
   const blocks = buildRestaurantHoursBlocks(schedules, serviceTypes ?? []);
   const [expandedBlocks, setExpandedBlocks] = useState<Record<RestaurantServiceType, boolean>>({
-    takeout: true,
-    delivery: false,
+    delivery: true,
+    takeout: false,
   });
 
   if (blocks.length === 0) return null;
 
   return (
-    <section className={styles.hoursSection} aria-label="Horario del restaurante">
+    <section
+      className={`${styles.hoursSection} ${variant === 'sidebar' ? styles.hoursSectionSidebar : ''} ${className ?? ''}`.trim()}
+      aria-label="Horario del restaurante"
+    >
       <div className={styles.hoursHeader}>
         <AccessTimeOutlinedIcon className={styles.hoursIcon} aria-hidden />
         <div className={styles.hoursHeading}>
           <h2 className={styles.hoursTitle}>Horarios de Servicio</h2>
-          <p className={styles.hoursHint}>Consulta nuestros horarios por tipo de entrega.</p>
+          {variant === 'default' ? (
+            <p className={styles.hoursHint}>Consulta nuestros horarios por tipo de entrega.</p>
+          ) : null}
         </div>
       </div>
 
