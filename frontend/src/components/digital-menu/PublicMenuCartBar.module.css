@@ -1,0 +1,90 @@
+.cartBar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  z-index: 25;
+  width: min(calc(100% - 1.5rem), 420px);
+}
+
+.cartBarBtn {
+  width: 100%;
+  min-height: 52px;
+  border: none;
+  border-radius: 999px;
+  padding: 0.65rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--dm-primary, #111827);
+  color: var(--dm-surface, #fff);
+  cursor: pointer;
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--dm-primary, #111827) 28%, transparent),
+    0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cartBarBtn {
+    transition: filter 180ms ease, transform 180ms ease;
+  }
+}
+
+.cartBarBtn:hover {
+  filter: brightness(1.06);
+}
+
+.cartBarBtn:focus-visible {
+  outline: 2px solid var(--dm-accent, var(--dm-primary, #111827));
+  outline-offset: 3px;
+}
+
+.cartBarLeft {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.countBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dm-surface, #fff) 18%, transparent);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.cartBarLabel {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.cartBarTotal {
+  font-size: 0.95rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+@media (min-width: 1024px) {
+  .cartBar {
+    width: min(calc(100% - 2rem), 360px);
+    left: auto;
+    right: 1.5rem;
+    transform: none;
+  }
+}
+
+.cartBarTablet {
+  width: min(calc(100% - 3rem), 400px);
+  left: auto;
+  right: 1.5rem;
+  transform: none;
+}
