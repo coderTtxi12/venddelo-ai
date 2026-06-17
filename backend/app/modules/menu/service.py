@@ -202,3 +202,6 @@ class MenuService:
 
     def get_full_menu(self, restaurant_id: uuid.UUID) -> FullMenuDTO:
         return self._repo.get_full_menu(restaurant_id)
+
+    def get_preview_menu(self, restaurant_id: uuid.UUID) -> FullMenuDTO:
+        return self._repo.get_preview_menu(restaurant_id)

@@ -269,3 +269,30 @@ class SqlAlchemyMenuRepository(MenuRepository):
             categories=[CategoryDTO.model_validate(c) for c in categories],
             products=[_product_to_dto(p) for p in products],
         )
+
+    def get_preview_menu(self, restaurant_id: uuid.UUID) -> FullMenuDTO:
+        categories = list(
+            self._session.scalars(
+                select(Category)
+                .where(
+                    Category.restaurant_id == restaurant_id,
+                    Category.is_active.is_(True),
+                )
+                .order_by(Category.sort_index, Category.created_at)
+            )
+        )
+        products = list(
+            self._session.scalars(
+                select(Product)
+                .where(
+                    Product.restaurant_id == restaurant_id,
+                    Product.is_active.is_(True),
+                )
+                .order_by(Product.created_at, Product.id)
+            )
+        )
+        return FullMenuDTO(
+            restaurant_id=restaurant_id,
+            categories=[CategoryDTO.model_validate(c) for c in categories],
+            products=[_product_to_dto(p) for p in products],
+        )
