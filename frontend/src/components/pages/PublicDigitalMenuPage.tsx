@@ -540,6 +540,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
                 onBack={closeProduct}
                 onAddToCart={handleAddToCart}
                 hideHeroBackButton
+                enableHaptics
                 isTabletLayout={isTabletLayout}
               />
             ) : (
@@ -747,6 +748,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
               onBack={closeProduct}
               onAddToCart={handleAddToCart}
               hideHeroBackButton
+              enableHaptics
             />
           ) : undefined}
         </PublicDesktopMenuLayout>
