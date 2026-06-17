@@ -432,14 +432,16 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
         >
           {selectedProduct ? (
             <>
-              <button
-                type="button"
-                className={styles.productFixedBack}
-                aria-label="Volver al menú"
-                onClick={closeProduct}
-              >
-                <ArrowBackIcon fontSize="small" />
-              </button>
+              {!productHeroCollapsed ? (
+                <button
+                  type="button"
+                  className={styles.productFixedBack}
+                  aria-label="Volver al menú"
+                  onClick={closeProduct}
+                >
+                  <ArrowBackIcon fontSize="small" />
+                </button>
+              ) : null}
               {!productHeroCollapsed ? (
                 <CartHeaderButton
                   itemCount={cart.itemCount}
