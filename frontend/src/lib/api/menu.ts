@@ -1,6 +1,6 @@
 import { DEFAULT_CURRENCY } from '@/lib/currency';
 import { apiRequest } from './client';
-import type { Category, CursorPage, Product } from './types';
+import type { Category, CategoryDisplayLayout, CursorPage, Product } from './types';
 
 export function listCategories(
   token: string,
@@ -62,6 +62,7 @@ export function updateCategory(
     description?: string | null;
     image_path?: string | null;
     sort_index?: number;
+    display_layout?: CategoryDisplayLayout | null;
     is_active?: boolean;
   },
 ) {

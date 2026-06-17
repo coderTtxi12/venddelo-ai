@@ -22,6 +22,11 @@ const quickActions: DashboardQuickAction[] = [
     desc: 'Administra tus productos, categorías y promociones',
     to: '/products',
   },
+  {
+    title: 'Menú Digital',
+    desc: 'Previsualiza, comparte y publica tu menú para tus clientes',
+    to: '/digital-menu',
+  },
 ];
 
 const statsRow1 = [

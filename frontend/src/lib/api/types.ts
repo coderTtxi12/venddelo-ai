@@ -33,6 +33,7 @@ export type Restaurant = {
   longitude: number | null;
   place_id: string | null;
   logo_path: string | null;
+  cover_path: string | null;
   whatsapp_phone: string | null;
   color_palette: string | null;
   owner_id: string | null;
@@ -41,6 +42,8 @@ export type Restaurant = {
   updated_at: string;
 };
 
+export type CategoryDisplayLayout = 'vertical' | 'horizontal' | 'grid';
+
 export type Category = {
   id: string;
   restaurant_id: string;
@@ -48,6 +51,7 @@ export type Category = {
   description: string | null;
   image_path: string | null;
   sort_index: number;
+  display_layout: CategoryDisplayLayout | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
