@@ -32,7 +32,7 @@ class TranslatedMenuService:
 
     def get_public_menu(self, subdomain: str, locale: str = "default") -> FullMenuDTO:
         restaurant = self._restaurants.get_by_subdomain(subdomain)
-        if restaurant is None or restaurant.status != "published":
+        if restaurant is None:
             raise NotFoundError("Restaurant not found")
 
         original = normalize_locale(restaurant.original_language)
