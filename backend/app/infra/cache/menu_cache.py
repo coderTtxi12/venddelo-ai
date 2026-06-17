@@ -40,10 +40,13 @@ class MenuCacheService:
 
         logger.info("menu cache miss subdomain=%s locale=%s", subdomain, locale)
         restaurant = self._restaurants.get_by_subdomain(subdomain)
-        if restaurant is None or restaurant.status != "published":
+        if restaurant is None:
             raise NotFoundError("Restaurant not found")
 
-        menu = self._menu.get_full_menu(restaurant.id)
+        if restaurant.status == "published":
+            menu = self._menu.get_full_menu(restaurant.id)
+        else:
+            menu = self._menu.get_preview_menu(restaurant.id)
         self._cache.set(key, menu.model_dump_json(), self._ttl)
         logger.info(
             "menu cache populated subdomain=%s locale=%s ttl_seconds=%s",

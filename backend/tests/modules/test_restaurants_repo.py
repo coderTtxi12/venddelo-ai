@@ -28,8 +28,22 @@ def test_get_by_subdomain(session):
 def test_update_and_soft_delete(session):
     repo = SqlAlchemyRestaurantRepository(session)
     dto = repo.add(RestaurantCreate(name="R", subdomain="sub2"))
-    repo.update(dto.id, RestaurantUpdate(name="R2"))
-    assert repo.get(dto.id).name == "R2"
+    repo.update(
+        dto.id,
+        RestaurantUpdate(
+            name="R2",
+            description="Tacos al pastor desde 1985",
+            latitude=19.318899,
+            longitude=-98.236788,
+            address="Centro, Tlaxcala",
+        ),
+    )
+    updated = repo.get(dto.id)
+    assert updated.name == "R2"
+    assert updated.description == "Tacos al pastor desde 1985"
+    assert updated.latitude == 19.318899
+    assert updated.longitude == -98.236788
+    assert updated.address == "Centro, Tlaxcala"
     assert repo.soft_delete(dto.id) is True
     assert repo.get(dto.id) is None
 
@@ -61,6 +75,9 @@ def test_set_schedules_and_payment_methods(session):
             )
         ],
     )
+    schedules = repo.list_schedules(dto.id)
+    assert len(schedules) == 1
+    assert schedules[0].service_type == "takeout"
     repo.set_payment_methods(
         dto.id,
         [PaymentMethodCreate(method="cash", service_type="takeout")],
@@ -70,3 +87,6 @@ def test_set_schedules_and_payment_methods(session):
         dto.id,
         [PaymentMethodCreate(method="transfer", service_type="delivery")],
     )
+    methods = repo.list_payment_methods(dto.id)
+    assert len(methods) == 1
+    assert methods[0].method == "transfer"

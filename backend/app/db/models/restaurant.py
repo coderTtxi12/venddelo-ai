@@ -23,17 +23,23 @@ class Restaurant(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "restaurants"
 
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     place_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     logo_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     cover_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    digital_menu_theme_id: Mapped[str] = mapped_column(
+        String(64), nullable=False, server_default="original"
+    )
     whatsapp_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     subdomain: Mapped[str] = mapped_column(String(63), nullable=False)
     color_palette: Mapped[str | None] = mapped_column(String(50), nullable=True)
     original_language: Mapped[str] = mapped_column(String(10), nullable=False, server_default="es")
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="draft")
+    takeout_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    delivery_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     owner_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),

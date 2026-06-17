@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, status
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api.deps import (
     get_synced_user,
@@ -9,10 +11,13 @@ from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.modules.restaurants.schemas import (
     PaymentMethodCreate,
+    PaymentMethodDTO,
     RestaurantCreate,
     RestaurantDTO,
     RestaurantUpdate,
     ScheduleCreate,
+    ScheduleDTO,
+    SubdomainAvailabilityDTO,
 )
 from app.modules.restaurants.service import RestaurantService
 from app.modules.users.schemas import UserDTO
@@ -40,6 +45,25 @@ def list_my_restaurants(
     service: RestaurantService = Depends(_service),
 ) -> CursorPage[RestaurantDTO]:
     return service.list_for_owner(user.id, params)
+
+
+@router.get("/check-subdomain", response_model=SubdomainAvailabilityDTO)
+def check_subdomain_availability(
+    subdomain: str = Query(..., min_length=1, max_length=63),
+    exclude: UUID | None = Query(None),
+    user: UserDTO = Depends(get_synced_user),
+    service: RestaurantService = Depends(_service),
+) -> SubdomainAvailabilityDTO:
+    normalized, available, valid, message = service.check_subdomain_availability(
+        subdomain,
+        exclude_id=exclude,
+    )
+    return SubdomainAvailabilityDTO(
+        subdomain=normalized,
+        available=available,
+        valid=valid,
+        message=message,
+    )
 
 
 @router.get("/{restaurant_id}", response_model=RestaurantDTO)
@@ -75,6 +99,14 @@ def set_schedules(
     service.set_schedules(restaurant.id, schedules)
 
 
+@router.get("/{restaurant_id}/schedules", response_model=list[ScheduleDTO])
+def list_schedules(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: RestaurantService = Depends(_service),
+) -> list[ScheduleDTO]:
+    return service.list_schedules(restaurant.id)
+
+
 @router.put("/{restaurant_id}/payment-methods", status_code=status.HTTP_204_NO_CONTENT)
 def set_payment_methods(
     methods: list[PaymentMethodCreate],
@@ -82,3 +114,11 @@ def set_payment_methods(
     service: RestaurantService = Depends(_service),
 ) -> None:
     service.set_payment_methods(restaurant.id, methods)
+
+
+@router.get("/{restaurant_id}/payment-methods", response_model=list[PaymentMethodDTO])
+def list_payment_methods(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: RestaurantService = Depends(_service),
+) -> list[PaymentMethodDTO]:
+    return service.list_payment_methods(restaurant.id)

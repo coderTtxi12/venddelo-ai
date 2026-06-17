@@ -11,6 +11,10 @@ from app.modules.menu.service import MenuService
 from app.modules.orders.schemas import OrderDTO, PublicOrderInput
 from app.modules.orders.service import OrderService
 from app.modules.public.schemas import PublicRestaurantDTO
+from app.core.pagination import PaginationParams
+from app.modules.promotions.schemas import PromotionDTO
+from app.modules.promotions.service import PromotionService
+from app.modules.restaurants.schemas import ScheduleDTO
 from app.modules.translations.service import TranslationService
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -45,21 +49,64 @@ def _order_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> OrderService
     )
 
 
+def _promotion_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> PromotionService:
+    return PromotionService(uow.promotions)
+
+
+def _public_restaurant(uow: SqlAlchemyUnitOfWork, subdomain: str):
+    restaurant = uow.restaurants.get_by_subdomain(subdomain)
+    if restaurant is None:
+        raise NotFoundError("Restaurant not found")
+    return restaurant
+
+
+def _to_public_restaurant_dto(restaurant) -> PublicRestaurantDTO:
+    return PublicRestaurantDTO(
+        name=restaurant.name,
+        description=restaurant.description,
+        subdomain=restaurant.subdomain,
+        logo_path=restaurant.logo_path,
+        cover_path=restaurant.cover_path,
+        address=restaurant.address,
+        latitude=restaurant.latitude,
+        longitude=restaurant.longitude,
+        place_id=restaurant.place_id,
+        takeout_enabled=restaurant.takeout_enabled,
+        delivery_enabled=restaurant.delivery_enabled,
+        color_palette=restaurant.color_palette,
+        digital_menu_theme_id=restaurant.digital_menu_theme_id,
+        whatsapp_phone=restaurant.whatsapp_phone,
+        original_language=restaurant.original_language,
+    )
+
+
 @router.get("/restaurants/{subdomain}", response_model=PublicRestaurantDTO)
 def get_public_restaurant(
     subdomain: str,
     uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> PublicRestaurantDTO:
-    restaurant = uow.restaurants.get_by_subdomain(subdomain)
-    if restaurant is None or restaurant.status != "published":
-        raise NotFoundError("Restaurant not found")
-    return PublicRestaurantDTO(
-        name=restaurant.name,
-        subdomain=restaurant.subdomain,
-        color_palette=restaurant.color_palette,
-        whatsapp_phone=restaurant.whatsapp_phone,
-        original_language=restaurant.original_language,
-    )
+    restaurant = _public_restaurant(uow, subdomain)
+    return _to_public_restaurant_dto(restaurant)
+
+
+@router.get("/restaurants/{subdomain}/schedules", response_model=list[ScheduleDTO])
+def get_public_restaurant_schedules(
+    subdomain: str,
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> list[ScheduleDTO]:
+    restaurant = _public_restaurant(uow, subdomain)
+    return list(uow.restaurants.list_schedules(restaurant.id))
+
+
+@router.get("/restaurants/{subdomain}/promotions", response_model=list[PromotionDTO])
+def get_public_restaurant_promotions(
+    subdomain: str,
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+    service: PromotionService = Depends(_promotion_service),
+) -> list[PromotionDTO]:
+    restaurant = _public_restaurant(uow, subdomain)
+    page = service.list_active(restaurant.id, PaginationParams(limit=100))
+    return page.items
 
 
 @router.get("/menu/{subdomain}", response_model=FullMenuDTO)

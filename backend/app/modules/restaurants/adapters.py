@@ -26,6 +26,7 @@ from app.modules.restaurants.schemas import (
     RestaurantDTO,
     RestaurantUpdate,
     ScheduleCreate,
+    ScheduleDTO,
 )
 
 
@@ -99,6 +100,12 @@ class SqlAlchemyRestaurantRepository(RestaurantRepository):
             next_cursor=next_cursor,
             has_more=has_more,
         )
+
+    def list_schedules(self, restaurant_id: uuid.UUID) -> Sequence[ScheduleDTO]:
+        rows = self._session.scalars(
+            select(RestaurantSchedule).where(RestaurantSchedule.restaurant_id == restaurant_id)
+        )
+        return [ScheduleDTO.model_validate(r) for r in rows]
 
     def list_payment_methods(self, restaurant_id: uuid.UUID) -> Sequence[PaymentMethodDTO]:
         rows = self._session.scalars(

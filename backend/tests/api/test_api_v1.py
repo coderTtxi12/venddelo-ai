@@ -122,3 +122,90 @@ def test_public_menu_and_order(client, engine):
     )
     assert o2.status_code == 201
     assert o2.json()["id"] == o1.json()["id"]
+
+
+@requires_db
+def test_restaurant_description_patch_and_public(client, engine):
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        dto = uow.restaurants.add(
+            RestaurantCreate(
+                name="Desc Rest",
+                subdomain="desc-rest",
+                status="published",
+                description="Tacos desde 1985",
+            ),
+            owner_id=OWNER,
+        )
+        uow.commit()
+
+    get_resp = client.get(f"/api/v1/restaurants/{dto.id}", headers=AUTH)
+    assert get_resp.status_code == 200
+    assert get_resp.json()["description"] == "Tacos desde 1985"
+
+    patch_resp = client.patch(
+        f"/api/v1/restaurants/{dto.id}",
+        json={"description": "Nueva descripción"},
+        headers=AUTH,
+    )
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["description"] == "Nueva descripción"
+
+    public_resp = client.get("/api/v1/public/restaurants/desc-rest")
+    assert public_resp.status_code == 200
+    assert public_resp.json()["description"] == "Nueva descripción"
+
+
+@requires_db
+def test_restaurant_subdomain_patch_and_check(client):
+    first_resp = client.post(
+        "/api/v1/restaurants",
+        json={"name": "First", "subdomain": "first-rest"},
+        headers=AUTH,
+    )
+    assert first_resp.status_code == 201
+    second_resp = client.post(
+        "/api/v1/restaurants",
+        json={"name": "Second", "subdomain": "second-rest"},
+        headers=AUTH,
+    )
+    assert second_resp.status_code == 201
+    second_id = second_resp.json()["id"]
+    taken_resp = client.get(
+        "/api/v1/restaurants/check-subdomain",
+        params={"subdomain": "first-rest", "exclude": second_id},
+        headers=AUTH,
+    )
+    assert taken_resp.status_code == 200
+    assert taken_resp.json()["available"] is False
+
+    own_resp = client.get(
+        "/api/v1/restaurants/check-subdomain",
+        params={"subdomain": "second-rest", "exclude": second_id},
+        headers=AUTH,
+    )
+    assert own_resp.status_code == 200
+    assert own_resp.json()["available"] is True
+
+    free_resp = client.get(
+        "/api/v1/restaurants/check-subdomain",
+        params={"subdomain": "wild-rooster"},
+        headers=AUTH,
+    )
+    assert free_resp.status_code == 200
+    assert free_resp.json()["available"] is True
+
+    conflict_resp = client.patch(
+        f"/api/v1/restaurants/{second_id}",
+        json={"subdomain": "first-rest"},
+        headers=AUTH,
+    )
+    assert conflict_resp.status_code == 409
+
+    patch_resp = client.patch(
+        f"/api/v1/restaurants/{second_id}",
+        json={"subdomain": "wild-rooster"},
+        headers=AUTH,
+    )
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["subdomain"] == "wild-rooster"

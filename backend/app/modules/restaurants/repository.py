@@ -12,6 +12,7 @@ from app.modules.restaurants.schemas import (
     RestaurantDTO,
     RestaurantUpdate,
     ScheduleCreate,
+    ScheduleDTO,
 )
 
 
@@ -34,6 +35,9 @@ class RestaurantRepository(ABC):
     def list_for_owner(
         self, owner_id: uuid.UUID, params: PaginationParams
     ) -> CursorPage[RestaurantDTO]: ...
+
+    @abstractmethod
+    def list_schedules(self, restaurant_id: uuid.UUID) -> Sequence[ScheduleDTO]: ...
 
     @abstractmethod
     def list_payment_methods(self, restaurant_id: uuid.UUID) -> Sequence[PaymentMethodDTO]: ...
