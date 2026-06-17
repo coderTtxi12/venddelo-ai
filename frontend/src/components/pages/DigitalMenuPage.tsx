@@ -575,6 +575,9 @@ export default function DigitalMenuPage() {
                   onHeroCollapsedChange={handleProductHeroCollapsedChange}
                   scrollRootRef={phoneScrollRef}
                   onBack={closeProduct}
+                  onAddToCart={() => {
+                    // En el editor no hay carrito real; habilitamos CTA para igualar vista pública.
+                  }}
                   onReorderGroups={handleReorderOptionGroups}
                   onReorderItems={handleReorderOptionItems}
                 />
