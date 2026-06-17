@@ -11,7 +11,7 @@ import ViewListOutlinedIcon from '@mui/icons-material/ViewListOutlined';
 import { listCategories, listProducts, updateCategory, updateOptionGroup, updateOptionItem } from '@/lib/api/menu';
 import { fetchAllPages } from '@/lib/api/pagination';
 import { listAllPromotions } from '@/lib/api/promotions';
-import { getRestaurant, updateRestaurant } from '@/lib/api/restaurants';
+import { getRestaurant, listRestaurantPaymentMethods, listRestaurantSchedules, setRestaurantSchedules, updateRestaurant } from '@/lib/api/restaurants';
 import {
   ApiError,
   type Category,
@@ -20,17 +20,25 @@ import {
   type Product,
   type Promotion,
   type Restaurant,
+  type RestaurantSchedule,
+  type RestaurantScheduleCreateInput,
+  type RestaurantPaymentMethod,
 } from '@/lib/api/types';
-import {
-  buildMenuProductDiscountMap,
-  type MenuProductDiscountInfo,
-} from '@/lib/promotions/menuProductDiscount';
+import { buildMenuProductDiscountMap } from '@/lib/promotions/menuProductDiscount';
 import { arrayMove } from '@/lib/arrayMove';
-import { formatMoney } from '@/lib/currency';
 import { attachDragOverlay } from '@/lib/dragOverlay';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
 import { DigitalMenuProductDetail } from '@/components/digital-menu/DigitalMenuProductDetail';
+import {
+  ProductList,
+  productsForCategory,
+  sortCategories,
+} from '@/components/digital-menu/menuProductUi';
+import { RestaurantOpenStatusBadge } from '@/components/digital-menu/RestaurantOpenStatusBadge';
+import { RestaurantServiceChips } from '@/components/digital-menu/RestaurantServiceChips';
+import { RestaurantHoursFooter } from '@/components/digital-menu/RestaurantHoursFooter';
+import { RestaurantLocationSection } from '@/components/digital-menu/RestaurantLocationSection';
 import { DigitalMenuThemePicker } from '@/components/digital-menu/DigitalMenuThemePicker';
 import {
   DEFAULT_DIGITAL_MENU_THEME_ID,
@@ -38,6 +46,8 @@ import {
   getDigitalMenuThemeOrDefault,
   loadDigitalMenuThemeFonts,
 } from '@/lib/digital-menu/themes';
+import { resolveRestaurantServices, type RestaurantServiceType } from '@/lib/restaurantServices';
+import { restaurantPublicMenuUrl } from '@/lib/restaurantSubdomain';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveSupplierIdByEmail } from '@/services/db';
 import { legacyDb as db } from '@/services/legacyDb';
@@ -46,169 +56,9 @@ import styles from './DigitalMenuPage.module.css';
 const LAYOUTS: CategoryDisplayLayout[] = ['vertical', 'horizontal', 'grid'];
 const COVER_HEIGHT = 168;
 const PINNED_BAR_HEIGHT = 48;
-const THEME_STORAGE_KEY = 'venddelo-digital-menu-theme-id';
 
 function pickRandomLayout(): CategoryDisplayLayout {
   return LAYOUTS[Math.floor(Math.random() * LAYOUTS.length)]!;
-}
-
-function sortCategories(list: Category[]): Category[] {
-  return [...list].sort((a, b) => a.sort_index - b.sort_index || a.name.localeCompare(b.name));
-}
-
-function productsForCategory(products: Product[], categoryId: string): Product[] {
-  return products.filter(
-    (p) => p.is_active && p.category_ids.includes(categoryId),
-  );
-}
-
-function ProductThumb({ product, className }: { product: Product; className?: string }) {
-  const url = storagePublicUrl(product.image_path);
-  if (url) {
-    return <img src={url} alt={product.name} className={className} />;
-  }
-  return <div className={className} aria-hidden />;
-}
-
-function ProductPrice({
-  product,
-  discount,
-}: {
-  product: Product;
-  discount?: MenuProductDiscountInfo | null;
-}) {
-  const originalPrice = product.price_cents / 100;
-  const hasPriceDiscount = discount != null && discount.amountOff > 0;
-
-  if (!hasPriceDiscount && !discount?.badge) {
-    return (
-      <div className={styles.productPrice}>
-        {formatMoney(originalPrice, product.currency)}
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.productPriceRow}>
-      {hasPriceDiscount ? (
-        <>
-          <span className={styles.productPriceOriginal}>
-            {formatMoney(originalPrice, product.currency)}
-          </span>
-          <span className={styles.productPriceSale}>
-            {formatMoney(discount.finalPrice, product.currency)}
-          </span>
-        </>
-      ) : (
-        <span className={styles.productPrice}>
-          {formatMoney(originalPrice, product.currency)}
-        </span>
-      )}
-      {discount?.badge ? (
-        <span className={styles.productDiscountBadge}>{discount.badge}</span>
-      ) : null}
-    </div>
-  );
-}
-
-function ProductCardContent({
-  product,
-  discount,
-}: {
-  product: Product;
-  discount?: MenuProductDiscountInfo | null;
-}) {
-  return (
-    <>
-      <div className={styles.productName}>{product.name}</div>
-      {product.description ? (
-        <div className={styles.productDesc}>{product.description}</div>
-      ) : null}
-      <ProductPrice product={product} discount={discount} />
-    </>
-  );
-}
-
-function ProductList({
-  layout,
-  products,
-  productDiscounts,
-  onProductClick,
-}: {
-  layout: CategoryDisplayLayout;
-  products: Product[];
-  productDiscounts: Map<string, MenuProductDiscountInfo>;
-  onProductClick: (productId: string) => void;
-}) {
-  if (products.length === 0) {
-    return <div className={styles.emptyProducts}>Sin productos en esta categoría</div>;
-  }
-
-  if (layout === 'horizontal') {
-    return (
-      <div className={styles.productsHorizontal}>
-        {products.map((product) => (
-          <button
-            key={product.id}
-            type="button"
-            className={`${styles.productCardH} ${styles.productTapTarget}`}
-            onClick={() => onProductClick(product.id)}
-            aria-label={`Ver ${product.name}`}
-          >
-            <ProductThumb product={product} className={styles.productThumb} />
-            <ProductCardContent
-              product={product}
-              discount={productDiscounts.get(product.id)}
-            />
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  if (layout === 'grid') {
-    return (
-      <div className={styles.productsGrid}>
-        {products.map((product) => (
-          <button
-            key={product.id}
-            type="button"
-            className={`${styles.productCardG} ${styles.productTapTarget}`}
-            onClick={() => onProductClick(product.id)}
-            aria-label={`Ver ${product.name}`}
-          >
-            <ProductThumb product={product} className={styles.productThumb} />
-            <ProductCardContent
-              product={product}
-              discount={productDiscounts.get(product.id)}
-            />
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.productsVertical}>
-      {products.map((product) => (
-        <button
-          key={product.id}
-          type="button"
-          className={`${styles.productRow} ${styles.productTapTarget}`}
-          onClick={() => onProductClick(product.id)}
-          aria-label={`Ver ${product.name}`}
-        >
-          <div className={styles.productRowBody}>
-            <ProductCardContent
-              product={product}
-              discount={productDiscounts.get(product.id)}
-            />
-          </div>
-          <ProductThumb product={product} className={styles.productThumb} />
-        </button>
-      ))}
-    </div>
-  );
 }
 
 export default function DigitalMenuPage() {
@@ -223,7 +73,6 @@ export default function DigitalMenuPage() {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [dragCategoryId, setDragCategoryId] = useState<string | null>(null);
   const [dropCategoryId, setDropCategoryId] = useState<string | null>(null);
-  const [savingName, setSavingName] = useState(false);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -236,27 +85,62 @@ export default function DigitalMenuPage() {
   const [themeId, setThemeId] = useState(DEFAULT_DIGITAL_MENU_THEME_ID);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [productHeroCollapsed, setProductHeroCollapsed] = useState(false);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(THEME_STORAGE_KEY);
-      if (stored) setThemeId(stored);
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const [enabledServices, setEnabledServices] = useState<RestaurantServiceType[]>([]);
+  const [schedules, setSchedules] = useState<RestaurantSchedule[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<RestaurantPaymentMethod[]>([]);
+  const [savingSchedules, setSavingSchedules] = useState(false);
 
   const menuTheme = useMemo(() => getDigitalMenuThemeOrDefault(themeId), [themeId]);
   const menuThemeStyle = useMemo(() => digitalMenuThemeToStyle(menuTheme), [menuTheme]);
 
   useEffect(() => {
     loadDigitalMenuThemeFonts(menuTheme);
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, themeId);
-    } catch {
-      /* ignore */
-    }
-  }, [menuTheme, themeId]);
+  }, [menuTheme]);
+
+  const handleThemeChange = useCallback(
+    async (nextThemeId: string) => {
+      const resolvedThemeId = getDigitalMenuThemeOrDefault(nextThemeId).id;
+      if (!accessToken || !restaurantId) {
+        setThemeId(resolvedThemeId);
+        return;
+      }
+
+      const previousThemeId = themeId;
+      setThemeId(resolvedThemeId);
+
+      try {
+        const updated = await updateRestaurant(accessToken, restaurantId, {
+          digital_menu_theme_id: resolvedThemeId,
+        });
+        setRestaurant(updated);
+      } catch (error) {
+        console.error(error);
+        setThemeId(previousThemeId);
+      }
+    },
+    [accessToken, restaurantId, themeId],
+  );
+
+  const handleSaveSchedules = useCallback(
+    async (payload: RestaurantScheduleCreateInput[]) => {
+      if (!accessToken || !restaurantId) return;
+
+      setSavingSchedules(true);
+      try {
+        await setRestaurantSchedules(accessToken, restaurantId, payload);
+        const updatedSchedules = await listRestaurantSchedules(accessToken, restaurantId);
+        setSchedules(updatedSchedules);
+        setEnabledServices((current) =>
+          resolveRestaurantServices(
+            restaurant ?? { takeout_enabled: true, delivery_enabled: true },
+          ),
+        );
+      } finally {
+        setSavingSchedules(false);
+      }
+    },
+    [accessToken, restaurantId, restaurant],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -288,11 +172,14 @@ export default function DigitalMenuPage() {
         }
 
         const rid = resolved.supplierId;
-        const [restaurantData, categoryRows, productRows, promotionRows] = await Promise.all([
+        const [restaurantData, categoryRows, productRows, promotionRows, schedules, paymentMethods] =
+          await Promise.all([
           getRestaurant(accessToken, rid),
           fetchAllPages((cursor) => listCategories(accessToken, rid, 100, cursor)),
           fetchAllPages((cursor) => listProducts(accessToken, rid, 100, cursor)),
           listAllPromotions(accessToken, rid),
+          listRestaurantSchedules(accessToken, rid),
+          listRestaurantPaymentMethods(accessToken, rid),
         ]);
 
         const layoutUpdates: Promise<Category>[] = [];
@@ -315,6 +202,10 @@ export default function DigitalMenuPage() {
 
         setRestaurantId(rid);
         setRestaurant(restaurantData);
+        setSchedules(schedules);
+        setPaymentMethods(paymentMethods);
+        setEnabledServices(resolveRestaurantServices(restaurantData));
+        setThemeId(getDigitalMenuThemeOrDefault(restaurantData.digital_menu_theme_id).id);
         setCategories(normalizedCategories);
         setProducts(productRows);
         setPromotions(promotionRows);
@@ -403,14 +294,29 @@ export default function DigitalMenuPage() {
       if (!accessToken || !restaurantId || !restaurant) return;
       const trimmed = value.trim();
       if (!trimmed || trimmed === restaurant.name) return;
-      setSavingName(true);
       try {
         const updated = await updateRestaurant(accessToken, restaurantId, { name: trimmed });
         setRestaurant(updated);
       } catch (error) {
         console.error(error);
-      } finally {
-        setSavingName(false);
+      }
+    },
+    [accessToken, restaurant, restaurantId],
+  );
+
+  const handleDescriptionBlur = useCallback(
+    async (value: string) => {
+      if (!accessToken || !restaurantId || !restaurant) return;
+      const trimmed = value.trim();
+      const current = restaurant.description?.trim() ?? '';
+      if (trimmed === current) return;
+      try {
+        const updated = await updateRestaurant(accessToken, restaurantId, {
+          description: trimmed || null,
+        });
+        setRestaurant(updated);
+      } catch (error) {
+        console.error(error);
       }
     },
     [accessToken, restaurant, restaurantId],
@@ -594,15 +500,25 @@ export default function DigitalMenuPage() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Menú Digital</h1>
-        <p className={styles.subtitle}>
-          Personaliza portada, logo, nombre, orden de categorías y cómo se muestran los productos
-        </p>
+        <div className={styles.pageHeaderMain}>
+          <h1 className={styles.title}>Menú Digital</h1>
+          <p className={styles.subtitle}>
+            Personaliza portada, logo, nombre, orden de categorías y cómo se muestran los productos
+          </p>
+        </div>
+        <a
+          href={restaurantPublicMenuUrl(restaurant.subdomain)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.livePreviewBtn}
+        >
+          Ver en vivo
+        </a>
       </div>
 
       <div className={styles.previewLayout}>
         <div className={styles.themePanelWrap}>
-          <DigitalMenuThemePicker value={themeId} onChange={setThemeId} />
+          <DigitalMenuThemePicker value={themeId} onChange={handleThemeChange} />
         </div>
 
         <div className={styles.previewShell}>
@@ -742,14 +658,21 @@ export default function DigitalMenuPage() {
                     aria-label="Nombre del restaurante"
                     onBlur={(e) => void handleNameBlur(e.target.value)}
                   />
-                  <div className={styles.nameHint}>
-                    {savingName ? 'Guardando…' : 'Toca el nombre para editarlo'}
-                  </div>
+                  <RestaurantOpenStatusBadge schedules={schedules} services={enabledServices} />
                 </div>
               </div>
-              {restaurant.address ? (
-                <div className={styles.addressLine}>{restaurant.address}</div>
-              ) : null}
+              <div className={styles.descriptionBlock}>
+                <textarea
+                  className={styles.restaurantDescription}
+                  defaultValue={restaurant.description ?? ''}
+                  key={`${restaurant.id}-desc-${restaurant.description ?? ''}`}
+                  aria-label="Descripción del restaurante"
+                  placeholder="Describe tu restaurante (ej. especialidad, ambiente, historia…)"
+                  rows={2}
+                  onBlur={(e) => void handleDescriptionBlur(e.target.value)}
+                />
+              </div>
+              <RestaurantServiceChips services={enabledServices} />
               <div ref={heroSentinelRef} className={styles.heroSentinel} aria-hidden />
             </div>
               </section>
@@ -893,6 +816,12 @@ export default function DigitalMenuPage() {
                 })}
               </>
             )}
+            <RestaurantHoursFooter
+              schedules={schedules}
+              saving={savingSchedules}
+              onSave={handleSaveSchedules}
+            />
+            <RestaurantLocationSection restaurant={restaurant} />
               </>
               )}
             </div>

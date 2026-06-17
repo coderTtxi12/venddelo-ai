@@ -7,8 +7,66 @@
 
 .header {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.pageHeaderMain {
+  display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  min-width: 0;
+}
+
+.livePreviewBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.55rem 0.95rem;
+  min-height: 44px;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.livePreviewBtn:hover {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+}
+
+.publicRoot {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  min-height: 100dvh;
+  max-height: none;
+  border-radius: 0;
+}
+
+.restaurantNameStatic {
+  margin: 0;
+  font-family: var(--dm-font-heading, inherit);
+  font-size: 1.15rem;
+  font-weight: var(--dm-font-heading-weight, 700);
+  line-height: 1.25;
+  color: var(--dm-text, #111827);
+}
+
+.restaurantDescriptionStatic {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--dm-text-secondary, #64748b);
 }
 
 .title {
@@ -371,17 +429,32 @@
   border-bottom: 1px dashed var(--dm-primary, var(--color-primary));
 }
 
-.nameHint {
-  font-size: 0.72rem;
-  color: var(--dm-text-secondary, #64748b);
-  margin-top: 4px;
+.descriptionBlock {
+  margin-top: 10px;
 }
 
-.addressLine {
-  margin-top: 8px;
-  font-size: 0.78rem;
+.restaurantDescription {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  resize: vertical;
+  min-height: 2.6em;
+  font: inherit;
+  font-size: 0.82rem;
+  line-height: 1.4;
   color: var(--dm-text-secondary, #64748b);
-  line-height: 1.35;
+  background: transparent;
+}
+
+.restaurantDescription::placeholder {
+  color: var(--dm-text-secondary, #94a3b8);
+  opacity: 0.85;
+}
+
+.restaurantDescription:focus {
+  outline: none;
+  border-bottom: 1px dashed var(--dm-primary, var(--color-primary));
 }
 
 .categoryBar {

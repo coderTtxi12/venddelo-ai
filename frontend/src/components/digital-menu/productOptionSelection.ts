@@ -62,6 +62,32 @@ export function isGroupRequirementMet(group: OptionGroup, selectedIds: string[])
   return true;
 }
 
+/** True when the user has finished this group (auto-collapse trigger). */
+export function isGroupSelectionComplete(group: OptionGroup, selectedIds: string[]): boolean {
+  const count = selectedIds.length;
+
+  if (group.selection === 'single') {
+    return count === 1;
+  }
+
+  const max = group.max_selections;
+  if (max != null) {
+    return count >= max;
+  }
+
+  const minRequired = group.required ? Math.max(1, group.min_selections) : group.min_selections;
+  if (group.required && count >= minRequired) {
+    return true;
+  }
+
+  return false;
+}
+
+export function getSelectedOptionLabels(group: OptionGroup, selectedIds: string[]): string[] {
+  const selected = new Set(selectedIds);
+  return group.items.filter((item) => selected.has(item.id)).map((item) => item.label);
+}
+
 /** True when every required option group has a valid selection. */
 export function canAddProductToCart(
   groups: OptionGroup[],

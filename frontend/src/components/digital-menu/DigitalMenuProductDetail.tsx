@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CheckIcon from '@mui/icons-material/Check';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
@@ -20,6 +22,8 @@ import {
   canAddProductToCart,
   computeLineTotal,
   createEmptySelections,
+  getGroupSelection,
+  isGroupSelectionComplete,
   isItemSelected,
   toggleOptionSelection,
   type OptionSelections,
@@ -37,8 +41,8 @@ type DigitalMenuProductDetailProps = {
   onHeroCollapsedChange: (collapsed: boolean) => void;
   scrollRootRef: RefObject<HTMLDivElement | null>;
   onBack: () => void;
-  onReorderGroups: (groups: OptionGroup[]) => Promise<void>;
-  onReorderItems: (groupId: string, group: OptionGroup) => Promise<void>;
+  onReorderGroups?: (groups: OptionGroup[]) => Promise<void>;
+  onReorderItems?: (groupId: string, group: OptionGroup) => Promise<void>;
 };
 
 function DetailPrice({
@@ -78,6 +82,24 @@ function DetailPrice({
   );
 }
 
+function formatCollapsedGroupSummary(
+  group: OptionGroup,
+  selectedIds: string[],
+  currency: string,
+): string {
+  const selectedSet = new Set(selectedIds);
+  const items = group.items.filter((item) => selectedSet.has(item.id));
+  if (items.length === 0) return 'Sin seleccionar';
+  return items
+    .map((item) => {
+      if (item.price_delta_cents !== 0) {
+        return `${item.label} (+${formatMoney(item.price_delta_cents / 100, currency)})`;
+      }
+      return item.label;
+    })
+    .join(' · ');
+}
+
 export function DigitalMenuProductDetail({
   product,
   discount,
@@ -95,9 +117,11 @@ export function DigitalMenuProductDetail({
   const [dropItemId, setDropItemId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [selections, setSelections] = useState<OptionSelections>(createEmptySelections);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const imageUrl = storagePublicUrl(product.image_path);
   const groups = activeOptionGroups(product);
+  const canReorder = onReorderGroups != null && onReorderItems != null;
   const unitPrice =
     discount != null && discount.amountOff > 0
       ? discount.finalPrice
@@ -112,6 +136,7 @@ export function DigitalMenuProductDetail({
   useEffect(() => {
     setQuantity(1);
     setSelections(createEmptySelections());
+    setExpandedGroups({});
   }, [product.id]);
 
   useEffect(() => {
@@ -139,7 +164,7 @@ export function DigitalMenuProductDetail({
   }, [product.id, scrollRootRef, onHeroCollapsedChange]);
 
   const handleGroupDrop = (targetGroupId: string) => {
-    if (!dragGroupId || dragGroupId === targetGroupId) return;
+    if (!canReorder || !onReorderGroups || !dragGroupId || dragGroupId === targetGroupId) return;
     const from = groups.findIndex((group) => group.id === dragGroupId);
     const to = groups.findIndex((group) => group.id === targetGroupId);
     if (from < 0 || to < 0) return;
@@ -150,7 +175,7 @@ export function DigitalMenuProductDetail({
   };
 
   const handleItemDrop = (group: OptionGroup, targetItemId: string) => {
-    if (!dragItemId || dragItemId === targetItemId) return;
+    if (!canReorder || !onReorderItems || !dragItemId || dragItemId === targetItemId) return;
     const activeItems = group.items.filter((item) => item.is_active);
     const from = activeItems.findIndex((item) => item.id === dragItemId);
     const to = activeItems.findIndex((item) => item.id === targetItemId);
@@ -162,8 +187,17 @@ export function DigitalMenuProductDetail({
   };
 
   const handleOptionToggle = (group: OptionGroup, itemId: string) => {
-    setSelections((prev) => toggleOptionSelection(group, itemId, prev));
+    setSelections((prev) => {
+      const next = toggleOptionSelection(group, itemId, prev);
+      const selectedIds = getGroupSelection(next, group.id);
+      if (isGroupSelectionComplete(group, selectedIds)) {
+        setExpandedGroups((current) => ({ ...current, [group.id]: false }));
+      }
+      return next;
+    });
   };
+
+  const isGroupExpanded = (groupId: string) => expandedGroups[groupId] !== false;
 
   return (
     <>
@@ -208,6 +242,16 @@ export function DigitalMenuProductDetail({
             <div className={styles.optionSections}>
               {groups.map((group) => {
                 const activeItems = group.items.filter((item) => item.is_active);
+                const selectedIds = getGroupSelection(selections, group.id);
+                const isComplete = isGroupSelectionComplete(group, selectedIds);
+                const isExpanded = isGroupExpanded(group.id);
+                const isCollapsed = isComplete && !isExpanded;
+                const collapsedSummary = formatCollapsedGroupSummary(
+                  group,
+                  selectedIds,
+                  product.currency,
+                );
+
                 return (
                   <div
                     key={group.id}
@@ -218,20 +262,33 @@ export function DigitalMenuProductDetail({
                         ? styles.optionGroupDropTarget
                         : ''
                     }`}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      if (dragGroupId && dragGroupId !== group.id) {
-                        setDropGroupId(group.id);
-                      }
-                    }}
-                    onDragLeave={() => {
-                      if (dropGroupId === group.id) setDropGroupId(null);
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      handleGroupDrop(group.id);
-                    }}
+                    onDragOver={
+                      canReorder
+                        ? (e) => {
+                            e.preventDefault();
+                            if (dragGroupId && dragGroupId !== group.id) {
+                              setDropGroupId(group.id);
+                            }
+                          }
+                        : undefined
+                    }
+                    onDragLeave={
+                      canReorder
+                        ? () => {
+                            if (dropGroupId === group.id) setDropGroupId(null);
+                          }
+                        : undefined
+                    }
+                    onDrop={
+                      canReorder
+                        ? (e) => {
+                            e.preventDefault();
+                            handleGroupDrop(group.id);
+                          }
+                        : undefined
+                    }
                   >
+                    {canReorder ? (
                     <button
                       type="button"
                       className={styles.groupDragHandle}
@@ -262,24 +319,62 @@ export function DigitalMenuProductDetail({
                     >
                       <DragIndicatorIcon sx={{ fontSize: 18 }} aria-hidden />
                     </button>
+                    ) : null}
 
-                    <section className={styles.optionGroupCard} aria-label={group.title}>
-                      <div className={styles.optionGroupHeader}>
-                        <div className={styles.optionGroupTitleRow}>
-                          <h2 className={styles.optionGroupTitle}>{group.title}</h2>
-                          {group.required ? (
-                            <span className={styles.requiredBadge}>Obligatorio</span>
-                          ) : null}
-                        </div>
-                        <span className={styles.optionGroupHint}>
-                          {optionGroupSelectionHint(group)}
-                        </span>
-                      </div>
-                      <ul
-                        className={styles.optionList}
-                        role={group.selection === 'single' ? 'radiogroup' : 'group'}
-                        aria-label={group.title}
-                      >
+                    <section
+                      className={`${styles.optionGroupCard} ${
+                        isCollapsed ? styles.optionGroupCardCollapsed : ''
+                      }`}
+                      aria-label={group.title}
+                    >
+                      {isCollapsed ? (
+                        <button
+                          type="button"
+                          className={styles.optionGroupCollapsedBtn}
+                          aria-expanded={false}
+                          onClick={() =>
+                            setExpandedGroups((current) => ({ ...current, [group.id]: true }))
+                          }
+                        >
+                          <span className={styles.optionGroupCollapsedMain}>
+                            <span className={styles.optionGroupCollapsedTop}>
+                              <CheckCircleIcon
+                                className={styles.optionGroupCompleteIcon}
+                                sx={{ fontSize: 18 }}
+                                aria-hidden
+                              />
+                              <span className={styles.optionGroupTitle}>{group.title}</span>
+                            </span>
+                            <span className={styles.optionGroupSummary}>{collapsedSummary}</span>
+                          </span>
+                          <ExpandMoreIcon className={styles.optionGroupChevron} aria-hidden />
+                        </button>
+                      ) : (
+                        <>
+                          <div className={styles.optionGroupHeader}>
+                            <div className={styles.optionGroupTitleRow}>
+                              <h2 className={styles.optionGroupTitle}>{group.title}</h2>
+                              <div className={styles.optionGroupTitleActions}>
+                                {isComplete ? (
+                                  <span className={styles.completeBadge}>
+                                    <CheckCircleIcon sx={{ fontSize: 14 }} aria-hidden />
+                                    Listo
+                                  </span>
+                                ) : null}
+                                {group.required ? (
+                                  <span className={styles.requiredBadge}>Obligatorio</span>
+                                ) : null}
+                              </div>
+                            </div>
+                            <span className={styles.optionGroupHint}>
+                              {optionGroupSelectionHint(group)}
+                            </span>
+                          </div>
+                          <ul
+                            className={styles.optionList}
+                            role={group.selection === 'single' ? 'radiogroup' : 'group'}
+                            aria-label={group.title}
+                          >
                         {activeItems.map((item) => {
                           const selected = isItemSelected(selections, group.id, item.id);
                           return (
@@ -292,20 +387,33 @@ export function DigitalMenuProductDetail({
                                 ? styles.optionItemDropTarget
                                 : ''
                             }`}
-                            onDragOver={(e) => {
-                              e.preventDefault();
-                              if (dragItemId && dragItemId !== item.id) {
-                                setDropItemId(item.id);
-                              }
-                            }}
-                            onDragLeave={() => {
-                              if (dropItemId === item.id) setDropItemId(null);
-                            }}
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              handleItemDrop(group, item.id);
-                            }}
+                            onDragOver={
+                              canReorder
+                                ? (e) => {
+                                    e.preventDefault();
+                                    if (dragItemId && dragItemId !== item.id) {
+                                      setDropItemId(item.id);
+                                    }
+                                  }
+                                : undefined
+                            }
+                            onDragLeave={
+                              canReorder
+                                ? () => {
+                                    if (dropItemId === item.id) setDropItemId(null);
+                                  }
+                                : undefined
+                            }
+                            onDrop={
+                              canReorder
+                                ? (e) => {
+                                    e.preventDefault();
+                                    handleItemDrop(group, item.id);
+                                  }
+                                : undefined
+                            }
                           >
+                            {canReorder ? (
                             <button
                               type="button"
                               className={styles.itemDragHandle}
@@ -336,6 +444,7 @@ export function DigitalMenuProductDetail({
                             >
                               <DragIndicatorIcon sx={{ fontSize: 16 }} aria-hidden />
                             </button>
+                            ) : null}
                             <button
                               type="button"
                               className={`${styles.optionItem} ${selected ? styles.optionItemSelected : ''}`}
@@ -370,7 +479,20 @@ export function DigitalMenuProductDetail({
                           </li>
                           );
                         })}
-                      </ul>
+                          </ul>
+                          {isComplete ? (
+                            <button
+                              type="button"
+                              className={styles.optionGroupMinimizeBtn}
+                              onClick={() =>
+                                setExpandedGroups((current) => ({ ...current, [group.id]: false }))
+                              }
+                            >
+                              Minimizar
+                            </button>
+                          ) : null}
+                        </>
+                      )}
                     </section>
                   </div>
                 );

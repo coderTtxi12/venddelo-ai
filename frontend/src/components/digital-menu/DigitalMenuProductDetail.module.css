@@ -216,6 +216,11 @@
   margin-top: 18px;
 }
 
+.optionGroupSortable:has(.optionGroupCardCollapsed) .groupDragHandle {
+  margin-top: 0;
+  align-self: center;
+}
+
 .itemDragHandle {
   margin-top: 10px;
   align-self: flex-start;
@@ -247,6 +252,125 @@
   min-width: 0;
   border-top: 1px solid var(--dm-border, #eef2f7);
   padding-top: 16px;
+}
+
+.optionGroupCardCollapsed {
+  border: 1px solid var(--dm-border, #eef2f7);
+  border-radius: var(--dm-radius-ui, 12px);
+  padding: 0;
+  margin-top: 0;
+  background: color-mix(in srgb, var(--dm-primary, #111827) 4%, var(--dm-surface, #fff));
+  overflow: hidden;
+}
+
+.optionGroupCollapsedBtn {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 12px 12px 12px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .optionGroupCollapsedBtn {
+    transition: background-color 180ms ease;
+  }
+}
+
+.optionGroupCollapsedBtn:hover {
+  background: color-mix(in srgb, var(--dm-primary, #111827) 7%, var(--dm-surface, #fff));
+}
+
+.optionGroupCollapsedBtn:focus-visible {
+  outline: 2px solid var(--dm-primary, #111827);
+  outline-offset: -2px;
+}
+
+.optionGroupCollapsedMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.optionGroupCollapsedTop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.optionGroupCompleteIcon {
+  color: var(--dm-primary, #111827);
+  flex-shrink: 0;
+}
+
+.optionGroupSummary {
+  font-size: 0.78rem;
+  color: var(--dm-text-muted, #64748b);
+  line-height: 1.35;
+  padding-left: 24px;
+}
+
+.optionGroupChevron {
+  color: var(--dm-text-secondary, #94a3b8);
+  flex-shrink: 0;
+}
+
+.optionGroupTitleActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.completeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dm-primary, #111827) 12%, transparent);
+  color: var(--dm-primary, #111827);
+}
+
+.optionGroupMinimizeBtn {
+  margin-top: 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--dm-text-muted, #64748b);
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 8px 0 2px;
+  cursor: pointer;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .optionGroupMinimizeBtn {
+    transition: color 180ms ease;
+  }
+}
+
+.optionGroupMinimizeBtn:hover {
+  color: var(--dm-text, #111827);
+}
+
+.optionGroupMinimizeBtn:focus-visible {
+  outline: 2px solid var(--dm-primary, #111827);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 .optionGroup {

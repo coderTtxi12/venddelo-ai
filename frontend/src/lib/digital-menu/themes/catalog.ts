@@ -27,7 +27,7 @@ function c(
 /**
  * Curated digital menu themes generated with ui-ux-pro-max design-system searches.
  * Each theme combines typography pairing, color roles, surfaces, and layout tokens.
- * Stored in frontend only — not persisted to the database.
+ * Stored in restaurants.digital_menu_theme_id — persisted via PATCH /restaurants/{id}.
  */
 export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
   {
