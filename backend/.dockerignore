@@ -2,7 +2,12 @@
 __pycache__
 *.pyc
 .env
+.env.*
+!.env.docker.example
 tests
 .pytest_cache
 .mypy_cache
 .ruff_cache
+docker-compose.yml
+requirements-dev.txt
+.pre-commit-config.yaml
