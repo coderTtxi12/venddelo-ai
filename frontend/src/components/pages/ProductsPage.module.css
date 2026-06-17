@@ -1357,7 +1357,7 @@
  
  .optionItemRow {
    display: grid;
-   grid-template-columns: 28px 1fr 140px 44px;
+   grid-template-columns: 28px 1fr 140px auto;
    gap: 0.6rem;
    align-items: center;
    border-radius: 12px;
@@ -1371,6 +1371,19 @@
  .optionItemRow .dragHandle {
    margin-top: 0;
    padding: 0.25rem;
+ }
+
+ .optionItemActions {
+   display: flex;
+   align-items: center;
+   gap: 0.15rem;
+ }
+
+ .inactiveItemActions {
+   display: flex;
+   align-items: center;
+   gap: 0.35rem;
+   flex-shrink: 0;
  }
 
  .optionItemDragging {
@@ -1420,6 +1433,76 @@
    display: flex;
    justify-content: space-between;
    align-items: center;
+ }
+
+ .inactiveItemsSection {
+   margin-top: 0.5rem;
+   border: 1px dashed var(--color-border);
+   background: var(--color-bg);
+   border-radius: 12px;
+   padding: 0.65rem 0.75rem;
+   display: flex;
+   flex-direction: column;
+   gap: 0.55rem;
+ }
+
+ .inactiveItemsHeader {
+   display: flex;
+   align-items: baseline;
+   justify-content: space-between;
+   gap: 0.5rem;
+   flex-wrap: wrap;
+ }
+
+ .inactiveItemsTitle {
+   margin: 0;
+   font-size: 0.85rem;
+   font-weight: 950;
+   color: var(--color-text);
+ }
+
+ .inactiveItemsHint {
+   font-size: 0.75rem;
+   color: var(--color-text-secondary);
+ }
+
+ .inactiveItemsList {
+   display: flex;
+   flex-direction: column;
+   gap: 0.4rem;
+ }
+
+ .inactiveItemRow {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 0.65rem;
+   padding: 0.5rem 0.6rem;
+   border: 1px solid var(--color-border);
+   border-radius: 10px;
+   background: var(--color-surface);
+ }
+
+ .inactiveItemMeta {
+   min-width: 0;
+ }
+
+ .inactiveItemLabel {
+   display: block;
+   font-weight: 800;
+   font-size: 0.85rem;
+   color: var(--color-text);
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   max-width: 16rem;
+ }
+
+ .inactiveItemSub {
+   display: block;
+   margin-top: 0.1rem;
+   font-size: 0.72rem;
+   color: var(--color-text-secondary);
  }
  
  .disabledSection {

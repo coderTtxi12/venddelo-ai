@@ -6,9 +6,11 @@ import {
   deleteOptionItem,
   listProducts,
   updateOptionGroup,
+  updateOptionItem,
   updateProduct,
   type OptionGroupCreateInput,
   type OptionGroupUpdateInput,
+  type OptionItemUpdateInput,
 } from '@/lib/api/menu';
 import { mapOptionGroupToDraft, mapProductToDraft } from '@/lib/api/mappers';
 import type { Product } from '@/lib/api/types';
@@ -212,15 +214,28 @@ async function syncGroupItems(
   const activeItems = group.items.filter((item) => item.isActive);
   const keptPersistedIds = new Set<string>();
   const deleteIds: string[] = [];
+  const pendingUpdates: Array<{ itemId: string; body: OptionItemUpdateInput }> = [];
 
   for (const existingItem of existing.items) {
     const draftItem = group.items.find((item) => item.id === existingItem.id);
-    if (!draftItem || !draftItem.isActive) {
+    if (!draftItem) {
       deleteIds.push(existingItem.id);
       continue;
     }
 
     const priceDeltaCents = Math.round(draftItem.priceDeltaUsd * 100);
+
+    if (!draftItem.isActive) {
+      if (existingItem.isActive) {
+        pendingUpdates.push({ itemId: existingItem.id, body: { is_active: false } });
+      }
+      continue;
+    }
+
+    if (!existingItem.isActive) {
+      pendingUpdates.push({ itemId: existingItem.id, body: { is_active: true } });
+    }
+
     if (itemPayloadMatches(draftItem.label, priceDeltaCents, existingItem)) {
       keptPersistedIds.add(existingItem.id);
       continue;
@@ -244,15 +259,18 @@ async function syncGroupItems(
     });
   }
 
-  if (deleteIds.length === 0 && pendingCreates.length === 0) {
+  if (deleteIds.length === 0 && pendingCreates.length === 0 && pendingUpdates.length === 0) {
     return group;
   }
 
-  await Promise.all(
-    deleteIds.map((itemId) =>
+  await Promise.all([
+    ...pendingUpdates.map(({ itemId, body }) =>
+      updateOptionItem(accessToken, restaurantId, productId, groupId, itemId, body),
+    ),
+    ...deleteIds.map((itemId) =>
       deleteOptionItem(accessToken, restaurantId, productId, groupId, itemId),
     ),
-  );
+  ]);
 
   const createdItems = await Promise.all(
     pendingCreates.map((item) =>

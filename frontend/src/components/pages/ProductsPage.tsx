@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './ProductsPage.module.css';
 import CloseIcon from '@mui/icons-material/Close';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import FilterListIcon from '@mui/icons-material/FilterList';
@@ -1952,6 +1953,7 @@ function OptionGroupEditor({
   onDisable: () => void;
 }) {
   const activeItems = group.items.filter((i) => i.isActive);
+  const inactiveItems = group.items.filter((i) => !i.isActive);
   const maxSelectable = Math.max(1, activeItems.length);
   const [dragItemId, setDragItemId] = useState<string | null>(null);
   const [dropItemId, setDropItemId] = useState<string | null>(null);
@@ -1964,6 +1966,10 @@ function OptionGroupEditor({
     onChange(reorderActiveItems(group, from, to));
     setDragItemId(null);
     setDropItemId(null);
+  };
+
+  const removeItem = (itemId: string) => {
+    onChange({ ...group, items: group.items.filter((item) => item.id !== itemId) });
   };
 
   return (
@@ -2131,19 +2137,85 @@ function OptionGroupEditor({
                   aria-label="Costo extra en MXN"
                 />
               </div>
-              <button
-                type="button"
-                className={styles.dangerGhostBtn}
-                onClick={() => onChange({ ...group, items: group.items.map((x) => (x.id === it.id ? { ...x, isActive: false } : x)) })}
-                aria-label={`Eliminar opción ${it.label}`}
-                title="Eliminar"
-              >
-                <DeleteOutlineOutlinedIcon sx={{ fontSize: 20 }} aria-hidden />
-              </button>
+              <div className={styles.optionItemActions}>
+                <button
+                  type="button"
+                  className={styles.dangerGhostBtn}
+                  onClick={() =>
+                    onChange({
+                      ...group,
+                      items: group.items.map((x) =>
+                        x.id === it.id ? { ...x, isActive: false } : x,
+                      ),
+                    })
+                  }
+                  aria-label={`Desactivar opción ${it.label}`}
+                  title="Desactivar ítem"
+                >
+                  <VisibilityOffOutlinedIcon sx={{ fontSize: 20 }} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className={styles.dangerGhostBtn}
+                  onClick={() => removeItem(it.id)}
+                  aria-label={`Eliminar opción ${it.label}`}
+                  title="Eliminar ítem"
+                >
+                  <DeleteOutlineOutlinedIcon sx={{ fontSize: 20 }} aria-hidden />
+                </button>
+              </div>
             </div>
           ))}
         </div>
       )}
+
+      {inactiveItems.length > 0 ? (
+        <div className={styles.inactiveItemsSection}>
+          <div className={styles.inactiveItemsHeader}>
+            <h5 className={styles.inactiveItemsTitle}>Ítems desactivados</h5>
+            <span className={styles.inactiveItemsHint}>No los ven tus clientes.</span>
+          </div>
+          <div className={styles.inactiveItemsList}>
+            {inactiveItems.map((it) => (
+              <div key={it.id} className={styles.inactiveItemRow}>
+                <div className={styles.inactiveItemMeta}>
+                  <span className={styles.inactiveItemLabel}>{it.label || 'Opción sin nombre'}</span>
+                  {it.priceDeltaUsd > 0 ? (
+                    <span className={styles.inactiveItemSub}>
+                      + MXN {it.priceDeltaUsd.toFixed(2)}
+                    </span>
+                  ) : null}
+                </div>
+                <div className={styles.inactiveItemActions}>
+                  <button
+                    type="button"
+                    className={styles.secondaryBtn}
+                    onClick={() =>
+                      onChange({
+                        ...group,
+                        items: group.items.map((x) =>
+                          x.id === it.id ? { ...x, isActive: true } : x,
+                        ),
+                      })
+                    }
+                  >
+                    Activar ítem
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.dangerGhostBtn}
+                    onClick={() => removeItem(it.id)}
+                    aria-label={`Eliminar opción ${it.label}`}
+                    title="Eliminar ítem"
+                  >
+                    <DeleteOutlineOutlinedIcon sx={{ fontSize: 20 }} aria-hidden />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className={styles.optionGroupFooter}>
         <span className={styles.muted}>
