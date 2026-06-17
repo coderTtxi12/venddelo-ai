@@ -1,0 +1,387 @@
+.layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--dm-bg, #fff);
+  color: var(--dm-text, #111827);
+}
+
+.sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--dm-border, #e2e8f0);
+  background: var(--dm-surface, #fff);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebarCover {
+  flex-shrink: 0;
+  height: var(--dm-cover-height, 168px);
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    var(--dm-cover-from, #cbd5e1) 0%,
+    var(--dm-cover-to, #94a3b8) 100%
+  );
+}
+
+.sidebarScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sidebarCoverImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sidebarCoverPlaceholder {
+  width: 100%;
+  height: 100%;
+}
+
+.sidebarBody {
+  padding: 16px 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.brandRow {
+  display: flex;
+  gap: 12px;
+  padding: 0 16px;
+}
+
+.logoWrap {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--dm-radius-card, 12px);
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid var(--dm-border, #e2e8f0);
+  background: var(--dm-bg, #fff);
+}
+
+.logoImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.logoPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: var(--dm-text-secondary, #64748b);
+}
+
+.brandMeta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.restaurantName {
+  margin: 0;
+  font-family: var(--dm-font-heading, inherit);
+  font-size: 1.05rem;
+  font-weight: var(--dm-font-heading-weight, 700);
+  line-height: 1.25;
+  color: var(--dm-text, #111827);
+}
+
+.restaurantMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.restaurantDescription {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--dm-text-secondary, #64748b);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  font-weight: var(--dm-font-body-weight, 400);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.restaurantServiceList {
+  margin: 0;
+}
+
+.categoryNav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-top: 1px solid var(--dm-border, #e2e8f0);
+  margin-top: 4px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--dm-surface, #fff);
+}
+
+.categoryNavItem {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 11px 16px 11px 13px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  color: var(--dm-text, #111827);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.categoryNavItem:hover {
+  background: color-mix(in srgb, var(--dm-primary, #2563eb) 8%, transparent);
+}
+
+.categoryNavItemActive {
+  border-left-color: var(--dm-primary, #2563eb);
+  color: var(--dm-primary, #2563eb);
+  font-weight: 700;
+  background: color-mix(in srgb, var(--dm-primary, #2563eb) 10%, transparent);
+}
+
+.cartNavBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 8px;
+  padding: 11px 14px;
+  border: 1px solid var(--dm-border, #e2e8f0);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--dm-primary, #2563eb) 6%, var(--dm-surface, #fff));
+  color: var(--dm-text, #111827);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cartNavBtn {
+    transition: background-color 180ms ease, border-color 180ms ease;
+  }
+}
+
+.cartNavBtn:hover {
+  border-color: color-mix(in srgb, var(--dm-primary, #2563eb) 35%, var(--dm-border, #e2e8f0));
+  background: color-mix(in srgb, var(--dm-primary, #2563eb) 10%, var(--dm-surface, #fff));
+}
+
+.cartNavBtn:focus-visible {
+  outline: 2px solid var(--dm-primary, #2563eb);
+  outline-offset: 2px;
+}
+
+.cartNavBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--dm-primary, #2563eb);
+  color: var(--dm-surface, #fff);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.sidebarFooter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid var(--dm-border, #e2e8f0);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: var(--dm-bg, #fff);
+}
+
+.section {
+  padding: 28px 32px 8px;
+  scroll-margin-top: 16px;
+}
+
+.sectionTitle {
+  margin: 0 0 18px;
+  font-family: var(--dm-font-heading, inherit);
+  font-size: 1.35rem;
+  font-weight: var(--dm-font-heading-weight, 700);
+  color: var(--dm-text, #111827);
+  letter-spacing: -0.01em;
+}
+
+.productGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (min-width: 1280px) {
+  .section {
+    padding: 32px 40px 12px;
+  }
+
+  .sectionTitle {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+  }
+
+  .productGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .productGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px;
+  }
+}
+
+.productCard {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 1px solid var(--dm-border, #e2e8f0);
+  border-radius: var(--dm-radius-card, 14px);
+  background: color-mix(in srgb, var(--dm-surface, #fff) 94%, var(--dm-bg, #fff));
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .productCard {
+    transition:
+      border-color 180ms ease,
+      transform 180ms ease,
+      box-shadow 180ms ease;
+  }
+}
+
+.productCard:hover {
+  border-color: color-mix(in srgb, var(--dm-primary, #2563eb) 35%, var(--dm-border, #e2e8f0));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--dm-text, #111827) 8%, transparent);
+}
+
+.productCard:focus-visible {
+  outline: 2px solid var(--dm-primary, #2563eb);
+  outline-offset: 2px;
+}
+
+.productCardImage {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  height: auto;
+  border-radius: 0;
+  object-fit: cover;
+  display: block;
+  background: var(--dm-product-thumb-bg, #f1f5f9);
+}
+
+.productCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+  padding: 14px 14px 16px;
+}
+
+.productName {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--dm-text, #111827);
+}
+
+.productDesc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--dm-text-secondary, #64748b);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  font-weight: var(--dm-font-body-weight, 400);
+}
+
+.productPriceWrap {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.productPriceWrap > div {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.productPriceWrap span {
+  font-size: inherit;
+}
+
+.empty,
+.emptySection {
+  margin: 0;
+  padding: 24px 40px;
+  font-size: 0.9rem;
+  color: var(--dm-text-secondary, #64748b);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .categoryNavItem,
+  .productCard {
+    transition: none;
+  }
+
+  .productCard:hover {
+    transform: none;
+  }
+}
