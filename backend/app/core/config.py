@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     translation_cache_ttl_seconds: int = 3600
     cors_origins: str = "http://localhost:3000"
+    menu_public_domain: str = "venddelo.ai"
 
     @field_validator("database_url", "database_url_test")
     @classmethod
