@@ -1,0 +1,34 @@
+import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
+import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlined';
+import {
+  RESTAURANT_SERVICE_LABELS,
+  type RestaurantServiceType,
+} from '@/lib/restaurantServices';
+import styles from './RestaurantServiceChips.module.css';
+
+const SERVICE_ICONS: Record<RestaurantServiceType, typeof StorefrontOutlinedIcon> = {
+  takeout: StorefrontOutlinedIcon,
+  delivery: DeliveryDiningOutlinedIcon,
+};
+
+type RestaurantServiceChipsProps = {
+  services: RestaurantServiceType[];
+};
+
+export function RestaurantServiceChips({ services }: RestaurantServiceChipsProps) {
+  if (services.length === 0) return null;
+
+  return (
+    <ul className={styles.serviceList} aria-label="Servicios disponibles">
+      {services.map((type) => {
+        const Icon = SERVICE_ICONS[type];
+        return (
+          <li key={type} className={styles.serviceChip}>
+            <Icon className={styles.serviceIcon} aria-hidden />
+            <span>{RESTAURANT_SERVICE_LABELS[type]}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
