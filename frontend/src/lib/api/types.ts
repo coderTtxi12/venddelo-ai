@@ -28,18 +28,51 @@ export type Restaurant = {
   subdomain: string;
   original_language: string;
   status: string;
+  description: string | null;
   address: string | null;
   latitude: number | null;
   longitude: number | null;
   place_id: string | null;
   logo_path: string | null;
   cover_path: string | null;
+  digital_menu_theme_id: string;
   whatsapp_phone: string | null;
   color_palette: string | null;
+  takeout_enabled: boolean;
+  delivery_enabled: boolean;
   owner_id: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type RestaurantSchedule = {
+  id: string;
+  service_type: 'takeout' | 'delivery';
+  day_of_week: number;
+  opens_at: string;
+  closes_at: string;
+};
+
+export type RestaurantScheduleCreateInput = {
+  service_type: 'takeout' | 'delivery';
+  day_of_week: number;
+  opens_at: string;
+  closes_at: string;
+};
+
+export type RestaurantPaymentMethod = {
+  id: string;
+  method: 'cash' | 'transfer' | 'card_terminal';
+  service_type: 'takeout' | 'delivery';
+  enabled: boolean;
+};
+
+export type SubdomainAvailability = {
+  subdomain: string;
+  available: boolean;
+  valid: boolean;
+  message: string | null;
 };
 
 export type CategoryDisplayLayout = 'vertical' | 'horizontal' | 'grid';
