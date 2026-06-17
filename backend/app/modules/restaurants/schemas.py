@@ -39,6 +39,7 @@ class RestaurantCreate(BaseModel):
     longitude: float | None = None
     place_id: str | None = None
     logo_path: str | None = None
+    cover_path: str | None = None
     whatsapp_phone: str | None = None
     color_palette: str | None = None
 
@@ -50,6 +51,7 @@ class RestaurantUpdate(BaseModel):
     longitude: float | None = None
     place_id: str | None = None
     logo_path: str | None = None
+    cover_path: str | None = None
     whatsapp_phone: str | None = None
     color_palette: str | None = None
     original_language: str | None = None
@@ -69,6 +71,7 @@ class RestaurantDTO(BaseModel):
     longitude: float | None = None
     place_id: str | None = None
     logo_path: str | None = None
+    cover_path: str | None = None
     whatsapp_phone: str | None = None
     color_palette: str | None = None
     owner_id: uuid.UUID | None = None

@@ -64,8 +64,8 @@ class SqlAlchemyMenuRepository(MenuRepository):
     ) -> CursorPage[CategoryDTO]:
         stmt = (
             select(Category)
-            .where(Category.restaurant_id == restaurant_id)
-            .order_by(Category.created_at, Category.id)
+            .where(Category.restaurant_id == restaurant_id, Category.is_active.is_(True))
+            .order_by(Category.sort_index, Category.created_at, Category.id)
             .limit(params.limit + 1)
         )
         if params.cursor:

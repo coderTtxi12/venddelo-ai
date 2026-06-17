@@ -46,12 +46,19 @@ class Category(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     image_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     sort_index: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    display_layout: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     products: Mapped[list["Product"]] = relationship(
         secondary=product_categories, back_populates="categories"
     )
 
-    __table_args__ = (Index("ix_categories_listing", "restaurant_id", "is_active", "sort_index"),)
+    __table_args__ = (
+        Index("ix_categories_listing", "restaurant_id", "is_active", "sort_index"),
+        CheckConstraint(
+            "display_layout IS NULL OR display_layout IN ('vertical','horizontal','grid')",
+            name="display_layout_allowed",
+        ),
+    )
 
 
 class Product(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):

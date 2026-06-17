@@ -17,6 +17,7 @@ class CategoryUpdate(BaseModel):
     description: str | None = None
     image_path: str | None = None
     sort_index: int | None = None
+    display_layout: str | None = None
     is_active: bool | None = None
 
 
@@ -29,6 +30,7 @@ class CategoryDTO(BaseModel):
     description: str | None = None
     image_path: str | None = None
     sort_index: int
+    display_layout: str | None = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
