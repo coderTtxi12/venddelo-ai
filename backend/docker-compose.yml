@@ -1,0 +1,18 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vendelo_api
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://vendelo:vendelo@host.docker.internal:5434/vendelo}
+      DATABASE_URL_TEST: ${DATABASE_URL_TEST:-postgresql+psycopg://vendelo:vendelo@host.docker.internal:5434/vendelo_test}
+      REDIS_URL: ${REDIS_URL:-redis://host.docker.internal:6379/0}
+      RUN_MIGRATIONS: "true"
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
