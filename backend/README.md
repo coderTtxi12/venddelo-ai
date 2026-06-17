@@ -18,6 +18,49 @@ python start.py
 # health: http://localhost:8080/api/v1/health
 ```
 
+## Docker (local stack)
+
+`backend/docker-compose.yml` runs only the API container (no DB/Redis duplication).
+Use `infra/docker-compose.yml` for Postgres + Redis.
+
+```bash
+cd infra
+docker compose up -d
+
+cd ../backend
+cp .env.docker.example .env   # first time only
+docker compose up --build
+# health: http://localhost:8080/api/v1/health
+```
+
+The API container connects to host services via `host.docker.internal`:
+- Postgres: `localhost:5434`
+- Redis: `localhost:6379`
+
+Migrations run automatically on API startup (`RUN_MIGRATIONS=true`). Set `RUN_MIGRATIONS=false` for Cloud Run (run migrations in CI instead).
+
+## Docker (Cloud Run)
+
+Build the production image:
+
+```bash
+cd backend
+docker build -t vendelo-api:latest .
+```
+
+Deploy manually (example):
+
+```bash
+gcloud run deploy vendelo-api \
+  --image gcr.io/<PROJECT>/vendelo-api:latest \
+  --region us-central1 \
+  --port 8080 \
+  --set-env-vars APP_ENV=prod,RUN_MIGRATIONS=false \
+  --set-secrets DATABASE_URL=database-url:latest,REDIS_URL=redis-url:latest
+```
+
+Cloud Run injects `PORT` at runtime. The image listens on `0.0.0.0` and uses `NullPool` automatically when `DATABASE_URL` points to the Supabase pooler (`:6543`).
+
 ## Quality
 
 ```bash
