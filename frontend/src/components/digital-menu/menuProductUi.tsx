@@ -15,23 +15,25 @@ export function ProductThumb({ product, className }: { product: Product; classNa
 export function ProductPrice({
   product,
   discount,
+  className,
 }: {
   product: Product;
   discount?: MenuProductDiscountInfo | null;
+  className?: string;
 }) {
   const originalPrice = product.price_cents / 100;
   const hasPriceDiscount = discount != null && discount.amountOff > 0;
 
   if (!hasPriceDiscount && !discount?.badge) {
     return (
-      <div className={styles.productPrice}>
+      <div className={`${styles.productPrice} ${className ?? ''}`.trim()}>
         {formatMoney(originalPrice, product.currency)}
       </div>
     );
   }
 
   return (
-    <div className={styles.productPriceRow}>
+    <div className={`${styles.productPriceRow} ${className ?? ''}`.trim()}>
       {hasPriceDiscount ? (
         <>
           <span className={styles.productPriceOriginal}>
@@ -56,11 +58,13 @@ export function ProductPrice({
 function ProductCardContent({
   product,
   discount,
+  bodyClassName,
 }: {
   product: Product;
   discount?: MenuProductDiscountInfo | null;
+  bodyClassName?: string;
 }) {
-  return (
+  const content = (
     <>
       <div className={styles.productName}>{product.name}</div>
       {product.description ? (
@@ -69,7 +73,15 @@ function ProductCardContent({
       <ProductPrice product={product} discount={discount} />
     </>
   );
+
+  if (bodyClassName) {
+    return <div className={bodyClassName}>{content}</div>;
+  }
+
+  return content;
 }
+
+export type ProductListLayout = CategoryDisplayLayout | 'tablet';
 
 export function ProductList({
   layout,
@@ -77,13 +89,36 @@ export function ProductList({
   productDiscounts,
   onProductClick,
 }: {
-  layout: CategoryDisplayLayout;
+  layout: ProductListLayout;
   products: Product[];
   productDiscounts: Map<string, MenuProductDiscountInfo>;
   onProductClick: (productId: string) => void;
 }) {
   if (products.length === 0) {
     return <div className={styles.emptyProducts}>Sin productos en esta categoría</div>;
+  }
+
+  if (layout === 'tablet') {
+    return (
+      <div className={styles.productsTabletGrid}>
+        {products.map((product) => (
+          <button
+            key={product.id}
+            type="button"
+            className={`${styles.productCardTablet} ${styles.productTapTarget}`}
+            onClick={() => onProductClick(product.id)}
+            aria-label={`Ver ${product.name}`}
+          >
+            <ProductThumb product={product} className={styles.productThumb} />
+            <ProductCardContent
+              product={product}
+              discount={productDiscounts.get(product.id)}
+              bodyClassName={styles.productCardTabletBody}
+            />
+          </button>
+        ))}
+      </div>
+    );
   }
 
   if (layout === 'horizontal') {
