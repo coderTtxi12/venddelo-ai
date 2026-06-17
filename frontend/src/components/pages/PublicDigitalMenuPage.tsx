@@ -37,6 +37,7 @@ import {
 import { resolveRestaurantServices } from '@/lib/restaurantServices';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { buildAddToCartInput } from '@/lib/digital-menu/cart/buildCartLine';
+import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
 import { scrollCategoryTabIntoView, getCategoryScrollAnchorPosition, getSectionOffsetTop } from '@/lib/digital-menu/categoryScrollSpy';
 import { usePublicMenuCart } from '@/lib/digital-menu/cart/usePublicMenuCart';
 import { useCategoryScrollSpy } from '@/lib/digital-menu/useCategoryScrollSpy';
@@ -342,6 +343,8 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
 
   const openProduct = useCallback(
     (productId: string) => {
+      triggerHaptic('selection');
+
       if (isDesktopLayout) {
         const product = products.find((item) => item.id === productId);
         if (product) {
