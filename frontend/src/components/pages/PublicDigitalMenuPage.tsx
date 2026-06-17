@@ -450,11 +450,21 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
                 />
               ) : null}
               <header
-                className={`${menuStyles.compactHeader} ${styles.productCompactHeader} ${
+                className={`${menuStyles.compactHeader} ${
                   productHeroCollapsed ? menuStyles.compactHeaderVisible : ''
                 }`}
                 aria-hidden={!productHeroCollapsed}
               >
+                {productHeroCollapsed ? (
+                  <button
+                    type="button"
+                    className={menuStyles.compactIconBtn}
+                    aria-label="Volver al menú"
+                    onClick={closeProduct}
+                  >
+                    <ArrowBackIcon fontSize="small" />
+                  </button>
+                ) : null}
                 <span className={menuStyles.compactTitle}>{selectedProduct.name}</span>
                 <div className={menuStyles.headerActions}>
                   <CartHeaderButton
@@ -667,20 +677,32 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
       <div className={styles.desktopLayout}>
         {selectedProduct && !showCart ? (
           <>
-            <button
-              type="button"
-              className={styles.productFixedBack}
-              aria-label="Volver al menú"
-              onClick={closeProduct}
-            >
-              <ArrowBackIcon fontSize="small" />
-            </button>
+            {!productHeroCollapsed ? (
+              <button
+                type="button"
+                className={styles.productFixedBack}
+                aria-label="Volver al menú"
+                onClick={closeProduct}
+              >
+                <ArrowBackIcon fontSize="small" />
+              </button>
+            ) : null}
             <header
-              className={`${menuStyles.compactHeader} ${styles.productCompactHeader} ${styles.productDesktopCompactHeader} ${
+              className={`${menuStyles.compactHeader} ${styles.productDesktopCompactHeader} ${
                 productHeroCollapsed ? menuStyles.compactHeaderVisible : ''
               }`}
               aria-hidden={!productHeroCollapsed}
             >
+              {productHeroCollapsed ? (
+                <button
+                  type="button"
+                  className={menuStyles.compactIconBtn}
+                  aria-label="Volver al menú"
+                  onClick={closeProduct}
+                >
+                  <ArrowBackIcon fontSize="small" />
+                </button>
+              ) : null}
               <span className={menuStyles.compactTitle}>{selectedProduct.name}</span>
             </header>
           </>
