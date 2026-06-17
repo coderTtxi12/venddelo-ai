@@ -110,10 +110,6 @@
   outline-offset: 2px;
 }
 
-.productCompactHeader {
-  padding-left: 52px;
-}
-
 .productFixedCart {
   position: absolute;
   top: 12px;
@@ -147,5 +143,4 @@
   left: 300px;
   right: 0;
   z-index: 35;
-  padding-left: 52px;
 }
