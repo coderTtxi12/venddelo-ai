@@ -96,6 +96,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
   const categoryBarRef = useRef<HTMLDivElement>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const mobileScrollRafRef = useRef<number | null>(null);
+  const pendingDesktopCategoryScrollRef = useRef<string | null>(null);
   const [viewportBand, setViewportBand] = useState<PublicMenuViewportBand>('mobile');
   const isDesktopLayout = viewportBand === 'desktop';
   const isTabletLayout = viewportBand === 'tablet';
@@ -248,6 +249,36 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
     [heroCollapsed, isDesktopLayout, lockDesktopScrollSpy, lockMobileScrollSpy],
   );
 
+  const handleDesktopCategorySelect = useCallback(
+    (categoryId: string) => {
+      if (selectedProductId || showCart) {
+        if (selectedProductId) {
+          setSelectedProductId(null);
+          setProductHeroCollapsed(false);
+        }
+        if (showCart) {
+          setShowCart(false);
+        }
+        pendingDesktopCategoryScrollRef.current = categoryId;
+        setActiveCategoryId(categoryId);
+        lockDesktopScrollSpy();
+        return;
+      }
+      scrollToCategory(categoryId);
+    },
+    [selectedProductId, showCart, scrollToCategory, lockDesktopScrollSpy],
+  );
+
+  useEffect(() => {
+    const categoryId = pendingDesktopCategoryScrollRef.current;
+    if (!isDesktopLayout || categoryId == null || selectedProductId || showCart) {
+      return;
+    }
+
+    pendingDesktopCategoryScrollRef.current = null;
+    scrollToCategory(categoryId);
+  }, [isDesktopLayout, selectedProductId, showCart, scrollToCategory, categories]);
+
   const handleMobileScroll = useCallback(() => {
     if (mobileScrollRafRef.current != null) return;
     mobileScrollRafRef.current = requestAnimationFrame(() => {
@@ -309,13 +340,29 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
     [products, selectedProductId],
   );
 
-  const openProduct = useCallback((productId: string) => {
-    setShowCart(false);
-    setSelectedProductId(productId);
-    setProductHeroCollapsed(false);
-    mobileScrollRef.current?.scrollTo({ top: 0 });
-    desktopScrollRef.current?.scrollTo({ top: 0 });
-  }, []);
+  const openProduct = useCallback(
+    (productId: string) => {
+      if (isDesktopLayout) {
+        const product = products.find((item) => item.id === productId);
+        if (product) {
+          const productCategoryId =
+            categoryIds.find((categoryId) => product.category_ids.includes(categoryId)) ??
+            product.category_ids[0] ??
+            null;
+          if (productCategoryId) {
+            setActiveCategoryId(productCategoryId);
+          }
+        }
+      }
+
+      setShowCart(false);
+      setSelectedProductId(productId);
+      setProductHeroCollapsed(false);
+      mobileScrollRef.current?.scrollTo({ top: 0 });
+      desktopScrollRef.current?.scrollTo({ top: 0 });
+    },
+    [categoryIds, isDesktopLayout, products],
+  );
 
   const closeProduct = useCallback(() => {
     setSelectedProductId(null);
@@ -646,7 +693,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
           logoUrl={logoUrl}
           coverUrl={coverUrl}
           activeCategoryId={activeCategoryId}
-          onCategorySelect={scrollToCategory}
+          onCategorySelect={handleDesktopCategorySelect}
           sectionRefs={sectionRefs}
           scrollRef={desktopScrollRef}
           onProductClick={openProduct}
