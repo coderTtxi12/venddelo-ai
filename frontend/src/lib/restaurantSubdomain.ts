@@ -56,7 +56,7 @@ export function isMenuPublicHost(host: string): boolean {
   return extractMenuSubdomainFromHost(host) != null;
 }
 
-function devMenuBaseUrl(): string {
+function menuAppBaseUrl(): string {
   const configured = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
   try {
     return new URL(configured).origin;
