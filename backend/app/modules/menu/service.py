@@ -15,6 +15,7 @@ from app.modules.menu.schemas import (
     OptionGroupUpdate,
     OptionItemCreate,
     OptionItemDTO,
+    OptionItemUpdate,
     ProductCreate,
     ProductDTO,
     ProductUpdate,
@@ -179,6 +180,25 @@ class MenuService:
     ) -> None:
         if not self._repo.delete_option_item(item_id):
             raise NotFoundError("Option item not found")
+
+    def update_option_item(
+        self,
+        restaurant_id: uuid.UUID,
+        product_id: uuid.UUID,
+        group_id: uuid.UUID,
+        item_id: uuid.UUID,
+        data: OptionItemUpdate,
+    ) -> OptionItemDTO:
+        prod = self.get_product(restaurant_id, product_id)
+        group = next((g for g in prod.option_groups if g.id == group_id), None)
+        if group is None:
+            raise NotFoundError("Option group not found")
+        if not any(item.id == item_id for item in group.items):
+            raise NotFoundError("Option item not found")
+        dto = self._repo.update_option_item(item_id, data)
+        if dto is None:
+            raise NotFoundError("Option item not found")
+        return dto
 
     def get_full_menu(self, restaurant_id: uuid.UUID) -> FullMenuDTO:
         return self._repo.get_full_menu(restaurant_id)

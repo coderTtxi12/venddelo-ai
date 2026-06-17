@@ -19,6 +19,7 @@ from app.modules.menu.schemas import (
     OptionGroupUpdate,
     OptionItemCreate,
     OptionItemDTO,
+    OptionItemUpdate,
     ProductCreate,
     ProductDTO,
     ProductUpdate,
@@ -285,6 +286,24 @@ def create_option_item(
     uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> OptionItemDTO:
     dto = service.add_option_item(restaurant.id, product_id, group_id, data)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+    return dto
+
+
+@router.patch(
+    "/restaurants/{restaurant_id}/products/{product_id}/option-groups/{group_id}/items/{item_id}",
+    response_model=OptionItemDTO,
+)
+def update_option_item(
+    product_id: uuid.UUID,
+    group_id: uuid.UUID,
+    item_id: uuid.UUID,
+    data: OptionItemUpdate,
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> OptionItemDTO:
+    dto = service.update_option_item(restaurant.id, product_id, group_id, item_id, data)
     invalidate_restaurant_menu_cache(uow, restaurant.id)
     return dto
 

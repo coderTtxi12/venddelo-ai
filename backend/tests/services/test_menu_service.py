@@ -140,6 +140,9 @@ class FakeMenuRepo(MenuRepository):
     def delete_option_item(self, id):
         return True
 
+    def update_option_item(self, id, data):
+        return None
+
     def get_full_menu(self, restaurant_id: uuid.UUID) -> FullMenuDTO:
         return FullMenuDTO(restaurant_id=restaurant_id, categories=[], products=[])
 

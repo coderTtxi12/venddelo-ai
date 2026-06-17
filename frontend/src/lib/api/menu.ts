@@ -212,3 +212,24 @@ export function deleteOptionItem(
     { method: 'DELETE', token },
   );
 }
+
+export type OptionItemUpdateInput = {
+  label?: string;
+  price_delta_cents?: number;
+  sort_index?: number;
+  is_active?: boolean;
+};
+
+export function updateOptionItem(
+  token: string,
+  restaurantId: string,
+  productId: string,
+  groupId: string,
+  itemId: string,
+  data: OptionItemUpdateInput,
+) {
+  return apiRequest<Product['option_groups'][number]['items'][number]>(
+    `/restaurants/${restaurantId}/products/${productId}/option-groups/${groupId}/items/${itemId}`,
+    { method: 'PATCH', token, body: data },
+  );
+}

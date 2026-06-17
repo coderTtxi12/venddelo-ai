@@ -24,6 +24,7 @@ from app.modules.menu.schemas import (
     OptionGroupUpdate,
     OptionItemCreate,
     OptionItemDTO,
+    OptionItemUpdate,
     ProductCreate,
     ProductDTO,
     ProductUpdate,
@@ -228,6 +229,16 @@ class SqlAlchemyMenuRepository(MenuRepository):
         self._session.delete(obj)
         self._session.flush()
         return True
+
+    def update_option_item(self, id: uuid.UUID, data: OptionItemUpdate) -> OptionItemDTO | None:
+        obj = self._session.get(OptionItem, id)
+        if obj is None:
+            return None
+        for field, value in data.model_dump(exclude_unset=True).items():
+            setattr(obj, field, value)
+        self._session.flush()
+        self._session.refresh(obj)
+        return OptionItemDTO.model_validate(obj)
 
     # Public menu
     def get_full_menu(self, restaurant_id: uuid.UUID) -> FullMenuDTO:

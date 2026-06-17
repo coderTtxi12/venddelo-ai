@@ -42,6 +42,13 @@ class OptionItemCreate(BaseModel):
     sort_index: int = 0
 
 
+class OptionItemUpdate(BaseModel):
+    label: str | None = None
+    price_delta_cents: int | None = None
+    sort_index: int | None = None
+    is_active: bool | None = None
+
+
 class OptionItemDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

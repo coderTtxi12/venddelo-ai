@@ -14,6 +14,7 @@ from app.modules.menu.schemas import (
     OptionGroupUpdate,
     OptionItemCreate,
     OptionItemDTO,
+    OptionItemUpdate,
     ProductCreate,
     ProductDTO,
     ProductUpdate,
@@ -88,6 +89,9 @@ class MenuRepository(ABC):
 
     @abstractmethod
     def delete_option_item(self, id: uuid.UUID) -> bool: ...
+
+    @abstractmethod
+    def update_option_item(self, id: uuid.UUID, data: OptionItemUpdate) -> OptionItemDTO | None: ...
 
     # Public menu
     @abstractmethod
