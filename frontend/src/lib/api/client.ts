@@ -31,16 +31,25 @@ export async function apiRequest<T>(
     headers['Idempotency-Key'] = options.idempotencyKey;
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    method: options.method ?? (options.body !== undefined ? 'POST' : 'GET'),
-    headers,
-    body:
-      options.body === undefined
-        ? undefined
-        : options.body instanceof FormData
-          ? options.body
-          : JSON.stringify(options.body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method: options.method ?? (options.body !== undefined ? 'POST' : 'GET'),
+      headers,
+      body:
+        options.body === undefined
+          ? undefined
+          : options.body instanceof FormData
+            ? options.body
+            : JSON.stringify(options.body),
+    });
+  } catch {
+    throw new ApiError(
+      'network_error',
+      `No se pudo conectar con el backend (${API_URL}). Verifica que esté en marcha.`,
+      0,
+    );
+  }
 
   if (response.status === 204) {
     return undefined as T;
