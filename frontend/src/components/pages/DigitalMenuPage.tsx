@@ -8,7 +8,7 @@ import IosShareOutlinedIcon from '@mui/icons-material/IosShareOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import ViewCarouselOutlinedIcon from '@mui/icons-material/ViewCarouselOutlined';
 import ViewListOutlinedIcon from '@mui/icons-material/ViewListOutlined';
-import { listCategories, listProducts, updateCategory, updateOptionGroup, updateOptionItem } from '@/lib/api/menu';
+import { listCategories, listProducts, setCategoryProductOrder, updateCategory, updateOptionGroup, updateOptionItem } from '@/lib/api/menu';
 import { fetchAllPages } from '@/lib/api/pagination';
 import { listAllPromotions } from '@/lib/api/promotions';
 import { getRestaurant, listRestaurantPaymentMethods, listRestaurantSchedules, setRestaurantSchedules, updateRestaurant } from '@/lib/api/restaurants';
@@ -31,10 +31,10 @@ import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
 import { DigitalMenuProductDetail } from '@/components/digital-menu/DigitalMenuProductDetail';
 import {
-  ProductList,
   productsForCategory,
   sortCategories,
 } from '@/components/digital-menu/menuProductUi';
+import { SortableProductList, type ProductDragTarget } from '@/components/digital-menu/SortableProductList';
 import { RestaurantOpenStatusBadge } from '@/components/digital-menu/RestaurantOpenStatusBadge';
 import { RestaurantServiceChips } from '@/components/digital-menu/RestaurantServiceChips';
 import { RestaurantHoursFooter } from '@/components/digital-menu/RestaurantHoursFooter';
@@ -74,6 +74,8 @@ export default function DigitalMenuPage() {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [dragCategoryId, setDragCategoryId] = useState<string | null>(null);
   const [dropCategoryId, setDropCategoryId] = useState<string | null>(null);
+  const [productDragTarget, setProductDragTarget] = useState<ProductDragTarget>(null);
+  const [productDropTarget, setProductDropTarget] = useState<ProductDragTarget>(null);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -273,6 +275,75 @@ export default function DigitalMenuPage() {
       }
     },
     [categories, dragCategoryId, persistCategoryOrder],
+  );
+
+  const persistCategoryProductOrder = useCallback(
+    async (categoryId: string, orderedProductIds: string[]) => {
+      if (!accessToken || !restaurantId) return;
+      await setCategoryProductOrder(accessToken, restaurantId, categoryId, orderedProductIds);
+    },
+    [accessToken, restaurantId],
+  );
+
+  const applyCategoryProductOrder = useCallback(
+    (categoryId: string, orderedProductIds: string[]) => {
+      setProducts((prev) =>
+        prev.map((product) => {
+          const nextIndex = orderedProductIds.indexOf(product.id);
+          if (nextIndex < 0 || !product.category_ids.includes(categoryId)) return product;
+          return {
+            ...product,
+            category_sort_indices: {
+              ...product.category_sort_indices,
+              [categoryId]: nextIndex,
+            },
+          };
+        }),
+      );
+    },
+    [],
+  );
+
+  const handleProductDrop = useCallback(
+    async (categoryId: string, targetProductId: string) => {
+      if (
+        !productDragTarget ||
+        productDragTarget.categoryId !== categoryId ||
+        productDragTarget.productId === targetProductId
+      ) {
+        setProductDragTarget(null);
+        setProductDropTarget(null);
+        return;
+      }
+
+      const catProducts = productsForCategory(products, categoryId);
+      const from = catProducts.findIndex(
+        (product) => product.id === productDragTarget.productId,
+      );
+      const to = catProducts.findIndex((product) => product.id === targetProductId);
+      if (from < 0 || to < 0) return;
+
+      const reordered = arrayMove(catProducts, from, to);
+      const orderedProductIds = reordered.map((product) => product.id);
+      const previousProducts = products;
+
+      applyCategoryProductOrder(categoryId, orderedProductIds);
+      setProductDragTarget(null);
+      setProductDropTarget(null);
+
+      try {
+        await persistCategoryProductOrder(categoryId, orderedProductIds);
+      } catch (error) {
+        console.error(error);
+        setProducts(previousProducts);
+      }
+    },
+    [
+      applyCategoryProductOrder,
+      persistCategoryProductOrder,
+      productDragTarget,
+      products,
+    ],
   );
 
   const handleLayoutChange = useCallback(
@@ -504,7 +575,7 @@ export default function DigitalMenuPage() {
         <div className={styles.pageHeaderMain}>
           <h1 className={styles.title}>Menú Digital</h1>
           <p className={styles.subtitle}>
-            Personaliza portada, logo, nombre, orden de categorías y cómo se muestran los productos
+            Personaliza portada, logo, nombre, orden de categorías y productos, y cómo se muestran
           </p>
         </div>
         <a
@@ -809,10 +880,18 @@ export default function DigitalMenuPage() {
                           </button>
                         </div>
                       </div>
-                      <ProductList
+                      <SortableProductList
+                        categoryId={cat.id}
                         layout={layout}
                         products={catProducts}
                         productDiscounts={productDiscounts}
+                        dragTarget={productDragTarget}
+                        dropTarget={productDropTarget}
+                        onDragTargetChange={setProductDragTarget}
+                        onDropTargetChange={setProductDropTarget}
+                        onProductDrop={(categoryId, targetProductId) => {
+                          void handleProductDrop(categoryId, targetProductId);
+                        }}
                         onProductClick={openProduct}
                       />
                     </section>
