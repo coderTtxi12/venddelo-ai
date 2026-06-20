@@ -193,6 +193,96 @@
   gap: 16px;
 }
 
+.notesSection {
+  margin-top: 20px;
+  border-top: 1px solid var(--dm-border, #eef2f7);
+  padding-top: 16px;
+}
+
+.notesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.notesTitle {
+  font-family: var(--dm-font-heading, inherit);
+  font-size: 0.92rem;
+  font-weight: var(--dm-font-heading-weight, 700);
+  color: var(--dm-text, #111827);
+  margin: 0;
+}
+
+.notesOptionalBadge {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dm-text-secondary, #94a3b8) 12%, transparent);
+  color: var(--dm-text-secondary, #64748b);
+}
+
+.notesHint {
+  margin: 6px 0 10px;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--dm-text-secondary, #94a3b8);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  font-weight: var(--dm-font-body-weight, 400);
+}
+
+.notesInput {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  border: 1px solid var(--dm-border, #e2e8f0);
+  border-radius: var(--dm-radius-ui, 12px);
+  background: var(--dm-surface, #fff);
+  color: var(--dm-text, #111827);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  padding: 10px 12px;
+  box-sizing: border-box;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .notesInput {
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+  }
+}
+
+.notesInput::placeholder {
+  color: var(--dm-text-secondary, #94a3b8);
+}
+
+.notesInput:hover {
+  border-color: color-mix(in srgb, var(--dm-primary, #111827) 25%, var(--dm-border, #e2e8f0));
+}
+
+.notesInput:focus {
+  outline: none;
+  border-color: var(--dm-primary, #111827);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dm-primary, #111827) 14%, transparent);
+}
+
+.notesInput:focus-visible {
+  outline: 2px solid var(--dm-primary, #111827);
+  outline-offset: 2px;
+}
+
+.notesMeta {
+  margin: 6px 0 0;
+  text-align: right;
+  font-size: 0.72rem;
+  color: var(--dm-text-secondary, #94a3b8);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+}
+
 .optionGroupSortable {
   display: flex;
   align-items: flex-start;
