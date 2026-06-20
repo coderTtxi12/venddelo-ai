@@ -72,6 +72,18 @@ export function updateCategory(
   );
 }
 
+export function setCategoryProductOrder(
+  token: string,
+  restaurantId: string,
+  categoryId: string,
+  productIds: string[],
+) {
+  return apiRequest<void>(
+    `/restaurants/${restaurantId}/categories/${categoryId}/products/order`,
+    { method: 'PUT', token, body: { product_ids: productIds } },
+  );
+}
+
 export function getProduct(token: string, restaurantId: string, productId: string) {
   return apiRequest<Product>(`/restaurants/${restaurantId}/products/${productId}`, { token });
 }

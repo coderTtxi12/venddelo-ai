@@ -125,6 +125,7 @@ export type Product = {
   created_at: string;
   updated_at: string;
   category_ids: string[];
+  category_sort_indices?: Record<string, number>;
   option_groups: OptionGroup[];
 };
 
