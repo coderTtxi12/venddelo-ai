@@ -1,0 +1,19 @@
+.wrap {
+  width: 100%;
+}
+
+.inlineHint {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.sectionTitle {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
