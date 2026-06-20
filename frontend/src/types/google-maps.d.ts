@@ -61,6 +61,7 @@ declare global {
       mapTypeControl?: boolean;
       streetViewControl?: boolean;
       fullscreenControl?: boolean;
+      clickableIcons?: boolean;
     }
 
     class Map {
@@ -68,6 +69,13 @@ declare global {
       setCenter(center: LatLngLiteral | LatLng): void;
       setZoom(zoom: number): void;
       panTo(center: LatLngLiteral | LatLng): void;
+      addListener(eventName: 'click', handler: (event: MapMouseEvent) => void): MapsEventListener;
+    }
+
+    interface MapMouseEvent {
+      latLng?: LatLng | null;
+      placeId?: string;
+      stop(): void;
     }
 
     interface MapsEventListener {
@@ -88,6 +96,14 @@ declare global {
       PlaceAutocompleteElement: new (options?: {
         includedRegionCodes?: string[];
       }) => google.maps.places.PlaceAutocompleteElement;
+      Place: new (options: { id: string }) => google.maps.places.Place;
+    }>;
+    function importLibrary(name: 'geocoding'): Promise<{
+      Geocoder: new () => {
+        geocode(request: { location: LatLngLiteral }): Promise<{
+          results: Array<{ formatted_address?: string }>;
+        }>;
+      };
     }>;
     function importLibrary(name: string): Promise<unknown>;
   }
