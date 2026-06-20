@@ -385,7 +385,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
   }, []);
 
   const handleAddToCart = useCallback(
-    (payload: { quantity: number; selections: OptionSelections; lineTotal: number }) => {
+    (payload: { quantity: number; selections: OptionSelections; lineTotal: number; notes: string }) => {
       if (!selectedProduct) return;
       cart.addItem(
         buildAddToCartInput(
@@ -393,6 +393,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
           productDiscounts.get(selectedProduct.id),
           payload.quantity,
           payload.selections,
+          payload.notes,
         ),
       );
     },
