@@ -7,6 +7,51 @@ function mapsApiKey(): string | null {
   return key || null;
 }
 
+type StaticMapOptions = {
+  width?: number;
+  height?: number;
+  scale?: 1 | 2;
+  zoom?: number;
+};
+
+export function buildGoogleMapsStaticUrl(
+  restaurant: LocationFields,
+  options: StaticMapOptions = {},
+): string | null {
+  const apiKey = mapsApiKey();
+  if (!apiKey) return null;
+
+  const width = Math.min(Math.max(options.width ?? 600, 1), 640);
+  const height = Math.min(Math.max(options.height ?? 168, 1), 640);
+  const scale = options.scale ?? 2;
+  const zoom = options.zoom ?? 16;
+
+  let center: string | null = null;
+  let marker: string | null = null;
+
+  if (restaurant.latitude != null && restaurant.longitude != null) {
+    center = `${restaurant.latitude},${restaurant.longitude}`;
+    marker = `color:0xea4335|${center}`;
+  } else {
+    const address = restaurant.address?.trim();
+    if (!address) return null;
+    center = address;
+    marker = `color:0xea4335|${address}`;
+  }
+
+  const params = new URLSearchParams({
+    center,
+    zoom: String(zoom),
+    size: `${width}x${height}`,
+    scale: String(scale),
+    markers: marker,
+    key: apiKey,
+    language: 'es',
+  });
+
+  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+}
+
 export function buildGoogleMapsEmbedUrl(restaurant: LocationFields): string | null {
   const apiKey = mapsApiKey();
 
