@@ -48,6 +48,10 @@ export interface DigitalMenuThemeColors {
   logoPlaceholderBg: string;
   /** Product thumbnail fallback */
   productThumbBg: string;
+  /** Live menu "Agregado" CTA background — optional override */
+  addSuccess?: string;
+  /** Text on addSuccess background — optional override */
+  addSuccessText?: string;
 }
 
 export interface DigitalMenuThemeTypography {

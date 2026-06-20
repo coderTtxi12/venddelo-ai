@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { DigitalMenuTheme, DigitalMenuThemeCssVars } from './types';
+import { resolveAddSuccessTokens } from './deriveAddSuccess';
 
 const BORDER_RADIUS_MAP = {
   sharp: '8px',
@@ -11,6 +12,7 @@ const BORDER_RADIUS_MAP = {
 /** Maps a theme to CSS custom properties for the phone preview root. */
 export function digitalMenuThemeToCssVars(theme: DigitalMenuTheme): DigitalMenuThemeCssVars {
   const { colors, typography, style } = theme;
+  const { addSuccess, addSuccessText } = resolveAddSuccessTokens(theme);
 
   return {
     '--dm-primary': colors.primary,
@@ -37,6 +39,8 @@ export function digitalMenuThemeToCssVars(theme: DigitalMenuTheme): DigitalMenuT
     '--dm-logo-border': colors.logoBorder,
     '--dm-logo-placeholder-bg': colors.logoPlaceholderBg,
     '--dm-product-thumb-bg': colors.productThumbBg,
+    '--dm-add-success': addSuccess,
+    '--dm-add-success-text': addSuccessText,
     '--dm-font-heading': typography.headingFont,
     '--dm-font-body': typography.bodyFont,
     '--dm-font-heading-weight': String(typography.headingWeight),
