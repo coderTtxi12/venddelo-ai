@@ -97,4 +97,15 @@ export const THEME_ADD_SUCCESS: Record<string, ThemeAddSuccessTokens> = {
   'cinco-mayo': { addSuccess: '#FFE000', addSuccessText: '#004D30' },
   // Revolución — field lime
   'revolucion-mx': { addSuccess: '#AAFF00', addSuccessText: '#3D2A14' },
+  // ── Pure black (#000000) themes ──
+  'obsidiana-oro': { addSuccess: '#FFD700', addSuccessText: '#000000' },
+  'neon-tokyo': { addSuccess: '#39FF14', addSuccessText: '#000000' },
+  'carbon-bbq': { addSuccess: '#7FFF00', addSuccessText: '#1A0500' },
+  'midnight-taco': { addSuccess: '#00FF88', addSuccessText: '#000000' },
+  'void-omakase': { addSuccess: '#4DFF88', addSuccessText: '#000000' },
+  'noir-copa': { addSuccess: '#00FFAA', addSuccessText: '#000000' },
+  'cyber-void': { addSuccess: '#39FF14', addSuccessText: '#0A0014' },
+  'lampara-ramen': { addSuccess: '#00FF66', addSuccessText: '#1A0500' },
+  'abisal-mar': { addSuccess: '#00FFBB', addSuccessText: '#000000' },
+  'forno-notte': { addSuccess: '#7FFF00', addSuccessText: '#1A0505' },
 };
