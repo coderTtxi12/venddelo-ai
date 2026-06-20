@@ -84,6 +84,37 @@ def test_option_group_with_items(session):
 
 
 @requires_db
+def test_full_menu_includes_inactive_published_products(session):
+    r = _restaurant(session, "menu6")
+    repo = SqlAlchemyMenuRepository(session)
+    cat = repo.add_category(CategoryCreate(restaurant_id=r.id, name="Cat"))
+    unavailable = repo.add_product(
+        ProductCreate(
+            restaurant_id=r.id,
+            name="Unavailable",
+            price_cents=1000,
+            approval_status="approved",
+            is_published=True,
+            category_ids=[cat.id],
+        )
+    )
+    repo.update_product(unavailable.id, ProductUpdate(is_active=False))
+    repo.add_product(
+        ProductCreate(
+            restaurant_id=r.id,
+            name="Available",
+            price_cents=1000,
+            approval_status="approved",
+            is_published=True,
+            category_ids=[cat.id],
+        )
+    )
+    menu = repo.get_full_menu(r.id)
+    names = [p.name for p in menu.products]
+    assert names == ["Available", "Unavailable"]
+
+
+@requires_db
 def test_full_menu_only_published_approved(session):
     r = _restaurant(session, "menu5")
     repo = SqlAlchemyMenuRepository(session)
