@@ -257,11 +257,10 @@ class SqlAlchemyMenuRepository(MenuRepository):
                 select(Product)
                 .where(
                     Product.restaurant_id == restaurant_id,
-                    Product.is_active.is_(True),
                     Product.is_published.is_(True),
                     Product.approval_status == "approved",
                 )
-                .order_by(Product.created_at, Product.id)
+                .order_by(Product.is_active.desc(), Product.created_at, Product.id)
             )
         )
         return FullMenuDTO(
@@ -286,9 +285,8 @@ class SqlAlchemyMenuRepository(MenuRepository):
                 select(Product)
                 .where(
                     Product.restaurant_id == restaurant_id,
-                    Product.is_active.is_(True),
                 )
-                .order_by(Product.created_at, Product.id)
+                .order_by(Product.is_active.desc(), Product.created_at, Product.id)
             )
         )
         return FullMenuDTO(
