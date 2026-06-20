@@ -15,15 +15,17 @@ type RestaurantLocationSectionProps = {
   restaurant: Pick<Restaurant, 'name' | 'address' | 'latitude' | 'longitude' | 'place_id'>;
   className?: string;
   variant?: 'default' | 'sidebar';
+  cartBarInset?: boolean;
 };
 
 export function RestaurantLocationSection({
   restaurant,
   className,
   variant = 'default',
+  cartBarInset = false,
 }: RestaurantLocationSectionProps) {
   const [staticMapFailed, setStaticMapFailed] = useState(false);
-  const mapHeight = variant === 'sidebar' ? 140 : 168;
+  const mapHeight = variant === 'sidebar' ? 192 : 224;
   const staticMapUrl = buildGoogleMapsStaticUrl(restaurant, {
     width: 600,
     height: mapHeight,
@@ -38,7 +40,7 @@ export function RestaurantLocationSection({
 
   return (
     <section
-      className={`${styles.locationSection} ${variant === 'sidebar' ? styles.locationSectionSidebar : ''} ${className ?? ''}`.trim()}
+      className={`${styles.locationSection} ${variant === 'sidebar' ? styles.locationSectionSidebar : ''} ${cartBarInset ? styles.locationSectionCartBarInset : ''} ${className ?? ''}`.trim()}
       aria-label="Ubicación del restaurante"
     >
       <div className={styles.locationHeader}>
