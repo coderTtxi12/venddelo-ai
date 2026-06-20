@@ -819,7 +819,15 @@
 }
 
 .addBtnAdded {
-  background: color-mix(in srgb, #16a34a 88%, var(--dm-primary, #111827));
+  background: var(--dm-add-success, var(--dm-accent, #00E676));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--dm-add-success, #00e676) 35%, transparent),
+    0 8px 24px color-mix(in srgb, var(--dm-add-success, #00e676) 42%, transparent);
+}
+
+.addBtnAdded .addBtnLabel,
+.addBtnAdded .addBtnPrice {
+  color: var(--dm-add-success-text, var(--dm-surface, #fff));
 }
 
 .addBtnAdded:hover {
