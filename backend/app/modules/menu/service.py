@@ -9,6 +9,7 @@ from app.modules.menu.schemas import (
     CategoryCreate,
     CategoryDTO,
     CategoryUpdate,
+    CategoryProductOrderUpdate,
     FullMenuDTO,
     OptionGroupCreate,
     OptionGroupDTO,
@@ -114,6 +115,22 @@ class MenuService:
         self.get_product(restaurant_id, product_id)
         if not self._repo.soft_delete_product(product_id):
             raise NotFoundError("Product not found")
+
+    def set_category_product_order(
+        self,
+        restaurant_id: uuid.UUID,
+        category_id: uuid.UUID,
+        data: CategoryProductOrderUpdate,
+    ) -> None:
+        cat = self._repo.get_category_by_id(category_id)
+        if cat is None or cat.restaurant_id != restaurant_id:
+            raise NotFoundError("Category not found")
+        if len(data.product_ids) < 1:
+            raise ValidationError("At least one product is required")
+        try:
+            self._repo.set_category_product_order(category_id, data.product_ids)
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from exc
 
     def set_approval(
         self, restaurant_id: uuid.UUID, product_id: uuid.UUID, status: str

@@ -14,6 +14,7 @@ from app.modules.menu.schemas import (
     CategoryCreate,
     CategoryDTO,
     CategoryUpdate,
+    CategoryProductOrderUpdate,
     OptionGroupCreate,
     OptionGroupDTO,
     OptionGroupUpdate,
@@ -123,6 +124,21 @@ def delete_category(
     uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
     service.delete_category(restaurant.id, category_id)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+
+
+@router.put(
+    "/restaurants/{restaurant_id}/categories/{category_id}/products/order",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def reorder_category_products(
+    category_id: uuid.UUID,
+    data: CategoryProductOrderUpdate,
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> None:
+    service.set_category_product_order(restaurant.id, category_id, data)
     invalidate_restaurant_menu_cache(uow, restaurant.id)
 
 

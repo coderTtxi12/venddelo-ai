@@ -8,6 +8,7 @@ from app.modules.menu.schemas import (
     CategoryCreate,
     CategoryDTO,
     CategoryUpdate,
+    CategoryProductOrderUpdate,
     FullMenuDTO,
     OptionGroupCreate,
     OptionGroupDTO,
@@ -64,6 +65,11 @@ class MenuRepository(ABC):
 
     @abstractmethod
     def update_product(self, id: uuid.UUID, data: ProductUpdate) -> ProductDTO | None: ...
+
+    @abstractmethod
+    def set_category_product_order(
+        self, category_id: uuid.UUID, product_ids: list[uuid.UUID]
+    ) -> None: ...
 
     @abstractmethod
     def soft_delete_product(self, id: uuid.UUID) -> bool: ...
