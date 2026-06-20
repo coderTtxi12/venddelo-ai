@@ -39,11 +39,13 @@ import {
 
 export const PRODUCT_HERO_HEIGHT = DIGITAL_MENU_COVER_HEIGHT_PX;
 export const PRODUCT_PINNED_BAR_HEIGHT = DIGITAL_MENU_PINNED_BAR_HEIGHT_PX;
+export const PRODUCT_NOTES_MAX_LENGTH = 250;
 
 type AddToCartPayload = {
   quantity: number;
   selections: OptionSelections;
   lineTotal: number;
+  notes: string;
 };
 
 type DigitalMenuProductDetailProps = {
@@ -140,6 +142,7 @@ export function DigitalMenuProductDetail({
   const [selections, setSelections] = useState<OptionSelections>(createEmptySelections);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [justAdded, setJustAdded] = useState(false);
+  const [notes, setNotes] = useState('');
 
   const imageUrl = storagePublicUrl(product.image_path);
   const groups = activeOptionGroups(product);
@@ -163,6 +166,7 @@ export function DigitalMenuProductDetail({
     setQuantity(1);
     setSelections(createEmptySelections());
     setExpandedGroups({});
+    setNotes('');
     if (addFeedbackTimerRef.current != null) {
       window.clearTimeout(addFeedbackTimerRef.current);
       addFeedbackTimerRef.current = null;
@@ -248,7 +252,7 @@ export function DigitalMenuProductDetail({
     if (enableHaptics) {
       triggerHaptic('success');
     }
-    onAddToCart({ quantity, selections, lineTotal });
+    onAddToCart({ quantity, selections, lineTotal, notes });
     setJustAdded(true);
     if (addFeedbackTimerRef.current != null) {
       window.clearTimeout(addFeedbackTimerRef.current);
@@ -311,9 +315,7 @@ export function DigitalMenuProductDetail({
             <DetailPrice product={product} discount={discount} />
           </div>
 
-          {groups.length === 0 ? (
-            <p className={styles.emptyOptions}>Este producto no tiene opciones configuradas.</p>
-          ) : (
+          {groups.length > 0 ? (
             <div className={styles.optionSections}>
               {groups.map((group) => {
                 const activeItems = group.items.filter((item) => item.is_active);
@@ -573,7 +575,34 @@ export function DigitalMenuProductDetail({
                 );
               })}
             </div>
-          )}
+          ) : null}
+
+          {isAvailable ? (
+            <section className={styles.notesSection} aria-labelledby={`product-notes-${product.id}`}>
+              <div className={styles.notesHeader}>
+                <h2 className={styles.notesTitle} id={`product-notes-${product.id}`}>
+                  Comentarios adicionales
+                </h2>
+                <span className={styles.notesOptionalBadge}>Opcional</span>
+              </div>
+              <p className={styles.notesHint}>
+                Indica preferencias o instrucciones especiales para este platillo.
+              </p>
+              <textarea
+                id={`product-notes-input-${product.id}`}
+                className={styles.notesInput}
+                value={notes}
+                maxLength={PRODUCT_NOTES_MAX_LENGTH}
+                rows={3}
+                placeholder="Ej. sin cebolla, extra picante, empaquetar aparte…"
+                aria-describedby={`product-notes-meta-${product.id}`}
+                onChange={(event) => setNotes(event.target.value)}
+              />
+              <p className={styles.notesMeta} id={`product-notes-meta-${product.id}`}>
+                {notes.length}/{PRODUCT_NOTES_MAX_LENGTH}
+              </p>
+            </section>
+          ) : null}
         </div>
       </div>
 
