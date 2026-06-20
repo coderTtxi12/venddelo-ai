@@ -1,9 +1,11 @@
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
+import { useState } from 'react';
 import type { Restaurant } from '@/lib/api/types';
 import {
   buildGoogleMapsEmbedUrl,
   buildGoogleMapsLink,
+  buildGoogleMapsStaticUrl,
   formatGeoCoordinate,
   hasRestaurantLocation,
 } from '@/lib/googleMaps';
@@ -20,7 +22,16 @@ export function RestaurantLocationSection({
   className,
   variant = 'default',
 }: RestaurantLocationSectionProps) {
+  const [staticMapFailed, setStaticMapFailed] = useState(false);
+  const mapHeight = variant === 'sidebar' ? 140 : 168;
+  const staticMapUrl = buildGoogleMapsStaticUrl(restaurant, {
+    width: 600,
+    height: mapHeight,
+    scale: 2,
+    zoom: 15,
+  });
   const embedUrl = buildGoogleMapsEmbedUrl(restaurant);
+  const showStaticMap = Boolean(staticMapUrl) && !staticMapFailed;
   const mapsLink = buildGoogleMapsLink(restaurant);
   const hasLocation = hasRestaurantLocation(restaurant);
   const addressText = restaurant.address?.trim();
@@ -44,8 +55,19 @@ export function RestaurantLocationSection({
         <p className={styles.locationEmpty}>Aún no hay ubicación configurada para este restaurante.</p>
       ) : (
         <>
-          {embedUrl ? (
-            <div className={styles.mapWrap}>
+          {showStaticMap && staticMapUrl ? (
+            <div className={styles.mapWrap} style={{ height: mapHeight }}>
+              <img
+                className={styles.mapImage}
+                src={staticMapUrl}
+                alt={`Mapa de ubicación de ${restaurant.name}`}
+                loading="lazy"
+                decoding="async"
+                onError={() => setStaticMapFailed(true)}
+              />
+            </div>
+          ) : embedUrl ? (
+            <div className={`${styles.mapWrap} ${styles.mapWrapEmbed}`} style={{ height: mapHeight }}>
               <iframe
                 className={styles.mapFrame}
                 src={embedUrl}
