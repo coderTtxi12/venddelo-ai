@@ -27,12 +27,21 @@ export function selectionsEqual(a: OptionSelections, b: OptionSelections): boole
   return true;
 }
 
+export function normalizeCartNotes(notes: string | undefined): string {
+  return (notes ?? '').trim();
+}
+
 export function findMatchingLineIndex(
   lines: PublicMenuCartLine[],
   productId: string,
   selections: OptionSelections,
+  notes?: string,
 ): number {
+  const normalizedNotes = normalizeCartNotes(notes);
   return lines.findIndex(
-    (line) => line.productId === productId && selectionsEqual(line.selections, selections),
+    (line) =>
+      line.productId === productId &&
+      selectionsEqual(line.selections, selections) &&
+      normalizeCartNotes(line.notes) === normalizedNotes,
   );
 }
