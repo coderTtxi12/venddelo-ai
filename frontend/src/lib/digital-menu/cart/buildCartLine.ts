@@ -7,6 +7,7 @@ import {
 } from '@/components/digital-menu/productOptionSelection';
 import type { Product } from '@/lib/api/types';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
+import { normalizeCartNotes } from './cartMath';
 import type { AddToCartInput } from './types';
 
 export function buildAddToCartInput(
@@ -14,12 +15,14 @@ export function buildAddToCartInput(
   discount: MenuProductDiscountInfo | null | undefined,
   quantity: number,
   selections: OptionSelections,
+  notes?: string,
 ): AddToCartInput {
   const groups = activeOptionGroups(product);
   const unitPrice =
     discount != null && discount.amountOff > 0
       ? discount.finalPrice
       : product.price_cents / 100;
+  const normalizedNotes = normalizeCartNotes(notes);
 
   return {
     productId: product.id,
@@ -37,5 +40,6 @@ export function buildAddToCartInput(
         return { groupTitle: group.title, itemLabels: labels };
       })
       .filter((entry): entry is NonNullable<typeof entry> => entry != null),
+    ...(normalizedNotes ? { notes: normalizedNotes } : {}),
   };
 }
