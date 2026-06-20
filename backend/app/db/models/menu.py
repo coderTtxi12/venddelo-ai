@@ -31,6 +31,8 @@ product_categories = Table(
         ForeignKey("categories.id", ondelete="CASCADE"),
         primary_key=True,
     ),
+    Column("sort_index", Integer, nullable=False, server_default="0"),
+    Index("ix_product_categories_category_sort", "category_id", "sort_index"),
 )
 
 
