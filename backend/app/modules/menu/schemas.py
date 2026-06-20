@@ -135,7 +135,12 @@ class ProductDTO(BaseModel):
     created_at: datetime
     updated_at: datetime
     category_ids: list[uuid.UUID] = []
+    category_sort_indices: dict[str, int] = {}
     option_groups: list[OptionGroupDTO] = []
+
+
+class CategoryProductOrderUpdate(BaseModel):
+    product_ids: list[uuid.UUID]
 
 
 class FullMenuDTO(BaseModel):
