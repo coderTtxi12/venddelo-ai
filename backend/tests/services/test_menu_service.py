@@ -105,6 +105,11 @@ class FakeMenuRepo(MenuRepository):
         self.products[id] = p
         return p
 
+    def set_category_product_order(
+        self, category_id: uuid.UUID, product_ids: list[uuid.UUID]
+    ) -> None:
+        return None
+
     def soft_delete_product(self, id):
         return True
 

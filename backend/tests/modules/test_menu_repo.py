@@ -115,6 +115,35 @@ def test_full_menu_includes_inactive_published_products(session):
 
 
 @requires_db
+def test_set_category_product_order(session):
+    r = _restaurant(session, "menu7")
+    repo = SqlAlchemyMenuRepository(session)
+    cat = repo.add_category(CategoryCreate(restaurant_id=r.id, name="Cat"))
+    first = repo.add_product(
+        ProductCreate(
+            restaurant_id=r.id,
+            name="First",
+            price_cents=1000,
+            category_ids=[cat.id],
+        )
+    )
+    second = repo.add_product(
+        ProductCreate(
+            restaurant_id=r.id,
+            name="Second",
+            price_cents=1000,
+            category_ids=[cat.id],
+        )
+    )
+    repo.set_category_product_order(cat.id, [second.id, first.id])
+
+    loaded_first = repo.get_product(first.id)
+    loaded_second = repo.get_product(second.id)
+    assert loaded_first.category_sort_indices[str(cat.id)] == 1
+    assert loaded_second.category_sort_indices[str(cat.id)] == 0
+
+
+@requires_db
 def test_full_menu_only_published_approved(session):
     r = _restaurant(session, "menu5")
     repo = SqlAlchemyMenuRepository(session)
