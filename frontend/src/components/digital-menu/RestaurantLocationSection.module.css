@@ -5,6 +5,10 @@
   background: var(--dm-surface, #fff);
 }
 
+.locationSectionCartBarInset {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+}
+
 .locationSectionSidebar {
   margin-top: 0;
   padding: 0 16px 20px;
@@ -92,8 +96,7 @@
 .mapFrame {
   display: block;
   width: 100%;
-  height: calc(100% + 42px);
-  margin-bottom: -42px;
+  height: 100%;
   border: none;
 }
 
