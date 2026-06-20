@@ -29,10 +29,14 @@ class RedisRateLimiterAdapter(RateLimiterPort):
         return cls(Redis.from_url(url, decode_responses=True))
 
     def is_allowed(self, key: str, *, limit: int, window_seconds: int) -> bool:
-        pipe = self._client.pipeline()
-        pipe.incr(key)
-        pipe.expire(key, window_seconds, nx=True)
-        count, _ = cast(tuple[int, bool], pipe.execute())  # type: ignore[no-untyped-call]
+        try:
+            pipe = self._client.pipeline()
+            pipe.incr(key)
+            pipe.expire(key, window_seconds, nx=True)
+            count, _ = cast(tuple[int, bool], pipe.execute())  # type: ignore[no-untyped-call]
+        except Exception:
+            logger.warning("redis rate limit check failed, allowing request", exc_info=True)
+            return True
         allowed = int(count) <= limit
         logger.debug(
             "redis rate limit key=%s count=%s limit=%s allowed=%s",
