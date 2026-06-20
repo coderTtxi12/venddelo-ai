@@ -289,6 +289,15 @@
   color: var(--dm-text, #111827);
 }
 
+.productUnavailable {
+  opacity: 0.88;
+  cursor: pointer;
+}
+
+.productUnavailable:hover {
+  opacity: 0.94;
+}
+
 .productDesc {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -313,15 +322,6 @@
 
 .productPriceWrap span {
   font-size: inherit;
-}
-
-.productThumb {
-  width: 96px;
-  height: 96px;
-  border-radius: 10px;
-  object-fit: cover;
-  flex-shrink: 0;
-  background: var(--dm-product-thumb-bg, #f1f5f9);
 }
 
 .empty,
