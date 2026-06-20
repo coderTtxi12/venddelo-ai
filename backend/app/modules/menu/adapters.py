@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select, tuple_
+from sqlalchemy import delete, func, insert, select, tuple_, update
 from sqlalchemy.orm import Session
 
 from app.core.pagination import (
@@ -12,12 +12,13 @@ from app.core.pagination import (
     decode_keyset_cursor,
     encode_keyset_cursor,
 )
-from app.db.models.menu import Category, OptionGroup, OptionItem, Product
+from app.db.models.menu import Category, OptionGroup, OptionItem, Product, product_categories
 from app.modules.menu.repository import MenuRepository
 from app.modules.menu.schemas import (
     CategoryCreate,
     CategoryDTO,
     CategoryUpdate,
+    CategoryProductOrderUpdate,
     FullMenuDTO,
     OptionGroupCreate,
     OptionGroupDTO,
@@ -31,9 +32,19 @@ from app.modules.menu.schemas import (
 )
 
 
-def _product_to_dto(obj: Product) -> ProductDTO:
+def _category_sort_indices(session: Session, product_id: uuid.UUID) -> dict[str, int]:
+    rows = session.execute(
+        select(product_categories.c.category_id, product_categories.c.sort_index).where(
+            product_categories.c.product_id == product_id
+        )
+    ).all()
+    return {str(row.category_id): row.sort_index for row in rows}
+
+
+def _product_to_dto(obj: Product, session: Session) -> ProductDTO:
     dto = ProductDTO.model_validate(obj)
     dto.category_ids = [c.id for c in obj.categories]
+    dto.category_sort_indices = _category_sort_indices(session, obj.id)
     dto.option_groups = [OptionGroupDTO.model_validate(g) for g in obj.option_groups]
     return dto
 
@@ -111,24 +122,58 @@ class SqlAlchemyMenuRepository(MenuRepository):
             return []
         return list(self._session.scalars(select(Category).where(Category.id.in_(ids))))
 
+    def _next_sort_index(self, category_id: uuid.UUID) -> int:
+        current = self._session.execute(
+            select(func.coalesce(func.max(product_categories.c.sort_index), -1)).where(
+                product_categories.c.category_id == category_id
+            )
+        ).scalar_one()
+        return int(current) + 1
+
+    def _set_product_categories(
+        self, product_id: uuid.UUID, category_ids: list[uuid.UUID]
+    ) -> None:
+        existing_rows = self._session.execute(
+            select(product_categories.c.category_id, product_categories.c.sort_index).where(
+                product_categories.c.product_id == product_id
+            )
+        ).all()
+        preserved = {row.category_id: row.sort_index for row in existing_rows}
+
+        self._session.execute(
+            delete(product_categories).where(product_categories.c.product_id == product_id)
+        )
+        for category_id in category_ids:
+            sort_index = preserved.get(category_id)
+            if sort_index is None:
+                sort_index = self._next_sort_index(category_id)
+            self._session.execute(
+                insert(product_categories).values(
+                    product_id=product_id,
+                    category_id=category_id,
+                    sort_index=sort_index,
+                )
+            )
+
     def add_product(self, data: ProductCreate) -> ProductDTO:
         payload = data.model_dump(exclude={"category_ids"})
         obj = Product(**payload)
-        obj.categories = self._load_categories(data.category_ids)
         self._session.add(obj)
         self._session.flush()
+        self._set_product_categories(obj.id, data.category_ids)
+        self._session.flush()
         self._session.refresh(obj)
-        return _product_to_dto(obj)
+        return _product_to_dto(obj, self._session)
 
     def get_product(self, id: uuid.UUID) -> ProductDTO | None:
         obj = self._session.get(Product, id)
         if obj is None or not obj.is_active:
             return None
-        return _product_to_dto(obj)
+        return _product_to_dto(obj, self._session)
 
     def get_product_by_id(self, id: uuid.UUID) -> ProductDTO | None:
         obj = self._session.get(Product, id)
-        return _product_to_dto(obj) if obj else None
+        return _product_to_dto(obj, self._session) if obj else None
 
     def list_products(
         self,
@@ -156,7 +201,7 @@ class SqlAlchemyMenuRepository(MenuRepository):
         rows = rows[: params.limit]
         next_cursor = encode_keyset_cursor(rows[-1].created_at, rows[-1].id) if has_more else None
         return CursorPage(
-            items=[_product_to_dto(r) for r in rows],
+            items=[_product_to_dto(r, self._session) for r in rows],
             next_cursor=next_cursor,
             has_more=has_more,
         )
@@ -174,10 +219,10 @@ class SqlAlchemyMenuRepository(MenuRepository):
         for field, value in values.items():
             setattr(obj, field, value)
         if category_ids is not None:
-            obj.categories = self._load_categories(category_ids)
+            self._set_product_categories(obj.id, category_ids)
         self._session.flush()
         self._session.refresh(obj)
-        return _product_to_dto(obj)
+        return _product_to_dto(obj, self._session)
 
     def soft_delete_product(self, id: uuid.UUID) -> bool:
         obj = self._session.get(Product, id)
@@ -266,7 +311,7 @@ class SqlAlchemyMenuRepository(MenuRepository):
         return FullMenuDTO(
             restaurant_id=restaurant_id,
             categories=[CategoryDTO.model_validate(c) for c in categories],
-            products=[_product_to_dto(p) for p in products],
+            products=[_product_to_dto(p, self._session) for p in products],
         )
 
     def get_preview_menu(self, restaurant_id: uuid.UUID) -> FullMenuDTO:
@@ -292,5 +337,30 @@ class SqlAlchemyMenuRepository(MenuRepository):
         return FullMenuDTO(
             restaurant_id=restaurant_id,
             categories=[CategoryDTO.model_validate(c) for c in categories],
-            products=[_product_to_dto(p) for p in products],
+            products=[_product_to_dto(p, self._session) for p in products],
         )
+
+    def set_category_product_order(
+        self, category_id: uuid.UUID, product_ids: list[uuid.UUID]
+    ) -> None:
+        linked_ids = {
+            row.product_id
+            for row in self._session.execute(
+                select(product_categories.c.product_id).where(
+                    product_categories.c.category_id == category_id
+                )
+            ).all()
+        }
+        if set(product_ids) != linked_ids:
+            raise ValueError("product_ids must match products linked to category")
+
+        for index, product_id in enumerate(product_ids):
+            self._session.execute(
+                update(product_categories)
+                .where(
+                    product_categories.c.category_id == category_id,
+                    product_categories.c.product_id == product_id,
+                )
+                .values(sort_index=index)
+            )
+        self._session.flush()
