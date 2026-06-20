@@ -1,6 +1,5 @@
 'use client';
 
-import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
 import PinDropOutlinedIcon from '@mui/icons-material/PinDropOutlined';
 import {
   forwardRef,
@@ -10,19 +9,22 @@ import {
   useRef,
   useState,
 } from 'react';
-import { buildGoogleMapsLink, formatGeoCoordinate } from '@/lib/googleMaps';
+import { formatGeoCoordinate } from '@/lib/googleMaps';
 import {
+  fetchPlaceById,
   getGoogleMapsApiKey,
   getGoogleMapsMapId,
   loadGoogleMapsEditor,
+  type MapLocationUpdate,
 } from '@/lib/loadGoogleMapsPlaces';
 import styles from './RestaurantLocationMapPicker.module.css';
 
 type RestaurantLocationMapPickerProps = {
   latitude: number | null;
   longitude: number | null;
-  address?: string | null;
-  onLocationChange: (coords: { latitude: number; longitude: number }) => void;
+  onLocationChange: (location: MapLocationUpdate) => void;
+  /** Texto del botón de guardado mostrado en las instrucciones del mapa. */
+  saveHintLabel?: string;
 };
 
 export type RestaurantLocationMapPickerHandle = {
@@ -48,13 +50,14 @@ export const RestaurantLocationMapPicker = forwardRef<
   RestaurantLocationMapPickerHandle,
   RestaurantLocationMapPickerProps
 >(function RestaurantLocationMapPicker(
-  { latitude, longitude, address, onLocationChange },
+  { latitude, longitude, onLocationChange, saveHintLabel = 'Guardar configuración' },
   ref,
 ) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
   const dragEndListenerRef = useRef<google.maps.MapsEventListener | null>(null);
+  const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
   const skipDragEmitRef = useRef(false);
   const onLocationChangeRef = useRef(onLocationChange);
 
@@ -82,17 +85,6 @@ export const RestaurantLocationMapPicker = forwardRef<
     [latitude, liveCoords, longitude],
   );
 
-  const mapsLink =
-    displayCoords != null
-      ? buildGoogleMapsLink({
-          name: '',
-          address: address ?? null,
-          latitude: displayCoords.latitude,
-          longitude: displayCoords.longitude,
-          place_id: null,
-        })
-      : null;
-
   const emitMarkerPosition = useCallback(() => {
     if (skipDragEmitRef.current) return;
     const coords = readMarkerCoords(markerRef.current?.position);
@@ -100,6 +92,42 @@ export const RestaurantLocationMapPicker = forwardRef<
     setLiveCoords(coords);
     onLocationChangeRef.current(coords);
   }, []);
+
+  const applyLocationUpdate = useCallback((update: MapLocationUpdate) => {
+    skipDragEmitRef.current = true;
+    if (markerRef.current) {
+      markerRef.current.position = { lat: update.latitude, lng: update.longitude };
+    }
+    mapRef.current?.panTo({ lat: update.latitude, lng: update.longitude });
+    mapRef.current?.setZoom(DEFAULT_ZOOM);
+    setLiveCoords({ latitude: update.latitude, longitude: update.longitude });
+    skipDragEmitRef.current = false;
+    onLocationChangeRef.current(update);
+  }, []);
+
+  const handleMapPoiClick = useCallback(async (event: google.maps.MapMouseEvent) => {
+    if (!event.placeId) return;
+
+    event.stop();
+
+    try {
+      const place = await fetchPlaceById(event.placeId);
+      applyLocationUpdate({
+        latitude: place.latitude,
+        longitude: place.longitude,
+        address: place.address,
+        placeId: place.placeId,
+      });
+    } catch (error) {
+      console.error(error);
+      const latLng = event.latLng;
+      if (!latLng) return;
+      applyLocationUpdate({
+        latitude: latLng.lat(),
+        longitude: latLng.lng(),
+      });
+    }
+  }, [applyLocationUpdate]);
 
   const syncMarkerPosition = useCallback((lat: number, lng: number) => {
     const position = { lat, lng };
@@ -159,6 +187,7 @@ export const RestaurantLocationMapPicker = forwardRef<
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: true,
+          clickableIcons: true,
         });
 
         markerRef.current = new AdvancedMarkerElement({
@@ -169,6 +198,9 @@ export const RestaurantLocationMapPicker = forwardRef<
         });
 
         dragEndListenerRef.current = markerRef.current.addListener('dragend', emitMarkerPosition);
+        mapClickListenerRef.current = mapRef.current.addListener('click', (event) => {
+          void handleMapPoiClick(event);
+        });
 
         if (!cancelled) setLoadState('ready');
       } catch (error) {
@@ -180,12 +212,14 @@ export const RestaurantLocationMapPicker = forwardRef<
     return () => {
       cancelled = true;
     };
-  }, [emitMarkerPosition, hasCoords, latitude, longitude, syncMarkerPosition]);
+  }, [applyLocationUpdate, emitMarkerPosition, handleMapPoiClick, hasCoords, latitude, longitude, syncMarkerPosition]);
 
   useEffect(() => {
     return () => {
       dragEndListenerRef.current?.remove();
       dragEndListenerRef.current = null;
+      mapClickListenerRef.current?.remove();
+      mapClickListenerRef.current = null;
       if (markerRef.current) {
         markerRef.current.map = null;
       }
@@ -209,8 +243,8 @@ export const RestaurantLocationMapPicker = forwardRef<
         <div>
           <p className={styles.instructionsTitle}>Ajusta la ubicación exacta</p>
           <p className={styles.instructionsText}>
-            Haz zoom y arrastra el pin rojo hasta la entrada de tu restaurante. Los cambios se
-            guardan al pulsar <strong>Guardar configuración</strong>.
+            Haz clic en un negocio del mapa, arrastra el pin rojo hasta la entrada exacta o usa el
+            buscador. Los cambios se guardan al pulsar <strong>{saveHintLabel}</strong>.
           </p>
         </div>
       </div>
@@ -236,17 +270,6 @@ export const RestaurantLocationMapPicker = forwardRef<
             ? `${formatGeoCoordinate(displayCoords.latitude)}, ${formatGeoCoordinate(displayCoords.longitude)}`
             : '—'}
         </p>
-        {mapsLink ? (
-          <a
-            className={styles.mapsLink}
-            href={mapsLink}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Abrir en Google Maps
-            <OpenInNewOutlinedIcon sx={{ fontSize: 15 }} aria-hidden />
-          </a>
-        ) : null}
       </div>
     </div>
   );
