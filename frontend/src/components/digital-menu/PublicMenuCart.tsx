@@ -138,6 +138,13 @@ export function PublicMenuCart({
                       </ul>
                     ) : null}
 
+                    {line.notes ? (
+                      <p className={styles.lineNotes}>
+                        <span className={styles.lineNotesLabel}>Nota: </span>
+                        {line.notes}
+                      </p>
+                    ) : null}
+
                     <div className={styles.lineFooter}>
                       <div className={styles.qtyStepper} aria-label={`Cantidad de ${line.productName}`}>
                         <button
