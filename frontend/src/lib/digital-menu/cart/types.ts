@@ -18,6 +18,8 @@ export type PublicMenuCartLine = {
   optionsTotalCents: number;
   selections: OptionSelections;
   optionSummary: PublicMenuCartOptionSummary[];
+  /** Free-text notes from the customer (e.g. "sin cebolla"). Stored in localStorage only for now. */
+  notes?: string;
   addedAt: number;
 };
 
