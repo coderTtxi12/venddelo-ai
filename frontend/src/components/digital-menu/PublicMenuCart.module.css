@@ -188,6 +188,20 @@
   color: color-mix(in srgb, var(--dm-text-secondary, #64748b) 85%, var(--dm-text, #111827));
 }
 
+.lineNotes {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--dm-text-secondary, #64748b);
+  font-style: italic;
+}
+
+.lineNotesLabel {
+  font-weight: 600;
+  font-style: normal;
+  color: color-mix(in srgb, var(--dm-text-secondary, #64748b) 85%, var(--dm-text, #111827));
+}
+
 .lineFooter {
   display: flex;
   align-items: center;
