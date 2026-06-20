@@ -18,7 +18,7 @@ async function fetchSupplierId(accessToken: string): Promise<ResolveSupplierResu
     if (!restaurant) {
       return {
         error:
-          'No tienes ningún restaurante asociado. Crea uno desde el onboarding para ver productos y categorías.',
+          'No tienes ningún restaurante asociado. Completa el registro inicial para continuar.',
       };
     }
     return { supplierId: restaurant.id };
