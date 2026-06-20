@@ -19,6 +19,7 @@ import {
   reorderActiveOptionItems,
 } from './optionGroupReorder';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
+import { PRODUCT_UNAVAILABLE_LABEL } from '@/components/digital-menu/menuProductUi';
 import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
 import {
   canAddProductToCart,
@@ -143,12 +144,16 @@ export function DigitalMenuProductDetail({
   const imageUrl = storagePublicUrl(product.image_path);
   const groups = activeOptionGroups(product);
   const canReorder = onReorderGroups != null && onReorderItems != null;
+  const isAvailable = product.is_active;
   const unitPrice =
     discount != null && discount.amountOff > 0
       ? discount.finalPrice
       : product.price_cents / 100;
 
-  const canAdd = useMemo(() => canAddProductToCart(groups, selections), [groups, selections]);
+  const canAdd = useMemo(
+    () => isAvailable && canAddProductToCart(groups, selections),
+    [isAvailable, groups, selections],
+  );
   const lineTotal = useMemo(
     () => computeLineTotal(unitPrice, groups, selections, quantity),
     [unitPrice, groups, selections, quantity],
@@ -285,7 +290,20 @@ export function DigitalMenuProductDetail({
         </section>
 
         <div className={styles.detailBody}>
-          <h1 className={styles.productTitle}>{product.name}</h1>
+          <div className={styles.productTitleRow}>
+            <h1 className={styles.productTitle}>{product.name}</h1>
+            {!isAvailable ? (
+              <span className={`${menuStyles.productUnavailableBadge} ${styles.unavailableBadge}`}>
+                {PRODUCT_UNAVAILABLE_LABEL}
+              </span>
+            ) : null}
+          </div>
+          {!isAvailable ? (
+            <p className={styles.unavailableNotice} role="status">
+              Este producto no está disponible por ahora. Puedes ver los detalles, pero no agregarlo al
+              pedido.
+            </p>
+          ) : null}
           {product.description ? (
             <p className={styles.productDescription}>{product.description}</p>
           ) : null}
@@ -562,7 +580,12 @@ export function DigitalMenuProductDetail({
       <footer
         className={`${styles.detailFooter} ${isTabletLayout ? menuStyles.publicTablet : ''}`}
       >
-        <div className={styles.detailFooterInner}>
+        <div
+          className={`${styles.detailFooterInner} ${
+            !isAvailable ? styles.detailFooterInnerUnavailable : ''
+          }`}
+        >
+          {isAvailable ? (
           <div className={styles.footerQtyBlock}>
             <span className={styles.footerQtyLabel}>Cantidad</span>
             <div className={styles.qtyStepper} aria-label="Cantidad">
@@ -588,19 +611,24 @@ export function DigitalMenuProductDetail({
               </button>
             </div>
           </div>
+          ) : null}
           <button
             type="button"
             className={`${styles.addBtn} ${canAdd && onAddToCart ? styles.addBtnReady : ''} ${
               justAdded ? styles.addBtnAdded : ''
-            }`}
+            } ${!isAvailable ? styles.addBtnUnavailable : ''}`}
             disabled={!canAdd || !onAddToCart}
             aria-disabled={!canAdd || !onAddToCart}
             onClick={handleAddToCart}
           >
-            <span className={styles.addBtnLabel}>{justAdded ? 'Agregado' : 'Agregar'}</span>
+            <span className={styles.addBtnLabel}>
+              {!isAvailable ? PRODUCT_UNAVAILABLE_LABEL : justAdded ? 'Agregado' : 'Agregar'}
+            </span>
+            {isAvailable ? (
             <span className={styles.addBtnPrice} aria-live="polite">
               {formatMoney(lineTotal, product.currency)}
             </span>
+            ) : null}
           </button>
         </div>
       </footer>
