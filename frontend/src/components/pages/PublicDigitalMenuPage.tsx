@@ -671,6 +671,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
                 />
                 <RestaurantLocationSection
                   restaurant={restaurant}
+                  cartBarInset={showCartBar}
                   className={isTabletLayout ? menuStyles.tabletInsetSection : undefined}
                 />
               </>
