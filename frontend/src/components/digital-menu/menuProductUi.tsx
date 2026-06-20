@@ -12,8 +12,15 @@ export function isProductAvailable(product: Product): boolean {
 
 export function productsForCategory(products: Product[], categoryId: string): Product[] {
   const inCategory = products.filter((p) => p.category_ids.includes(categoryId));
-  const available = inCategory.filter((p) => p.is_active);
-  const unavailable = inCategory.filter((p) => !p.is_active);
+  const sortByCategoryIndex = (list: Product[]) =>
+    [...list].sort((a, b) => {
+      const sa = a.category_sort_indices?.[categoryId] ?? Number.MAX_SAFE_INTEGER;
+      const sb = b.category_sort_indices?.[categoryId] ?? Number.MAX_SAFE_INTEGER;
+      if (sa !== sb) return sa - sb;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+  const available = sortByCategoryIndex(inCategory.filter((p) => p.is_active));
+  const unavailable = sortByCategoryIndex(inCategory.filter((p) => !p.is_active));
   return [...available, ...unavailable];
 }
 
@@ -87,7 +94,7 @@ export function ProductPrice({
   );
 }
 
-function ProductCardContent({
+export function ProductCardContent({
   product,
   discount,
   bodyClassName,
@@ -115,7 +122,7 @@ function ProductCardContent({
 
 export type ProductListLayout = CategoryDisplayLayout | 'tablet';
 
-function productCardClassName(baseClass: string, product: Product): string {
+export function productCardClassName(baseClass: string, product: Product): string {
   const classes = [baseClass, styles.productTapTarget];
   if (!isProductAvailable(product)) {
     classes.push(styles.productUnavailable);
