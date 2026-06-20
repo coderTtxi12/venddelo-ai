@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import type { AppUser } from '@/types/auth';
@@ -43,6 +44,7 @@ function mapSessionUser(session: Session): AppUser {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const supabase = useMemo<SupabaseClient>(() => createClient(), []);
   const [user, setUser] = useState<AppUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -99,6 +101,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     setAccessToken(null);
+    router.replace('/login');
+    router.refresh();
   };
 
   return (
