@@ -5,6 +5,7 @@ import { RestaurantHoursFooter } from '@/components/digital-menu/RestaurantHours
 import { RestaurantLocationMapPicker } from '@/components/settings/RestaurantLocationMapPicker';
 import type { RestaurantLocationMapPickerHandle } from '@/components/settings/RestaurantLocationMapPicker';
 import { RestaurantPlaceAutocomplete } from '@/components/settings/RestaurantPlaceAutocomplete';
+import type { MapLocationUpdate } from '@/lib/loadGoogleMapsPlaces';
 import { useAuth } from '@/hooks/useAuth';
 import {
   checkRestaurantSubdomainAvailability,
@@ -277,12 +278,13 @@ export default function SettingsPage() {
     [],
   );
 
-  const handleMapLocationChange = useCallback((coords: { latitude: number; longitude: number }) => {
+  const handleMapLocationChange = useCallback((update: MapLocationUpdate) => {
     setLocation((prev) => ({
       ...prev,
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-      placeId: null,
+      latitude: update.latitude,
+      longitude: update.longitude,
+      address: update.address ?? prev.address,
+      placeId: update.placeId !== undefined ? update.placeId : null,
     }));
     setSaveOk(false);
   }, []);
@@ -657,7 +659,6 @@ export default function SettingsPage() {
           ref={mapPickerRef}
           latitude={location.latitude}
           longitude={location.longitude}
-          address={location.address}
           onLocationChange={handleMapLocationChange}
         />
       </section>
