@@ -62,7 +62,12 @@ export function usePublicMenuCart(subdomain: string) {
   const addItem = useCallback(
     (input: AddToCartInput) => {
       const store = getStore(subdomain);
-      const matchIndex = findMatchingLineIndex(store.lines, input.productId, input.selections);
+      const matchIndex = findMatchingLineIndex(
+        store.lines,
+        input.productId,
+        input.selections,
+        input.notes,
+      );
 
       if (matchIndex >= 0) {
         store.lines = store.lines.map((line, index) =>
