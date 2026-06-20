@@ -97,23 +97,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.mapsLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 36px;
-  color: var(--color-primary);
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-decoration: none;
-  touch-action: manipulation;
-  transition: opacity 0.2s ease;
-}
-
-.mapsLink:hover {
-  opacity: 0.82;
-}
-
 .emptyState {
   padding: 1rem 0.85rem;
   border: 1px dashed var(--color-border);
@@ -131,8 +114,3 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .mapsLink {
-    transition: none;
-  }
-}
