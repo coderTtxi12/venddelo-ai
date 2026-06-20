@@ -8,6 +8,30 @@ import type {
   SubdomainAvailability,
 } from './types';
 
+export function createRestaurant(
+  token: string,
+  data: {
+    name: string;
+    subdomain: string;
+    original_language?: string;
+    status?: string;
+    description?: string | null;
+    address?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    place_id?: string | null;
+    whatsapp_phone?: string | null;
+    takeout_enabled?: boolean;
+    delivery_enabled?: boolean;
+  },
+) {
+  return apiRequest<Restaurant>('/restaurants', {
+    method: 'POST',
+    token,
+    body: data,
+  });
+}
+
 export function listRestaurants(token: string, limit = 20, cursor?: string | null) {
   const params = new URLSearchParams({ limit: String(limit) });
   if (cursor) params.set('cursor', cursor);
