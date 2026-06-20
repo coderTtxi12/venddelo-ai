@@ -2,6 +2,7 @@ import type { DigitalMenuTheme, DigitalMenuThemeColors } from './types';
 import { EXTENDED_DIGITAL_MENU_THEMES } from './catalogExtended';
 import { EXTENDED_DIGITAL_MENU_THEMES_2 } from './catalogExtended2';
 import { FESTIVIDADES_MX_THEMES } from './catalogFestividades';
+import { DARK_DIGITAL_MENU_THEMES } from './catalogDark';
 
 function c(
   colors: Omit<
@@ -705,6 +706,7 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
   },
   ...EXTENDED_DIGITAL_MENU_THEMES,
   ...EXTENDED_DIGITAL_MENU_THEMES_2,
+  ...DARK_DIGITAL_MENU_THEMES,
   ...FESTIVIDADES_MX_THEMES,
 ];
 
