@@ -57,7 +57,26 @@ export async function loadGoogleMapsEditor(): Promise<void> {
   await Promise.all([
     window.google!.maps.importLibrary('maps'),
     window.google!.maps.importLibrary('marker'),
+    window.google!.maps.importLibrary('geocoding'),
   ]);
+}
+
+export async function reverseGeocodeCoordinates(
+  latitude: number,
+  longitude: number,
+): Promise<string | null> {
+  await loadGoogleMapsEditor();
+  const { Geocoder } = (await google.maps.importLibrary('geocoding')) as {
+    Geocoder: new () => {
+      geocode(request: { location: { lat: number; lng: number } }): Promise<{
+        results: Array<{ formatted_address?: string }>;
+      }>;
+    };
+  };
+
+  const geocoder = new Geocoder();
+  const { results } = await geocoder.geocode({ location: { lat: latitude, lng: longitude } });
+  return results[0]?.formatted_address ?? null;
 }
 
 export type SelectedPlace = {
@@ -66,6 +85,22 @@ export type SelectedPlace = {
   longitude: number;
   placeId: string | null;
 };
+
+export type MapLocationUpdate = {
+  latitude: number;
+  longitude: number;
+  address?: string;
+  placeId?: string | null;
+};
+
+export async function fetchPlaceById(placeId: string): Promise<SelectedPlace> {
+  await loadGoogleMapsPlaces();
+  const { Place } = (await google.maps.importLibrary('places')) as {
+    Place: new (options: { id: string }) => google.maps.places.Place;
+  };
+  const place = new Place({ id: placeId });
+  return readSelectedPlace(place);
+}
 
 export async function readSelectedPlace(place: google.maps.places.Place): Promise<SelectedPlace> {
   await place.fetchFields({
