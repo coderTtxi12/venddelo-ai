@@ -2,10 +2,13 @@
 
 import type { Category, Product, RestaurantSchedule } from '@/lib/api/types';
 import {
+  ProductListThumb,
   ProductPrice,
-  ProductThumb,
+  isProductAvailable,
+  productAriaLabel,
   productsForCategory,
 } from '@/components/digital-menu/menuProductUi';
+import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import { RestaurantHoursDisplay } from '@/components/digital-menu/RestaurantHoursDisplay';
 import { RestaurantLocationSection } from '@/components/digital-menu/RestaurantLocationSection';
 import { RestaurantOpenStatusBadge } from '@/components/digital-menu/RestaurantOpenStatusBadge';
@@ -160,9 +163,11 @@ export function PublicDesktopMenuLayout({
                           <button
                             key={product.id}
                             type="button"
-                            className={styles.productCard}
+                            className={`${styles.productCard} ${
+                              !isProductAvailable(product) ? styles.productUnavailable : ''
+                            }`}
                             onClick={() => onProductClick(product.id)}
-                            aria-label={`Ver ${product.name}`}
+                            aria-label={productAriaLabel(product)}
                           >
                             <div className={styles.productBody}>
                               <span className={styles.productName}>{product.name}</span>
@@ -176,7 +181,7 @@ export function PublicDesktopMenuLayout({
                                 />
                               </div>
                             </div>
-                            <ProductThumb product={product} className={styles.productThumb} />
+                            <ProductListThumb product={product} className={menuStyles.productThumb} />
                           </button>
                         ))}
                       </div>
