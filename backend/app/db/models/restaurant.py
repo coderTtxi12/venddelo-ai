@@ -40,6 +40,9 @@ class Restaurant(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="draft")
     takeout_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     delivery_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    timezone: Mapped[str] = mapped_column(
+        String(64), nullable=False, server_default="America/Mexico_City"
+    )
     owner_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
