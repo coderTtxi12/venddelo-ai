@@ -17,6 +17,7 @@ export function mapPromotionFormToApi(
 
   const input: CreateManualPromotionInput = {
     name: payload.name.trim(),
+    image_path: payload.imagePath,
     type: payload.kind === 'bundle' ? 'bundle' : payload.kind,
     scope: payload.scope,
     product_ids: payload.productIds,
