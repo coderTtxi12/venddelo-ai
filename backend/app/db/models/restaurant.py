@@ -33,6 +33,18 @@ class Restaurant(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     digital_menu_theme_id: Mapped[str] = mapped_column(
         String(64), nullable=False, server_default="original"
     )
+    digital_menu_promotions_category_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
+    digital_menu_promotions_category_name: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="Promociones"
+    )
+    digital_menu_limited_time_category_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
+    digital_menu_limited_time_category_name: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="Por tiempo limitado"
+    )
     whatsapp_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     subdomain: Mapped[str] = mapped_column(String(63), nullable=False)
     color_palette: Mapped[str | None] = mapped_column(String(50), nullable=True)
