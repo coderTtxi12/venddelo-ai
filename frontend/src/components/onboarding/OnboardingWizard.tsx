@@ -93,7 +93,7 @@ const STEP_COPY: Record<
   whatsapp: {
     questionLabel: 'Paso final',
     title: '¿Cuál es el WhatsApp de tu negocio?',
-    subtitle: 'Tus clientes podrán contactarte por este número para pedidos y dudas.',
+    subtitle: 'Tus pedidos llegarán a este número de WhatsApp.',
   },
 };
 
@@ -516,14 +516,16 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
                 })
               }
             />
-            <input
-              className={`${styles.addressInput} ${styles.addressInputReadOnly}`}
-              value={data.location.address}
-              placeholder="Busca una dirección arriba para verla aquí"
-              readOnly
-              aria-readonly="true"
-              tabIndex={-1}
-            />
+            <div className={styles.addressReadout} aria-live="polite">
+              <span className={styles.addressReadoutLabel}>Ubicación seleccionada</span>
+              <p
+                className={`${styles.addressReadoutValue} ${
+                  !data.location.address.trim() ? styles.addressReadoutEmpty : ''
+                }`}
+              >
+                {data.location.address.trim() || 'Busca una dirección arriba para verla aquí'}
+              </p>
+            </div>
             <div className={styles.mapWrap}>
               <RestaurantLocationMapPicker
                 ref={mapPickerRef}
