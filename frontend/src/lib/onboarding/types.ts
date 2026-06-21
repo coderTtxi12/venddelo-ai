@@ -3,6 +3,7 @@ import type { ServiceScheduleDraft } from '@/lib/restaurantScheduleHours';
 
 export type OnboardingStepId =
   | 'businessName'
+  | 'description'
   | 'ownerName'
   | 'ownerPhone'
   | 'branchCount'
@@ -23,6 +24,7 @@ export type OnboardingLocation = {
 
 export type OnboardingData = {
   businessName: string;
+  businessDescription: string;
   ownerName: string;
   ownerPhoneCountryIso: string;
   ownerPhoneLocal: string;
