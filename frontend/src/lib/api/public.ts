@@ -15,6 +15,10 @@ export type PublicRestaurant = {
   delivery_enabled: boolean;
   color_palette: string | null;
   digital_menu_theme_id: string;
+  digital_menu_promotions_category_enabled: boolean;
+  digital_menu_promotions_category_name: string;
+  digital_menu_limited_time_category_enabled: boolean;
+  digital_menu_limited_time_category_name: string;
   whatsapp_phone: string | null;
   original_language: string;
   timezone: string;
