@@ -116,6 +116,15 @@
   resize: vertical;
 }
 
+.addressTextarea {
+  min-height: 3.25rem;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  field-sizing: content;
+}
+
 .subdomainInputWrap {
   display: flex;
   align-items: stretch;

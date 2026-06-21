@@ -644,8 +644,9 @@ export default function SettingsPage() {
 
         <label className={styles.label}>
           Dirección
-          <input
-            className={styles.input}
+          <textarea
+            className={`${styles.textarea} ${styles.addressTextarea}`}
+            rows={2}
             value={location.address}
             onChange={(e) => {
               setLocation((prev) => ({ ...prev, address: e.target.value }));
