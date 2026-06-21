@@ -1,4 +1,5 @@
 .page {
+  --keyboard-offset: 0px;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -73,6 +74,9 @@
   align-items: center;
   justify-content: center;
   padding: 2rem 1.5rem 6rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .stepCard {
@@ -114,6 +118,11 @@
   text-transform: uppercase;
 }
 
+.questionNumberOptional {
+  background: rgba(100, 116, 139, 0.12);
+  color: var(--color-text-secondary);
+}
+
 .title {
   margin: 0 0 0.5rem;
   font-size: clamp(1.75rem, 4vw, 2.375rem);
@@ -150,6 +159,44 @@
 .textInput:focus {
   outline: none;
   border-bottom-color: var(--color-primary);
+}
+
+.descriptionWrap {
+  width: 100%;
+  max-width: 32rem;
+}
+
+.textArea {
+  width: 100%;
+  min-height: 8rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius) + 4px);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  resize: vertical;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.textArea::placeholder {
+  color: #94a3b8;
+}
+
+.textArea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.charCount {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  text-align: right;
 }
 
 .numberInput {
@@ -378,12 +425,55 @@
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 25;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
   padding: 1rem 1.5rem calc(1rem + env(safe-area-inset-bottom));
   background: linear-gradient(180deg, transparent, rgba(248, 250, 252, 0.96) 24%);
+  transform: translateY(calc(-1 * var(--keyboard-offset)));
+  transition: transform 0.15s ease;
+  will-change: transform;
+}
+
+.footerActions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: min(42rem, 100%);
+}
+
+.skipBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 6rem;
+  padding: 0.875rem 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.skipBtn:hover:not(:disabled) {
+  background: rgba(79, 70, 229, 0.04);
+  border-color: rgba(79, 70, 229, 0.25);
+  color: var(--color-text);
+}
+
+.skipBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.skipBtn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .continueBtn {
@@ -442,4 +532,123 @@
   color: var(--color-text);
   font-size: 1.125rem;
   font-weight: 600;
+}
+
+@media (max-width: 1024px) {
+  .header {
+    padding: 1rem 1rem 0;
+  }
+
+  .main {
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 1.25rem 1rem calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  .stepCard {
+    width: 100%;
+  }
+
+  .title {
+    font-size: clamp(1.5rem, 5vw, 2rem);
+  }
+
+  .subtitle {
+    margin-bottom: 1.25rem;
+    font-size: 1rem;
+  }
+
+  .textInput {
+    max-width: none;
+    font-size: 1.125rem;
+  }
+
+  .descriptionWrap,
+  .uploadZone,
+  .optionList,
+  .locationWrap {
+    max-width: none;
+  }
+
+  .footer {
+    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+    background: rgba(248, 250, 252, 0.98);
+    border-top: 1px solid var(--color-border);
+    box-shadow: 0 -4px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .footerActions {
+    gap: 0.5rem;
+  }
+
+  .continueBtn,
+  .skipBtn {
+    flex: 1;
+    min-width: 0;
+    min-height: 2.75rem;
+  }
+
+  .continueBtn {
+    font-size: 0.9375rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding-top: 0.75rem;
+  }
+
+  .backBtn {
+    padding: 0.4375rem 0.625rem;
+    font-size: 0.8125rem;
+  }
+
+  .main {
+    padding-top: 1rem;
+    padding-bottom: calc(6.25rem + env(safe-area-inset-bottom));
+  }
+
+  .questionNumber {
+    margin-bottom: 0.5rem;
+    font-size: 0.6875rem;
+  }
+
+  .title {
+    font-size: 1.375rem;
+    line-height: 1.2;
+  }
+
+  .subtitle {
+    font-size: 0.9375rem;
+    line-height: 1.45;
+  }
+
+  .optionCard {
+    padding: 0.875rem 1rem;
+    gap: 0.75rem;
+  }
+
+  .optionTitle {
+    font-size: 0.9375rem;
+  }
+
+  .optionHint {
+    font-size: 0.75rem;
+  }
+
+  .footerActions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .continueBtn,
+  .skipBtn {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .footer {
+    transition: none;
+  }
 }

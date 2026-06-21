@@ -11,6 +11,14 @@ export function validateStep(stepId: OnboardingStepId, data: OnboardingData): st
       }
       return null;
 
+    case 'description': {
+      const text = data.businessDescription.trim();
+      if (text.length > 500) {
+        return 'La descripción puede tener máximo 500 caracteres.';
+      }
+      return null;
+    }
+
     case 'ownerName':
       if (data.ownerName.trim().length < 2) {
         return 'Indica quién es el responsable del negocio.';
@@ -83,14 +91,9 @@ export function validateStep(stepId: OnboardingStepId, data: OnboardingData): st
   }
 }
 
-export function buildOwnerDescription(data: OnboardingData): string {
-  const ownerCountry = findCountryByIso(data.ownerPhoneCountryIso);
-  const ownerPhone = formatE164(ownerCountry.dialCode, data.ownerPhoneLocal);
-  return [
-    `Responsable: ${data.ownerName.trim()}`,
-    `Celular del responsable: ${ownerPhone}`,
-    `Sucursales: ${data.branchCount}`,
-  ].join('\n');
+export function buildRestaurantDescription(data: OnboardingData): string | null {
+  const text = data.businessDescription.trim();
+  return text.length > 0 ? text : null;
 }
 
 export function buildWhatsappE164(data: OnboardingData): string {
