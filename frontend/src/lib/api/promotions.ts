@@ -21,6 +21,7 @@ export type PromotionBundleInput = {
 
 export type CreateManualPromotionInput = {
   name: string;
+  image_path?: string | null;
   type: PromotionType;
   scope: PromotionScope;
   percent?: number | null;
