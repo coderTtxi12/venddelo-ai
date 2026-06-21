@@ -3,8 +3,21 @@ import type { CursorPage, Promotion } from './types';
 
 export const PROMOTIONS_PAGE_SIZE = 20;
 
-export type PromotionType = 'percent' | 'amount' | 'combo';
+export type PromotionType = 'percent' | 'amount' | 'combo' | 'bundle';
 export type PromotionScope = 'product' | 'category' | 'order';
+
+export type PromotionScheduleInput = {
+  weekdays: number[];
+  use_time_window: boolean;
+  daily_start_time: string | null;
+  daily_end_time: string | null;
+};
+
+export type PromotionBundleInput = {
+  get_quantity: number;
+  pay_quantity: number;
+  pairing_mode?: 'cross_product' | 'same_product';
+};
 
 export type CreateManualPromotionInput = {
   name: string;
@@ -15,8 +28,11 @@ export type CreateManualPromotionInput = {
   min_order_cents?: number | null;
   starts_at?: string | null;
   ends_at?: string | null;
+  bundle?: PromotionBundleInput | null;
+  schedule?: PromotionScheduleInput | null;
   product_ids?: string[];
   category_ids?: string[];
+  option_item_ids?: string[];
 };
 
 export function listPromotions(
@@ -103,5 +119,17 @@ export function setPromotionCategories(
   return apiRequest<void>(
     `/restaurants/${restaurantId}/promotions/${promotionId}/categories`,
     { method: 'PUT', token, body: { ids: categoryIds } },
+  );
+}
+
+export function setPromotionOptionItems(
+  token: string,
+  restaurantId: string,
+  promotionId: string,
+  optionItemIds: string[],
+) {
+  return apiRequest<void>(
+    `/restaurants/${restaurantId}/promotions/${promotionId}/option-items`,
+    { method: 'PUT', token, body: { ids: optionItemIds } },
   );
 }
