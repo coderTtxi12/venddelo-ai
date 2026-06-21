@@ -1,0 +1,164 @@
+.container {
+  display: flex;
+  height: 100%;
+}
+
+/* ---------- Left image panel ---------- */
+.imagePanel {
+  position: relative;
+  flex: 1;
+  display: none;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .imagePanel {
+    display: block;
+  }
+}
+
+.coverImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imageOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2.5rem;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
+  color: #fff;
+}
+
+.quote {
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.4;
+  max-width: 360px;
+}
+
+.author {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  opacity: 0.85;
+}
+
+/* ---------- Right form panel ---------- */
+.formPanel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: var(--color-surface);
+}
+
+.formContent {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* ---------- Logo ---------- */
+.logo {
+  display: flex;
+  align-items: center;
+  color: var(--color-primary);
+  margin-bottom: 2rem;
+  z-index: 1;
+}
+
+.logo span {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.logoLight {
+  position: absolute;
+  top: 2rem;
+  left: 2rem;
+  color: #fff;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.55);
+  backdrop-filter: blur(6px);
+  margin-bottom: 0;
+}
+
+/* ---------- Text ---------- */
+.title {
+  font-size: 1.85rem;
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: center;
+  max-width: 480px;
+  margin-bottom: 0.9rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.subtitle {
+  font-size: 0.95rem;
+  color: var(--color-text-secondary);
+  text-align: center;
+  line-height: 1.6;
+  max-width: 480px;
+  margin: 0 auto 2rem;
+}
+
+.accessDenied {
+  width: 100%;
+  max-width: 380px;
+  margin: 0 auto 1rem;
+  padding: 0.85rem 1rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+/* ---------- Google button ---------- */
+.googleButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 380px;
+  padding: 0.8rem 1rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  margin: 0 auto;
+}
+
+.googleButton:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  box-shadow: var(--shadow-sm);
+}
+
+.googleButton:active {
+  transform: scale(0.99);
+}
+
+.googleButton:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
