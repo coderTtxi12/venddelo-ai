@@ -118,6 +118,19 @@ export function usePublicMenuCart(subdomain: string) {
     emitChange(subdomain);
   }, [subdomain]);
 
+  const pruneInvalidLines = useCallback(
+    (validProductIds: Iterable<string>) => {
+      const valid = new Set(validProductIds);
+      const store = getStore(subdomain);
+      const next = store.lines.filter((line) => valid.has(line.productId));
+      if (next.length !== store.lines.length) {
+        store.lines = next;
+        emitChange(subdomain);
+      }
+    },
+    [subdomain],
+  );
+
   const itemCount = useMemo(() => cartItemCount(lines), [lines]);
   const subtotalCents = useMemo(() => cartSubtotalCents(lines), [lines]);
 
@@ -129,5 +142,6 @@ export function usePublicMenuCart(subdomain: string) {
     updateLineQuantity,
     removeLine,
     clearCart,
+    pruneInvalidLines,
   };
 }
