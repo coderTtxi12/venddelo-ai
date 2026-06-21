@@ -13,6 +13,7 @@ from app.modules.promotions.schemas import (
     PromotionUpdate,
     enrich_promotion_dto,
 )
+from app.modules.promotions.pricing import CATALOG_DISCOUNT_PREFIX
 from app.modules.promotions.types import normalize_promotion_type
 
 _STORAGE_TYPES = {"percent", "amount", "combo", "two_for_one"}
@@ -85,6 +86,18 @@ class PromotionService:
                     raise ValidationError(
                         "NxM promotions require at least one product or category"
                     )
+
+        name = getattr(data, "name", None)
+        is_catalog = bool(name and str(name).startswith(CATALOG_DISCOUNT_PREFIX))
+        if not is_catalog:
+            if isinstance(data, PromotionCreate):
+                image_path = getattr(data, "image_path", None)
+                if not image_path or not str(image_path).strip():
+                    raise ValidationError("image_path is required for menu promotional banners")
+            elif isinstance(data, PromotionUpdate) and "image_path" in data.model_fields_set:
+                image_path = data.image_path
+                if not image_path or not str(image_path).strip():
+                    raise ValidationError("image_path is required for menu promotional banners")
 
     def _with_status(self, dto: PromotionDTO, timezone: str) -> PromotionDTO:
         tz = resolve_timezone(timezone)
