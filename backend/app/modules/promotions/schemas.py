@@ -42,6 +42,7 @@ def _parse_hhmm(value: str | None) -> time | None:
 class PromotionCreate(BaseModel):
     restaurant_id: uuid.UUID
     name: str
+    image_path: str | None = None
     type: str
     scope: str
     percent: int | None = None
@@ -75,6 +76,7 @@ class PromotionCreate(BaseModel):
 
 class PromotionUpdate(BaseModel):
     name: str | None = None
+    image_path: str | None = None
     type: str | None = None
     scope: str | None = None
     percent: int | None = None
@@ -119,6 +121,7 @@ class PromotionDTO(BaseModel):
     id: uuid.UUID
     restaurant_id: uuid.UUID
     name: str
+    image_path: str | None = None
     type: str
     scope: str
     percent: int | None = None
