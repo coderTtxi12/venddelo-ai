@@ -30,7 +30,16 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     delivery_address: Mapped[str | None] = mapped_column(Text, nullable=True)
     payment_method: Mapped[str] = mapped_column(String, nullable=False)
     subtotal_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    discount_cents: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    subtotal_before_discount_cents: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
     total_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    applied_order_promotion_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("promotions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="pending")
     idempotency_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -70,7 +79,14 @@ class OrderItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     unit_price_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     selected_options: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    line_subtotal_cents: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    discount_cents: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     line_total_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    applied_promotion_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("promotions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     order: Mapped["Order"] = relationship(back_populates="items")
 
