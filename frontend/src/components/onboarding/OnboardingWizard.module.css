@@ -1,8 +1,12 @@
 .page {
   --keyboard-offset: 0px;
+  --footer-height: 5.25rem;
+  height: 100dvh;
+  max-height: 100dvh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-inter, 'Inter', system-ui, sans-serif);
@@ -25,10 +29,13 @@
 }
 
 .header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.25rem 1.5rem 0;
+  padding: calc(0.75rem + 4px) 1.5rem 0.75rem;
+  background: var(--color-bg);
+  z-index: 15;
 }
 
 .backBtn {
@@ -69,18 +76,22 @@
 }
 
 .main {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem 1.5rem 6rem;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 0.5rem 1.5rem calc(var(--footer-height) + env(safe-area-inset-bottom));
+  overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
 }
 
 .stepCard {
   width: min(42rem, 100%);
+  margin: 0 auto;
+  padding-bottom: 0.5rem;
   animation: fadeSlideIn 0.35s ease;
 }
 
@@ -318,6 +329,25 @@
   box-shadow: var(--shadow-sm);
 }
 
+.mapWrap [class*='mapCanvas'] {
+  height: min(280px, 42dvh) !important;
+  min-height: 180px !important;
+}
+
+@media (max-height: 720px) {
+  .mapWrap [class*='mapCanvas'] {
+    height: min(220px, 36dvh) !important;
+    min-height: 160px !important;
+  }
+}
+
+@media (max-height: 560px) {
+  .mapWrap [class*='mapCanvas'] {
+    height: min(180px, 32dvh) !important;
+    min-height: 140px !important;
+  }
+}
+
 .optionList {
   display: flex;
   flex-direction: column;
@@ -535,14 +565,16 @@
 }
 
 @media (max-width: 1024px) {
+  .page {
+    --footer-height: 5.5rem;
+  }
+
   .header {
-    padding: 1rem 1rem 0;
+    padding: calc(0.625rem + 4px) 1rem 0.625rem;
   }
 
   .main {
-    align-items: flex-start;
-    justify-content: flex-start;
-    padding: 1.25rem 1rem calc(5.5rem + env(safe-area-inset-bottom));
+    padding: 0.25rem 1rem calc(var(--footer-height) + env(safe-area-inset-bottom));
   }
 
   .stepCard {
@@ -594,8 +626,12 @@
 }
 
 @media (max-width: 480px) {
+  .page {
+    --footer-height: 7.75rem;
+  }
+
   .header {
-    padding-top: 0.75rem;
+    padding-top: calc(0.5rem + 4px);
   }
 
   .backBtn {
@@ -604,8 +640,8 @@
   }
 
   .main {
-    padding-top: 1rem;
-    padding-bottom: calc(6.25rem + env(safe-area-inset-bottom));
+    padding-top: 0.125rem;
+    padding-bottom: calc(var(--footer-height) + env(safe-area-inset-bottom));
   }
 
   .questionNumber {
@@ -644,6 +680,40 @@
   .continueBtn,
   .skipBtn {
     width: 100%;
+  }
+}
+
+@media (max-height: 720px) {
+  .title {
+    font-size: clamp(1.375rem, 4vw, 1.75rem);
+  }
+
+  .subtitle {
+    margin-bottom: 1rem;
+    font-size: 0.9375rem;
+  }
+
+  .scheduleWrap {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-height: 560px) {
+  .header {
+    padding-bottom: 0.375rem;
+  }
+
+  .title {
+    font-size: 1.25rem;
+  }
+
+  .subtitle {
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .questionNumber {
+    margin-bottom: 0.375rem;
   }
 }
 
