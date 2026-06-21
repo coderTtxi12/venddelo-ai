@@ -98,7 +98,7 @@ export function RestaurantPlaceAutocomplete({
       {loading ? <p className={styles.hint}>Cargando autocompletado…</p> : null}
       {loadError ? <p className={styles.error}>{loadError}</p> : null}
       <div ref={hostRef} id="restaurant-place-autocomplete" className={styles.host} />
-      <p className={styles.hint}>Usa Places API (New). Selecciona una sugerencia para guardar la ubicación.</p>
+      <p className={styles.hint}>Selecciona una sugerencia para guardar la ubicación.</p>
     </div>
   );
 }
