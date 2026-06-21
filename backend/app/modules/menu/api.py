@@ -40,7 +40,7 @@ class ApprovalBody(BaseModel):
 
 
 MAX_ASSET_BYTES = 2 * 1024 * 1024
-ALLOWED_ASSET_FOLDERS = frozenset({"categories", "products", "logo", "cover"})
+ALLOWED_ASSET_FOLDERS = frozenset({"categories", "products", "logo", "cover", "promotions"})
 
 
 @router.post(
