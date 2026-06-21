@@ -6,7 +6,14 @@ export type MenuProductDiscountInfo = {
   amountOff: number;
   finalPrice: number;
   badge: string | null;
+  offerSlogan: string | null;
 };
+
+export function bundleOfferSlogan(getQ: number, payQ: number): string {
+  if (getQ === 2 && payQ === 1) return 'Pide 2, paga 1';
+  if (payQ === 1 && getQ > 1) return `Pide ${getQ}, paga 1`;
+  return `Pide ${getQ}, paga ${payQ}`;
+}
 
 function promotionAppliesToProduct(promotion: Promotion, product: Product): boolean {
   if (promotion.scope === 'product') {
@@ -55,11 +62,17 @@ export function resolveMenuProductDiscount(
   let bestAmountOff = 0;
   let bestPercentBadge: string | null = null;
   let specialBadge: string | null = null;
+  let offerSlogan: string | null = null;
 
   for (const promotion of applicable) {
     const special = specialOfferBadge(promotion);
     if (special) {
       specialBadge = special;
+      if (promotion.type === 'bundle' || promotion.type === '2x1') {
+        const getQ = promotion.bundle?.get_quantity ?? 2;
+        const payQ = promotion.bundle?.pay_quantity ?? 1;
+        offerSlogan = bundleOfferSlogan(getQ, payQ);
+      }
       continue;
     }
 
@@ -78,6 +91,7 @@ export function resolveMenuProductDiscount(
     amountOff: bestAmountOff,
     finalPrice: Math.max(0, Math.round((price - bestAmountOff) * 100) / 100),
     badge: bestPercentBadge ?? specialBadge,
+    offerSlogan,
   };
 }
 
