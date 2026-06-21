@@ -46,6 +46,7 @@ class RestaurantCreate(BaseModel):
     color_palette: str | None = None
     takeout_enabled: bool = True
     delivery_enabled: bool = True
+    timezone: str = "America/Mexico_City"
 
 
 class RestaurantUpdate(BaseModel):
@@ -65,6 +66,7 @@ class RestaurantUpdate(BaseModel):
     status: str | None = None
     takeout_enabled: bool | None = None
     delivery_enabled: bool | None = None
+    timezone: str | None = None
 
 
 class SubdomainAvailabilityDTO(BaseModel):
@@ -95,6 +97,7 @@ class RestaurantDTO(BaseModel):
     owner_id: uuid.UUID | None = None
     takeout_enabled: bool = True
     delivery_enabled: bool = True
+    timezone: str = "America/Mexico_City"
     is_active: bool
     created_at: datetime
     updated_at: datetime
