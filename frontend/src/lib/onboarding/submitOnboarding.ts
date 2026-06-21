@@ -8,7 +8,7 @@ import { matrixToPaymentCreates } from '@/lib/restaurantPaymentConfig';
 import { buildOnboardingSchedulePayload } from '@/lib/onboarding/schedule';
 import { normalizeSubdomainInput } from '@/lib/restaurantSubdomain';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
-import { buildOwnerDescription, buildWhatsappE164 } from './validation';
+import { buildRestaurantDescription, buildWhatsappE164 } from './validation';
 import type { OnboardingData } from './types';
 
 function dataUrlToFile(dataUrl: string, fileName: string): File {
@@ -35,11 +35,13 @@ export async function submitOnboarding(
 ): Promise<{ restaurantId: string }> {
   const subdomain = generateSubdomain(data.businessName);
 
+  const restaurantDescription = buildRestaurantDescription(data);
+
   const restaurant = await createRestaurant(token, {
     name: data.businessName.trim(),
     subdomain,
     status: 'draft',
-    description: buildOwnerDescription(data),
+    ...(restaurantDescription != null ? { description: restaurantDescription } : {}),
     address: data.location.address.trim(),
     latitude: data.location.latitude,
     longitude: data.location.longitude,
