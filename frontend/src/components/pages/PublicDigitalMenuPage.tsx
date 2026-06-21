@@ -24,10 +24,12 @@ import {
   getPublicRestaurant,
   getPublicRestaurantPromotions,
   getPublicRestaurantSchedules,
+  type PublicPromotionsContext,
   type PublicRestaurant,
 } from '@/lib/api/public';
 import { ApiError } from '@/lib/api/types';
 import { buildMenuProductDiscountMap } from '@/lib/promotions/menuProductDiscount';
+import { getBundleComplementRulesForProduct } from '@/lib/promotions/bundlePromoEligibility';
 import {
   DEFAULT_DIGITAL_MENU_THEME_ID,
   digitalMenuThemeToStyle,
@@ -37,9 +39,11 @@ import {
 import { resolveRestaurantServices } from '@/lib/restaurantServices';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { buildAddToCartInput } from '@/lib/digital-menu/cart/buildCartLine';
+import { filterOrderableProducts } from '@/lib/digital-menu/orderableProducts';
 import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
 import { scrollCategoryTabIntoView, getCategoryScrollAnchorPosition, getSectionOffsetTop } from '@/lib/digital-menu/categoryScrollSpy';
 import { usePublicMenuCart } from '@/lib/digital-menu/cart/usePublicMenuCart';
+import { useCartQuote } from '@/lib/digital-menu/cart/useCartQuote';
 import { useCategoryScrollSpy } from '@/lib/digital-menu/useCategoryScrollSpy';
 import {
   DIGITAL_MENU_COVER_HEIGHT_PX,
@@ -108,7 +112,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
   const [categories, setCategories] = useState<Awaited<ReturnType<typeof getPublicMenu>>['categories']>([]);
   const [products, setProducts] = useState<Awaited<ReturnType<typeof getPublicMenu>>['products']>([]);
   const [schedules, setSchedules] = useState<Awaited<ReturnType<typeof getPublicRestaurantSchedules>>>([]);
-  const [promotions, setPromotions] = useState<Awaited<ReturnType<typeof getPublicRestaurantPromotions>>>([]);
+  const [promotionsContext, setPromotionsContext] = useState<PublicPromotionsContext | null>(null);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [heroCollapsed, setHeroCollapsed] = useState(false);
   const [scrollY, setScrollY] = useState(0);
@@ -117,6 +121,20 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
   const [showCart, setShowCart] = useState(false);
 
   const cart = usePublicMenuCart(subdomain);
+
+  const validProductIds = useMemo(
+    () => new Set(products.map((product) => product.id)),
+    [products],
+  );
+
+  useEffect(() => {
+    if (validProductIds.size === 0) return;
+    cart.pruneInvalidLines(validProductIds);
+  }, [cart.pruneInvalidLines, validProductIds]);
+
+  const cartQuote = useCartQuote(subdomain, cart.lines, validProductIds);
+  const promotionTimezone = promotionsContext?.timezone ?? restaurant?.timezone ?? 'America/Mexico_City';
+  const cartSubtotalCents = cartQuote.subtotalCents;
 
   const themeId = restaurant?.digital_menu_theme_id ?? DEFAULT_DIGITAL_MENU_THEME_ID;
   const menuTheme = useMemo(() => getDigitalMenuThemeOrDefault(themeId), [themeId]);
@@ -149,7 +167,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
       setLoadError(null);
 
       try {
-        const [restaurantData, menuData, scheduleRows, promotionRows] = await Promise.all([
+        const [restaurantData, menuData, scheduleRows, promotionContext] = await Promise.all([
           getPublicRestaurant(subdomain),
           getPublicMenu(subdomain),
           getPublicRestaurantSchedules(subdomain),
@@ -161,18 +179,26 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
         const sortedCategories = sortCategories(menuData.categories);
         setRestaurant(restaurantData);
         setCategories(sortedCategories);
-        setProducts(menuData.products);
+        setProducts(filterOrderableProducts(menuData.products));
         setSchedules(scheduleRows);
-        setPromotions(promotionRows);
+        setPromotionsContext(promotionContext);
         setActiveCategoryId(sortedCategories[0]?.id ?? null);
       } catch (error) {
-        console.error(error);
         if (!cancelled) {
-          setLoadError(
-            error instanceof ApiError && error.httpStatus === 404
-              ? 'No encontramos un menú público con ese subdominio.'
-              : 'No se pudo cargar el menú. Inténtalo de nuevo.',
-          );
+          if (error instanceof ApiError) {
+            if (error.code === 'network_error') {
+              setLoadError(
+                'No se pudo conectar con el servidor. Verifica que el backend esté en marcha (puerto 8080).',
+              );
+            } else if (error.httpStatus === 404) {
+              setLoadError('No encontramos un menú público con ese subdominio.');
+            } else {
+              setLoadError(error.message || 'No se pudo cargar el menú. Inténtalo de nuevo.');
+            }
+          } else {
+            console.error(error);
+            setLoadError('No se pudo cargar el menú. Inténtalo de nuevo.');
+          }
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -185,9 +211,20 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
     };
   }, [subdomain]);
 
+  const effectiveNow = useMemo(
+    () => new Date(promotionsContext?.server_now ?? restaurant?.server_now ?? Date.now()),
+    [promotionsContext?.server_now, restaurant?.server_now],
+  );
+
   const productDiscounts = useMemo(
-    () => buildMenuProductDiscountMap(products, promotions),
-    [products, promotions],
+    () =>
+      buildMenuProductDiscountMap(
+        products,
+        promotionsContext?.items ?? [],
+        effectiveNow,
+        promotionTimezone,
+      ),
+    [products, promotionsContext, effectiveNow, promotionTimezone],
   );
 
   const categoryIds = useMemo(() => categories.map((cat) => cat.id), [categories]);
@@ -340,6 +377,16 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
     () => (selectedProductId ? products.find((p) => p.id === selectedProductId) ?? null : null),
     [products, selectedProductId],
   );
+
+  const bundleComplementRules = useMemo(() => {
+    if (!selectedProduct) return null;
+    return getBundleComplementRulesForProduct(
+      selectedProduct,
+      promotionsContext?.items ?? [],
+      effectiveNow,
+      promotionTimezone,
+    );
+  }, [selectedProduct, promotionsContext, effectiveNow, promotionTimezone]);
 
   const openProduct = useCallback(
     (productId: string) => {
@@ -523,7 +570,10 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
             {showCart ? (
               <PublicMenuCart
                 lines={cart.lines}
-                subtotalCents={cart.subtotalCents}
+                subtotalCents={cartSubtotalCents}
+                quotedLineTotalsCents={cartQuote.quotedLineTotalsCents}
+                quote={cartQuote.quote}
+                quoteError={cartQuote.error}
                 currency={cartCurrency}
                 onBack={closeCart}
                 onUpdateQuantity={cart.updateLineQuantity}
@@ -535,6 +585,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
                 key={selectedProduct.id}
                 product={selectedProduct}
                 discount={productDiscounts.get(selectedProduct.id)}
+                bundleComplementRules={bundleComplementRules}
                 heroCollapsed={productHeroCollapsed}
                 onHeroCollapsedChange={setProductHeroCollapsed}
                 scrollRootRef={mobileScrollRef}
@@ -733,7 +784,10 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
           {showCart ? (
             <PublicMenuCart
               lines={cart.lines}
-              subtotalCents={cart.subtotalCents}
+              subtotalCents={cartSubtotalCents}
+              quotedLineTotalsCents={cartQuote.quotedLineTotalsCents}
+              quote={cartQuote.quote}
+              quoteError={cartQuote.error}
               currency={cartCurrency}
               onBack={closeCart}
               onUpdateQuantity={cart.updateLineQuantity}
@@ -744,6 +798,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
               key={selectedProduct.id}
               product={selectedProduct}
               discount={productDiscounts.get(selectedProduct.id)}
+              bundleComplementRules={bundleComplementRules}
               heroCollapsed={productHeroCollapsed}
               onHeroCollapsedChange={setProductHeroCollapsed}
               scrollRootRef={desktopScrollRef}
@@ -760,7 +815,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
       {showCartBar ? (
         <PublicMenuCartBar
           itemCount={cart.itemCount}
-          subtotalCents={cart.subtotalCents}
+          subtotalCents={cartSubtotalCents}
           currency={cartCurrency}
           onOpenCart={openCart}
           isTabletLayout={isTabletLayout}
