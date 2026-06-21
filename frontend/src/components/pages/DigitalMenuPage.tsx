@@ -234,7 +234,7 @@ export default function DigitalMenuPage() {
   }, [accessToken, authLoading, firebaseUser?.email]);
 
   const productDiscounts = useMemo(
-    () => buildMenuProductDiscountMap(products, promotions),
+    () => buildMenuProductDiscountMap(products, promotions, new Date()),
     [products, promotions],
   );
 
