@@ -5,14 +5,14 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import IosShareOutlinedIcon from '@mui/icons-material/IosShareOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
+import { DigitalMenuCategorySections } from '@/components/digital-menu/DigitalMenuCategorySections';
 import { DigitalMenuProductDetail } from '@/components/digital-menu/DigitalMenuProductDetail';
+import { PromotionShortcutProductsView } from '@/components/digital-menu/PromotionShortcutProductsView';
 import { PublicDesktopMenuLayout } from '@/components/digital-menu/PublicDesktopMenuLayout';
 import { PublicMenuCart } from '@/components/digital-menu/PublicMenuCart';
 import { PublicMenuCartBar } from '@/components/digital-menu/PublicMenuCartBar';
 import type { OptionSelections } from '@/components/digital-menu/productOptionSelection';
 import {
-  ProductList,
-  productsForCategory,
   sortCategories,
 } from '@/components/digital-menu/menuProductUi';
 import { RestaurantHoursDisplay } from '@/components/digital-menu/RestaurantHoursDisplay';
@@ -29,7 +29,13 @@ import {
 } from '@/lib/api/public';
 import { ApiError } from '@/lib/api/types';
 import { buildMenuProductDiscountMap } from '@/lib/promotions/menuProductDiscount';
+import {
+  buildDigitalMenuDisplayCategories,
+  digitalMenuSpecialCategoryConfigFromRestaurant,
+} from '@/lib/digital-menu/specialCategories';
+import { readPromotionsCache, writePromotionsCache } from '@/lib/promotions/publicPromotionsCache';
 import { getBundleComplementRulesForProduct } from '@/lib/promotions/bundlePromoEligibility';
+import { listLivePromotionShortcuts } from '@/lib/promotions/promotionShortcuts';
 import {
   DEFAULT_DIGITAL_MENU_THEME_ID,
   digitalMenuThemeToStyle,
@@ -42,8 +48,8 @@ import { buildAddToCartInput } from '@/lib/digital-menu/cart/buildCartLine';
 import { filterOrderableProducts } from '@/lib/digital-menu/orderableProducts';
 import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
 import { scrollCategoryTabIntoView, getCategoryScrollAnchorPosition, getSectionOffsetTop } from '@/lib/digital-menu/categoryScrollSpy';
+import { cartSubtotalCents as sumCartSubtotalCents } from '@/lib/digital-menu/cart/cartMath';
 import { usePublicMenuCart } from '@/lib/digital-menu/cart/usePublicMenuCart';
-import { useCartQuote } from '@/lib/digital-menu/cart/useCartQuote';
 import { useCategoryScrollSpy } from '@/lib/digital-menu/useCategoryScrollSpy';
 import {
   DIGITAL_MENU_COVER_HEIGHT_PX,
@@ -117,7 +123,9 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
   const [heroCollapsed, setHeroCollapsed] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedPromotionId, setSelectedPromotionId] = useState<string | null>(null);
   const [productHeroCollapsed, setProductHeroCollapsed] = useState(false);
+  const [promotionHeroCollapsed, setPromotionHeroCollapsed] = useState(false);
   const [showCart, setShowCart] = useState(false);
 
   const cart = usePublicMenuCart(subdomain);
@@ -132,9 +140,8 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
     cart.pruneInvalidLines(validProductIds);
   }, [cart.pruneInvalidLines, validProductIds]);
 
-  const cartQuote = useCartQuote(subdomain, cart.lines, validProductIds);
+  const cartSubtotalCents = useMemo(() => sumCartSubtotalCents(cart.lines), [cart.lines]);
   const promotionTimezone = promotionsContext?.timezone ?? restaurant?.timezone ?? 'America/Mexico_City';
-  const cartSubtotalCents = cartQuote.subtotalCents;
 
   const themeId = restaurant?.digital_menu_theme_id ?? DEFAULT_DIGITAL_MENU_THEME_ID;
   const menuTheme = useMemo(() => getDigitalMenuThemeOrDefault(themeId), [themeId]);
@@ -160,6 +167,13 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
   }, [isDesktopLayout]);
 
   useEffect(() => {
+    const cachedPromotions = readPromotionsCache(subdomain);
+    if (cachedPromotions) {
+      setPromotionsContext(cachedPromotions);
+    }
+  }, [subdomain]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function load() {
@@ -182,6 +196,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
         setProducts(filterOrderableProducts(menuData.products));
         setSchedules(scheduleRows);
         setPromotionsContext(promotionContext);
+        writePromotionsCache(subdomain, promotionContext);
         setActiveCategoryId(sortedCategories[0]?.id ?? null);
       } catch (error) {
         if (!cancelled) {
@@ -227,10 +242,58 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
     [products, promotionsContext, effectiveNow, promotionTimezone],
   );
 
-  const categoryIds = useMemo(() => categories.map((cat) => cat.id), [categories]);
+  const promotionShortcuts = useMemo(
+    () =>
+      listLivePromotionShortcuts(
+        promotionsContext?.items ?? [],
+        products,
+        effectiveNow,
+        promotionTimezone,
+      ),
+    [promotionsContext?.items, products, effectiveNow, promotionTimezone],
+  );
+
+  const specialCategoryConfig = useMemo(
+    () => digitalMenuSpecialCategoryConfigFromRestaurant(restaurant),
+    [restaurant],
+  );
+
+  const displayCategories = useMemo(
+    () =>
+      buildDigitalMenuDisplayCategories(categories, {
+        config: specialCategoryConfig,
+        restaurantId: restaurant?.subdomain ?? 'public',
+        hasPromotionShortcuts: promotionShortcuts.length > 0,
+        hasLimitedTimeProducts: productDiscounts.size > 0,
+      }),
+    [
+      categories,
+      specialCategoryConfig,
+      restaurant?.subdomain,
+      promotionShortcuts.length,
+      productDiscounts.size,
+    ],
+  );
+
+  const categoryIds = useMemo(() => displayCategories.map((cat) => cat.id), [displayCategories]);
+
+  useEffect(() => {
+    if (displayCategories.length === 0) return;
+    setActiveCategoryId((current) => {
+      if (current && displayCategories.some((category) => category.id === current)) {
+        return current;
+      }
+      return displayCategories[0]?.id ?? null;
+    });
+  }, [displayCategories]);
 
   const mobileScrollSpyEnabled =
-    !isDesktopLayout && !selectedProductId && !showCart && categoryIds.length > 0 && !loading;
+    !isDesktopLayout &&
+    !selectedProductId &&
+    !selectedPromotionId &&
+    !showCart &&
+    categoryIds.length > 0 &&
+    !loading;
 
   const { lockScrollSpy: lockMobileScrollSpy } = useCategoryScrollSpy({
     enabled: mobileScrollSpyEnabled,
@@ -245,7 +308,12 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
   });
 
   const desktopScrollSpyEnabled =
-    isDesktopLayout && !selectedProductId && !showCart && categoryIds.length > 0 && !loading;
+    isDesktopLayout &&
+    !selectedProductId &&
+    !selectedPromotionId &&
+    !showCart &&
+    categoryIds.length > 0 &&
+    !loading;
 
   const { lockScrollSpy: lockDesktopScrollSpy } = useCategoryScrollSpy({
     enabled: desktopScrollSpyEnabled,
@@ -289,10 +357,13 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
 
   const handleDesktopCategorySelect = useCallback(
     (categoryId: string) => {
-      if (selectedProductId || showCart) {
+      if (selectedProductId || selectedPromotionId || showCart) {
         if (selectedProductId) {
           setSelectedProductId(null);
           setProductHeroCollapsed(false);
+        }
+        if (selectedPromotionId) {
+          setSelectedPromotionId(null);
         }
         if (showCart) {
           setShowCart(false);
@@ -304,18 +375,18 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
       }
       scrollToCategory(categoryId);
     },
-    [selectedProductId, showCart, scrollToCategory, lockDesktopScrollSpy],
+    [selectedProductId, selectedPromotionId, showCart, scrollToCategory, lockDesktopScrollSpy],
   );
 
   useEffect(() => {
     const categoryId = pendingDesktopCategoryScrollRef.current;
-    if (!isDesktopLayout || categoryId == null || selectedProductId || showCart) {
+    if (!isDesktopLayout || categoryId == null || selectedProductId || selectedPromotionId || showCart) {
       return;
     }
 
     pendingDesktopCategoryScrollRef.current = null;
     scrollToCategory(categoryId);
-  }, [isDesktopLayout, selectedProductId, showCart, scrollToCategory, categories]);
+  }, [isDesktopLayout, selectedProductId, selectedPromotionId, showCart, scrollToCategory, categories]);
 
   const handleMobileScroll = useCallback(() => {
     if (mobileScrollRafRef.current != null) return;
@@ -337,7 +408,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
   useEffect(() => {
     const root = mobileScrollRef.current;
     const sentinel = heroSentinelRef.current;
-    if (!root || !sentinel || selectedProductId || showCart) return;
+    if (!root || !sentinel || selectedProductId || selectedPromotionId || showCart) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -352,7 +423,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [restaurant?.subdomain, loading, selectedProductId, showCart]);
+  }, [restaurant?.subdomain, loading, selectedProductId, selectedPromotionId, showCart]);
 
   useEffect(() => {
     if (isDesktopLayout || !activeCategoryId) return;
@@ -377,6 +448,16 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
     () => (selectedProductId ? products.find((p) => p.id === selectedProductId) ?? null : null),
     [products, selectedProductId],
   );
+
+  const selectedPromotion = useMemo(
+    () =>
+      selectedPromotionId
+        ? promotionsContext?.items.find((promotion) => promotion.id === selectedPromotionId) ?? null
+        : null,
+    [promotionsContext?.items, selectedPromotionId],
+  );
+
+  const promotionBannerViewport = isDesktopLayout ? 'desktop' : isTabletLayout ? 'tablet' : 'mobile';
 
   const bundleComplementRules = useMemo(() => {
     if (!selectedProduct) return null;
@@ -406,6 +487,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
       }
 
       setShowCart(false);
+      setSelectedPromotionId(null);
       setSelectedProductId(productId);
       setProductHeroCollapsed(false);
       mobileScrollRef.current?.scrollTo({ top: 0 });
@@ -419,8 +501,25 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
     setProductHeroCollapsed(false);
   }, []);
 
+  const openPromotion = useCallback((promotionId: string) => {
+    triggerHaptic('selection');
+    setShowCart(false);
+    setSelectedProductId(null);
+    setProductHeroCollapsed(false);
+    setPromotionHeroCollapsed(false);
+    setSelectedPromotionId(promotionId);
+    mobileScrollRef.current?.scrollTo({ top: 0 });
+    desktopScrollRef.current?.scrollTo({ top: 0 });
+  }, []);
+
+  const closePromotion = useCallback(() => {
+    setSelectedPromotionId(null);
+    setPromotionHeroCollapsed(false);
+  }, []);
+
   const openCart = useCallback(() => {
     setSelectedProductId(null);
+    setSelectedPromotionId(null);
     setProductHeroCollapsed(false);
     setShowCart(true);
     mobileScrollRef.current?.scrollTo({ top: 0 });
@@ -448,7 +547,16 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
   );
 
   const cartCurrency = cart.lines[0]?.currency ?? products[0]?.currency ?? 'MXN';
-  const showCartBar = !showCart && cart.itemCount > 0 && !selectedProduct;
+  const showCartBar =
+    !showCart && cart.itemCount > 0 && !selectedProduct;
+  const detailHeroCollapsed = selectedProduct
+    ? productHeroCollapsed
+    : selectedPromotion
+      ? promotionHeroCollapsed
+      : false;
+  const detailTitle = selectedProduct?.name ?? selectedPromotion?.name ?? '';
+  const closeDetailView = selectedProduct ? closeProduct : closePromotion;
+  const showDetailChrome = Boolean(selectedProduct || selectedPromotion) && !showCart;
 
   if (loading) {
     return (
@@ -481,19 +589,19 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
           }`}
           data-cat-tabs={menuTheme.style.categoryTabStyle}
         >
-          {selectedProduct ? (
+          {showDetailChrome ? (
             <>
-              {!productHeroCollapsed ? (
+              {!detailHeroCollapsed ? (
                 <button
                   type="button"
                   className={styles.productFixedBack}
                   aria-label="Volver al menú"
-                  onClick={closeProduct}
+                  onClick={closeDetailView}
                 >
                   <ArrowBackIcon fontSize="small" />
                 </button>
               ) : null}
-              {!productHeroCollapsed ? (
+              {!detailHeroCollapsed ? (
                 <CartHeaderButton
                   itemCount={cart.itemCount}
                   onClick={openCart}
@@ -502,21 +610,21 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
               ) : null}
               <header
                 className={`${menuStyles.compactHeader} ${
-                  productHeroCollapsed ? menuStyles.compactHeaderVisible : ''
+                  detailHeroCollapsed ? menuStyles.compactHeaderVisible : ''
                 }`}
-                aria-hidden={!productHeroCollapsed}
+                aria-hidden={!detailHeroCollapsed}
               >
-                {productHeroCollapsed ? (
+                {detailHeroCollapsed ? (
                   <button
                     type="button"
                     className={menuStyles.compactIconBtn}
                     aria-label="Volver al menú"
-                    onClick={closeProduct}
+                    onClick={closeDetailView}
                   >
                     <ArrowBackIcon fontSize="small" />
                   </button>
                 ) : null}
-                <span className={menuStyles.compactTitle}>{selectedProduct.name}</span>
+                <span className={menuStyles.compactTitle}>{detailTitle}</span>
                 <div className={menuStyles.headerActions}>
                   <CartHeaderButton
                     itemCount={cart.itemCount}
@@ -563,21 +671,35 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
           <div
             ref={mobileScrollRef}
             className={`${menuStyles.phoneScroll} ${styles.mobileScroll} ${
-              selectedProduct || showCart ? menuStyles.phoneScrollDetail : ''
+              selectedProduct || selectedPromotion || showCart ? menuStyles.phoneScrollDetail : ''
             } ${showCart ? styles.mobileScrollCart : ''}`}
-            onScroll={selectedProduct || showCart ? undefined : handleMobileScroll}
+            onScroll={selectedProduct || selectedPromotion || showCart ? undefined : handleMobileScroll}
           >
             {showCart ? (
               <PublicMenuCart
+                subdomain={subdomain}
                 lines={cart.lines}
-                subtotalCents={cartSubtotalCents}
-                quotedLineTotalsCents={cartQuote.quotedLineTotalsCents}
-                quote={cartQuote.quote}
-                quoteError={cartQuote.error}
+                validProductIds={validProductIds}
+                products={products}
+                promotions={promotionsContext?.items ?? []}
                 currency={cartCurrency}
                 onBack={closeCart}
                 onUpdateQuantity={cart.updateLineQuantity}
                 onRemoveLine={cart.removeLine}
+                isTabletLayout={isTabletLayout}
+              />
+            ) : selectedPromotion ? (
+              <PromotionShortcutProductsView
+                key={selectedPromotion.id}
+                promotion={selectedPromotion}
+                products={products}
+                productDiscounts={productDiscounts}
+                heroCollapsed={promotionHeroCollapsed}
+                onHeroCollapsedChange={setPromotionHeroCollapsed}
+                scrollRootRef={mobileScrollRef}
+                onProductClick={openProduct}
+                onBack={closePromotion}
+                hideHeroBackButton
                 isTabletLayout={isTabletLayout}
               />
             ) : selectedProduct ? (
@@ -672,7 +794,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
                         heroCollapsed ? menuStyles.categoryBarPinned : ''
                       }`}
                     >
-                      {categories.map((cat) => (
+                      {displayCategories.map((cat) => (
                         <button
                           key={cat.id}
                           type="button"
@@ -687,31 +809,17 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
                       ))}
                     </div>
 
-                    {categories.map((cat) => {
-                      const layout = cat.display_layout ?? 'vertical';
-                      const catProducts = productsForCategory(products, cat.id);
-                      return (
-                        <section
-                          key={cat.id}
-                          id={`menu-section-${cat.id}`}
-                          data-category-id={cat.id}
-                          ref={(el) => {
-                            sectionRefs.current[cat.id] = el;
-                          }}
-                          className={menuStyles.section}
-                        >
-                          <div className={menuStyles.sectionHeader}>
-                            <h2 className={menuStyles.sectionTitle}>{cat.name}</h2>
-                          </div>
-                          <ProductList
-                            layout={isTabletLayout ? 'tablet' : layout}
-                            products={catProducts}
-                            productDiscounts={productDiscounts}
-                            onProductClick={openProduct}
-                          />
-                        </section>
-                      );
-                    })}
+                    <DigitalMenuCategorySections
+                      displayCategories={displayCategories}
+                      products={products}
+                      productDiscounts={productDiscounts}
+                      promotionShortcuts={promotionShortcuts}
+                      sectionRefs={sectionRefs}
+                      isTabletLayout={isTabletLayout}
+                      promotionBannerViewport={promotionBannerViewport}
+                      onProductClick={openProduct}
+                      onPromotionSelect={openPromotion}
+                    />
                   </>
                 )}
 
@@ -732,66 +840,82 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
       </div>
       ) : (
       <div className={styles.desktopLayout}>
-        {selectedProduct && !showCart ? (
+        {showDetailChrome ? (
           <>
-            {!productHeroCollapsed ? (
+            {!detailHeroCollapsed ? (
               <button
                 type="button"
                 className={styles.productFixedBack}
                 aria-label="Volver al menú"
-                onClick={closeProduct}
+                onClick={closeDetailView}
               >
                 <ArrowBackIcon fontSize="small" />
               </button>
             ) : null}
             <header
               className={`${menuStyles.compactHeader} ${styles.productDesktopCompactHeader} ${
-                productHeroCollapsed ? menuStyles.compactHeaderVisible : ''
+                detailHeroCollapsed ? menuStyles.compactHeaderVisible : ''
               }`}
-              aria-hidden={!productHeroCollapsed}
+              aria-hidden={!detailHeroCollapsed}
             >
-              {productHeroCollapsed ? (
+              {detailHeroCollapsed ? (
                 <button
                   type="button"
                   className={menuStyles.compactIconBtn}
                   aria-label="Volver al menú"
-                  onClick={closeProduct}
+                  onClick={closeDetailView}
                 >
                   <ArrowBackIcon fontSize="small" />
                 </button>
               ) : null}
-              <span className={menuStyles.compactTitle}>{selectedProduct.name}</span>
+              <span className={menuStyles.compactTitle}>{detailTitle}</span>
             </header>
           </>
         ) : null}
         <PublicDesktopMenuLayout
           restaurant={restaurant}
-          categories={categories}
+          displayCategories={displayCategories}
           products={products}
           schedules={schedules}
           enabledServices={enabledServices}
           productDiscounts={productDiscounts}
+          promotionShortcuts={promotionShortcuts}
           logoUrl={logoUrl}
           coverUrl={coverUrl}
           activeCategoryId={activeCategoryId}
           onCategorySelect={handleDesktopCategorySelect}
+          onPromotionSelect={openPromotion}
           sectionRefs={sectionRefs}
           scrollRef={desktopScrollRef}
           onProductClick={openProduct}
           cartItemCount={cart.itemCount}
           onOpenCart={openCart}
+          themeStyle={menuThemeStyle}
         >
           {showCart ? (
             <PublicMenuCart
+              subdomain={subdomain}
               lines={cart.lines}
-              subtotalCents={cartSubtotalCents}
-              quotedLineTotalsCents={cartQuote.quotedLineTotalsCents}
-              quote={cartQuote.quote}
-              quoteError={cartQuote.error}
+              validProductIds={validProductIds}
+              products={products}
+              promotions={promotionsContext?.items ?? []}
               currency={cartCurrency}
               onBack={closeCart}
               onUpdateQuantity={cart.updateLineQuantity}
               onRemoveLine={cart.removeLine}
+            />
+          ) : selectedPromotion ? (
+            <PromotionShortcutProductsView
+              key={selectedPromotion.id}
+              promotion={selectedPromotion}
+              products={products}
+              productDiscounts={productDiscounts}
+              heroCollapsed={promotionHeroCollapsed}
+              onHeroCollapsedChange={setPromotionHeroCollapsed}
+              scrollRootRef={desktopScrollRef}
+              onProductClick={openProduct}
+              onBack={closePromotion}
+              hideHeroBackButton
             />
           ) : selectedProduct ? (
             <DigitalMenuProductDetail
@@ -817,6 +941,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
           itemCount={cart.itemCount}
           subtotalCents={cartSubtotalCents}
           currency={cartCurrency}
+          isEstimated
           onOpenCart={openCart}
           isTabletLayout={isTabletLayout}
         />
