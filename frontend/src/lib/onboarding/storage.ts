@@ -57,6 +57,7 @@ export function clearOnboardingState(userId: string): void {
 
 export const ONBOARDING_STEP_ORDER: OnboardingStepId[] = [
   'businessName',
+  'description',
   'ownerName',
   'ownerPhone',
   'branchCount',
