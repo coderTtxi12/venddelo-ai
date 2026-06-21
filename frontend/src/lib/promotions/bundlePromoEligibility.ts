@@ -3,8 +3,15 @@ import { isPromotionEffective } from '@/lib/promotions/effective';
 
 export type BundleComplementRules = {
   promoName: string;
+  promoBadge: string;
   allowedOptionItemIds: Set<string>;
 };
+
+function bundlePromoShortBadge(promotion: Promotion): string {
+  const getQ = promotion.bundle?.get_quantity ?? 2;
+  const payQ = promotion.bundle?.pay_quantity ?? 1;
+  return `${getQ}×${payQ}`;
+}
 
 function isNxmBundlePromo(promotion: Promotion): boolean {
   return (
@@ -41,6 +48,7 @@ export function getBundleComplementRulesForProduct(
     if (!promotion.option_item_ids?.length) continue;
     return {
       promoName: promotion.name,
+      promoBadge: bundlePromoShortBadge(promotion),
       allowedOptionItemIds: new Set(promotion.option_item_ids),
     };
   }
@@ -58,8 +66,8 @@ export function isOptionExcludedFromBundlePromo(
 export const BUNDLE_COMPLEMENT_EXCLUDED_MESSAGE =
   'Este complemento no participa en la promoción. La oferta no aplicará si lo eliges.';
 
-export function bundleComplementExcludedBadge(promoName: string): string {
-  return `Fuera de promo · ${promoName}`;
+export function bundleComplementExcludedBadge(promoBadge: string): string {
+  return `Fuera de promo · ${promoBadge}`;
 }
 
 export function bundleComplementExcludedTitle(promoName: string): string {
