@@ -7,6 +7,7 @@ import { mapPromotionFormToApi } from '@/lib/promotions/mapPromotionForm';
 function toUpdateBody(api: CreateManualPromotionInput): Partial<CreateManualPromotionInput> {
   return {
     name: api.name,
+    image_path: api.image_path,
     type: api.type,
     scope: api.scope,
     percent: api.percent,
