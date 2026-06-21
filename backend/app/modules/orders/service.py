@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from datetime import UTC, datetime
 
 from app.core.config import get_settings
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
@@ -16,6 +17,9 @@ from app.modules.orders.schemas import (
     OrderItemCreate,
     PublicOrderInput,
 )
+from app.modules.promotions.effective import resolve_timezone
+from app.modules.promotions.pricing import CartLineInput, price_cart
+from app.modules.promotions.repository import PromotionRepository
 from app.modules.restaurants.repository import RestaurantRepository
 
 _ALLOWED_ORDER_TYPES = {"takeout", "delivery"}
@@ -42,6 +46,7 @@ class OrderService:
         restaurants: RestaurantRepository,
         menu: MenuRepository,
         idempotency: IdempotencyRepository,
+        promotions: PromotionRepository,
         *,
         idempotency_ttl_seconds: int | None = None,
     ) -> None:
@@ -49,6 +54,7 @@ class OrderService:
         self._restaurants = restaurants
         self._menu = menu
         self._idempotency = idempotency
+        self._promotions = promotions
         self._idempotency_ttl = (
             idempotency_ttl_seconds or get_settings().order_idempotency_ttl_seconds
         )
@@ -87,13 +93,21 @@ class OrderService:
                 return
         raise ValidationError("Payment method not enabled for this order type")
 
-    def _build_order_items(
-        self, restaurant_id: uuid.UUID, data: PublicOrderInput
-    ) -> tuple[list[OrderItemCreate], int]:
+    def _build_priced_order(
+        self, restaurant_id: uuid.UUID, timezone: str, data: PublicOrderInput
+    ) -> tuple[list[OrderItemCreate], int, int, int, uuid.UUID | None]:
         if not data.items:
             raise ValidationError("Order must contain at least one item")
-        items: list[OrderItemCreate] = []
-        subtotal = 0
+
+        tz = resolve_timezone(timezone)
+        now = datetime.now(UTC)
+        promo_page = self._promotions.list_active(restaurant_id, PaginationParams(limit=200))
+        from app.modules.promotions.effective import is_promotion_effective
+
+        promotions = [p for p in promo_page.items if is_promotion_effective(p, now, tz)]
+
+        products_by_id = {}
+        cart_lines: list[CartLineInput] = []
         for line in data.items:
             if line.quantity < 1:
                 raise ValidationError("Quantity must be at least 1")
@@ -102,19 +116,46 @@ class OrderService:
                 raise NotFoundError(f"Product {line.product_id} not found")
             if not product.is_published or product.approval_status != "approved":
                 raise ValidationError(f"Product {line.product_id} is not available")
-            line_total = product.price_cents * line.quantity
-            subtotal += line_total
+            products_by_id[product.id] = product
+            cart_lines.append(
+                CartLineInput(
+                    product_id=line.product_id,
+                    quantity=line.quantity,
+                    selected_options=line.selected_options,
+                )
+            )
+
+        quote = price_cart(
+            lines=cart_lines,
+            products_by_id=products_by_id,
+            promotions=promotions,
+            now_utc=now,
+            tz=tz,
+        )
+
+        items: list[OrderItemCreate] = []
+        for line_input, priced in zip(data.items, quote.lines, strict=True):
+            product = products_by_id[line_input.product_id]
+            unit_with_options = (
+                priced.line_total_cents + priced.discount_cents
+            ) // max(line_input.quantity, 1)
             items.append(
                 OrderItemCreate(
                     product_id=product.id,
                     product_name=product.name,
-                    quantity=line.quantity,
-                    unit_price_cents=product.price_cents,
-                    selected_options=line.selected_options,
-                    line_total_cents=line_total,
+                    quantity=line_input.quantity,
+                    unit_price_cents=unit_with_options,
+                    selected_options=line_input.selected_options,
+                    line_subtotal_cents=priced.line_total_cents + priced.discount_cents,
+                    discount_cents=priced.discount_cents,
+                    line_total_cents=priced.line_total_cents,
+                    applied_promotion_id=priced.applied_promotion_id,
                 )
             )
-        return items, subtotal
+
+        subtotal_before = quote.subtotal_before_discount_cents
+        total = quote.total_cents
+        return items, subtotal_before, quote.order_discount_cents, total, quote.applied_order_promotion_id
 
     def create_public(
         self,
@@ -145,7 +186,10 @@ class OrderService:
                     return OrderDTO.model_validate(existing.response_snapshot)
 
         self._validate_payment_method(restaurant.id, data.type, data.payment_method)
-        order_items, subtotal = self._build_order_items(restaurant.id, data)
+        order_items, subtotal_before, order_discount, total, order_promo_id = (
+            self._build_priced_order(restaurant.id, restaurant.timezone, data)
+        )
+        lines_subtotal = total + order_discount
 
         order = self._orders.add(
             OrderCreate(
@@ -154,8 +198,11 @@ class OrderService:
                 customer_name=data.customer_name,
                 customer_phone=data.customer_phone,
                 payment_method=data.payment_method,
-                subtotal_cents=subtotal,
-                total_cents=subtotal,
+                subtotal_cents=lines_subtotal,
+                subtotal_before_discount_cents=subtotal_before,
+                discount_cents=order_discount,
+                total_cents=total,
+                applied_order_promotion_id=order_promo_id,
                 delivery_address=data.delivery_address,
                 note=data.note,
                 idempotency_key=idempotency_key,
