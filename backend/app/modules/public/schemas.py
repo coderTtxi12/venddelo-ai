@@ -21,6 +21,10 @@ class PublicRestaurantDTO(BaseModel):
     delivery_enabled: bool = True
     color_palette: str | None = None
     digital_menu_theme_id: str = "original"
+    digital_menu_promotions_category_enabled: bool = True
+    digital_menu_promotions_category_name: str = "Promociones"
+    digital_menu_limited_time_category_enabled: bool = True
+    digital_menu_limited_time_category_name: str = "Por tiempo limitado"
     whatsapp_phone: str | None = None
     original_language: str
     timezone: str = "America/Mexico_City"
