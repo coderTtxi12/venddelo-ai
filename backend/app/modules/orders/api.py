@@ -18,6 +18,7 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> OrderService:
         uow.restaurants,
         uow.menu,
         uow.idempotency,
+        uow.promotions,
     )
 
 
