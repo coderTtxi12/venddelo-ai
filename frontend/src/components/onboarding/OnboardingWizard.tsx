@@ -40,6 +40,11 @@ const STEP_COPY: Record<
     title: '¿Cómo se llama tu negocio?',
     subtitle: 'Este nombre aparecerá en tu menú digital y en las comunicaciones con tus clientes.',
   },
+  description: {
+    questionLabel: 'Opcional',
+    title: '¿Cómo describirías tu negocio?',
+    subtitle: 'Una breve presentación para tus clientes en el menú digital. Puedes omitir este paso.',
+  },
   ownerName: {
     questionLabel: 'Paso 2',
     title: '¿Quién es el responsable del negocio?',
@@ -113,6 +118,7 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
   const mapPickerRef = useRef<RestaurantLocationMapPickerHandle>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
 
   const [data, setData] = useState<OnboardingData>(() => createDefaultOnboardingData());
   const [currentStepId, setCurrentStepId] = useState<OnboardingStepId>('businessName');
@@ -155,6 +161,45 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
       setCurrentStepId(visibleSteps[visibleSteps.length - 1] ?? 'businessName');
     }
   }, [visibleSteps, currentStepId]);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const page = pageRef.current;
+    if (!viewport || !page) return;
+
+    const syncKeyboardOffset = () => {
+      const keyboardOffset = Math.max(
+        0,
+        window.innerHeight - viewport.height - viewport.offsetTop,
+      );
+      page.style.setProperty('--keyboard-offset', `${keyboardOffset}px`);
+    };
+
+    viewport.addEventListener('resize', syncKeyboardOffset);
+    viewport.addEventListener('scroll', syncKeyboardOffset);
+    syncKeyboardOffset();
+
+    return () => {
+      viewport.removeEventListener('resize', syncKeyboardOffset);
+      viewport.removeEventListener('scroll', syncKeyboardOffset);
+      page.style.removeProperty('--keyboard-offset');
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!target.matches('input, textarea, select, button[aria-haspopup="listbox"]')) return;
+
+      window.requestAnimationFrame(() => {
+        target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    };
+
+    document.addEventListener('focusin', handleFocusIn);
+    return () => document.removeEventListener('focusin', handleFocusIn);
+  }, [currentStepId]);
 
   const patchData = useCallback((patch: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...patch }));
@@ -262,6 +307,17 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
     }
   }, [accessToken, currentIndex, currentStepId, data, onComplete, userId, visibleSteps]);
 
+  const goSkipOptionalStep = useCallback(() => {
+    if (currentStepId !== 'description') return;
+
+    const nextStep = visibleSteps[currentIndex + 1];
+    if (!nextStep) return;
+
+    setData((prev) => ({ ...prev, businessDescription: '' }));
+    setCurrentStepId(nextStep);
+    setStepError(null);
+  }, [currentIndex, currentStepId, visibleSteps]);
+
   const goBack = () => {
     const prevStep = visibleSteps[currentIndex - 1];
     if (prevStep) {
@@ -315,6 +371,31 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
             onKeyDown={handleKeyDown}
             onChange={(e) => patchData({ businessName: e.target.value })}
           />
+        );
+
+      case 'description':
+        return (
+          <div className={styles.descriptionWrap}>
+            <textarea
+              className={styles.textArea}
+              value={data.businessDescription}
+              placeholder="Ej. Taquería con tortillas hechas a mano y ambiente familiar."
+              autoFocus
+              rows={4}
+              maxLength={500}
+              aria-label="Descripción del negocio"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && event.metaKey) {
+                  event.preventDefault();
+                  void goNext();
+                }
+              }}
+              onChange={(e) => patchData({ businessDescription: e.target.value })}
+            />
+            <p className={styles.charCount} aria-live="polite">
+              {data.businessDescription.length}/500
+            </p>
+          </div>
         );
 
       case 'ownerName':
@@ -562,7 +643,7 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
   const isLastStep = currentIndex === visibleSteps.length - 1;
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} ref={pageRef}>
       <div className={styles.progressTrack} aria-hidden>
         <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
       </div>
@@ -584,7 +665,13 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
 
       <main className={styles.main}>
         <section className={styles.stepCard} aria-live="polite">
-          <span className={styles.questionNumber}>{copy.questionLabel}</span>
+          <span
+            className={`${styles.questionNumber} ${
+              currentStepId === 'description' ? styles.questionNumberOptional : ''
+            }`}
+          >
+            {copy.questionLabel}
+          </span>
           <h1 className={styles.title}>{copy.title}</h1>
           <p className={styles.subtitle}>{copy.subtitle}</p>
           {renderStepContent()}
@@ -602,14 +689,32 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
       </main>
 
       <footer className={styles.footer}>
-        <button
-          type="button"
-          className={styles.continueBtn}
-          disabled={submitting}
-          onClick={() => void goNext()}
-        >
-          {submitting ? 'Guardando…' : isLastStep ? 'Finalizar' : 'Continuar'}
-        </button>
+        <div className={styles.footerActions}>
+          {currentStepId === 'description' ? (
+            <button
+              type="button"
+              className={styles.skipBtn}
+              disabled={submitting}
+              onClick={goSkipOptionalStep}
+            >
+              Omitir
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={styles.continueBtn}
+            disabled={submitting}
+            onClick={() => void goNext()}
+          >
+            {submitting
+              ? 'Guardando…'
+              : isLastStep
+                ? 'Finalizar'
+                : currentStepId === 'description' && !data.businessDescription.trim()
+                  ? 'Continuar sin descripción'
+                  : 'Continuar'}
+          </button>
+        </div>
       </footer>
 
       {submitting ? (
