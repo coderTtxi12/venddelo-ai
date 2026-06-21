@@ -1,9 +1,11 @@
 'use client';
 
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Category, Product } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
+import { uploadRestaurantAsset } from '@/lib/storage/upload';
+import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import {
   BUNDLE_PRESETS,
   createEmptyPromotionDraft,
@@ -33,6 +35,8 @@ export type PromotionFormSubmitPayload = Omit<
 type FormState = PromotionFormSubmitPayload;
 
 type PromotionFormProps = {
+  restaurantId: string;
+  accessToken: string;
   categories: Category[];
   products: Product[];
   saving: boolean;
@@ -143,6 +147,8 @@ function bundleMatchesPreset(
 }
 
 export function PromotionForm({
+  restaurantId,
+  accessToken,
   categories,
   products,
   saving,
@@ -153,10 +159,14 @@ export function PromotionForm({
   onSubmit,
 }: PromotionFormProps) {
   const [form, setForm] = useState<FormState>(() => initialValues ?? createEmptyPromotionDraft());
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   useEffect(() => {
     setForm(initialValues ?? createEmptyPromotionDraft());
     setProductSearch('');
+    setImageError(null);
   }, [initialValues]);
 
   const [productSearch, setProductSearch] = useState('');
@@ -182,6 +192,7 @@ export function PromotionForm({
 
   const canSave = useMemo(() => {
     if (!form.name.trim()) return false;
+    if (!form.imagePath?.trim()) return false;
 
     if (form.kind === 'percent' && (form.percent < 1 || form.percent > 100)) return false;
     if (form.kind === 'amount' && form.amount <= 0) return false;
@@ -216,6 +227,21 @@ export function PromotionForm({
     if (form.kind === 'amount') return formatMoney(form.amount);
     return '—';
   }, [form]);
+
+  const promoImageUrl = storagePublicUrl(form.imagePath);
+
+  async function handleImageUpload(file: File) {
+    setUploadingImage(true);
+    setImageError(null);
+    try {
+      const path = await uploadRestaurantAsset(accessToken, restaurantId, 'promotions', file);
+      setForm((prev) => ({ ...prev, imagePath: path }));
+    } catch {
+      setImageError('No se pudo subir la imagen. Usa JPG o PNG de hasta 2 MB.');
+    } finally {
+      setUploadingImage(false);
+    }
+  }
 
   return (
     <form
@@ -255,6 +281,67 @@ export function PromotionForm({
           onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
           placeholder="Ej. Miércoles pizza 2×1, Happy hour bebidas"
         />
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="promo-image">
+          Imagen promocional <span className={styles.requiredMark}>*</span>
+        </label>
+        <p className={styles.helpText} id="promo-image-help">
+          Banner del acceso directo en el menú público. Muestra los platillos participantes al
+          tocarla.
+        </p>
+        <div className={styles.promoImageRow}>
+          {promoImageUrl ? (
+            <img src={promoImageUrl} alt="" className={styles.promoImagePreview} />
+          ) : (
+            <div className={styles.promoImagePlaceholder} aria-hidden>
+              Sin imagen
+            </div>
+          )}
+          <div className={styles.promoImageActions}>
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              disabled={uploadingImage || saving}
+              onClick={() => imageInputRef.current?.click()}
+            >
+              {uploadingImage
+                ? 'Subiendo…'
+                : promoImageUrl
+                  ? 'Cambiar imagen'
+                  : 'Subir imagen'}
+            </button>
+            {form.imagePath ? (
+              <button
+                type="button"
+                className={styles.dangerGhostBtn}
+                disabled={uploadingImage || saving}
+                onClick={() => setForm((prev) => ({ ...prev, imagePath: null }))}
+              >
+                Quitar
+              </button>
+            ) : null}
+            <input
+              ref={imageInputRef}
+              id="promo-image"
+              type="file"
+              accept="image/*"
+              className={styles.hiddenInput}
+              aria-describedby="promo-image-help"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleImageUpload(file);
+                e.target.value = '';
+              }}
+            />
+          </div>
+        </div>
+        {imageError ? (
+          <p className={styles.errorBanner} role="alert">
+            {imageError}
+          </p>
+        ) : null}
       </div>
 
       <fieldset className={styles.fieldset}>
