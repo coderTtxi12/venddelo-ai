@@ -5,6 +5,7 @@ import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { cartItemCount, lineTotalCents } from '@/lib/digital-menu/cart/cartMath';
+import type { CartQuote } from '@/lib/api/public';
 import type { PublicMenuCartLine } from '@/lib/digital-menu/cart/types';
 import { formatMoney } from '@/lib/currency';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
@@ -14,6 +15,9 @@ import styles from './PublicMenuCart.module.css';
 type PublicMenuCartProps = {
   lines: PublicMenuCartLine[];
   subtotalCents: number;
+  quotedLineTotalsCents?: number[] | null;
+  quote?: CartQuote | null;
+  quoteError?: string | null;
   currency: string;
   onBack: () => void;
   onUpdateQuantity: (lineId: string, quantity: number) => void;
@@ -24,12 +28,18 @@ type PublicMenuCartProps = {
 function CartOrderSummary({
   itemCount,
   subtotal,
+  subtotalBefore,
+  promoSavings,
   currency,
+  quoteError,
   variant,
 }: {
   itemCount: number;
   subtotal: number;
+  subtotalBefore: number | null;
+  promoSavings: number;
   currency: string;
+  quoteError: string | null;
   variant: 'mobile' | 'desktop';
 }) {
   const itemLabel = itemCount === 1 ? '1 artículo' : `${itemCount} artículos`;
@@ -42,11 +52,25 @@ function CartOrderSummary({
         <h2 className={styles.summaryTitle}>Resumen del pedido</h2>
       ) : null}
 
+      {quoteError ? (
+        <p className={styles.quoteError} role="status">
+          {quoteError}
+        </p>
+      ) : null}
+
       <div className={styles.summaryRows}>
         <div className={styles.summaryRow}>
           <span className={styles.summaryRowLabel}>{itemLabel}</span>
-          <span className={styles.summaryRowValue}>{formatMoney(subtotal, currency)}</span>
+          <span className={styles.summaryRowValue}>
+            {formatMoney(subtotalBefore ?? subtotal, currency)}
+          </span>
         </div>
+        {promoSavings > 0 ? (
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryRowLabel}>Promociones</span>
+            <span className={styles.summaryRowPromo}>-{formatMoney(promoSavings, currency)}</span>
+          </div>
+        ) : null}
       </div>
 
       <div className={styles.summaryDivider} aria-hidden />
@@ -71,6 +95,9 @@ function CartOrderSummary({
 export function PublicMenuCart({
   lines,
   subtotalCents,
+  quotedLineTotalsCents,
+  quote,
+  quoteError = null,
   currency,
   onBack,
   onUpdateQuantity,
@@ -78,6 +105,10 @@ export function PublicMenuCart({
   isTabletLayout = false,
 }: PublicMenuCartProps) {
   const subtotal = subtotalCents / 100;
+  const subtotalBefore =
+    quote != null ? quote.subtotal_before_discount_cents / 100 : null;
+  const totalPromoSavings =
+    quote != null ? (quote.subtotal_before_discount_cents - quote.total_cents) / 100 : 0;
   const itemCount = cartItemCount(lines);
 
   return (
@@ -103,9 +134,16 @@ export function PublicMenuCart({
       ) : (
         <div className={styles.cartBody}>
           <ul className={styles.list} aria-label="Productos en el carrito">
-            {lines.map((line) => {
+            {lines.map((line, lineIndex) => {
               const imageUrl = storagePublicUrl(line.imagePath);
-              const total = lineTotalCents(line) / 100;
+              const listTotal = lineTotalCents(line) / 100;
+              const quotedLine = quote?.lines[lineIndex];
+              const quotedTotalCents = quotedLineTotalsCents?.[lineIndex];
+              const hasPromo =
+                quotedTotalCents != null && quotedTotalCents < lineTotalCents(line);
+              const total =
+                quotedTotalCents != null ? quotedTotalCents / 100 : listTotal;
+              const promoBadge = quotedLine?.badge;
 
               return (
                 <li key={line.id} className={styles.lineCard}>
@@ -117,7 +155,12 @@ export function PublicMenuCart({
 
                   <div className={styles.lineBody}>
                     <div className={styles.lineTop}>
-                      <h2 className={styles.lineName}>{line.productName}</h2>
+                      <div className={styles.lineTitleWrap}>
+                        <h2 className={styles.lineName}>{line.productName}</h2>
+                        {promoBadge ? (
+                          <span className={styles.linePromoBadge}>{promoBadge}</span>
+                        ) : null}
+                      </div>
                       <button
                         type="button"
                         className={styles.removeBtn}
@@ -167,7 +210,18 @@ export function PublicMenuCart({
                           <AddIcon sx={{ fontSize: 18 }} />
                         </button>
                       </div>
-                      <span className={styles.linePrice}>{formatMoney(total, line.currency)}</span>
+                      <span className={styles.linePrice}>
+                        {hasPromo ? (
+                          <>
+                            <span className={styles.linePriceOriginal}>
+                              {formatMoney(listTotal, line.currency)}
+                            </span>
+                            <span>{formatMoney(total, line.currency)}</span>
+                          </>
+                        ) : (
+                          formatMoney(total, line.currency)
+                        )}
+                      </span>
                     </div>
                   </div>
                 </li>
@@ -179,7 +233,10 @@ export function PublicMenuCart({
             <CartOrderSummary
               itemCount={itemCount}
               subtotal={subtotal}
+              subtotalBefore={subtotalBefore}
+              promoSavings={totalPromoSavings}
               currency={currency}
+              quoteError={quoteError}
               variant="desktop"
             />
           </aside>
@@ -191,7 +248,10 @@ export function PublicMenuCart({
           <CartOrderSummary
             itemCount={itemCount}
             subtotal={subtotal}
+            subtotalBefore={subtotalBefore}
+            promoSavings={totalPromoSavings}
             currency={currency}
+            quoteError={quoteError}
             variant="mobile"
           />
         </footer>

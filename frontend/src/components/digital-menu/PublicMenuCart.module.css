@@ -132,6 +132,40 @@
   gap: 0.5rem;
 }
 
+.lineTitleWrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.linePromoBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.quoteError {
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #92400e;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.summaryRowPromo {
+  font-weight: 700;
+  color: #047857;
+}
+
 .lineName {
   margin: 0;
   font-size: 0.95rem;
@@ -263,10 +297,20 @@
 }
 
 .linePrice {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
   font-size: 0.95rem;
   font-weight: 800;
   color: var(--dm-price, var(--dm-text, #111827));
   white-space: nowrap;
+}
+
+.linePriceOriginal {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--dm-text-secondary, #64748b);
+  text-decoration: line-through;
 }
 
 /* Mobile sticky footer */
