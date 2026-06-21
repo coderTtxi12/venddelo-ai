@@ -8,6 +8,7 @@ type PublicMenuCartBarProps = {
   itemCount: number;
   subtotalCents: number;
   currency: string;
+  isEstimated?: boolean;
   onOpenCart: () => void;
   isTabletLayout?: boolean;
 };
@@ -16,6 +17,7 @@ export function PublicMenuCartBar({
   itemCount,
   subtotalCents,
   currency,
+  isEstimated = false,
   onOpenCart,
   isTabletLayout = false,
 }: PublicMenuCartBarProps) {
@@ -31,7 +33,10 @@ export function PublicMenuCartBar({
           </span>
           <span className={styles.cartBarLabel}>Ver carrito</span>
         </span>
-        <span className={styles.cartBarTotal}>{formatMoney(subtotalCents / 100, currency)}</span>
+        <span className={styles.cartBarTotal}>
+          {formatMoney(subtotalCents / 100, currency)}
+          {isEstimated ? <span className={styles.cartBarEstimateHint}> est.</span> : null}
+        </span>
       </button>
     </div>
   );

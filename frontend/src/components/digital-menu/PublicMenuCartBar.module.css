@@ -73,6 +73,12 @@
   white-space: nowrap;
 }
 
+.cartBarEstimateHint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.82;
+}
+
 @media (min-width: 1024px) {
   .cartBar {
     width: min(calc(100% - 2rem), 360px);
