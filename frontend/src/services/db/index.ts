@@ -42,6 +42,7 @@ export {
   normalizeOptionGroups,
   saveSupplierProduct,
   updateSupplierProductActive,
+  updateSupplierProductVisibility,
   updateSupplierProductReviewStatus,
   type FetchSupplierProductsPageArgs,
   type FetchSupplierProductsPageResult,

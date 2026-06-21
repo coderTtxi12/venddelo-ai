@@ -22,6 +22,8 @@ import {
   syncProductCatalogDiscount,
 } from '@/lib/promotions/productCatalogDiscount';
 import { resolveImagePathForUpload } from '@/lib/storage/resolveImagePath';
+import type { ProductVisibilityState } from '@/lib/menu/productVisibility';
+import { visibilityUpdateForState } from '@/lib/menu/productVisibility';
 import type { LegacyDbClient, LegacyStorageClient } from '../legacyDb';
 import type {
   ImageDraft,
@@ -404,11 +406,15 @@ export async function saveSupplierProduct(
       price_cents: number;
       category_ids: string[];
       image_path?: string | null;
+      is_published: boolean;
+      approval_status: string;
     } = {
       name: payload.name,
       description,
       price_cents: priceCents,
       category_ids: payload.categoryIds,
+      is_published: true,
+      approval_status: 'approved',
     };
     if (imagePath !== undefined) {
       body.image_path = imagePath;
@@ -485,14 +491,31 @@ export async function saveSupplierProduct(
   };
 }
 
-export async function updateSupplierProductActive(
+export async function updateSupplierProductVisibility(
   accessToken: string,
   _db: LegacyDbClient,
   restaurantId: string,
   productId: string,
+  state: ProductVisibilityState,
+): Promise<void> {
+  const patch = visibilityUpdateForState(state);
+  await updateProduct(accessToken, restaurantId, productId, patch);
+}
+
+export async function updateSupplierProductActive(
+  accessToken: string,
+  db: LegacyDbClient,
+  restaurantId: string,
+  productId: string,
   isActive: boolean,
 ): Promise<void> {
-  await updateProduct(accessToken, restaurantId, productId, { is_active: isActive });
+  await updateSupplierProductVisibility(
+    accessToken,
+    db,
+    restaurantId,
+    productId,
+    isActive ? 'live' : 'inactive',
+  );
 }
 
 export async function updateSupplierProductReviewStatus(
