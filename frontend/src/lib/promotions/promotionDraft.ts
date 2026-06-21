@@ -51,6 +51,7 @@ export type PromotionDraft = {
   schedule: PromotionScheduleDraft;
   campaignStartsAt: string;
   campaignEndsAt: string;
+  imagePath: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -94,6 +95,7 @@ export function createEmptyPromotionDraft(): Omit<
     },
     campaignStartsAt: '',
     campaignEndsAt: '',
+    imagePath: null,
   };
 }
 
