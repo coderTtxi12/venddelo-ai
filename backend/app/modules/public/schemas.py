@@ -1,4 +1,10 @@
-from pydantic import BaseModel
+from datetime import datetime
+from typing import Any
+import uuid
+
+from pydantic import BaseModel, Field
+
+from app.modules.promotions.schemas import PromotionDTO
 
 
 class PublicRestaurantDTO(BaseModel):
@@ -17,3 +23,44 @@ class PublicRestaurantDTO(BaseModel):
     digital_menu_theme_id: str = "original"
     whatsapp_phone: str | None = None
     original_language: str
+    timezone: str = "America/Mexico_City"
+    server_now: datetime | None = None
+
+
+class PublicPromotionsContextDTO(BaseModel):
+    server_now: datetime
+    timezone: str
+    local_now: datetime
+    items: list[PromotionDTO] = Field(default_factory=list)
+
+
+class CartQuoteLineInput(BaseModel):
+    product_id: uuid.UUID
+    quantity: int = Field(ge=1)
+    selected_options: dict[str, Any] | None = None
+
+
+class CartQuoteInput(BaseModel):
+    items: list[CartQuoteLineInput]
+
+
+class CartQuoteLineDTO(BaseModel):
+    product_id: uuid.UUID
+    quantity: int
+    unit_base_cents: int
+    options_cents: int
+    discount_cents: int
+    line_total_cents: int
+    badge: str | None = None
+    applied_promotion_id: uuid.UUID | None = None
+    promo_warnings: list[str] = Field(default_factory=list)
+
+
+class CartQuoteDTO(BaseModel):
+    server_now: datetime
+    timezone: str
+    lines: list[CartQuoteLineDTO]
+    subtotal_before_discount_cents: int
+    order_discount_cents: int
+    total_cents: int
+    applied_order_promotion_id: uuid.UUID | None = None
