@@ -472,8 +472,11 @@ export default function MarketingPage() {
         title={editingPromotion ? 'Editar promoción' : 'Agregar promoción personalizada'}
         onClose={closeDrawer}
       >
+        {supplierId && accessToken ? (
         <PromotionForm
           key={editingPromotion?.id ?? 'create'}
+          restaurantId={supplierId}
+          accessToken={accessToken}
           categories={categories}
           products={products}
           saving={saving}
@@ -485,6 +488,7 @@ export default function MarketingPage() {
           onCancel={closeDrawer}
           onSubmit={handleSavePromotion}
         />
+        ) : null}
       </Drawer>
     </div>
   );
