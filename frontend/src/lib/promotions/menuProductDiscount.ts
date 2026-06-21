@@ -1,4 +1,5 @@
 import type { Product, Promotion } from '@/lib/api/types';
+import { isPromotionEffective } from './effective';
 import { discountUsdFromPromotion } from './productCatalogDiscount';
 
 export type MenuProductDiscountInfo = {
@@ -6,13 +7,6 @@ export type MenuProductDiscountInfo = {
   finalPrice: number;
   badge: string | null;
 };
-
-function isPromotionCurrentlyActive(promotion: Promotion, now = new Date()): boolean {
-  if (!promotion.is_active) return false;
-  if (promotion.starts_at && new Date(promotion.starts_at) > now) return false;
-  if (promotion.ends_at && new Date(promotion.ends_at) < now) return false;
-  return true;
-}
 
 function promotionAppliesToProduct(promotion: Promotion, product: Product): boolean {
   if (promotion.scope === 'product') {
@@ -24,10 +18,16 @@ function promotionAppliesToProduct(promotion: Promotion, product: Product): bool
   return false;
 }
 
+function bundleBadge(promotion: Promotion): string | null {
+  if (promotion.type !== 'bundle' && promotion.type !== '2x1') return null;
+  const getQ = promotion.bundle?.get_quantity ?? 2;
+  const payQ = promotion.bundle?.pay_quantity ?? 1;
+  return `${getQ}×${payQ}`;
+}
+
 function specialOfferBadge(promotion: Promotion): string | null {
-  if (promotion.type === '2x1') return '2x1';
   if (promotion.type === 'combo') return 'Combo';
-  return null;
+  return bundleBadge(promotion);
 }
 
 function percentBadge(promotion: Promotion): string | null {
@@ -40,12 +40,14 @@ function percentBadge(promotion: Promotion): string | null {
 export function resolveMenuProductDiscount(
   product: Product,
   promotions: Promotion[],
-  now = new Date(),
+  now: Date,
+  timezone = 'America/Mexico_City',
 ): MenuProductDiscountInfo | null {
   const price = product.price_cents / 100;
   const applicable = promotions.filter(
     (promotion) =>
-      isPromotionCurrentlyActive(promotion, now) && promotionAppliesToProduct(promotion, product),
+      isPromotionEffective(promotion, now, timezone) &&
+      promotionAppliesToProduct(promotion, product),
   );
 
   if (applicable.length === 0) return null;
@@ -82,11 +84,13 @@ export function resolveMenuProductDiscount(
 export function buildMenuProductDiscountMap(
   products: Product[],
   promotions: Promotion[],
+  now: Date,
+  timezone = 'America/Mexico_City',
 ): Map<string, MenuProductDiscountInfo> {
   const discounts = new Map<string, MenuProductDiscountInfo>();
 
   for (const product of products) {
-    const info = resolveMenuProductDiscount(product, promotions);
+    const info = resolveMenuProductDiscount(product, promotions, now, timezone);
     if (info) {
       discounts.set(product.id, info);
     }
