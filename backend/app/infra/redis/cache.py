@@ -35,7 +35,11 @@ class RedisCacheAdapter(CachePort):
         return cls(Redis.from_url(url, decode_responses=True))
 
     def get(self, key: str) -> str | None:
-        value = cast(str | None, self._client.get(key))
+        try:
+            value = cast(str | None, self._client.get(key))
+        except Exception:
+            logger.warning("redis cache get failed, treating as miss key=%s", key, exc_info=True)
+            return None
         logger.debug(
             "redis cache get key=%s result=%s",
             key,
@@ -44,17 +48,29 @@ class RedisCacheAdapter(CachePort):
         return value
 
     def set(self, key: str, value: str, ttl_seconds: int) -> None:
-        self._client.set(key, value, ex=ttl_seconds)
+        try:
+            self._client.set(key, value, ex=ttl_seconds)
+        except Exception:
+            logger.warning("redis cache set failed key=%s", key, exc_info=True)
+            return
         logger.debug("redis cache set key=%s ttl_seconds=%s", key, ttl_seconds)
 
     def delete(self, key: str) -> None:
-        self._client.delete(key)
+        try:
+            self._client.delete(key)
+        except Exception:
+            logger.warning("redis cache delete failed key=%s", key, exc_info=True)
+            return
         logger.debug("redis cache delete key=%s", key)
 
     def delete_pattern(self, pattern: str) -> int:
         count = 0
-        for key in self._client.scan_iter(match=pattern):
-            self._client.delete(key)
-            count += 1
+        try:
+            for key in self._client.scan_iter(match=pattern):
+                self._client.delete(key)
+                count += 1
+        except Exception:
+            logger.warning("redis cache delete_pattern failed pattern=%s", pattern, exc_info=True)
+            return 0
         logger.debug("redis cache delete_pattern pattern=%s removed=%s", pattern, count)
         return count
