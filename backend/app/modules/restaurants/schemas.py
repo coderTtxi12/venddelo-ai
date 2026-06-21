@@ -42,6 +42,10 @@ class RestaurantCreate(BaseModel):
     logo_path: str | None = None
     cover_path: str | None = None
     digital_menu_theme_id: str = "original"
+    digital_menu_promotions_category_enabled: bool = True
+    digital_menu_promotions_category_name: str = "Promociones"
+    digital_menu_limited_time_category_enabled: bool = True
+    digital_menu_limited_time_category_name: str = "Por tiempo limitado"
     whatsapp_phone: str | None = None
     color_palette: str | None = None
     takeout_enabled: bool = True
@@ -60,6 +64,10 @@ class RestaurantUpdate(BaseModel):
     logo_path: str | None = None
     cover_path: str | None = None
     digital_menu_theme_id: str | None = None
+    digital_menu_promotions_category_enabled: bool | None = None
+    digital_menu_promotions_category_name: str | None = None
+    digital_menu_limited_time_category_enabled: bool | None = None
+    digital_menu_limited_time_category_name: str | None = None
     whatsapp_phone: str | None = None
     color_palette: str | None = None
     original_language: str | None = None
@@ -92,6 +100,10 @@ class RestaurantDTO(BaseModel):
     logo_path: str | None = None
     cover_path: str | None = None
     digital_menu_theme_id: str = "original"
+    digital_menu_promotions_category_enabled: bool = True
+    digital_menu_promotions_category_name: str = "Promociones"
+    digital_menu_limited_time_category_enabled: bool = True
+    digital_menu_limited_time_category_name: str = "Por tiempo limitado"
     whatsapp_phone: str | None = None
     color_palette: str | None = None
     owner_id: uuid.UUID | None = None
