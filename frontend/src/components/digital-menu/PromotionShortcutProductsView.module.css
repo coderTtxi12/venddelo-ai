@@ -1,0 +1,40 @@
+.eyebrow {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--dm-text-secondary, #64748b);
+}
+
+.meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.84rem;
+  color: var(--dm-text-secondary, #64748b);
+}
+
+.empty {
+  margin: 0;
+  padding: 1rem 0;
+  color: var(--dm-text-secondary, #64748b);
+}
+
+.listSection {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--dm-border, #e2e8f0);
+}
+
+.listHeading {
+  margin: 0 0 0.85rem;
+  font-family: var(--dm-font-heading, inherit);
+  font-size: 0.78rem;
+  font-weight: var(--dm-font-heading-weight, 700);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--dm-text-secondary, #64748b);
+}
+
+.productListWrap {
+  margin-top: 0;
+}
