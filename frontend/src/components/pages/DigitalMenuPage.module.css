@@ -111,6 +111,9 @@
 
 .themePanelWrap {
   width: min(100%, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .error,
