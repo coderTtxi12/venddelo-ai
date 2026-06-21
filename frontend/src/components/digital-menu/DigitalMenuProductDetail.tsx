@@ -12,6 +12,12 @@ import type { OptionGroup, Product } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
 import { attachDragOverlay } from '@/lib/dragOverlay';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
+import {
+  bundleComplementExcludedBadge,
+  bundleComplementExcludedTitle,
+  isOptionExcludedFromBundlePromo,
+  type BundleComplementRules,
+} from '@/lib/promotions/bundlePromoEligibility';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { activeOptionGroups, optionGroupSelectionHint } from './optionGroupHint';
 import {
@@ -51,6 +57,7 @@ type AddToCartPayload = {
 type DigitalMenuProductDetailProps = {
   product: Product;
   discount?: MenuProductDiscountInfo | null;
+  bundleComplementRules?: BundleComplementRules | null;
   heroCollapsed: boolean;
   onHeroCollapsedChange: (collapsed: boolean) => void;
   scrollRootRef: RefObject<HTMLDivElement | null>;
@@ -121,6 +128,7 @@ function formatCollapsedGroupSummary(
 export function DigitalMenuProductDetail({
   product,
   discount,
+  bundleComplementRules = null,
   heroCollapsed,
   onHeroCollapsedChange,
   scrollRootRef,
@@ -454,6 +462,9 @@ export function DigitalMenuProductDetail({
                           >
                         {activeItems.map((item) => {
                           const selected = isItemSelected(selections, group.id, item.id);
+                          const excludedFromPromo =
+                            bundleComplementRules &&
+                            isOptionExcludedFromBundlePromo(item.id, bundleComplementRules);
                           return (
                           <li
                             key={item.id}
@@ -524,14 +535,25 @@ export function DigitalMenuProductDetail({
                             ) : null}
                             <button
                               type="button"
-                              className={`${styles.optionItem} ${selected ? styles.optionItemSelected : ''}`}
+                              className={`${styles.optionItem} ${selected ? styles.optionItemSelected : ''} ${
+                                excludedFromPromo ? styles.optionItemOutsidePromo : ''
+                              }`}
                               role={group.selection === 'single' ? 'radio' : 'checkbox'}
                               aria-checked={selected}
                               aria-label={`${item.label}${
                                 item.price_delta_cents
                                   ? `, ${formatMoney(item.price_delta_cents / 100, product.currency)} extra`
                                   : ''
+                              }${
+                                excludedFromPromo && bundleComplementRules
+                                  ? `, ${bundleComplementExcludedBadge(bundleComplementRules.promoName)}`
+                                  : ''
                               }`}
+                              title={
+                                excludedFromPromo && bundleComplementRules
+                                  ? bundleComplementExcludedTitle(bundleComplementRules.promoName)
+                                  : undefined
+                              }
                               onClick={() => handleOptionToggle(group, item.id)}
                             >
                               <span
@@ -546,7 +568,14 @@ export function DigitalMenuProductDetail({
                                   <CheckIcon sx={{ fontSize: 14, color: '#fff' }} />
                                 ) : null}
                               </span>
-                              <span className={styles.optionItemLabel}>{item.label}</span>
+                              <span className={styles.optionItemLabelWrap}>
+                                <span className={styles.optionItemLabel}>{item.label}</span>
+                                {excludedFromPromo && bundleComplementRules ? (
+                                  <span className={styles.optionOutsidePromoBadge}>
+                                    {bundleComplementExcludedBadge(bundleComplementRules.promoName)}
+                                  </span>
+                                ) : null}
+                              </span>
                               {item.price_delta_cents !== 0 ? (
                                 <span className={styles.optionItemPrice}>
                                   +{formatMoney(item.price_delta_cents / 100, product.currency)}
