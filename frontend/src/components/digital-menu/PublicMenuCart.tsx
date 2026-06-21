@@ -1,23 +1,29 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { cartItemCount, lineTotalCents } from '@/lib/digital-menu/cart/cartMath';
-import type { CartQuote } from '@/lib/api/public';
+import { useCheckoutCartQuote } from '@/lib/digital-menu/cart/useCheckoutCartQuote';
 import type { PublicMenuCartLine } from '@/lib/digital-menu/cart/types';
+import type { Product, Promotion } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
+import { PublicMenuCheckoutSummary } from './PublicMenuCheckoutSummary';
 import styles from './PublicMenuCart.module.css';
 
 type PublicMenuCartProps = {
+  subdomain: string;
   lines: PublicMenuCartLine[];
-  subtotalCents: number;
-  quotedLineTotalsCents?: number[] | null;
-  quote?: CartQuote | null;
-  quoteError?: string | null;
+  validProductIds: ReadonlySet<string>;
+  products: Product[];
+  promotions: Promotion[];
   currency: string;
   onBack: () => void;
   onUpdateQuantity: (lineId: string, quantity: number) => void;
@@ -32,6 +38,10 @@ function CartOrderSummary({
   promoSavings,
   currency,
   quoteError,
+  promosApplied,
+  quoteLoading,
+  onContinue,
+  canContinue,
   variant,
 }: {
   itemCount: number;
@@ -40,6 +50,10 @@ function CartOrderSummary({
   promoSavings: number;
   currency: string;
   quoteError: string | null;
+  promosApplied: boolean;
+  quoteLoading: boolean;
+  onContinue: () => void;
+  canContinue: boolean;
   variant: 'mobile' | 'desktop';
 }) {
   const itemLabel = itemCount === 1 ? '1 artículo' : `${itemCount} artículos`;
@@ -53,7 +67,7 @@ function CartOrderSummary({
       ) : null}
 
       {quoteError ? (
-        <p className={styles.quoteError} role="status">
+        <p className={styles.quoteError} role="alert">
           {quoteError}
         </p>
       ) : null}
@@ -75,41 +89,137 @@ function CartOrderSummary({
 
       <div className={styles.summaryDivider} aria-hidden />
 
-      <div className={styles.summaryTotalBlock}>
-        <span className={styles.summaryLabel}>Subtotal</span>
-        <p className={styles.summaryTotal}>{formatMoney(subtotal, currency)}</p>
+      <div className={styles.summaryActionsRow}>
+        <div className={styles.summaryTotalBlock}>
+          <span className={styles.summaryLabel}>
+            {promosApplied ? 'Subtotal' : 'Subtotal estimado'}
+          </span>
+          <p className={styles.summaryTotal}>{formatMoney(subtotal, currency)}</p>
+        </div>
+
+        <button
+          type="button"
+          className={styles.checkoutBtn}
+          disabled={!canContinue || quoteLoading}
+          aria-busy={quoteLoading}
+          onClick={onContinue}
+        >
+          <span>
+            {quoteLoading
+              ? 'Aplicando promociones…'
+              : promosApplied
+                ? 'Ver cuenta'
+                : 'Continuar'}
+          </span>
+          {!quoteLoading && variant === 'desktop' ? (
+            <ArrowForwardIcon sx={{ fontSize: 18 }} aria-hidden />
+          ) : null}
+        </button>
       </div>
 
-      <button type="button" className={styles.checkoutBtn} disabled aria-disabled="true">
-        <span>Continuar</span>
-        {variant === 'desktop' ? <ArrowForwardIcon sx={{ fontSize: 18 }} aria-hidden /> : null}
-      </button>
-
-      {variant === 'desktop' ? (
-        <p className={styles.summaryNote}>Impuestos y cargos de envío se calculan al continuar.</p>
-      ) : null}
+      {!promosApplied ? (
+        <p className={`${styles.pricingNotice} ${styles.pricingNoticeBelowBtn}`} role="status">
+          <InfoOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
+          <span>Al continuar aplicamos promociones vigentes y el total final.</span>
+        </p>
+      ) : (
+        <p className={styles.summaryNote}>
+          Impuestos y envío se confirman al completar el pedido.
+        </p>
+      )}
     </div>
   );
 }
 
 export function PublicMenuCart({
+  subdomain,
   lines,
-  subtotalCents,
-  quotedLineTotalsCents,
-  quote,
-  quoteError = null,
+  validProductIds,
+  products,
+  promotions,
   currency,
   onBack,
   onUpdateQuantity,
   onRemoveLine,
   isTabletLayout = false,
 }: PublicMenuCartProps) {
-  const subtotal = subtotalCents / 100;
+  const [showCheckoutSummary, setShowCheckoutSummary] = useState(false);
+  const [collapsedLineIds, setCollapsedLineIds] = useState<Set<string>>(() => new Set());
+
+  const {
+    displaySubtotalCents,
+    quote,
+    quotedLineTotalsCents,
+    promosApplied,
+    loading: quoteLoading,
+    error: quoteError,
+    applyPromotions,
+    allLinesValid,
+  } = useCheckoutCartQuote(subdomain, lines, validProductIds);
+
+  const subtotal = displaySubtotalCents / 100;
   const subtotalBefore =
     quote != null ? quote.subtotal_before_discount_cents / 100 : null;
   const totalPromoSavings =
     quote != null ? (quote.subtotal_before_discount_cents - quote.total_cents) / 100 : 0;
   const itemCount = cartItemCount(lines);
+  const canContinue = lines.length > 0 && allLinesValid && !quoteLoading;
+
+  const linesKey = useMemo(
+    () =>
+      JSON.stringify(
+        lines.map((line) => ({
+          id: line.id,
+          productId: line.productId,
+          quantity: line.quantity,
+          selections: line.selections,
+        })),
+      ),
+    [lines],
+  );
+
+  useEffect(() => {
+    setShowCheckoutSummary(false);
+    setCollapsedLineIds(new Set());
+  }, [linesKey]);
+
+  const toggleLine = (lineId: string) => {
+    setCollapsedLineIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(lineId)) {
+        next.delete(lineId);
+      } else {
+        next.add(lineId);
+      }
+      return next;
+    });
+  };
+
+  const handleContinue = async () => {
+    if (!canContinue) return;
+    if (promosApplied && quote) {
+      setShowCheckoutSummary(true);
+      return;
+    }
+    const result = await applyPromotions();
+    if (result) {
+      setShowCheckoutSummary(true);
+    }
+  };
+
+  if (showCheckoutSummary && quote) {
+    return (
+      <PublicMenuCheckoutSummary
+        lines={lines}
+        quote={quote}
+        products={products}
+        promotions={promotions}
+        currency={currency}
+        onBack={() => setShowCheckoutSummary(false)}
+        isTabletLayout={isTabletLayout}
+      />
+    );
+  }
 
   return (
     <div
@@ -124,6 +234,9 @@ export function PublicMenuCart({
           {lines.length > 0 ? (
             <p className={styles.headerMeta}>
               {itemCount === 1 ? '1 artículo' : `${itemCount} artículos`}
+              {!promosApplied ? (
+                <span className={styles.headerMetaEstimate}> · total estimado</span>
+              ) : null}
             </p>
           ) : null}
         </div>
@@ -144,6 +257,8 @@ export function PublicMenuCart({
               const total =
                 quotedTotalCents != null ? quotedTotalCents / 100 : listTotal;
               const promoBadge = quotedLine?.badge;
+              const expanded = !collapsedLineIds.has(line.id);
+              const panelId = `cart-line-${line.id}`;
 
               return (
                 <li key={line.id} className={styles.lineCard}>
@@ -161,68 +276,107 @@ export function PublicMenuCart({
                           <span className={styles.linePromoBadge}>{promoBadge}</span>
                         ) : null}
                       </div>
-                      <button
-                        type="button"
-                        className={styles.removeBtn}
-                        onClick={() => onRemoveLine(line.id)}
-                      >
-                        Quitar
-                      </button>
-                    </div>
-
-                    {line.optionSummary.length > 0 ? (
-                      <ul className={styles.options}>
-                        {line.optionSummary.map((group) => (
-                          <li key={group.groupTitle} className={styles.optionGroup}>
-                            <span className={styles.optionGroupLabel}>{group.groupTitle}: </span>
-                            {group.itemLabels.join(', ')}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-
-                    {line.notes ? (
-                      <p className={styles.lineNotes}>
-                        <span className={styles.lineNotesLabel}>Nota: </span>
-                        {line.notes}
-                      </p>
-                    ) : null}
-
-                    <div className={styles.lineFooter}>
-                      <div className={styles.qtyStepper} aria-label={`Cantidad de ${line.productName}`}>
+                      <div className={styles.lineTopActions}>
+                        {!expanded ? (
+                          <span className={styles.lineCollapsedPrice}>
+                            {hasPromo ? (
+                              <>
+                                <span className={styles.linePriceOriginal}>
+                                  {formatMoney(listTotal, line.currency)}
+                                </span>
+                                <span>{formatMoney(total, line.currency)}</span>
+                              </>
+                            ) : (
+                              formatMoney(total, line.currency)
+                            )}
+                          </span>
+                        ) : null}
                         <button
                           type="button"
-                          className={styles.qtyBtn}
-                          aria-label="Disminuir cantidad"
-                          onClick={() => onUpdateQuantity(line.id, line.quantity - 1)}
+                          className={styles.lineToggleBtn}
+                          aria-expanded={expanded}
+                          aria-controls={panelId}
+                          onClick={() => toggleLine(line.id)}
                         >
-                          <RemoveIcon sx={{ fontSize: 18 }} />
+                          {expanded ? (
+                            <ExpandLessIcon sx={{ fontSize: 18 }} aria-hidden />
+                          ) : (
+                            <ExpandMoreIcon sx={{ fontSize: 18 }} aria-hidden />
+                          )}
+                          <span className={styles.srOnly}>
+                            {expanded ? 'Contraer detalle' : 'Expandir detalle'}
+                          </span>
                         </button>
-                        <span className={styles.qtyValue} aria-live="polite">
-                          {line.quantity}
-                        </span>
                         <button
                           type="button"
-                          className={styles.qtyBtn}
-                          aria-label="Aumentar cantidad"
-                          onClick={() => onUpdateQuantity(line.id, line.quantity + 1)}
+                          className={styles.removeBtn}
+                          onClick={() => onRemoveLine(line.id)}
                         >
-                          <AddIcon sx={{ fontSize: 18 }} />
+                          Quitar
                         </button>
                       </div>
-                      <span className={styles.linePrice}>
-                        {hasPromo ? (
-                          <>
-                            <span className={styles.linePriceOriginal}>
-                              {formatMoney(listTotal, line.currency)}
-                            </span>
-                            <span>{formatMoney(total, line.currency)}</span>
-                          </>
-                        ) : (
-                          formatMoney(total, line.currency)
-                        )}
-                      </span>
                     </div>
+
+                    {expanded ? (
+                      <div id={panelId}>
+                        {line.optionSummary.length > 0 ? (
+                          <ul className={styles.options}>
+                            {line.optionSummary.map((group) => (
+                              <li key={group.groupTitle} className={styles.optionGroup}>
+                                <span className={styles.optionGroupLabel}>{group.groupTitle}: </span>
+                                {group.itemLabels.join(', ')}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+
+                        {line.notes ? (
+                          <p className={styles.lineNotes}>
+                            <span className={styles.lineNotesLabel}>Nota: </span>
+                            {line.notes}
+                          </p>
+                        ) : null}
+
+                        <div className={styles.lineFooter}>
+                          <div
+                            className={styles.qtyStepper}
+                            aria-label={`Cantidad de ${line.productName}`}
+                          >
+                            <button
+                              type="button"
+                              className={styles.qtyBtn}
+                              aria-label="Disminuir cantidad"
+                              onClick={() => onUpdateQuantity(line.id, line.quantity - 1)}
+                            >
+                              <RemoveIcon sx={{ fontSize: 18 }} />
+                            </button>
+                            <span className={styles.qtyValue} aria-live="polite">
+                              {line.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              className={styles.qtyBtn}
+                              aria-label="Aumentar cantidad"
+                              onClick={() => onUpdateQuantity(line.id, line.quantity + 1)}
+                            >
+                              <AddIcon sx={{ fontSize: 18 }} />
+                            </button>
+                          </div>
+                          <span className={styles.linePrice}>
+                            {hasPromo ? (
+                              <>
+                                <span className={styles.linePriceOriginal}>
+                                  {formatMoney(listTotal, line.currency)}
+                                </span>
+                                <span>{formatMoney(total, line.currency)}</span>
+                              </>
+                            ) : (
+                              formatMoney(total, line.currency)
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </li>
               );
@@ -237,8 +391,12 @@ export function PublicMenuCart({
               promoSavings={totalPromoSavings}
               currency={currency}
               quoteError={quoteError}
-              variant="desktop"
-            />
+              promosApplied={promosApplied}
+              quoteLoading={quoteLoading}
+          onContinue={() => void handleContinue()}
+          canContinue={canContinue}
+          variant="desktop"
+        />
           </aside>
         </div>
       )}
@@ -252,6 +410,10 @@ export function PublicMenuCart({
             promoSavings={totalPromoSavings}
             currency={currency}
             quoteError={quoteError}
+            promosApplied={promosApplied}
+            quoteLoading={quoteLoading}
+            onContinue={() => void handleContinue()}
+            canContinue={canContinue}
             variant="mobile"
           />
         </footer>
