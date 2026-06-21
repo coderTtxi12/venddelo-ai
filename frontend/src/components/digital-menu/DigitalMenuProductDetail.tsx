@@ -8,6 +8,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
+import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import type { OptionGroup, Product } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
 import { attachDragOverlay } from '@/lib/dragOverlay';
@@ -321,6 +322,12 @@ export function DigitalMenuProductDetail({
           ) : null}
           <div className={styles.priceBlock}>
             <DetailPrice product={product} discount={discount} />
+            {discount?.offerSlogan ? (
+              <p className={styles.bundleOfferCallout} role="note">
+                <LocalOfferOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
+                <span>{discount.offerSlogan}</span>
+              </p>
+            ) : null}
           </div>
 
           {groups.length > 0 ? (
@@ -546,7 +553,7 @@ export function DigitalMenuProductDetail({
                                   : ''
                               }${
                                 excludedFromPromo && bundleComplementRules
-                                  ? `, ${bundleComplementExcludedBadge(bundleComplementRules.promoName)}`
+                                  ? `, fuera de promoción ${bundleComplementExcludedBadge(bundleComplementRules.promoBadge)}`
                                   : ''
                               }`}
                               title={
@@ -572,7 +579,7 @@ export function DigitalMenuProductDetail({
                                 <span className={styles.optionItemLabel}>{item.label}</span>
                                 {excludedFromPromo && bundleComplementRules ? (
                                   <span className={styles.optionOutsidePromoBadge}>
-                                    {bundleComplementExcludedBadge(bundleComplementRules.promoName)}
+                                    {bundleComplementExcludedBadge(bundleComplementRules.promoBadge)}
                                   </span>
                                 ) : null}
                               </span>
