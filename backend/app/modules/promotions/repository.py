@@ -34,3 +34,6 @@ class PromotionRepository(ABC):
 
     @abstractmethod
     def set_categories(self, promotion_id: uuid.UUID, category_ids: list[uuid.UUID]) -> None: ...
+
+    @abstractmethod
+    def set_option_items(self, promotion_id: uuid.UUID, option_item_ids: list[uuid.UUID]) -> None: ...
