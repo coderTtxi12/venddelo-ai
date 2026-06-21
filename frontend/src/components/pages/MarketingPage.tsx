@@ -6,21 +6,21 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatMoney } from '@/lib/currency';
 import { listCategories, listProducts } from '@/lib/api/menu';
 import type { Category, Product, Promotion } from '@/lib/api/types';
-import {
-  createPromotion,
-  deletePromotion,
-  listAllPromotions,
-  type PromotionScope,
-  type PromotionType,
-} from '@/lib/api/promotions';
+import { deletePromotion, listAllPromotions } from '@/lib/api/promotions';
+import { mapPromotionToForm, PROMOTION_STATUS_HELP } from '@/lib/promotions/mapPromotionToForm';
+import { persistPromotion } from '@/lib/promotions/persistPromotion';
 import { PRODUCT_CATALOG_DISCOUNT_PREFIX } from '@/lib/promotions/productCatalogDiscount';
+import {
+  deletePromotionDraft,
+  draftDiscountSummary,
+  draftScheduleSummary,
+  kindLabel,
+  loadPromotionDrafts,
+  type PromotionDraft,
+} from '@/lib/promotions/promotionDraft';
+import { PromotionForm, type PromotionFormSubmitPayload } from '@/components/marketing/PromotionForm';
 import { legacyDb as db } from '@/services/legacyDb';
 import { resolveSupplierIdByEmail } from '@/services/db';
-
-function clampNumber(n: number, min: number, max: number): number {
-  if (Number.isNaN(n)) return min;
-  return Math.min(max, Math.max(min, n));
-}
 
 function isManualPromotion(promotion: Promotion): boolean {
   return !promotion.name.startsWith(PRODUCT_CATALOG_DISCOUNT_PREFIX);
@@ -36,6 +36,7 @@ function typeLabel(type: Promotion['type']): string {
   if (type === 'percent') return 'Porcentaje';
   if (type === 'amount') return 'Monto fijo';
   if (type === 'combo') return 'Combo';
+  if (type === 'bundle' || type === '2x1') return 'N×M';
   return type;
 }
 
@@ -47,7 +48,20 @@ function discountSummary(promotion: Promotion): string {
     return formatMoney(promotion.amount_cents / 100);
   }
   if (promotion.type === 'combo') return 'Combo';
+  if (promotion.type === 'bundle' || promotion.type === '2x1') {
+    const getQ = promotion.bundle?.get_quantity ?? 2;
+    const payQ = promotion.bundle?.pay_quantity ?? 1;
+    return `${getQ}×${payQ}`;
+  }
   return '—';
+}
+
+function statusLabel(promotion: Promotion): string {
+  if (promotion.effective_status === 'active') return 'Vigente ahora';
+  if (promotion.effective_status === 'scheduled') return 'Programada';
+  if (promotion.effective_status === 'expired') return 'Expirada';
+  if (promotion.effective_status === 'outside_schedule') return 'Fuera de horario';
+  return promotion.is_active ? 'Activa' : 'Inactiva';
 }
 
 function formatDateRange(startsAt: string | null, endsAt: string | null): string {
@@ -57,12 +71,6 @@ function formatDateRange(startsAt: string | null, endsAt: string | null): string
   if (startsAt && endsAt) return `${fmt(startsAt)} – ${fmt(endsAt)}`;
   if (startsAt) return `Desde ${fmt(startsAt)}`;
   return `Hasta ${fmt(endsAt!)}`;
-}
-
-function toIsoOrNull(value: string): string | null {
-  if (!value.trim()) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 async function loadAllCategories(token: string, restaurantId: string): Promise<Category[]> {
@@ -128,301 +136,6 @@ function Drawer({
   );
 }
 
-type PromotionFormState = {
-  name: string;
-  type: PromotionType;
-  scope: PromotionScope;
-  percent: number;
-  amount: number;
-  minOrderAmount: number;
-  startsAt: string;
-  endsAt: string;
-  productIds: string[];
-  categoryIds: string[];
-};
-
-const emptyForm = (): PromotionFormState => ({
-  name: '',
-  type: 'percent',
-  scope: 'product',
-  percent: 10,
-  amount: 0,
-  minOrderAmount: 0,
-  startsAt: '',
-  endsAt: '',
-  productIds: [],
-  categoryIds: [],
-});
-
-function PromotionForm({
-  categories,
-  products,
-  saving,
-  error,
-  onCancel,
-  onSubmit,
-}: {
-  categories: Category[];
-  products: Product[];
-  saving: boolean;
-  error: string | null;
-  onCancel: () => void;
-  onSubmit: (state: PromotionFormState) => Promise<void>;
-}) {
-  const [form, setForm] = useState<PromotionFormState>(emptyForm);
-
-  const canSave = useMemo(() => {
-    if (!form.name.trim()) return false;
-    if (form.type === 'percent' && (form.percent < 1 || form.percent > 100)) return false;
-    if (form.type === 'amount' && form.amount <= 0) return false;
-    if (form.scope === 'product' && form.productIds.length === 0) return false;
-    if (form.scope === 'category' && form.categoryIds.length === 0) return false;
-    if (form.startsAt && form.endsAt && new Date(form.startsAt) >= new Date(form.endsAt)) return false;
-    return true;
-  }, [form]);
-
-  function toggleId(list: string[], id: string): string[] {
-    return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
-  }
-
-  return (
-    <form
-      className={styles.form}
-      onSubmit={(e) => {
-        e.preventDefault();
-        void onSubmit(form);
-      }}
-    >
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor="promo-name">
-          Nombre de la promoción
-        </label>
-        <input
-          id="promo-name"
-          className={styles.input}
-          value={form.name}
-          onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-          placeholder="Ej. Happy hour, 20% en bebidas"
-        />
-      </div>
-
-      <div className={styles.field}>
-        <span className={styles.label}>Tipo de descuento</span>
-        <div className={styles.segment} role="group" aria-label="Tipo de descuento">
-          {(
-            [
-              ['percent', 'Porcentaje'],
-              ['amount', 'Monto fijo'],
-              ['combo', 'Combo'],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              className={
-                form.type === value ? `${styles.segmentBtn} ${styles.segmentBtnActive}` : styles.segmentBtn
-              }
-              onClick={() => setForm((prev) => ({ ...prev, type: value }))}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.field}>
-        <span className={styles.label}>Aplica a</span>
-        <div className={styles.segment} role="group" aria-label="Alcance de la promoción">
-          {(
-            [
-              ['product', 'Productos'],
-              ['category', 'Categorías'],
-              ['order', 'Pedido'],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              className={
-                form.scope === value ? `${styles.segmentBtn} ${styles.segmentBtnActive}` : styles.segmentBtn
-              }
-              onClick={() => setForm((prev) => ({ ...prev, scope: value }))}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {form.type === 'percent' ? (
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="promo-percent">
-            Porcentaje (%)
-          </label>
-          <input
-            id="promo-percent"
-            className={styles.input}
-            type="number"
-            min={1}
-            max={100}
-            step={1}
-            value={form.percent}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                percent: clampNumber(Math.round(Number(e.target.value)), 1, 100),
-              }))
-            }
-          />
-        </div>
-      ) : null}
-
-      {form.type === 'amount' ? (
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="promo-amount">
-            Monto de descuento (MXN)
-          </label>
-          <input
-            id="promo-amount"
-            className={styles.input}
-            type="number"
-            min={0.01}
-            step={0.01}
-            value={form.amount}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                amount: clampNumber(Number(e.target.value), 0, 1_000_000),
-              }))
-            }
-          />
-        </div>
-      ) : null}
-
-      {form.type === 'combo' ? (
-        <p className={styles.helpText}>
-          Las promociones combo combinan productos o categorías seleccionados. Configura el alcance abajo.
-        </p>
-      ) : null}
-
-      {form.scope === 'order' ? (
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="promo-min-order">
-            Pedido mínimo (MXN, opcional)
-          </label>
-          <input
-            id="promo-min-order"
-            className={styles.input}
-            type="number"
-            min={0}
-            step={0.01}
-            value={form.minOrderAmount}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                minOrderAmount: clampNumber(Number(e.target.value), 0, 1_000_000),
-              }))
-            }
-          />
-          <p className={styles.helpText}>Déjalo en 0 si no hay monto mínimo.</p>
-        </div>
-      ) : null}
-
-      {form.scope === 'product' ? (
-        <div className={styles.field}>
-          <span className={styles.label}>Productos incluidos</span>
-          {products.length === 0 ? (
-            <p className={styles.helpText}>No hay productos disponibles.</p>
-          ) : (
-            <div className={styles.checkList}>
-              {products.map((product) => (
-                <label key={product.id} className={styles.checkItem}>
-                  <input
-                    type="checkbox"
-                    checked={form.productIds.includes(product.id)}
-                    onChange={() =>
-                      setForm((prev) => ({
-                        ...prev,
-                        productIds: toggleId(prev.productIds, product.id),
-                      }))
-                    }
-                  />
-                  <span>{product.name}</span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : null}
-
-      {form.scope === 'category' ? (
-        <div className={styles.field}>
-          <span className={styles.label}>Categorías incluidas</span>
-          {categories.length === 0 ? (
-            <p className={styles.helpText}>No hay categorías disponibles.</p>
-          ) : (
-            <div className={styles.checkList}>
-              {categories.map((category) => (
-                <label key={category.id} className={styles.checkItem}>
-                  <input
-                    type="checkbox"
-                    checked={form.categoryIds.includes(category.id)}
-                    onChange={() =>
-                      setForm((prev) => ({
-                        ...prev,
-                        categoryIds: toggleId(prev.categoryIds, category.id),
-                      }))
-                    }
-                  />
-                  <span>{category.name}</span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : null}
-
-      <div className={styles.grid2}>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="promo-starts">
-            Inicio (opcional)
-          </label>
-          <input
-            id="promo-starts"
-            className={styles.input}
-            type="datetime-local"
-            value={form.startsAt}
-            onChange={(e) => setForm((prev) => ({ ...prev, startsAt: e.target.value }))}
-          />
-        </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="promo-ends">
-            Fin (opcional)
-          </label>
-          <input
-            id="promo-ends"
-            className={styles.input}
-            type="datetime-local"
-            value={form.endsAt}
-            onChange={(e) => setForm((prev) => ({ ...prev, endsAt: e.target.value }))}
-          />
-        </div>
-      </div>
-
-      {error ? <div className={styles.errorBanner} role="alert">{error}</div> : null}
-
-      <div className={styles.formActions}>
-        <button type="button" className={styles.secondaryBtn} onClick={onCancel} disabled={saving}>
-          Cancelar
-        </button>
-        <button type="submit" className={styles.primaryBtn} disabled={!canSave || saving}>
-          {saving ? 'Guardando…' : 'Crear promoción'}
-        </button>
-      </div>
-    </form>
-  );
-}
-
 export default function MarketingPage() {
   const { accessToken, user } = useAuth();
   const email = user?.email ?? null;
@@ -430,19 +143,30 @@ export default function MarketingPage() {
   const [supplierId, setSupplierId] = useState<string | null>(null);
   const [supplierError, setSupplierError] = useState<string | null>(null);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [drafts, setDrafts] = useState<PromotionDraft[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null);
 
   const manualPromotions = useMemo(
     () => promotions.filter(isManualPromotion),
     [promotions],
   );
+
+  const refreshDrafts = useCallback(() => {
+    if (!supplierId) {
+      setDrafts([]);
+      return;
+    }
+    setDrafts(loadPromotionDrafts(supplierId));
+  }, [supplierId]);
 
   const loadData = useCallback(async () => {
     if (!supplierId || !accessToken) return;
@@ -457,13 +181,14 @@ export default function MarketingPage() {
       setPromotions(promoList);
       setCategories(categoryList.filter((c) => c.is_active));
       setProducts(productList.filter((p) => p.is_active));
+      refreshDrafts();
     } catch (err) {
       console.error(err);
       setLoadError('No se pudieron cargar las promociones. Intenta de nuevo.');
     } finally {
       setLoading(false);
     }
-  }, [accessToken, supplierId]);
+  }, [accessToken, supplierId, refreshDrafts]);
 
   useEffect(() => {
     if (!email || !accessToken) return;
@@ -488,49 +213,82 @@ export default function MarketingPage() {
     void loadData();
   }, [loadData]);
 
-  async function handleCreatePromotion(state: PromotionFormState) {
+  useEffect(() => {
+    refreshDrafts();
+  }, [refreshDrafts]);
+
+  function openCreateDrawer() {
+    setEditingPromotion(null);
+    setFormError(null);
+    setDrawerOpen(true);
+  }
+
+  function openEditDrawer(promotion: Promotion) {
+    setEditingPromotion(promotion);
+    setFormError(null);
+    setDrawerOpen(true);
+  }
+
+  function closeDrawer() {
+    if (saving) return;
+    setDrawerOpen(false);
+    setEditingPromotion(null);
+  }
+
+  async function handleSavePromotion(payload: PromotionFormSubmitPayload) {
     if (!supplierId || !accessToken) {
-      setFormError(supplierError ?? 'No hay sesión o restaurante disponible.');
+      setFormError(supplierError ?? 'No hay restaurante disponible.');
       return;
     }
     setSaving(true);
     setFormError(null);
     try {
-      await createPromotion(accessToken, supplierId, {
-        name: state.name.trim(),
-        type: state.type,
-        scope: state.scope,
-        percent: state.type === 'percent' ? state.percent : null,
-        amount_cents: state.type === 'amount' ? Math.round(state.amount * 100) : null,
-        min_order_cents:
-          state.scope === 'order' && state.minOrderAmount > 0
-            ? Math.round(state.minOrderAmount * 100)
-            : null,
-        starts_at: toIsoOrNull(state.startsAt),
-        ends_at: toIsoOrNull(state.endsAt),
-        product_ids: state.scope === 'product' ? state.productIds : [],
-        category_ids: state.scope === 'category' ? state.categoryIds : [],
+      const saved = await persistPromotion(
+        accessToken,
+        supplierId,
+        payload,
+        editingPromotion?.id ?? null,
+      );
+      setPromotions((prev) => {
+        const index = prev.findIndex((promotion) => promotion.id === saved.id);
+        if (index >= 0) {
+          const next = [...prev];
+          next[index] = saved;
+          return next;
+        }
+        return [saved, ...prev];
       });
-      setDrawerOpen(false);
-      await loadData();
+      closeDrawer();
     } catch (err) {
       console.error(err);
       setFormError(
-        err instanceof Error && err.message
-          ? err.message
-          : 'No se pudo crear la promoción. Revisa los datos e inténtalo de nuevo.',
+        editingPromotion
+          ? 'No se pudieron guardar los cambios. Revisa los datos e intenta de nuevo.'
+          : 'No se pudo guardar la promoción. Revisa los datos e intenta de nuevo.',
       );
     } finally {
       setSaving(false);
     }
   }
 
+  function handleDeleteDraft(draftId: string) {
+    if (!supplierId) return;
+    setDeletingDraftId(draftId);
+    try {
+      deletePromotionDraft(supplierId, draftId);
+      refreshDrafts();
+    } finally {
+      setDeletingDraftId(null);
+    }
+  }
+
+
   async function handleDeletePromotion(promotionId: string) {
     if (!supplierId || !accessToken) return;
     setDeletingId(promotionId);
     try {
       await deletePromotion(accessToken, supplierId, promotionId);
-      await loadData();
+      setPromotions((prev) => prev.filter((promotion) => promotion.id !== promotionId));
     } catch (err) {
       console.error(err);
       setLoadError('No se pudo eliminar la promoción.');
@@ -539,23 +297,25 @@ export default function MarketingPage() {
     }
   }
 
+  const totalCount = manualPromotions.length + drafts.length;
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Marketing</h1>
           <p className={styles.subtitle}>
-            Crea promociones personalizadas para productos, categorías o pedidos completos. Los descuentos
-            automáticos del catálogo se gestionan desde cada producto.
+            Configura promociones con días, horarios, ofertas N×M y complementos. Los descuentos de
+            catálogo siguen en cada producto.
+          </p>
+          <p className={styles.marketingBundleBadge}>
+            N×M: se cobra el de mayor precio (con descuento de catálogo si aplica)
           </p>
         </div>
         <button
           type="button"
           className={styles.primaryBtn}
-          onClick={() => {
-            setFormError(null);
-            setDrawerOpen(true);
-          }}
+          onClick={openCreateDrawer}
           disabled={!supplierId || !!supplierError}
         >
           + Agregar promoción personalizada
@@ -566,20 +326,66 @@ export default function MarketingPage() {
         <div className={styles.counter}>
           {loading
             ? 'Cargando…'
-            : `${manualPromotions.length} promoción${manualPromotions.length === 1 ? '' : 'es'} personalizada${manualPromotions.length === 1 ? '' : 's'}`}
+            : `${totalCount} promoción${totalCount === 1 ? '' : 'es'} (${drafts.length} borrador${drafts.length === 1 ? '' : 'es'})`}
         </div>
 
         {loadError ? <div className={styles.errorBanner} role="alert">{loadError}</div> : null}
 
-        {!loading && manualPromotions.length === 0 ? (
+        {!loading && totalCount === 0 ? (
           <div className={styles.empty}>
             <div className={styles.emptyTitle}>Aún no hay promociones personalizadas</div>
-            <p>Crea una promoción para aplicar descuentos en productos, categorías o pedidos.</p>
+            <p>Crea una promoción con días, horario y complementos.</p>
+          </div>
+        ) : null}
+
+        {drafts.length > 0 ? (
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Tipo</th>
+                  <th>Alcance</th>
+                  <th>Descuento</th>
+                  <th>Horario / vigencia</th>
+                  <th>Estado</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {drafts.map((draft) => (
+                  <tr key={draft.id}>
+                    <td>{draft.name}</td>
+                    <td>{kindLabel(draft.kind)}</td>
+                    <td>{scopeLabel(draft.scope)}</td>
+                    <td>{draftDiscountSummary(draft)}</td>
+                    <td className={styles.muted}>{draftScheduleSummary(draft)}</td>
+                    <td>
+                      <span className={`${styles.pill} ${styles.pill_draft}`}>Borrador</span>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className={styles.dangerGhostBtn}
+                        disabled={deletingDraftId === draft.id}
+                        onClick={() => handleDeleteDraft(draft.id)}
+                      >
+                        {deletingDraftId === draft.id ? '…' : 'Eliminar'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : null}
 
         {manualPromotions.length > 0 ? (
           <div className={styles.tableWrap}>
+            <p className={styles.statusLegend}>
+              <strong>Vigente ahora</strong> significa que la promoción aplica en este momento según
+              el reloj del servidor, la zona horaria del restaurante y los días/horarios configurados.
+            </p>
             <table className={styles.table}>
               <thead>
                 <tr>
@@ -594,7 +400,20 @@ export default function MarketingPage() {
               </thead>
               <tbody>
                 {manualPromotions.map((promotion) => (
-                  <tr key={promotion.id}>
+                  <tr
+                    key={promotion.id}
+                    className={styles.tableRowClickable}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Editar promoción ${promotion.name}`}
+                    onClick={() => openEditDrawer(promotion)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openEditDrawer(promotion);
+                      }
+                    }}
+                  >
                     <td>{promotion.name}</td>
                     <td>{typeLabel(promotion.type)}</td>
                     <td>{scopeLabel(promotion.scope)}</td>
@@ -604,17 +423,38 @@ export default function MarketingPage() {
                     </td>
                     <td>
                       <span
-                        className={`${styles.pill} ${promotion.is_active ? styles.pill_success : styles.pill_neutral}`}
+                        className={`${styles.pill} ${
+                          promotion.effective_status === 'active'
+                            ? styles.pill_success
+                            : styles.pill_neutral
+                        }`}
+                        title={
+                          PROMOTION_STATUS_HELP[promotion.effective_status ?? 'inactive'] ??
+                          undefined
+                        }
                       >
-                        {promotion.is_active ? 'Activa' : 'Inactiva'}
+                        {statusLabel(promotion)}
                       </span>
                     </td>
-                    <td>
+                    <td className={styles.actionsCell}>
+                      <button
+                        type="button"
+                        className={styles.editGhostBtn}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openEditDrawer(promotion);
+                        }}
+                      >
+                        Editar
+                      </button>
                       <button
                         type="button"
                         className={styles.dangerGhostBtn}
                         disabled={deletingId === promotion.id}
-                        onClick={() => void handleDeletePromotion(promotion.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleDeletePromotion(promotion.id);
+                        }}
                       >
                         {deletingId === promotion.id ? '…' : 'Eliminar'}
                       </button>
@@ -629,18 +469,21 @@ export default function MarketingPage() {
 
       <Drawer
         open={drawerOpen}
-        title="Agregar promoción personalizada"
-        onClose={() => {
-          if (!saving) setDrawerOpen(false);
-        }}
+        title={editingPromotion ? 'Editar promoción' : 'Agregar promoción personalizada'}
+        onClose={closeDrawer}
       >
         <PromotionForm
+          key={editingPromotion?.id ?? 'create'}
           categories={categories}
           products={products}
           saving={saving}
           error={formError}
-          onCancel={() => setDrawerOpen(false)}
-          onSubmit={handleCreatePromotion}
+          mode={editingPromotion ? 'edit' : 'create'}
+          initialValues={
+            editingPromotion ? mapPromotionToForm(editingPromotion) : null
+          }
+          onCancel={closeDrawer}
+          onSubmit={handleSavePromotion}
         />
       </Drawer>
     </div>
