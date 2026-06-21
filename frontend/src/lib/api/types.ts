@@ -36,6 +36,10 @@ export type Restaurant = {
   logo_path: string | null;
   cover_path: string | null;
   digital_menu_theme_id: string;
+  digital_menu_promotions_category_enabled: boolean;
+  digital_menu_promotions_category_name: string;
+  digital_menu_limited_time_category_enabled: boolean;
+  digital_menu_limited_time_category_name: string;
   whatsapp_phone: string | null;
   color_palette: string | null;
   takeout_enabled: boolean;
@@ -133,6 +137,7 @@ export type Promotion = {
   id: string;
   restaurant_id: string;
   name: string;
+  image_path: string | null;
   type: 'percent' | 'amount' | 'combo' | 'bundle' | '2x1';
   scope: 'product' | 'category' | 'order';
   percent: number | null;
