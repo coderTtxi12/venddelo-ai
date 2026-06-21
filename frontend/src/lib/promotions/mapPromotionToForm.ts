@@ -59,6 +59,7 @@ export function mapPromotionToForm(promotion: Promotion): PromotionFormSubmitPay
     },
     campaignStartsAt: toDatetimeLocalValue(promotion.starts_at),
     campaignEndsAt: toDatetimeLocalValue(promotion.ends_at),
+    imagePath: promotion.image_path ?? null,
   };
 }
 
