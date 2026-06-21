@@ -19,6 +19,14 @@ import { arrayMove } from '@/lib/arrayMove';
 import { attachDragOverlay } from '@/lib/dragOverlay';
 import type { Promotion } from '@/lib/api/types';
 import {
+  applyVisibilityStateToDraft,
+  getProductVisibilityState,
+  productVisibilityMeta,
+  PRODUCT_VISIBILITY_OPTIONS,
+  type ProductVisibilityState,
+} from '@/lib/menu/productVisibility';
+import { ProductVisibilitySelect } from '@/components/products/ProductVisibilitySelect';
+import {
   CATEGORIES_PAGE_SIZE,
   fetchSupplierCategoriesPage,
   normalizeOptionGroups,
@@ -28,7 +36,7 @@ import {
   saveSupplierCategory,
   updateSupplierCategoryActive,
   saveSupplierProduct,
-  updateSupplierProductActive,
+  updateSupplierProductVisibility,
   type PageCursor,
 } from '@/services/db';
 import type {
@@ -77,8 +85,7 @@ function productLineTotal(p: { price: { amount: number }; discountUsd: number })
   const raw = p.price.amount - p.discountUsd;
   return raw > 0 ? raw : 0;
 }
-
-type CatalogVisibilityFilter = 'active' | 'inactive';
+type ProductVisibilityFilter = ProductVisibilityState;
 
 type ColumnSort = 'none' | 'asc' | 'desc';
 
@@ -227,8 +234,20 @@ function ImagePicker({
   );
 }
 
-function Pill({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: 'neutral' | 'info' | 'success' | 'danger' }) {
-  return <span className={`${styles.pill} ${styles[`pill_${tone}`]}`}>{children}</span>;
+function Pill({
+  children,
+  tone = 'neutral',
+  title,
+}: {
+  children: React.ReactNode;
+  tone?: 'neutral' | 'info' | 'success' | 'danger';
+  title?: string;
+}) {
+  return (
+    <span className={`${styles.pill} ${styles[`pill_${tone}`]}`} title={title}>
+      {children}
+    </span>
+  );
 }
 
 function EmptyState({
@@ -404,9 +423,9 @@ export default function ProductsPage() {
   const [productPriceSort, setProductPriceSort] = useState<ColumnSort>('none');
   const [productDiscountSort, setProductDiscountSort] = useState<ColumnSort>('none');
   const [productTotalSort, setProductTotalSort] = useState<ColumnSort>('none');
-  const [productCatalogFilter, setProductCatalogFilter] = useState<CatalogVisibilityFilter[]>([]);
-  const [productActiveToggleId, setProductActiveToggleId] = useState<Id | null>(null);
-  const [productActiveError, setProductActiveError] = useState<string | null>(null);
+  const [productVisibilityFilter, setProductVisibilityFilter] = useState<ProductVisibilityFilter[]>([]);
+  const [productVisibilitySavingId, setProductVisibilitySavingId] = useState<Id | null>(null);
+  const [productVisibilityError, setProductVisibilityError] = useState<string | null>(null);
   const [categoryActiveToggleId, setCategoryActiveToggleId] = useState<Id | null>(null);
   const [categoryActiveError, setCategoryActiveError] = useState<string | null>(null);
 
@@ -428,7 +447,7 @@ export default function ProductsPage() {
       productPriceSort !== 'none' ||
       productDiscountSort !== 'none' ||
       productTotalSort !== 'none' ||
-      productCatalogFilter.length > 0
+      productVisibilityFilter.length > 0
     );
   }, [
     productNameFilter,
@@ -436,7 +455,7 @@ export default function ProductsPage() {
     productPriceSort,
     productDiscountSort,
     productTotalSort,
-    productCatalogFilter,
+    productVisibilityFilter,
   ]);
 
   const displayedProducts = useMemo(() => {
@@ -448,11 +467,8 @@ export default function ProductsPage() {
     if (productCategoryFilterIds.length > 0) {
       rows = rows.filter((p) => p.categoryIds.some((id) => productCategoryFilterIds.includes(id)));
     }
-    if (productCatalogFilter.length > 0) {
-      rows = rows.filter((p) => {
-        const key: CatalogVisibilityFilter = p.isActive ? 'active' : 'inactive';
-        return productCatalogFilter.includes(key);
-      });
+    if (productVisibilityFilter.length > 0) {
+      rows = rows.filter((p) => productVisibilityFilter.includes(getProductVisibilityState(p)));
     }
     rows = [...rows].sort((a, b) => {
       if (productPriceSort !== 'none') {
@@ -480,7 +496,7 @@ export default function ProductsPage() {
     products,
     productNameFilter,
     productCategoryFilterIds,
-    productCatalogFilter,
+    productVisibilityFilter,
     productPriceSort,
     productDiscountSort,
     productTotalSort,
@@ -492,7 +508,7 @@ export default function ProductsPage() {
     setProductPriceSort('none');
     setProductDiscountSort('none');
     setProductTotalSort('none');
-    setProductCatalogFilter([]);
+    setProductVisibilityFilter([]);
   }
 
   const [categoryFilterAnchor, setCategoryFilterAnchor] = useState<HTMLElement | null>(null);
@@ -505,21 +521,40 @@ export default function ProductsPage() {
   }, [productCategoryFilterIds, categories]);
 
   const selectedStatusTags = useMemo(() => {
-    const tags: { key: string; label: string }[] = [];
-    if (productCatalogFilter.includes('active')) tags.push({ key: 'c:active', label: 'Activo' });
-    if (productCatalogFilter.includes('inactive')) tags.push({ key: 'c:inactive', label: 'Inactivo' });
-    return tags;
-  }, [productCatalogFilter]);
+    return productVisibilityFilter.map((state) => {
+      const option = PRODUCT_VISIBILITY_OPTIONS.find((entry) => entry.value === state);
+      return { key: `v:${state}`, label: option?.label ?? state };
+    });
+  }, [productVisibilityFilter]);
 
   function removeCategoryFilter(id: Id) {
     setProductCategoryFilterIds((prev) => prev.filter((x) => x !== id));
   }
 
   function removeStatusTag(key: string) {
-    if (key === 'c:active') {
-      setProductCatalogFilter((prev) => prev.filter((x) => x !== 'active'));
-    } else if (key === 'c:inactive') {
-      setProductCatalogFilter((prev) => prev.filter((x) => x !== 'inactive'));
+    const state = key.replace(/^v:/, '') as ProductVisibilityState;
+    setProductVisibilityFilter((prev) => prev.filter((value) => value !== state));
+  }
+
+  async function handleProductVisibilityChange(productId: Id, nextState: ProductVisibilityState) {
+    if (!supplierId || !accessToken) return;
+    const current = products.find((product) => product.id === productId);
+    if (!current || getProductVisibilityState(current) === nextState) return;
+
+    setProductVisibilitySavingId(productId);
+    setProductVisibilityError(null);
+    try {
+      await updateSupplierProductVisibility(accessToken, db, supplierId, productId, nextState);
+      setProducts((prev) =>
+        prev.map((product) =>
+          product.id === productId ? applyVisibilityStateToDraft(product, nextState) : product,
+        ),
+      );
+    } catch (err) {
+      console.error(err);
+      setProductVisibilityError('No se pudo cambiar el estado del producto. Intenta de nuevo.');
+    } finally {
+      setProductVisibilitySavingId(null);
     }
   }
 
@@ -565,7 +600,8 @@ export default function ProductsPage() {
         <div>
           <h1 className={styles.title}>Productos</h1>
           <p className={styles.subtitle}>
-            Administra tus categorías y productos. Los productos activos se muestran en el marketplace móvil.
+            Administra tus categorías y productos. Cambia el estado en la columna <strong>Estado</strong>{' '}
+            para controlar si un producto aparece en el menú público.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -824,8 +860,8 @@ export default function ProductsPage() {
                 />
               ) : (
                 <div className={styles.tableWrap}>
-                  {productActiveError ? (
-                    <div className={styles.errorBanner} role="alert">{productActiveError}</div>
+                  {productVisibilityError ? (
+                    <div className={styles.errorBanner} role="alert">{productVisibilityError}</div>
                   ) : null}
                   <table className={styles.table}>
                     <thead>
@@ -1036,13 +1072,12 @@ export default function ProductsPage() {
                             </div>
                           ) : null}
                         </th>
-                        <th className={styles.thDashboard} aria-label="Acciones" />
                       </tr>
                     </thead>
                     <tbody>
                       {displayedProducts.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className={styles.filterNoResults}>
+                          <td colSpan={6} className={styles.filterNoResults}>
                             <div className={styles.filterNoResultsInner}>
                               <p>Ningún producto coincide con los filtros actuales.</p>
                               {productFiltersActive ? (
@@ -1090,79 +1125,15 @@ export default function ProductsPage() {
                             <td className={styles.nowrap}>{formatMoney(p.price.amount, p.price.currency)}</td>
                             <td className={styles.nowrap}>{p.discountUsd > 0 ? `-${formatMoney(p.discountUsd, p.price.currency)}` : '—'}</td>
                             <td className={styles.nowrap}>{formatMoney(productLineTotal(p), p.price.currency)}</td>
-                            <td>
-                              <Pill tone={p.isActive ? 'success' : 'neutral'}>
-                                {p.isActive ? 'Activo' : 'Inactivo'}
-                              </Pill>
-                            </td>
-                            <td className={styles.actionsCell}>
-                              <div className={styles.productRowActions}>
-                                {p.isActive ? (
-                                <button
-                                  type="button"
-                                  className={styles.dangerGhostBtn}
-                                  disabled={
-                                    productActiveToggleId === p.id ||
-                                    !supplierId
-                                  }
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (!supplierId || !accessToken) return;
-                                    void (async () => {
-                                      setProductActiveError(null);
-                                      setProductActiveToggleId(p.id);
-                                      try {
-                                        await updateSupplierProductActive(accessToken, db, supplierId, p.id, false);
-                                        setProducts((prev) =>
-                                          prev.map((x) =>
-                                            x.id === p.id ? { ...x, isActive: false, updatedAt: nowIso() } : x
-                                          )
-                                        );
-                                      } catch (err) {
-                                        console.error(err);
-                                        setProductActiveError('No se pudo desactivar el producto. Intenta de nuevo.');
-                                      } finally {
-                                        setProductActiveToggleId(null);
-                                      }
-                                    })();
-                                  }}
-                                >
-                                  Desactivar
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className={styles.secondaryBtn}
-                                  disabled={
-                                    productActiveToggleId === p.id ||
-                                    !supplierId
-                                  }
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (!supplierId || !accessToken) return;
-                                    void (async () => {
-                                      setProductActiveError(null);
-                                      setProductActiveToggleId(p.id);
-                                      try {
-                                        await updateSupplierProductActive(accessToken, db, supplierId, p.id, true);
-                                        setProducts((prev) =>
-                                          prev.map((x) =>
-                                            x.id === p.id ? { ...x, isActive: true, updatedAt: nowIso() } : x
-                                          )
-                                        );
-                                      } catch (err) {
-                                        console.error(err);
-                                        setProductActiveError('No se pudo activar el producto. Intenta de nuevo.');
-                                      } finally {
-                                        setProductActiveToggleId(null);
-                                      }
-                                    })();
-                                  }}
-                                >
-                                  Activar
-                                </button>
-                              )}
-                              </div>
+                            <td onClick={(event) => event.stopPropagation()}>
+                              <ProductVisibilitySelect
+                                product={p}
+                                saving={productVisibilitySavingId === p.id}
+                                disabled={!supplierId || !accessToken}
+                                onChange={(nextState) => {
+                                  void handleProductVisibilityChange(p.id, nextState);
+                                }}
+                              />
                             </td>
                           </tr>
                         );
@@ -1223,24 +1194,19 @@ export default function ProductsPage() {
                     }}
                   >
                     <div className={styles.filterPopoverBody}>
-                      <p className={styles.filterPopoverTitle}>Estado</p>
-                      <div className={styles.filterPopoverChips} role="group" aria-label="Activo o inactivo">
-                        {(
-                          [
-                            { key: 'active' as const, label: 'Activo' },
-                            { key: 'inactive' as const, label: 'Inactivo' },
-                          ] as const
-                        ).map(({ key, label }) => {
-                          const on = productCatalogFilter.includes(key);
+                      <p className={styles.filterPopoverTitle}>Estado en menú</p>
+                      <div className={styles.filterPopoverChips} role="group" aria-label="Estado del producto">
+                        {PRODUCT_VISIBILITY_OPTIONS.map(({ value, label }) => {
+                          const on = productVisibilityFilter.includes(value);
                           return (
                             <button
-                              key={key}
+                              key={value}
                               type="button"
                               role="checkbox"
                               aria-checked={on}
                               className={`${styles.filterChip} ${on ? styles.filterChipOn : ''}`}
                               onClick={() =>
-                                setProductCatalogFilter((prev) => toggleInList(prev, key))
+                                setProductVisibilityFilter((prev) => toggleInList(prev, value))
                               }
                             >
                               {label}
@@ -1282,6 +1248,14 @@ export default function ProductsPage() {
                   onCancel={() => setProductDrawerOpen(false)}
                   supplierId={supplierId}
                   supplierIdError={supplierIdError}
+                  visibilitySaving={productVisibilitySavingId === editingProductId}
+                  onVisibilityChange={
+                    editingProductId
+                      ? (nextState) => {
+                          void handleProductVisibilityChange(editingProductId, nextState);
+                        }
+                      : undefined
+                  }
                   onSave={async (payload) => {
                     if (!supplierId || !accessToken) {
                       throw new Error(supplierIdError ?? 'No hay sesión o restaurante disponible.');
@@ -1424,11 +1398,15 @@ function ProductEditor({
   onSave,
   supplierId,
   supplierIdError,
+  onVisibilityChange,
+  visibilitySaving = false,
 }: {
   initial: ProductDraft | null;
   categories: CategoryDraft[];
   restaurantProducts: ProductDraft[];
   onCancel: () => void;
+  onVisibilityChange?: (state: ProductVisibilityState) => void;
+  visibilitySaving?: boolean;
   onSave: (payload: {
     id?: Id;
     name: string;
@@ -1573,20 +1551,18 @@ function ProductEditor({
         })();
       }}
     >
-      {initial ? (
+      {initial && onVisibilityChange ? (
         <div className={styles.banner}>
           <div className={styles.bannerLeft}>
-            <div className={styles.bannerTitle}>Visibilidad en catálogo</div>
-            <div className={styles.bannerText}>
-              {initial.isActive
-                ? 'Este producto está activo y visible en el marketplace móvil.'
-                : 'Este producto está inactivo y no se muestra en el marketplace móvil.'}
-            </div>
+            <div className={styles.bannerTitle}>Estado en el menú</div>
+            <div className={styles.bannerText}>{productVisibilityMeta(initial).help}</div>
           </div>
           <div className={styles.bannerRight}>
-            <Pill tone={initial.isActive ? 'success' : 'neutral'}>
-              {initial.isActive ? 'Activo' : 'Inactivo'}
-            </Pill>
+            <ProductVisibilitySelect
+              product={initial}
+              saving={visibilitySaving}
+              onChange={onVisibilityChange}
+            />
           </div>
         </div>
       ) : null}
