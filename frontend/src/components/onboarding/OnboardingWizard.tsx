@@ -425,14 +425,19 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
       case 'branchCount':
         return (
           <input
-            type="number"
-            min={1}
-            max={999}
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
             className={styles.numberInput}
-            value={data.branchCount}
+            value={data.branchCount > 0 ? String(data.branchCount) : ''}
+            placeholder="1"
             autoFocus
+            aria-label="Cantidad de sucursales"
             onKeyDown={handleKeyDown}
-            onChange={(e) => patchData({ branchCount: Number(e.target.value) || 1 })}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, '').slice(0, 3);
+              patchData({ branchCount: digits === '' ? 0 : Number(digits) });
+            }}
           />
         );
 

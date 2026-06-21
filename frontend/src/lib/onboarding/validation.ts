@@ -34,8 +34,11 @@ export function validateStep(stepId: OnboardingStepId, data: OnboardingData): st
     }
 
     case 'branchCount':
-      if (!Number.isFinite(data.branchCount) || data.branchCount < 1 || data.branchCount > 999) {
+      if (data.branchCount < 1) {
         return 'Indica cuántas sucursales tiene tu negocio (mínimo 1).';
+      }
+      if (data.branchCount > 999) {
+        return 'El máximo es 999 sucursales.';
       }
       return null;
 
