@@ -17,12 +17,51 @@ export type PublicRestaurant = {
   digital_menu_theme_id: string;
   whatsapp_phone: string | null;
   original_language: string;
+  timezone: string;
+  server_now: string | null;
+};
+
+export type PublicPromotionsContext = {
+  server_now: string;
+  timezone: string;
+  local_now: string;
+  items: Promotion[];
 };
 
 export type PublicMenu = {
   restaurant_id: string;
   categories: Category[];
   products: Product[];
+};
+
+export type CartQuoteLine = {
+  product_id: string;
+  quantity: number;
+  unit_base_cents: number;
+  options_cents: number;
+  discount_cents: number;
+  line_total_cents: number;
+  badge: string | null;
+  applied_promotion_id: string | null;
+  promo_warnings?: string[];
+};
+
+export type CartQuote = {
+  server_now: string;
+  timezone: string;
+  lines: CartQuoteLine[];
+  subtotal_before_discount_cents: number;
+  order_discount_cents: number;
+  total_cents: number;
+  applied_order_promotion_id: string | null;
+};
+
+export type CartQuoteInput = {
+  items: {
+    product_id: string;
+    quantity: number;
+    selected_options?: Record<string, string[]>;
+  }[];
 };
 
 export function getPublicRestaurant(subdomain: string) {
@@ -43,7 +82,14 @@ export function getPublicRestaurantSchedules(subdomain: string) {
 }
 
 export function getPublicRestaurantPromotions(subdomain: string) {
-  return apiRequest<Promotion[]>(
+  return apiRequest<PublicPromotionsContext>(
     `/public/restaurants/${encodeURIComponent(subdomain)}/promotions`,
+  );
+}
+
+export function quoteCart(subdomain: string, data: CartQuoteInput) {
+  return apiRequest<CartQuote>(
+    `/public/restaurants/${encodeURIComponent(subdomain)}/cart/quote`,
+    { method: 'POST', body: data },
   );
 }
