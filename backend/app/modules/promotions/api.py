@@ -47,7 +47,22 @@ def list_promotions(
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: PromotionService = Depends(_service),
 ) -> CursorPage[PromotionDTO]:
-    return service.list_active(restaurant.id, params)
+    return service.list_for_admin(restaurant.id, params, timezone=restaurant.timezone)
+
+
+@router.put(
+    "/restaurants/{restaurant_id}/promotions/{promotion_id}/option-items",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def set_promotion_option_items(
+    promotion_id: uuid.UUID,
+    body: IdListBody,
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: PromotionService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> None:
+    service.set_option_items(restaurant.id, promotion_id, body.ids)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
 
 
 @router.patch(
@@ -61,7 +76,7 @@ def update_promotion(
     service: PromotionService = Depends(_service),
     uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> PromotionDTO:
-    dto = service.update(restaurant.id, promotion_id, data)
+    dto = service.update(restaurant.id, promotion_id, data, timezone=restaurant.timezone)
     invalidate_restaurant_menu_cache(uow, restaurant.id)
     return dto
 
