@@ -25,12 +25,24 @@ import {
   type RestaurantPaymentMethod,
 } from '@/lib/api/types';
 import { buildMenuProductDiscountMap } from '@/lib/promotions/menuProductDiscount';
+import { listLivePromotionShortcuts } from '@/lib/promotions/promotionShortcuts';
+import {
+  buildDigitalMenuDisplayCategories,
+  digitalMenuSpecialCategoryConfigFromRestaurant,
+  getDigitalMenuSpecialCategoryKind,
+  isDigitalMenuSpecialCategoryId,
+  productsForLimitedTimeCategory,
+  type DigitalMenuSpecialCategoryConfig,
+} from '@/lib/digital-menu/specialCategories';
 import { arrayMove } from '@/lib/arrayMove';
 import { attachDragOverlay } from '@/lib/dragOverlay';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
 import { DigitalMenuProductDetail } from '@/components/digital-menu/DigitalMenuProductDetail';
+import { DigitalMenuSpecialCategoriesPanel } from '@/components/digital-menu/DigitalMenuSpecialCategoriesPanel';
+import { PromotionShortcutBanners } from '@/components/digital-menu/PromotionShortcutBanners';
 import {
+  ProductList,
   productsForCategory,
   sortCategories,
 } from '@/components/digital-menu/menuProductUi';
@@ -238,6 +250,53 @@ export default function DigitalMenuPage() {
     [products, promotions],
   );
 
+  const specialCategoryConfig = useMemo(
+    () => digitalMenuSpecialCategoryConfigFromRestaurant(restaurant),
+    [restaurant],
+  );
+
+  const promotionShortcuts = useMemo(
+    () => listLivePromotionShortcuts(promotions, products, new Date(), 'America/Mexico_City'),
+    [promotions, products],
+  );
+
+  const displayCategories = useMemo(
+    () =>
+      buildDigitalMenuDisplayCategories(categories, {
+        config: specialCategoryConfig,
+        restaurantId: restaurantId ?? 'preview',
+        hasPromotionShortcuts: promotionShortcuts.length > 0,
+        hasLimitedTimeProducts: productDiscounts.size > 0,
+      }),
+    [
+      categories,
+      specialCategoryConfig,
+      restaurantId,
+      promotionShortcuts.length,
+      productDiscounts.size,
+    ],
+  );
+
+  const persistSpecialCategoryConfig = useCallback(
+    async (patch: Partial<DigitalMenuSpecialCategoryConfig>) => {
+      if (!accessToken || !restaurantId || !restaurant) return;
+
+      const nextConfig = { ...specialCategoryConfig, ...patch };
+      try {
+        const updated = await updateRestaurant(accessToken, restaurantId, {
+          digital_menu_promotions_category_enabled: nextConfig.promotionsCategoryEnabled,
+          digital_menu_promotions_category_name: nextConfig.promotionsCategoryName,
+          digital_menu_limited_time_category_enabled: nextConfig.limitedTimeCategoryEnabled,
+          digital_menu_limited_time_category_name: nextConfig.limitedTimeCategoryName,
+        });
+        setRestaurant(updated);
+      } catch (error) {
+        console.error(error);
+      }
+    },
+    [accessToken, restaurant, restaurantId, specialCategoryConfig],
+  );
+
   const persistCategoryOrder = useCallback(
     async (ordered: Category[]) => {
       if (!accessToken || !restaurantId) return;
@@ -251,7 +310,8 @@ export default function DigitalMenuPage() {
 
   const handleCategoryDrop = useCallback(
     async (targetId: string) => {
-      if (!dragCategoryId || dragCategoryId === targetId) {
+      if (isDigitalMenuSpecialCategoryId(targetId)) return;
+      if (!dragCategoryId || dragCategoryId === targetId || isDigitalMenuSpecialCategoryId(dragCategoryId)) {
         setDragCategoryId(null);
         setDropCategoryId(null);
         return;
@@ -591,6 +651,25 @@ export default function DigitalMenuPage() {
       <div className={styles.previewLayout}>
         <div className={styles.themePanelWrap}>
           <DigitalMenuThemePicker value={themeId} onChange={handleThemeChange} />
+          <DigitalMenuSpecialCategoriesPanel
+            config={specialCategoryConfig}
+            onPromotionsEnabledChange={(enabled) => {
+              void persistSpecialCategoryConfig({ promotionsCategoryEnabled: enabled });
+            }}
+            onPromotionsNameChange={(name) => {
+              const trimmed = name.trim();
+              if (!trimmed || trimmed === specialCategoryConfig.promotionsCategoryName) return;
+              void persistSpecialCategoryConfig({ promotionsCategoryName: trimmed });
+            }}
+            onLimitedTimeEnabledChange={(enabled) => {
+              void persistSpecialCategoryConfig({ limitedTimeCategoryEnabled: enabled });
+            }}
+            onLimitedTimeNameChange={(name) => {
+              const trimmed = name.trim();
+              if (!trimmed || trimmed === specialCategoryConfig.limitedTimeCategoryName) return;
+              void persistSpecialCategoryConfig({ limitedTimeCategoryName: trimmed });
+            }}
+          />
         </div>
 
         <div className={styles.previewShell}>
@@ -761,17 +840,20 @@ export default function DigitalMenuPage() {
                 <div
                   className={`${styles.categoryBar} ${heroCollapsed ? styles.categoryBarPinned : ''}`}
                 >
-                  {categories.map((cat) => (
+                  {displayCategories.map((cat) => {
+                    const isSpecial = isDigitalMenuSpecialCategoryId(cat.id);
+                    return (
                     <div
                       key={cat.id}
                       className={`${styles.categoryTab} ${
                         activeCategoryId === cat.id ? styles.categoryTabActive : ''
-                      } ${dragCategoryId === cat.id ? styles.categoryTabDragging : ''} ${
-                        dropCategoryId === cat.id && dragCategoryId !== cat.id
+                      } ${!isSpecial && dragCategoryId === cat.id ? styles.categoryTabDragging : ''} ${
+                        !isSpecial && dropCategoryId === cat.id && dragCategoryId !== cat.id
                           ? styles.categoryTabDropTarget
                           : ''
                       }`}
                       onDragOver={(e) => {
+                        if (isSpecial) return;
                         e.preventDefault();
                         if (dragCategoryId && dragCategoryId !== cat.id) {
                           setDropCategoryId(cat.id);
@@ -781,10 +863,12 @@ export default function DigitalMenuPage() {
                         if (dropCategoryId === cat.id) setDropCategoryId(null);
                       }}
                       onDrop={(e) => {
+                        if (isSpecial) return;
                         e.preventDefault();
                         void handleCategoryDrop(cat.id);
                       }}
                     >
+                      {!isSpecial ? (
                       <button
                         type="button"
                         className={styles.dragHandle}
@@ -815,6 +899,7 @@ export default function DigitalMenuPage() {
                       >
                         <DragIndicatorIcon sx={{ fontSize: 16 }} />
                       </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => scrollToCategory(cat.id)}
@@ -830,10 +915,54 @@ export default function DigitalMenuPage() {
                         {cat.name}
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
-                {categories.map((cat) => {
+                {displayCategories.map((cat) => {
+                  const kind = getDigitalMenuSpecialCategoryKind(cat.id);
+
+                  if (kind === 'promotions') {
+                    return (
+                      <PromotionShortcutBanners
+                        key={cat.id}
+                        promotions={promotionShortcuts}
+                        viewport="mobile"
+                        onSelect={() => {}}
+                        title={cat.name}
+                        sectionId={`menu-section-${cat.id}`}
+                        categoryId={cat.id}
+                        sectionRef={(el) => {
+                          sectionRefs.current[cat.id] = el;
+                        }}
+                      />
+                    );
+                  }
+
+                  if (kind === 'limited_time') {
+                    const limitedProducts = productsForLimitedTimeCategory(products, productDiscounts);
+                    return (
+                      <section
+                        key={cat.id}
+                        id={`menu-section-${cat.id}`}
+                        ref={(el) => {
+                          sectionRefs.current[cat.id] = el;
+                        }}
+                        className={styles.section}
+                      >
+                        <div className={styles.sectionHeader}>
+                          <h2 className={styles.sectionTitle}>{cat.name}</h2>
+                        </div>
+                        <ProductList
+                          layout="horizontal"
+                          products={limitedProducts}
+                          productDiscounts={productDiscounts}
+                          onProductClick={openProduct}
+                        />
+                      </section>
+                    );
+                  }
+
                   const layout = cat.display_layout ?? 'vertical';
                   const catProducts = productsForCategory(products, cat.id);
                   return (
