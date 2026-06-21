@@ -1,6 +1,7 @@
 'use client';
 
-import type { Category, Product, RestaurantSchedule } from '@/lib/api/types';
+import type { CSSProperties, MutableRefObject } from 'react';
+import type { Category, Product, Promotion, RestaurantSchedule } from '@/lib/api/types';
 import {
   ProductListThumb,
   ProductPrice,
@@ -8,11 +9,16 @@ import {
   productAriaLabel,
   productsForCategory,
 } from '@/components/digital-menu/menuProductUi';
+import { PromotionShortcutBanners } from '@/components/digital-menu/PromotionShortcutBanners';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import { RestaurantHoursDisplay } from '@/components/digital-menu/RestaurantHoursDisplay';
 import { RestaurantLocationSection } from '@/components/digital-menu/RestaurantLocationSection';
 import { RestaurantOpenStatusBadge } from '@/components/digital-menu/RestaurantOpenStatusBadge';
 import { RestaurantServiceChips } from '@/components/digital-menu/RestaurantServiceChips';
+import {
+  getDigitalMenuSpecialCategoryKind,
+  productsForLimitedTimeCategory,
+} from '@/lib/digital-menu/specialCategories';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
 import type { PublicRestaurant } from '@/lib/api/public';
 import type { RestaurantServiceType } from '@/lib/restaurantServices';
@@ -20,43 +26,49 @@ import styles from './PublicDesktopMenuLayout.module.css';
 
 type PublicDesktopMenuLayoutProps = {
   restaurant: PublicRestaurant;
-  categories: Category[];
+  displayCategories: Category[];
   products: Product[];
   schedules: RestaurantSchedule[];
   enabledServices: RestaurantServiceType[];
   productDiscounts: Map<string, MenuProductDiscountInfo>;
+  promotionShortcuts: Promotion[];
   logoUrl: string | null;
   coverUrl: string | null;
   activeCategoryId: string | null;
   onCategorySelect: (categoryId: string) => void;
-  sectionRefs: React.MutableRefObject<Record<string, HTMLElement | null>>;
+  onPromotionSelect: (promotionId: string) => void;
+  sectionRefs: MutableRefObject<Record<string, HTMLElement | null>>;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   onProductClick: (productId: string) => void;
   cartItemCount?: number;
   onOpenCart?: () => void;
   children?: React.ReactNode;
+  themeStyle?: CSSProperties;
 };
 
 export function PublicDesktopMenuLayout({
   restaurant,
-  categories,
+  displayCategories,
   products,
   schedules,
   enabledServices,
   productDiscounts,
+  promotionShortcuts,
   logoUrl,
   coverUrl,
   activeCategoryId,
   onCategorySelect,
+  onPromotionSelect,
   sectionRefs,
   scrollRef,
   onProductClick,
   cartItemCount = 0,
   onOpenCart,
   children,
+  themeStyle,
 }: PublicDesktopMenuLayoutProps) {
   return (
-    <div className={styles.layout}>
+    <div className={styles.layout} style={themeStyle}>
       <aside className={styles.sidebar} aria-label="Información y categorías">
         <div className={styles.sidebarCover}>
           {coverUrl ? (
@@ -96,33 +108,33 @@ export function PublicDesktopMenuLayout({
               </div>
             ) : null}
 
-          {categories.length > 0 ? (
-            <nav className={styles.categoryNav} aria-label="Categorías del menú">
-              {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  className={`${styles.categoryNavItem} ${
-                    activeCategoryId === cat.id ? styles.categoryNavItemActive : ''
-                  }`}
-                  onClick={() => onCategorySelect(cat.id)}
-                >
-                  {cat.name}
-                </button>
-              ))}
-            </nav>
-          ) : null}
+            {displayCategories.length > 0 ? (
+              <nav className={styles.categoryNav} aria-label="Categorías del menú">
+                {displayCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    className={`${styles.categoryNavItem} ${
+                      activeCategoryId === cat.id ? styles.categoryNavItemActive : ''
+                    }`}
+                    onClick={() => onCategorySelect(cat.id)}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </nav>
+            ) : null}
 
-          {onOpenCart ? (
-            <button type="button" className={styles.cartNavBtn} onClick={onOpenCart}>
-              <span>Carrito</span>
-              {cartItemCount > 0 ? (
-                <span className={styles.cartNavBadge} aria-label={`${cartItemCount} artículos`}>
-                  {cartItemCount}
-                </span>
-              ) : null}
-            </button>
-          ) : null}
+            {onOpenCart ? (
+              <button type="button" className={styles.cartNavBtn} onClick={onOpenCart}>
+                <span>Carrito</span>
+                {cartItemCount > 0 ? (
+                  <span className={styles.cartNavBadge} aria-label={`${cartItemCount} artículos`}>
+                    {cartItemCount}
+                  </span>
+                ) : null}
+              </button>
+            ) : null}
 
             <div className={styles.sidebarFooter}>
               <RestaurantHoursDisplay
@@ -138,12 +150,31 @@ export function PublicDesktopMenuLayout({
 
       <main ref={scrollRef} className={styles.main} aria-label="Menú">
         {children ?? (
-          <>
-            {categories.length === 0 ? (
-              <p className={styles.empty}>Este menú aún no tiene categorías.</p>
-            ) : (
-              categories.map((cat) => {
-                const catProducts = productsForCategory(products, cat.id);
+          displayCategories.length === 0 ? (
+            <p className={styles.empty}>Este menú aún no tiene categorías.</p>
+          ) : (
+            displayCategories.map((cat) => {
+              const kind = getDigitalMenuSpecialCategoryKind(cat.id);
+
+              if (kind === 'promotions') {
+                return (
+                  <PromotionShortcutBanners
+                    key={cat.id}
+                    promotions={promotionShortcuts}
+                    viewport="desktop"
+                    onSelect={onPromotionSelect}
+                    title={cat.name}
+                    sectionId={`menu-section-${cat.id}`}
+                    categoryId={cat.id}
+                    sectionRef={(el) => {
+                      sectionRefs.current[cat.id] = el;
+                    }}
+                  />
+                );
+              }
+
+              if (kind === 'limited_time') {
+                const limitedProducts = productsForLimitedTimeCategory(products, productDiscounts);
                 return (
                   <section
                     key={cat.id}
@@ -155,21 +186,25 @@ export function PublicDesktopMenuLayout({
                     className={styles.section}
                   >
                     <h2 className={styles.sectionTitle}>{cat.name}</h2>
-                    {catProducts.length === 0 ? (
-                      <p className={styles.emptySection}>Sin productos en esta categoría.</p>
+                    {limitedProducts.length === 0 ? (
+                      <p className={styles.emptySection}>Sin productos en promoción por ahora.</p>
                     ) : (
-                      <div className={styles.productGrid}>
-                        {catProducts.map((product) => (
+                      <div className={styles.limitedTimeTrack} aria-label={cat.name}>
+                        {limitedProducts.map((product) => (
                           <button
                             key={product.id}
                             type="button"
-                            className={`${styles.productCard} ${
+                            className={`${styles.limitedTimeCard} ${
                               !isProductAvailable(product) ? styles.productUnavailable : ''
                             }`}
                             onClick={() => onProductClick(product.id)}
                             aria-label={productAriaLabel(product)}
                           >
-                            <div className={styles.productBody}>
+                            <ProductListThumb
+                              product={product}
+                              className={styles.limitedTimeThumb}
+                            />
+                            <div className={styles.limitedTimeBody}>
                               <span className={styles.productName}>{product.name}</span>
                               {product.description ? (
                                 <span className={styles.productDesc}>{product.description}</span>
@@ -181,16 +216,61 @@ export function PublicDesktopMenuLayout({
                                 />
                               </div>
                             </div>
-                            <ProductListThumb product={product} className={menuStyles.productThumb} />
                           </button>
                         ))}
                       </div>
                     )}
                   </section>
                 );
-              })
-            )}
-          </>
+              }
+
+              const catProducts = productsForCategory(products, cat.id);
+              return (
+                <section
+                  key={cat.id}
+                  id={`menu-section-${cat.id}`}
+                  data-category-id={cat.id}
+                  ref={(el) => {
+                    sectionRefs.current[cat.id] = el;
+                  }}
+                  className={styles.section}
+                >
+                  <h2 className={styles.sectionTitle}>{cat.name}</h2>
+                  {catProducts.length === 0 ? (
+                    <p className={styles.emptySection}>Sin productos en esta categoría.</p>
+                  ) : (
+                    <div className={styles.productGrid}>
+                      {catProducts.map((product) => (
+                        <button
+                          key={product.id}
+                          type="button"
+                          className={`${styles.productCard} ${
+                            !isProductAvailable(product) ? styles.productUnavailable : ''
+                          }`}
+                          onClick={() => onProductClick(product.id)}
+                          aria-label={productAriaLabel(product)}
+                        >
+                          <div className={styles.productBody}>
+                            <span className={styles.productName}>{product.name}</span>
+                            {product.description ? (
+                              <span className={styles.productDesc}>{product.description}</span>
+                            ) : null}
+                            <div className={styles.productPriceWrap}>
+                              <ProductPrice
+                                product={product}
+                                discount={productDiscounts.get(product.id)}
+                              />
+                            </div>
+                          </div>
+                          <ProductListThumb product={product} className={menuStyles.productThumb} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })
+          )
         )}
       </main>
     </div>

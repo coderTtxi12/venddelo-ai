@@ -244,6 +244,74 @@
   color: var(--dm-text, #111827);
 }
 
+.limitedTimeTrack {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin: 0 -4px;
+  padding-left: 4px;
+  padding-right: 4px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--dm-text-secondary, #64748b) 40%, transparent) transparent;
+}
+
+.limitedTimeTrack::-webkit-scrollbar {
+  height: 6px;
+}
+
+.limitedTimeTrack::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dm-text-secondary, #64748b) 35%, transparent);
+}
+
+.limitedTimeCard {
+  flex: 0 0 min(100%, 300px);
+  width: min(100%, 300px);
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .limitedTimeCard {
+    transition: opacity 0.15s ease;
+  }
+
+  .limitedTimeCard:hover {
+    opacity: 0.82;
+  }
+}
+
+.limitedTimeThumb {
+  width: 100%;
+  aspect-ratio: 1;
+  height: auto;
+  border-radius: var(--dm-radius-card, 12px);
+}
+
+.limitedTimeBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sectionTitleDesktop {
+  margin: 0 0 20px;
+  font-size: 1.5rem;
+}
+
 .productGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
