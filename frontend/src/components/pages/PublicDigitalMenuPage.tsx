@@ -46,7 +46,7 @@ import {
   getDigitalMenuThemeOrDefault,
   loadDigitalMenuThemeFonts,
 } from '@/lib/digital-menu/themes';
-import { resolveRestaurantServices } from '@/lib/restaurantServices';
+import { PUBLIC_MENU_SCHEDULE_SERVICE_TYPES, resolveRestaurantServices } from '@/lib/restaurantServices';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { buildAddToCartInput } from '@/lib/digital-menu/cart/buildCartLine';
 import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
@@ -803,7 +803,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
                       </div>
                       <div className={menuStyles.nameBlock}>
                         <h1 className={menuStyles.restaurantNameStatic}>{restaurant.name}</h1>
-                        <RestaurantOpenStatusBadge schedules={schedules} services={enabledServices} />
+                        <RestaurantOpenStatusBadge schedules={schedules} services={PUBLIC_MENU_SCHEDULE_SERVICE_TYPES} />
                       </div>
                     </div>
                     {restaurant.description ? (
@@ -858,7 +858,8 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
 
                 <RestaurantHoursDisplay
                   schedules={schedules}
-                  serviceTypes={enabledServices}
+                  serviceTypes={PUBLIC_MENU_SCHEDULE_SERVICE_TYPES}
+                  flat
                   className={isTabletLayout ? menuStyles.tabletInsetSection : undefined}
                 />
                 <RestaurantLocationSection

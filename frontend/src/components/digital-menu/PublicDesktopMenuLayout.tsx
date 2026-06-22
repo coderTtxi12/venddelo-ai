@@ -22,7 +22,7 @@ import {
 } from '@/lib/digital-menu/specialCategories';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
 import type { PublicRestaurant } from '@/lib/api/public';
-import type { RestaurantServiceType } from '@/lib/restaurantServices';
+import { PUBLIC_MENU_SCHEDULE_SERVICE_TYPES, type RestaurantServiceType } from '@/lib/restaurantServices';
 import styles from './PublicDesktopMenuLayout.module.css';
 
 type PublicDesktopMenuLayoutProps = {
@@ -99,7 +99,7 @@ export function PublicDesktopMenuLayout({
               </div>
               <div className={styles.brandMeta}>
                 <h1 className={styles.restaurantName}>{restaurant.name}</h1>
-                <RestaurantOpenStatusBadge schedules={schedules} services={enabledServices} />
+                <RestaurantOpenStatusBadge schedules={schedules} services={PUBLIC_MENU_SCHEDULE_SERVICE_TYPES} />
               </div>
             </div>
 
@@ -146,8 +146,9 @@ export function PublicDesktopMenuLayout({
             <div className={styles.sidebarFooter}>
               <RestaurantHoursDisplay
                 schedules={schedules}
-                serviceTypes={enabledServices}
+                serviceTypes={PUBLIC_MENU_SCHEDULE_SERVICE_TYPES}
                 variant="sidebar"
+                flat
               />
               <RestaurantLocationSection restaurant={restaurant} variant="sidebar" />
             </div>
