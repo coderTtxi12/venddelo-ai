@@ -7,6 +7,15 @@ from app.db.models.menu import (
     Product,
     product_categories,
 )
+from app.db.models.delivery import (
+    DeliveryAssignment,
+    DeliveryProvider,
+    DeliveryProviderMember,
+    DeliveryProviderSchedule,
+    DeliveryProviderTariff,
+    DeliveryProviderZone,
+    RestaurantDeliveryProvider,
+)
 from app.db.models.orders import Order, OrderItem
 from app.db.models.promotions import (
     Promotion,
@@ -36,6 +45,13 @@ __all__ = [
     "promotion_categories",
     "Order",
     "OrderItem",
+    "DeliveryProvider",
+    "DeliveryProviderMember",
+    "DeliveryProviderZone",
+    "DeliveryProviderSchedule",
+    "DeliveryProviderTariff",
+    "RestaurantDeliveryProvider",
+    "DeliveryAssignment",
     "AIArtifact",
     "AIJob",
     "MenuTranslation",
