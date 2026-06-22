@@ -28,7 +28,8 @@ function localParts(date: Date, timeZone: string) {
     Sun: 6,
   };
 
-  const hour = Number(get('hour'));
+  let hour = Number(get('hour'));
+  if (hour === 24) hour = 0;
   const minute = Number(get('minute'));
   const second = Number(get('second'));
 
@@ -40,7 +41,8 @@ function localParts(date: Date, timeZone: string) {
 
 function parseHm(value: string | null | undefined): number | null {
   if (!value) return null;
-  const [h, m] = value.split(':').map(Number);
+  const normalized = value.includes('T') ? value.split('T')[1]! : value;
+  const [h, m] = normalized.split(':').map(Number);
   if (Number.isNaN(h) || Number.isNaN(m)) return null;
   return h * 60 + m;
 }
