@@ -221,12 +221,7 @@ function CheckoutLineCard({
                 <PriceRow
                   key={`${group.groupTitle}-${option.label}`}
                   label={option.label}
-                  value={
-                    option.lineTotalCents === 0
-                      ? 'Incluido'
-                      : formatMoney(option.lineTotalCents / 100, currency)
-                  }
-                  variant={option.lineTotalCents === 0 ? 'free' : 'default'}
+                  value={formatMoney(option.lineTotalCents / 100, currency)}
                 />
               ))}
             </div>
