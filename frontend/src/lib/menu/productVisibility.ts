@@ -23,28 +23,35 @@ export const PRODUCT_VISIBILITY_OPTIONS: {
   },
   {
     value: 'hidden',
-    label: 'Activo (oculto)',
+    label: 'Draft',
     help: 'Solo visible en el panel; no aparece en el menú público.',
   },
   {
     value: 'inactive',
     label: 'Inactivo',
-    help: 'Desactivado; no aparece en el menú público.',
+    help: 'Visible en el menú, pero no se puede vender.',
   },
 ];
 
+export function isPublicMenuListed(product: VisibilityFields): boolean {
+  const published = product.is_published ?? product.isPublished ?? false;
+  const status = product.approval_status ?? product.approvalStatus ?? 'draft';
+  return published && status === 'approved';
+}
+
 export function getProductVisibilityState(product: VisibilityFields): ProductVisibilityState {
   const active = product.is_active ?? product.isActive ?? false;
+  if (isPublicMenuListed(product)) {
+    return active ? 'live' : 'inactive';
+  }
   if (!active) return 'inactive';
-  if (isLiveMenuVisible(product)) return 'live';
   return 'hidden';
 }
 
+/** Product is visible in the public menu and can be ordered. */
 export function isLiveMenuVisible(product: VisibilityFields): boolean {
   const active = product.is_active ?? product.isActive ?? false;
-  const published = product.is_published ?? product.isPublished ?? false;
-  const status = product.approval_status ?? product.approvalStatus ?? 'draft';
-  return active && published && status === 'approved';
+  return active && isPublicMenuListed(product);
 }
 
 export function productVisibilityMeta(product: VisibilityFields): {
@@ -74,7 +81,7 @@ export function visibilityUpdateForState(state: ProductVisibilityState): {
     case 'hidden':
       return { is_active: true, is_published: false, approval_status: 'draft' };
     case 'inactive':
-      return { is_active: false, is_published: false, approval_status: 'draft' };
+      return { is_active: false, is_published: true, approval_status: 'approved' };
   }
 }
 
