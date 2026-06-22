@@ -1,0 +1,65 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.host {
+  min-height: 48px;
+}
+
+.autocompleteHost {
+  width: 100%;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.error {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #b91c1c;
+}
+
+.host :global(gmp-place-autocomplete) {
+  width: 100%;
+  color-scheme: light;
+}
+
+.host :global(input) {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.host :global(input:focus) {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.host :global(input::placeholder) {
+  color: #94a3b8;
+}
