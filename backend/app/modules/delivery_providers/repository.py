@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 
-from app.modules.delivery_providers.schemas import DeliveryProviderDTO, DeliveryProviderZoneDTO
+from app.modules.delivery_providers.schemas import (
+    DeliveryProviderDTO,
+    DeliveryProviderScheduleCreate,
+    DeliveryProviderScheduleDTO,
+    DeliveryProviderServiceStatusDTO,
+    DeliveryProviderZoneDTO,
+)
 
 
 class DeliveryProviderRepository(ABC):
@@ -49,3 +56,25 @@ class DeliveryProviderRepository(ABC):
         center_lat: float | None,
         center_lng: float | None,
     ) -> DeliveryProviderDTO: ...
+
+    @abstractmethod
+    def list_schedules(self, provider_id: uuid.UUID) -> Sequence[DeliveryProviderScheduleDTO]: ...
+
+    @abstractmethod
+    def set_schedules(
+        self,
+        provider_id: uuid.UUID,
+        schedules: Sequence[DeliveryProviderScheduleCreate],
+    ) -> None: ...
+
+    @abstractmethod
+    def seed_default_schedules(self, provider_id: uuid.UUID) -> None: ...
+
+    @abstractmethod
+    def get_service_manually_enabled(self, provider_id: uuid.UUID) -> bool: ...
+
+    @abstractmethod
+    def set_service_manually_enabled(self, provider_id: uuid.UUID, enabled: bool) -> bool: ...
+
+    @abstractmethod
+    def get_provider_timezone(self, provider_id: uuid.UUID) -> str: ...
