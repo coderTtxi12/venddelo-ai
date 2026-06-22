@@ -1,7 +1,9 @@
 'use client';
 
 import type { Promotion } from '@/lib/api/types';
+import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
+import { PromotionCountdown } from '@/components/digital-menu/PromotionCountdown';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import styles from './PromotionShortcutBanners.module.css';
 
@@ -9,6 +11,8 @@ type PromotionShortcutBannersProps = {
   promotions: Promotion[];
   onSelect: (promotionId: string) => void;
   viewport: 'mobile' | 'tablet' | 'desktop';
+  timezone: string;
+  countdownContext?: PromotionCountdownContext;
   title?: string;
   sectionRef?: (element: HTMLElement | null) => void;
   sectionId?: string;
@@ -19,6 +23,8 @@ export function PromotionShortcutBanners({
   promotions,
   onSelect,
   viewport,
+  timezone,
+  countdownContext,
   title = 'Promociones',
   sectionRef,
   sectionId,
@@ -68,6 +74,12 @@ export function PromotionShortcutBanners({
               >
                 <img src={imageUrl} alt="" className={styles.bannerImage} />
                 <span className={styles.bannerScrim} aria-hidden />
+                <PromotionCountdown
+                  promotion={promotion}
+                  timezone={timezone}
+                  countdownContext={countdownContext}
+                  variant="banner"
+                />
                 <span className={styles.bannerLabel}>{promotion.name}</span>
               </button>
             </li>
