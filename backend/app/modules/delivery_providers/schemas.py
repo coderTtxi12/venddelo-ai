@@ -42,6 +42,28 @@ class DeliveryProviderDTO(BaseModel):
     updated_at: datetime
 
 
+class DeliveryProviderZoneDTO(BaseModel):
+    id: uuid.UUID
+    name: str
+    polygon: GeoJsonPolygon | None = None
+    center_lat: float | None = None
+    center_lng: float | None = None
+
+
+class DeliveryProviderProfileUpdate(BaseModel):
+    company_name: str = Field(min_length=2, max_length=200)
+    responsible_name: str = Field(min_length=2, max_length=200)
+    responsible_phone: str = Field(min_length=8, max_length=20)
+    whatsapp_phone: str = Field(min_length=8, max_length=20)
+    service_zone_name: str = Field(default="Cobertura principal", max_length=200)
+    service_zone_polygon: GeoJsonPolygon
+    center_lat: float | None = None
+    center_lng: float | None = None
+    logo_base64: str | None = None
+    logo_file_name: str | None = None
+
+
 class DeliveryProviderMeResponse(BaseModel):
     provider: DeliveryProviderDTO | None
     member_role: str | None = None
+    primary_zone: DeliveryProviderZoneDTO | None = None
