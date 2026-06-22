@@ -2034,7 +2034,7 @@ function OptionGroupEditor({
 
       <div className={styles.optionGroupFooter}>
         <span className={styles.muted}>
-          En app móvil: {group.required ? 'debe elegir' : 'puede omitir'} • {group.selection === 'single' ? 'elige 1' : 'elige ninguno o varios'}
+          Usuario: {group.required ? 'debe elegir' : 'puede omitir'} • {group.selection === 'single' ? 'elige 1' : 'elige ninguno o varios'}
         </span>
       </div>
     </div>
