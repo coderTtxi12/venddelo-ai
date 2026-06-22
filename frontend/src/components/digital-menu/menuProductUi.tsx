@@ -1,7 +1,9 @@
-import type { CategoryDisplayLayout, Product } from '@/lib/api/types';
+import type { CategoryDisplayLayout, Product, Promotion } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
+import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
+import { PromotionCountdown } from '@/components/digital-menu/PromotionCountdown';
 import styles from '../pages/DigitalMenuPage.module.css';
 
 export const PRODUCT_UNAVAILABLE_LABEL = 'No disponible';
@@ -54,16 +56,23 @@ export function ProductListThumb({ product, className }: { product: Product; cla
 export function ProductPrice({
   product,
   discount,
+  timeLimitedPromotion,
+  promotionTimezone,
+  countdownContext,
   className,
 }: {
   product: Product;
   discount?: MenuProductDiscountInfo | null;
+  timeLimitedPromotion?: Promotion | null;
+  promotionTimezone?: string;
+  countdownContext?: PromotionCountdownContext;
   className?: string;
 }) {
   const originalPrice = product.price_cents / 100;
   const hasPriceDiscount = discount != null && discount.amountOff > 0;
+  const showCountdown = timeLimitedPromotion != null && promotionTimezone != null;
 
-  if (!hasPriceDiscount && !discount?.badge) {
+  if (!hasPriceDiscount && !discount?.badge && !showCountdown) {
     return (
       <div className={`${styles.productPrice} ${className ?? ''}`.trim()}>
         {formatMoney(originalPrice, product.currency)}
@@ -90,6 +99,14 @@ export function ProductPrice({
       {discount?.badge ? (
         <span className={styles.productDiscountBadge}>{discount.badge}</span>
       ) : null}
+      {showCountdown ? (
+        <PromotionCountdown
+          promotion={timeLimitedPromotion}
+          timezone={promotionTimezone}
+          countdownContext={countdownContext}
+          variant="compact"
+        />
+      ) : null}
     </div>
   );
 }
@@ -97,10 +114,16 @@ export function ProductPrice({
 export function ProductCardContent({
   product,
   discount,
+  timeLimitedPromotion,
+  promotionTimezone,
+  countdownContext,
   bodyClassName,
 }: {
   product: Product;
   discount?: MenuProductDiscountInfo | null;
+  timeLimitedPromotion?: Promotion | null;
+  promotionTimezone?: string;
+  countdownContext?: PromotionCountdownContext;
   bodyClassName?: string;
 }) {
   const content = (
@@ -109,7 +132,13 @@ export function ProductCardContent({
       {product.description ? (
         <div className={styles.productDesc}>{product.description}</div>
       ) : null}
-      <ProductPrice product={product} discount={discount} />
+      <ProductPrice
+        product={product}
+        discount={discount}
+        timeLimitedPromotion={timeLimitedPromotion}
+        promotionTimezone={promotionTimezone}
+        countdownContext={countdownContext}
+      />
     </>
   );
 
@@ -141,11 +170,17 @@ export function ProductList({
   layout,
   products,
   productDiscounts,
+  productTimeLimitedPromotions,
+  promotionTimezone,
+  countdownContext,
   onProductClick,
 }: {
   layout: ProductListLayout;
   products: Product[];
   productDiscounts: Map<string, MenuProductDiscountInfo>;
+  productTimeLimitedPromotions?: Map<string, Promotion>;
+  promotionTimezone?: string;
+  countdownContext?: PromotionCountdownContext;
   onProductClick: (productId: string) => void;
 }) {
   if (products.length === 0) {
@@ -167,6 +202,9 @@ export function ProductList({
             <ProductCardContent
               product={product}
               discount={productDiscounts.get(product.id)}
+              timeLimitedPromotion={productTimeLimitedPromotions?.get(product.id)}
+              promotionTimezone={promotionTimezone}
+              countdownContext={countdownContext}
               bodyClassName={styles.productCardTabletBody}
             />
           </button>
@@ -190,6 +228,9 @@ export function ProductList({
             <ProductCardContent
               product={product}
               discount={productDiscounts.get(product.id)}
+              timeLimitedPromotion={productTimeLimitedPromotions?.get(product.id)}
+              promotionTimezone={promotionTimezone}
+              countdownContext={countdownContext}
             />
           </button>
         ))}
@@ -212,6 +253,9 @@ export function ProductList({
             <ProductCardContent
               product={product}
               discount={productDiscounts.get(product.id)}
+              timeLimitedPromotion={productTimeLimitedPromotions?.get(product.id)}
+              promotionTimezone={promotionTimezone}
+              countdownContext={countdownContext}
             />
           </button>
         ))}
@@ -233,6 +277,9 @@ export function ProductList({
             <ProductCardContent
               product={product}
               discount={productDiscounts.get(product.id)}
+              timeLimitedPromotion={productTimeLimitedPromotions?.get(product.id)}
+              promotionTimezone={promotionTimezone}
+              countdownContext={countdownContext}
             />
           </div>
           <ProductListThumb product={product} className={styles.productThumb} />
