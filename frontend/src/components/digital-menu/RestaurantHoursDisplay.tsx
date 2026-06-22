@@ -15,6 +15,8 @@ type RestaurantHoursDisplayProps = {
   variant?: 'default' | 'sidebar';
   showHeader?: boolean;
   readOnly?: boolean;
+  /** Oculta el nombre del servicio (p. ej. "Recoger en tienda") en el menú público. */
+  flat?: boolean;
 };
 
 function DayHoursReadout({ day }: { day: ServiceHoursBlock['days'][number] }) {
@@ -46,11 +48,13 @@ function ServiceHoursReadout({
   expanded,
   onToggle,
   readOnly = false,
+  hideServiceLabel = false,
 }: {
   block: ServiceHoursBlock;
   expanded: boolean;
   onToggle: () => void;
   readOnly?: boolean;
+  hideServiceLabel?: boolean;
 }) {
   const panelId = `hours-readout-${block.serviceType}`;
   const openDays = block.days.filter((day) => !day.isClosed).length;
@@ -70,13 +74,18 @@ function ServiceHoursReadout({
         className={styles.serviceToggle}
         aria-expanded={expanded}
         aria-controls={panelId}
+        aria-label={hideServiceLabel ? 'Ver horario del restaurante' : undefined}
         onClick={onToggle}
       >
         <span className={styles.serviceToggleMain}>
-          <span className={styles.serviceTitle}>
-            {block.label}
-            {readOnly ? <span className={styles.readOnlyBadge}>Solo lectura</span> : null}
-          </span>
+          {hideServiceLabel ? (
+            <span className={styles.serviceTitle}>Horario del restaurante</span>
+          ) : (
+            <span className={styles.serviceTitle}>
+              {block.label}
+              {readOnly ? <span className={styles.readOnlyBadge}>Solo lectura</span> : null}
+            </span>
+          )}
           {!expanded ? <span className={styles.serviceSummary}>{summary}</span> : null}
         </span>
         <span className={`${styles.chevron} ${expanded ? styles.chevronExpanded : ''}`}>
@@ -102,8 +111,10 @@ export function RestaurantHoursDisplay({
   variant = 'default',
   showHeader = true,
   readOnly = false,
+  flat = false,
 }: RestaurantHoursDisplayProps) {
   const blocks = buildRestaurantHoursBlocks(schedules, serviceTypes ?? []);
+  const hideServiceLabel = flat && blocks.length === 1;
   const [expandedBlocks, setExpandedBlocks] = useState<Record<RestaurantServiceType, boolean>>({
     takeout: false,
     delivery: false,
@@ -122,7 +133,11 @@ export function RestaurantHoursDisplay({
           <div className={styles.hoursHeading}>
             <h2 className={styles.hoursTitle}>Horarios de Servicio</h2>
             {variant === 'default' ? (
-              <p className={styles.hoursHint}>Consulta nuestros horarios por tipo de entrega.</p>
+              <p className={styles.hoursHint}>
+                {blocks.length === 1
+                  ? 'Consulta el horario del restaurante.'
+                  : 'Consulta nuestros horarios por tipo de entrega.'}
+              </p>
             ) : null}
           </div>
         </div>
@@ -134,6 +149,7 @@ export function RestaurantHoursDisplay({
             key={block.serviceType}
             block={block}
             readOnly={readOnly}
+            hideServiceLabel={hideServiceLabel}
             expanded={expandedBlocks[block.serviceType]}
             onToggle={() =>
               setExpandedBlocks((current) => ({
