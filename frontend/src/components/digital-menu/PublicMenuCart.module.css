@@ -204,10 +204,25 @@
   align-items: center;
   padding: 0.1rem 0.45rem;
   border-radius: 999px;
-  background: rgba(16, 185, 129, 0.12);
-  color: #047857;
+  background: var(--dm-discount-badge-bg, rgba(16, 185, 129, 0.12));
+  color: var(--dm-discount-badge-text, #047857);
   font-size: 0.72rem;
   font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.linePromoWarnings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+}
+
+.linePromoWarning {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: var(--color-text-secondary, #64748b);
 }
 
 .quoteError {
@@ -392,8 +407,12 @@
 .linePriceOriginal {
   font-size: 0.82rem;
   font-weight: 600;
-  color: var(--dm-text-secondary, #64748b);
+  color: var(--dm-price-original, var(--dm-text-secondary, #64748b));
   text-decoration: line-through;
+}
+
+.linePriceSale {
+  color: var(--dm-price-sale, var(--dm-price, var(--dm-text, #111827)));
 }
 
 /* Mobile sticky footer */
