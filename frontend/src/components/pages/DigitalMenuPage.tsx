@@ -49,7 +49,7 @@ import {
 import { SortableProductList, type ProductDragTarget } from '@/components/digital-menu/SortableProductList';
 import { RestaurantOpenStatusBadge } from '@/components/digital-menu/RestaurantOpenStatusBadge';
 import { RestaurantServiceChips } from '@/components/digital-menu/RestaurantServiceChips';
-import { RestaurantHoursFooter } from '@/components/digital-menu/RestaurantHoursFooter';
+import { DashboardRestaurantHours } from '@/components/settings/DashboardRestaurantHours';
 import { RestaurantLocationSection } from '@/components/digital-menu/RestaurantLocationSection';
 import { DigitalMenuThemePicker } from '@/components/digital-menu/DigitalMenuThemePicker';
 import {
@@ -1029,11 +1029,15 @@ export default function DigitalMenuPage() {
                 })}
               </>
             )}
-            <RestaurantHoursFooter
-              schedules={schedules}
-              saving={savingSchedules}
-              onSave={handleSaveSchedules}
-            />
+            {restaurant && (restaurant.takeout_enabled || restaurant.delivery_enabled) ? (
+              <DashboardRestaurantHours
+                schedules={schedules}
+                takeoutEnabled={restaurant.takeout_enabled}
+                deliveryEnabled={restaurant.delivery_enabled}
+                saving={savingSchedules}
+                onSave={handleSaveSchedules}
+              />
+            ) : null}
             <RestaurantLocationSection restaurant={restaurant} />
               </>
               )}
