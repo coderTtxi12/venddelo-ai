@@ -81,16 +81,15 @@ export function buildRestaurantHoursBlocks(
   schedules: RestaurantSchedule[],
   enabledServices: RestaurantServiceType[],
 ): ServiceHoursBlock[] {
-  const serviceTypesWithSchedules = RESTAURANT_SERVICE_ORDER.filter((serviceType) =>
+  const requestedServices =
+    enabledServices.length > 0 ? enabledServices : RESTAURANT_SERVICE_ORDER;
+
+  const serviceTypesWithSchedules = requestedServices.filter((serviceType) =>
     schedules.some((entry) => entry.service_type === serviceType),
   );
 
   const serviceTypes =
-    serviceTypesWithSchedules.length > 0
-      ? serviceTypesWithSchedules
-      : enabledServices.length > 0
-        ? enabledServices
-        : RESTAURANT_SERVICE_ORDER;
+    serviceTypesWithSchedules.length > 0 ? serviceTypesWithSchedules : requestedServices;
 
   return serviceTypes.map((serviceType) => ({
     serviceType,
@@ -193,6 +192,23 @@ export function scheduleDraftsToCreatePayload(
   }
 
   return payload;
+}
+
+/** Conserva horarios de delivery al guardar solo takeout desde el panel del restaurante. */
+export function mergeScheduleSavePreservingDelivery(
+  takeoutPayload: RestaurantScheduleCreateInput[],
+  existingSchedules: RestaurantSchedule[],
+): RestaurantScheduleCreateInput[] {
+  const deliveryPayload = existingSchedules
+    .filter((entry) => entry.service_type === 'delivery')
+    .map(({ service_type, day_of_week, opens_at, closes_at }) => ({
+      service_type,
+      day_of_week,
+      opens_at,
+      closes_at,
+    }));
+
+  return [...takeoutPayload, ...deliveryPayload];
 }
 
 export function validateScheduleDrafts(drafts: ServiceScheduleDraft[]): string | null {
