@@ -21,6 +21,7 @@ export type DeliveryProvider = {
   name: string;
   slug: string;
   status: 'draft' | 'pending_review' | 'active' | 'rejected' | 'suspended';
+  service_manually_enabled: boolean;
   responsible_name: string | null;
   responsible_phone: string | null;
   whatsapp_phone: string | null;
@@ -58,4 +59,39 @@ export type DeliveryProviderProfileUpdate = {
   center_lng: number | null;
   logo_base64: string | null;
   logo_file_name: string | null;
+};
+
+export type DeliveryProviderScheduleKind = 'regular' | 'night';
+
+export type DeliveryProviderSchedule = {
+  id: string;
+  schedule_kind: DeliveryProviderScheduleKind;
+  day_of_week: number;
+  opens_at: string;
+  closes_at: string;
+};
+
+export type DeliveryProviderScheduleCreateInput = {
+  schedule_kind: DeliveryProviderScheduleKind;
+  day_of_week: number;
+  opens_at: string;
+  closes_at: string;
+};
+
+export type DeliveryProviderServiceStatusReason =
+  | 'active'
+  | 'manual_off'
+  | 'outside_schedule';
+
+export type DeliveryProviderServiceStatus = {
+  manually_enabled: boolean;
+  within_schedule: boolean;
+  service_active: boolean;
+  status_reason: DeliveryProviderServiceStatusReason;
+  next_change_at: string | null;
+  timezone: string;
+};
+
+export type DeliveryProviderServiceStatusUpdate = {
+  manually_enabled: boolean;
 };
