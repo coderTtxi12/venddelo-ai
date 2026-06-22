@@ -1,0 +1,77 @@
+.page {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.subtitle {
+  margin-top: 0.35rem;
+  font-size: 0.92rem;
+  color: var(--color-text-secondary);
+  max-width: 42rem;
+  line-height: 1.45;
+}
+
+.panel {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.hoursWrap {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.hoursWrap :global(.hoursSection) {
+  margin-top: 0;
+  border-top: none;
+  padding: 0.75rem;
+}
+
+.settingsLink {
+  font-size: 0.85rem;
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.settingsLink:hover {
+  text-decoration: underline;
+}
+
+.errorBanner {
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 0.85rem;
+}
+
+.loading,
+.empty {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
