@@ -1,0 +1,320 @@
+.hoursSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.hoursHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.hoursIcon {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.hoursTitle {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.hoursHint {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+.hoursBlocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.hoursBlock {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.hoursBlockOpen {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+}
+
+.serviceToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  min-height: 44px;
+  transition: background 0.2s ease;
+}
+
+.serviceToggle:hover {
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-bg));
+}
+
+.serviceToggleMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.serviceTitle {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.serviceSummary {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.chevron {
+  display: inline-flex;
+  color: var(--color-text-secondary);
+  transition: transform 0.2s ease;
+}
+
+.chevronExpanded {
+  transform: rotate(180deg);
+}
+
+.servicePanel {
+  border-top: 1px solid var(--color-border);
+  padding: 0.65rem 0.85rem 0.85rem;
+}
+
+.dayList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.dayRow {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  background: var(--color-surface);
+}
+
+.dayRowToday {
+  border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
+}
+
+.dayMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.dayLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.todayBadge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+
+.closedToggle {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.closedToggleOn {
+  background: color-mix(in srgb, #16a34a 12%, var(--color-surface));
+  border-color: #86efac;
+  color: #166534;
+}
+
+.closedToggleOff {
+  background: color-mix(in srgb, #ef4444 8%, var(--color-surface));
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.closedHint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.slotsWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.slotRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.timeFields {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.45rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.timeField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.timeFieldLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.timeInput {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.timeInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.timeSep {
+  padding-bottom: 0.55rem;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
+.removeSlotBtn {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.removeSlotBtn:hover {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.addSlotBtn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.addSlotBtn:hover {
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.saveBtn {
+  border: none;
+  border-radius: 12px;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 800;
+  padding: 0.55rem 1rem;
+  min-height: 40px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.saveBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.errorText {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #991b1b;
+  flex: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .serviceToggle,
+  .chevron,
+  .closedToggle,
+  .removeSlotBtn,
+  .addSlotBtn,
+  .saveBtn {
+    transition: none;
+  }
+}
