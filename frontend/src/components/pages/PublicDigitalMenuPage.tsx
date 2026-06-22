@@ -37,6 +37,10 @@ import { readPromotionsCache, writePromotionsCache } from '@/lib/promotions/publ
 import { getBundleComplementRulesForProduct } from '@/lib/promotions/bundlePromoEligibility';
 import { listLivePromotionShortcuts } from '@/lib/promotions/promotionShortcuts';
 import {
+  buildProductTimeLimitedPromotionMap,
+  type PromotionCountdownContext,
+} from '@/lib/promotions/promotionCountdown';
+import {
   DEFAULT_DIGITAL_MENU_THEME_ID,
   digitalMenuThemeToStyle,
   getDigitalMenuThemeOrDefault,
@@ -45,7 +49,6 @@ import {
 import { resolveRestaurantServices } from '@/lib/restaurantServices';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { buildAddToCartInput } from '@/lib/digital-menu/cart/buildCartLine';
-import { filterOrderableProducts } from '@/lib/digital-menu/orderableProducts';
 import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
 import { scrollCategoryTabIntoView, getCategoryScrollAnchorPosition, getSectionOffsetTop } from '@/lib/digital-menu/categoryScrollSpy';
 import { cartSubtotalCents as sumCartSubtotalCents } from '@/lib/digital-menu/cart/cartMath';
@@ -193,7 +196,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
         const sortedCategories = sortCategories(menuData.categories);
         setRestaurant(restaurantData);
         setCategories(sortedCategories);
-        setProducts(filterOrderableProducts(menuData.products));
+        setProducts(menuData.products);
         setSchedules(scheduleRows);
         setPromotionsContext(promotionContext);
         writePromotionsCache(subdomain, promotionContext);
@@ -240,6 +243,26 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
         promotionTimezone,
       ),
     [products, promotionsContext, effectiveNow, promotionTimezone],
+  );
+
+  const promotionCountdownContext = useMemo<PromotionCountdownContext>(
+    () => ({
+      schedules,
+      enabledServices,
+    }),
+    [schedules, enabledServices],
+  );
+
+  const productTimeLimitedPromotions = useMemo(
+    () =>
+      buildProductTimeLimitedPromotionMap(
+        products,
+        promotionsContext?.items ?? [],
+        effectiveNow,
+        promotionTimezone,
+        promotionCountdownContext,
+      ),
+    [products, promotionsContext?.items, effectiveNow, promotionTimezone, promotionCountdownContext],
   );
 
   const promotionShortcuts = useMemo(
@@ -694,6 +717,9 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
                 promotion={selectedPromotion}
                 products={products}
                 productDiscounts={productDiscounts}
+                productTimeLimitedPromotions={productTimeLimitedPromotions}
+                timezone={promotionTimezone}
+                countdownContext={promotionCountdownContext}
                 heroCollapsed={promotionHeroCollapsed}
                 onHeroCollapsedChange={setPromotionHeroCollapsed}
                 scrollRootRef={mobileScrollRef}
@@ -707,6 +733,9 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
                 key={selectedProduct.id}
                 product={selectedProduct}
                 discount={productDiscounts.get(selectedProduct.id)}
+                timeLimitedPromotion={productTimeLimitedPromotions.get(selectedProduct.id) ?? null}
+                promotionTimezone={promotionTimezone}
+                countdownContext={promotionCountdownContext}
                 bundleComplementRules={bundleComplementRules}
                 heroCollapsed={productHeroCollapsed}
                 onHeroCollapsedChange={setProductHeroCollapsed}
@@ -813,7 +842,10 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
                       displayCategories={displayCategories}
                       products={products}
                       productDiscounts={productDiscounts}
+                      productTimeLimitedPromotions={productTimeLimitedPromotions}
                       promotionShortcuts={promotionShortcuts}
+                      promotionTimezone={promotionTimezone}
+                      countdownContext={promotionCountdownContext}
                       sectionRefs={sectionRefs}
                       isTabletLayout={isTabletLayout}
                       promotionBannerViewport={promotionBannerViewport}
@@ -879,7 +911,10 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
           schedules={schedules}
           enabledServices={enabledServices}
           productDiscounts={productDiscounts}
+          productTimeLimitedPromotions={productTimeLimitedPromotions}
           promotionShortcuts={promotionShortcuts}
+          promotionTimezone={promotionTimezone}
+          countdownContext={promotionCountdownContext}
           logoUrl={logoUrl}
           coverUrl={coverUrl}
           activeCategoryId={activeCategoryId}
@@ -910,6 +945,9 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
               promotion={selectedPromotion}
               products={products}
               productDiscounts={productDiscounts}
+              productTimeLimitedPromotions={productTimeLimitedPromotions}
+              timezone={promotionTimezone}
+              countdownContext={promotionCountdownContext}
               heroCollapsed={promotionHeroCollapsed}
               onHeroCollapsedChange={setPromotionHeroCollapsed}
               scrollRootRef={desktopScrollRef}
@@ -922,6 +960,9 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
               key={selectedProduct.id}
               product={selectedProduct}
               discount={productDiscounts.get(selectedProduct.id)}
+              timeLimitedPromotion={productTimeLimitedPromotions.get(selectedProduct.id) ?? null}
+              promotionTimezone={promotionTimezone}
+              countdownContext={promotionCountdownContext}
               bundleComplementRules={bundleComplementRules}
               heroCollapsed={productHeroCollapsed}
               onHeroCollapsedChange={setProductHeroCollapsed}
