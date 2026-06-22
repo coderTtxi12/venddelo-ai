@@ -9,6 +9,10 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderMeResponse,
     DeliveryProviderOnboardingSubmit,
     DeliveryProviderProfileUpdate,
+    DeliveryProviderScheduleCreate,
+    DeliveryProviderScheduleDTO,
+    DeliveryProviderServiceStatusDTO,
+    DeliveryProviderServiceStatusUpdate,
 )
 from app.modules.delivery_providers.service import DeliveryProviderService
 from app.modules.users.schemas import UserDTO
@@ -51,3 +55,37 @@ def update_my_delivery_provider(
     service: DeliveryProviderService = Depends(_service),
 ) -> DeliveryProviderDTO:
     return service.update_profile(user.id, data)
+
+
+@router.get("/me/schedules", response_model=list[DeliveryProviderScheduleDTO])
+def list_my_delivery_provider_schedules(
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> list[DeliveryProviderScheduleDTO]:
+    return service.list_schedules(user.id)
+
+
+@router.put("/me/schedules", status_code=status.HTTP_204_NO_CONTENT)
+def set_my_delivery_provider_schedules(
+    schedules: list[DeliveryProviderScheduleCreate],
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> None:
+    service.set_schedules(user.id, schedules)
+
+
+@router.get("/me/service-status", response_model=DeliveryProviderServiceStatusDTO)
+def get_my_delivery_provider_service_status(
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> DeliveryProviderServiceStatusDTO:
+    return service.get_service_status(user.id)
+
+
+@router.patch("/me/service-status", response_model=DeliveryProviderServiceStatusDTO)
+def update_my_delivery_provider_service_status(
+    data: DeliveryProviderServiceStatusUpdate,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> DeliveryProviderServiceStatusDTO:
+    return service.update_service_status(user.id, data)
