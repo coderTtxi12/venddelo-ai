@@ -1901,22 +1901,22 @@ function ProductEditor({
 function optionGroupMobileSummary(group: OptionGroupDraft, activeItemCount: number): string {
   const requirement = group.required ? 'debe elegir' : 'puede omitir';
   if (group.selection === 'single') {
-    return `En app móvil: ${requirement} • elige 1`;
+    return `Cliente: ${requirement} • elige 1`;
   }
   const max = group.maxSelections;
   if (group.required) {
     if (max != null) {
-      return `En app móvil: ${requirement} • elige entre 1 y ${max}`;
+      return `Cliente: ${requirement} • elige entre 1 y ${max}`;
     }
-    return `En app móvil: ${requirement} • elige al menos 1`;
+    return `Cliente: ${requirement} • elige al menos 1`;
   }
   if (max != null) {
-    return `En app móvil: ${requirement} • elige hasta ${max}`;
+    return `Cliente: ${requirement} • elige hasta ${max}`;
   }
   if (activeItemCount > 0) {
-    return `En app móvil: ${requirement} • elige ninguno o varios (máx. ${activeItemCount})`;
+    return `Cliente: ${requirement} • elige ninguno o varios (máx. ${activeItemCount})`;
   }
-  return `En app móvil: ${requirement} • elige ninguno o varios`;
+  return `Cliente: ${requirement} • elige ninguno o varios`;
 }
 
 function OptionGroupEditor({
