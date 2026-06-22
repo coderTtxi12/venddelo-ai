@@ -705,6 +705,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
                 validProductIds={validProductIds}
                 products={products}
                 promotions={promotionsContext?.items ?? []}
+                productDiscounts={productDiscounts}
                 currency={cartCurrency}
                 onBack={closeCart}
                 onUpdateQuantity={cart.updateLineQuantity}
@@ -934,6 +935,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
               validProductIds={validProductIds}
               products={products}
               promotions={promotionsContext?.items ?? []}
+              productDiscounts={productDiscounts}
               currency={cartCurrency}
               onBack={closeCart}
               onUpdateQuantity={cart.updateLineQuantity}
