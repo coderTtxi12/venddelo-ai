@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.modules.ai.api import router as ai_router
+from app.modules.delivery_providers.api import router as delivery_providers_router
 from app.modules.health.api import router as health_router
 from app.modules.menu.api import router as menu_router
 from app.modules.orders.api import router as orders_router
@@ -12,6 +13,7 @@ from app.modules.users.api import router as users_router
 api_v1_router = APIRouter()
 api_v1_router.include_router(health_router)
 api_v1_router.include_router(users_router)
+api_v1_router.include_router(delivery_providers_router)
 api_v1_router.include_router(restaurants_router)
 api_v1_router.include_router(menu_router)
 api_v1_router.include_router(promotions_router)
