@@ -359,7 +359,7 @@ def _line_discount_for_promo(
         return line_subtotal - discount, discount, _percent_badge(promo)
 
     if promo.type == "amount" and promo.amount_cents is not None:
-        discount = min(promo.amount_cents, line_subtotal)
+        discount = min(promo.amount_cents * quantity, line_subtotal)
         return line_subtotal - discount, discount, None
 
     return line_subtotal, 0, None
