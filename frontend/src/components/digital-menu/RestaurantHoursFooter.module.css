@@ -117,6 +117,33 @@
   color: var(--dm-text-secondary, #64748b);
   letter-spacing: 0.03em;
   text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hoursBlockReadOnly {
+  background: color-mix(in srgb, var(--dm-surface, #fff) 98%, var(--dm-text-secondary, #64748b) 2%);
+}
+
+.hoursSectionReadOnly {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.readOnlyBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dm-text-secondary, #64748b) 12%, transparent);
+  color: var(--dm-text-secondary, #64748b);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .serviceSummary {
