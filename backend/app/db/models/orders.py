@@ -43,6 +43,12 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="pending")
     idempotency_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    delivery_fee_cents: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    delivery_provider_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_providers.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order", cascade="all, delete-orphan"
