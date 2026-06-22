@@ -358,6 +358,122 @@ def test_bundle_uses_catalog_discounted_base_for_pairing():
     assert quote.total_cents == 20000
 
 
+def test_amount_line_discount_scales_with_quantity():
+    """Product amount discounts apply per unit (e.g. $59 off × 4 units = $236 off)."""
+    product = _product(25900)
+    catalog = PromotionDTO(
+        id=uuid.uuid4(),
+        restaurant_id=uuid.uuid4(),
+        name="__product_discount__Burger",
+        type="amount",
+        scope="product",
+        amount_cents=5900,
+        percent=None,
+        min_order_cents=None,
+        starts_at=None,
+        ends_at=None,
+        bundle_get_quantity=None,
+        bundle_pay_quantity=None,
+        bundle_pairing_mode=None,
+        recurrence_weekdays=None,
+        recurrence_start_time=None,
+        recurrence_end_time=None,
+        is_active=True,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        product_ids=[product.id],
+        category_ids=[],
+        option_item_ids=[],
+    )
+    tz = resolve_timezone("America/Mexico_City")
+
+    quote = price_cart(
+        lines=[CartLineInput(product_id=product.id, quantity=4)],
+        products_by_id={product.id: product},
+        promotions=[catalog],
+        now_utc=datetime.now(UTC),
+        tz=tz,
+    )
+
+    assert quote.lines[0].discount_cents == 5900 * 4
+    assert quote.lines[0].line_total_cents == 25900 * 4 - 5900 * 4
+    assert quote.total_cents == 25900 * 4 - 5900 * 4
+
+
+def test_amount_line_discount_with_options_scales_per_unit():
+    """Amount discounts apply to each unit; complements are billed separately."""
+    option_id = uuid.uuid4()
+    group_id = uuid.uuid4()
+    product = _product(25900)
+    product.option_groups = [
+        OptionGroupDTO(
+            id=group_id,
+            product_id=product.id,
+            title="Bebida",
+            required=False,
+            selection="single",
+            min_selections=0,
+            max_selections=1,
+            sort_index=0,
+            is_active=True,
+            items=[
+                OptionItemDTO(
+                    id=option_id,
+                    label="Sprite",
+                    price_delta_cents=2000,
+                    sort_index=0,
+                    is_active=True,
+                )
+            ],
+        )
+    ]
+    catalog = PromotionDTO(
+        id=uuid.uuid4(),
+        restaurant_id=uuid.uuid4(),
+        name="__product_discount__Burger",
+        type="amount",
+        scope="product",
+        amount_cents=5900,
+        percent=None,
+        min_order_cents=None,
+        starts_at=None,
+        ends_at=None,
+        bundle_get_quantity=None,
+        bundle_pay_quantity=None,
+        bundle_pairing_mode=None,
+        recurrence_weekdays=None,
+        recurrence_start_time=None,
+        recurrence_end_time=None,
+        is_active=True,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        product_ids=[product.id],
+        category_ids=[],
+        option_item_ids=[],
+    )
+    tz = resolve_timezone("America/Mexico_City")
+
+    quote = price_cart(
+        lines=[
+            CartLineInput(
+                product_id=product.id,
+                quantity=4,
+                selected_options={str(group_id): [str(option_id)]},
+            )
+        ],
+        products_by_id={product.id: product},
+        promotions=[catalog],
+        now_utc=datetime.now(UTC),
+        tz=tz,
+    )
+
+    # (259 + 20) × 4 = 1116.00, discount 59 × 4 = 236, total = 880.00
+    assert quote.subtotal_before_discount_cents == (25900 + 2000) * 4
+    assert quote.lines[0].discount_cents == 5900 * 4
+    assert quote.lines[0].line_total_cents == (25900 + 2000) * 4 - 5900 * 4
+    assert quote.total_cents == 88000
+
+
 def test_excluded_complement_disqualifies_bundle_line():
     cat_id = uuid.uuid4()
     option_allowed = uuid.uuid4()
