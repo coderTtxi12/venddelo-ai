@@ -144,3 +144,53 @@ def test_delivery_provider_me_after_onboarding(client, engine):
     assert payload["member_role"] == "owner"
     assert payload["provider"]["status"] == "pending_review"
     assert payload["provider"]["name"] == "Mexy Reparto"
+    assert payload["primary_zone"] is not None
+    assert payload["primary_zone"]["name"] == "Cobertura principal"
+    assert payload["primary_zone"]["polygon"]["type"] == "Polygon"
+
+
+@requires_db
+def test_delivery_provider_profile_update(client):
+    create = client.post(
+        "/api/v1/delivery-providers/onboarding",
+        json=ONBOARDING_PAYLOAD,
+        headers=AUTH,
+    )
+    assert create.status_code == 201
+
+    updated_polygon = {
+        "type": "Polygon",
+        "coordinates": [
+            [
+                [-99.1400, 19.4326],
+                [-99.1250, 19.4326],
+                [-99.1250, 19.4450],
+                [-99.1400, 19.4326],
+            ]
+        ],
+    }
+
+    patch = client.patch(
+        "/api/v1/delivery-providers/me",
+        json={
+            **ONBOARDING_PAYLOAD,
+            "company_name": "Mexy Reparto Actualizado",
+            "responsible_name": "Ana García",
+            "service_zone_name": "Zona norte",
+            "service_zone_polygon": updated_polygon,
+            "center_lat": 19.438,
+            "center_lng": -99.132,
+        },
+        headers=AUTH,
+    )
+    assert patch.status_code == 200, patch.text
+    body = patch.json()
+    assert body["name"] == "Mexy Reparto Actualizado"
+    assert body["responsible_name"] == "Ana García"
+
+    me = client.get("/api/v1/delivery-providers/me", headers=AUTH)
+    assert me.status_code == 200
+    payload = me.json()
+    assert payload["primary_zone"]["name"] == "Zona norte"
+    assert payload["primary_zone"]["center_lat"] == 19.438
+    assert payload["primary_zone"]["polygon"]["coordinates"][0][0][0] == -99.14
