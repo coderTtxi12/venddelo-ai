@@ -928,6 +928,7 @@ export default function DigitalMenuPage() {
                         key={cat.id}
                         promotions={promotionShortcuts}
                         viewport="mobile"
+                        timezone="America/Mexico_City"
                         onSelect={() => {}}
                         title={cat.name}
                         sectionId={`menu-section-${cat.id}`}
