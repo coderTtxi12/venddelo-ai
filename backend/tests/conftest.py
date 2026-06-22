@@ -1,7 +1,7 @@
 import os
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 import app.db.models  # noqa: F401
@@ -32,6 +32,8 @@ requires_db = pytest.mark.skipif(
 def engine():
     eng = create_engine(TEST_URL)
     Base.metadata.drop_all(eng)
+    with eng.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
     Base.metadata.create_all(eng)
     yield eng
     Base.metadata.drop_all(eng)
