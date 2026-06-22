@@ -5,13 +5,14 @@ import json
 import re
 import uuid
 
-from app.core.exceptions import ConflictError, ValidationError
+from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.core.storage import StoragePort
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryProviderDTO,
     DeliveryProviderMeResponse,
     DeliveryProviderOnboardingSubmit,
+    DeliveryProviderProfileUpdate,
 )
 
 
@@ -23,9 +24,50 @@ class DeliveryProviderService:
     def get_me(self, user_id: uuid.UUID) -> DeliveryProviderMeResponse:
         found = self._repo.get_for_user(user_id)
         if found is None:
-            return DeliveryProviderMeResponse(provider=None, member_role=None)
+            return DeliveryProviderMeResponse(provider=None, member_role=None, primary_zone=None)
         provider, member_role = found
-        return DeliveryProviderMeResponse(provider=provider, member_role=member_role)
+        primary_zone = self._repo.get_primary_zone(provider.id)
+        return DeliveryProviderMeResponse(
+            provider=provider,
+            member_role=member_role,
+            primary_zone=primary_zone,
+        )
+
+    def update_profile(
+        self, user_id: uuid.UUID, data: DeliveryProviderProfileUpdate
+    ) -> DeliveryProviderDTO:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+
+        provider, _member_role = found
+        polygon = data.service_zone_polygon
+        if polygon.type != "Polygon":
+            raise ValidationError("El cerco debe ser un polígono")
+        ring = polygon.coordinates[0] if polygon.coordinates else []
+        if len(ring) < 4:
+            raise ValidationError("Dibuja un cerco con al menos 3 puntos")
+
+        logo_path = self._upload_logo_if_present(data.logo_base64, data.logo_file_name)
+        geojson = json.dumps(
+            {
+                "type": "Polygon",
+                "coordinates": polygon.coordinates,
+            }
+        )
+
+        return self._repo.update_profile(
+            provider.id,
+            company_name=data.company_name.strip(),
+            responsible_name=data.responsible_name.strip(),
+            responsible_phone=data.responsible_phone.strip(),
+            whatsapp_phone=data.whatsapp_phone.strip(),
+            logo_path=logo_path,
+            zone_name=data.service_zone_name.strip() or "Cobertura principal",
+            zone_geojson=geojson,
+            center_lat=data.center_lat,
+            center_lng=data.center_lng,
+        )
 
     def submit_onboarding(
         self, user_id: uuid.UUID, data: DeliveryProviderOnboardingSubmit
