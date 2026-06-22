@@ -1,0 +1,73 @@
+import { createDefaultOnboardingData } from './defaults';
+import type { OnboardingData, OnboardingProgress, OnboardingStepId, PersistedOnboardingState } from './types';
+
+const STORAGE_PREFIX = 'delivery-dashboard:onboarding:';
+
+function storageKey(userId: string): string {
+  return `${STORAGE_PREFIX}${userId}`;
+}
+
+export function loadOnboardingState(userId: string): PersistedOnboardingState | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = localStorage.getItem(storageKey(userId));
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as PersistedOnboardingState;
+    if (parsed.version !== 1 || parsed.userId !== userId) return null;
+
+    return {
+      ...parsed,
+      data: {
+        ...createDefaultOnboardingData(),
+        ...parsed.data,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveOnboardingState(
+  userId: string,
+  data: OnboardingData,
+  progress: OnboardingProgress,
+): void {
+  if (typeof window === 'undefined') return;
+
+  const payload: PersistedOnboardingState = {
+    version: 1,
+    userId,
+    data,
+    progress,
+  };
+
+  try {
+    localStorage.setItem(storageKey(userId), JSON.stringify(payload));
+  } catch (error) {
+    console.warn('[onboarding] No se pudo guardar en localStorage', error);
+  }
+}
+
+export function clearOnboardingState(userId: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(storageKey(userId));
+}
+
+export const ONBOARDING_STEP_ORDER: OnboardingStepId[] = [
+  'companyName',
+  'responsibleName',
+  'responsiblePhone',
+  'whatsapp',
+  'serviceZone',
+  'logo',
+];
+
+export function getVisibleSteps(): OnboardingStepId[] {
+  return ONBOARDING_STEP_ORDER;
+}
+
+export function stepIndex(steps: OnboardingStepId[], stepId: OnboardingStepId): number {
+  return steps.indexOf(stepId);
+}
