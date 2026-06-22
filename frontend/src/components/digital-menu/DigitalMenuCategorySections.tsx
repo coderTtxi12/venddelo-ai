@@ -12,13 +12,17 @@ import {
   productsForLimitedTimeCategory,
 } from '@/lib/digital-menu/specialCategories';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
+import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 
 type DigitalMenuCategorySectionsProps = {
   displayCategories: Category[];
   products: Product[];
   productDiscounts: Map<string, MenuProductDiscountInfo>;
+  productTimeLimitedPromotions: Map<string, Promotion>;
   promotionShortcuts: Promotion[];
+  promotionTimezone: string;
+  countdownContext: PromotionCountdownContext;
   sectionRefs: MutableRefObject<Record<string, HTMLElement | null>>;
   isTabletLayout: boolean;
   promotionBannerViewport: 'mobile' | 'tablet' | 'desktop';
@@ -31,7 +35,10 @@ export function DigitalMenuCategorySections({
   displayCategories,
   products,
   productDiscounts,
+  productTimeLimitedPromotions,
   promotionShortcuts,
+  promotionTimezone,
+  countdownContext,
   sectionRefs,
   isTabletLayout,
   promotionBannerViewport,
@@ -49,6 +56,8 @@ export function DigitalMenuCategorySections({
               key={cat.id}
               promotions={promotionShortcuts}
               viewport={promotionBannerViewport}
+              timezone={promotionTimezone}
+              countdownContext={countdownContext}
               onSelect={onPromotionSelect}
               title={cat.name}
               sectionId={`menu-section-${cat.id}`}
@@ -79,6 +88,9 @@ export function DigitalMenuCategorySections({
                 layout={isTabletLayout ? 'tablet' : 'horizontal'}
                 products={limitedProducts}
                 productDiscounts={productDiscounts}
+                productTimeLimitedPromotions={productTimeLimitedPromotions}
+                promotionTimezone={promotionTimezone}
+                countdownContext={countdownContext}
                 onProductClick={onProductClick}
               />
             </section>
@@ -105,6 +117,9 @@ export function DigitalMenuCategorySections({
               layout={isTabletLayout ? 'tablet' : layout}
               products={catProducts}
               productDiscounts={productDiscounts}
+              productTimeLimitedPromotions={productTimeLimitedPromotions}
+              promotionTimezone={promotionTimezone}
+              countdownContext={countdownContext}
               onProductClick={onProductClick}
             />
           </section>
