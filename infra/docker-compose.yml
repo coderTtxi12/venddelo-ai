@@ -1,6 +1,7 @@
 services:
   postgres:
-    image: postgres:16
+    # imresamu/postgis: ARM64 + amd64 (postgis/postgis has no Apple Silicon manifest)
+    image: imresamu/postgis:16-3.5
     container_name: vendelo_postgres
     environment:
       POSTGRES_USER: vendelo
@@ -10,6 +11,7 @@ services:
       - "5434:5432"
     volumes:
       - vendelo_pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U vendelo -d vendelo"]
       interval: 5s
