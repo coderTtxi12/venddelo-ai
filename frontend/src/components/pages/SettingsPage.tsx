@@ -1,6 +1,8 @@
 'use client';
 
+import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
 import { DashboardRestaurantHours } from '@/components/settings/DashboardRestaurantHours';
 import { RestaurantLocationMapPicker } from '@/components/settings/RestaurantLocationMapPicker';
 import type { RestaurantLocationMapPickerHandle } from '@/components/settings/RestaurantLocationMapPicker';
@@ -38,6 +40,8 @@ import {
   RESTAURANT_SERVICE_ORDER,
   type RestaurantServiceType,
 } from '@/lib/restaurantServices';
+import { DEFAULT_COUNTRY_ISO } from '@/lib/phone/countryDialCodes';
+import { buildPhoneE164, parseE164Phone } from '@/lib/phone/parseE164';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
 import { resolveSupplierIdByEmail } from '@/services/db';
@@ -134,6 +138,9 @@ export default function SettingsPage() {
   );
   const [schedules, setSchedules] = useState<RestaurantSchedule[]>([]);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [whatsappCountryIso, setWhatsappCountryIso] = useState(DEFAULT_COUNTRY_ISO);
+  const [whatsappLocal, setWhatsappLocal] = useState('');
+  const [whatsappTouched, setWhatsappTouched] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -184,6 +191,10 @@ export default function SettingsPage() {
           longitude: restaurantData.longitude,
           placeId: restaurantData.place_id,
         });
+        const whatsapp = parseE164Phone(restaurantData.whatsapp_phone);
+        setWhatsappCountryIso(whatsapp.countryIso);
+        setWhatsappLocal(whatsapp.localNumber);
+        setWhatsappTouched(false);
         setTakeoutEnabled(restaurantData.takeout_enabled);
         setDeliveryEnabled(restaurantData.delivery_enabled);
         setPaymentMatrix(
@@ -265,6 +276,16 @@ export default function SettingsPage() {
     return true;
   }, [subdomain, subdomainChecking, subdomainError, subdomainVerified]);
 
+  const whatsappError = useMemo(() => {
+    const digits = whatsappLocal.replace(/\D/g, '');
+    if (digits.length < 8) {
+      return 'Ingresa el WhatsApp de tu negocio (mínimo 8 dígitos).';
+    }
+    return null;
+  }, [whatsappLocal]);
+
+  const canSaveWhatsapp = whatsappError === null;
+
   const handlePlaceSelected = useCallback(
     (place: { address: string; latitude: number; longitude: number; placeId: string | null }) => {
       setLocation({
@@ -321,7 +342,7 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
-    if (!accessToken || !restaurantId || !canSaveSubdomain) return;
+    if (!accessToken || !restaurantId || !canSaveSubdomain || !canSaveWhatsapp) return;
 
     setSaving(true);
     setSaveError(null);
@@ -343,6 +364,7 @@ export default function SettingsPage() {
         place_id: location.placeId,
         takeout_enabled: takeoutEnabled,
         delivery_enabled: deliveryEnabled,
+        whatsapp_phone: buildPhoneE164(whatsappCountryIso, whatsappLocal),
       });
 
       try {
@@ -370,6 +392,10 @@ export default function SettingsPage() {
         longitude: updatedRestaurant.longitude,
         placeId: updatedRestaurant.place_id,
       });
+      const savedWhatsapp = parseE164Phone(updatedRestaurant.whatsapp_phone);
+      setWhatsappCountryIso(savedWhatsapp.countryIso);
+      setWhatsappLocal(savedWhatsapp.localNumber);
+      setWhatsappTouched(false);
       setSaveOk(true);
     } catch (error) {
       console.error(error);
@@ -413,13 +439,14 @@ export default function SettingsPage() {
         <div>
           <h1 className={styles.title}>Configuración del restaurante</h1>
           <p className={styles.subtitle}>
-            Administra identidad, ubicación, tipos de entrega, métodos de pago y horarios de servicio.
+            Administra identidad, WhatsApp de pedidos, ubicación, tipos de entrega, métodos de pago y
+            horarios de servicio.
           </p>
         </div>
         <button
           type="button"
           className={styles.primaryBtn}
-          disabled={saving || !name.trim() || !canSaveSubdomain}
+          disabled={saving || !name.trim() || !canSaveSubdomain || !canSaveWhatsapp}
           onClick={() => void handleSave()}
         >
           {saving ? 'Guardando…' : saveOk ? 'Cambios guardados' : 'Guardar configuración'}
@@ -539,12 +566,13 @@ export default function SettingsPage() {
             </p>
             {subdomainPreviewUrl ? (
               <a
-                className={styles.subdomainPreviewLink}
+                className={styles.subdomainPreviewBtn}
                 href={subdomainPreviewUrl}
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 Abrir menú público
+                <OpenInNewOutlinedIcon className={styles.subdomainPreviewBtnIcon} aria-hidden />
               </a>
             ) : null}
           </div>
@@ -560,6 +588,40 @@ export default function SettingsPage() {
               placeholder="Breve descripción para tus clientes (opcional)"
             />
           </label>
+        </div>
+      </section>
+
+      <section className={styles.panel} aria-labelledby="settings-whatsapp">
+        <h2 id="settings-whatsapp" className={styles.panelTitle}>
+          WhatsApp de pedidos
+        </h2>
+        <p className={styles.panelHint}>
+          Tus pedidos llegarán a este número de WhatsApp. Asegúrate de que esté activo y puedas
+          recibir mensajes.
+        </p>
+
+        <div className={`${styles.label} ${styles.phoneField}`}>
+          <span id="settings-whatsapp-label">Número de WhatsApp</span>
+          <PhoneInputWithCountry
+            countryIso={whatsappCountryIso}
+            localNumber={whatsappLocal}
+            hint="Número donde recibirás pedidos por WhatsApp."
+            onCountryChange={(iso) => {
+              setWhatsappCountryIso(iso);
+              setWhatsappTouched(true);
+              setSaveOk(false);
+            }}
+            onLocalNumberChange={(value) => {
+              setWhatsappLocal(value);
+              setWhatsappTouched(true);
+              setSaveOk(false);
+            }}
+          />
+          {whatsappTouched && whatsappError ? (
+            <p className={styles.fieldError} role="alert">
+              {whatsappError}
+            </p>
+          ) : null}
         </div>
       </section>
 
