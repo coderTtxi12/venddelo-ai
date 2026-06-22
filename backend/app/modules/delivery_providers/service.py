@@ -7,12 +7,17 @@ import uuid
 
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.core.storage import StoragePort
+from app.modules.delivery_providers.availability import resolve_service_status
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryProviderDTO,
     DeliveryProviderMeResponse,
     DeliveryProviderOnboardingSubmit,
     DeliveryProviderProfileUpdate,
+    DeliveryProviderScheduleCreate,
+    DeliveryProviderScheduleDTO,
+    DeliveryProviderServiceStatusDTO,
+    DeliveryProviderServiceStatusUpdate,
 )
 
 
@@ -139,3 +144,79 @@ class DeliveryProviderService:
         path = f"delivery-providers/onboarding/{uuid.uuid4()}/{safe_name}.webp"
         stored = self._storage.upload(path, raw, "image/webp" if ext == "webp" else content_type)
         return stored.path
+
+    def list_schedules(self, user_id: uuid.UUID) -> list[DeliveryProviderScheduleDTO]:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+
+        provider, _member_role = found
+        rows = list(self._repo.list_schedules(provider.id))
+        if not rows:
+            self._repo.seed_default_schedules(provider.id)
+            rows = list(self._repo.list_schedules(provider.id))
+        return rows
+
+    def set_schedules(
+        self, user_id: uuid.UUID, schedules: list[DeliveryProviderScheduleCreate]
+    ) -> None:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+
+        provider, _member_role = found
+        self._validate_schedules(schedules)
+        self._repo.set_schedules(provider.id, schedules)
+
+    def _validate_schedules(self, schedules: list[DeliveryProviderScheduleCreate]) -> None:
+        for entry in schedules:
+            if entry.opens_at >= entry.closes_at:
+                raise ValidationError(
+                    "La hora de cierre debe ser posterior a la de apertura en cada turno"
+                )
+
+    def get_service_status(self, user_id: uuid.UUID) -> DeliveryProviderServiceStatusDTO:
+        provider, schedules = self._provider_schedules_for_user(user_id)
+        return self._build_service_status(provider.id, schedules)
+
+    def update_service_status(
+        self, user_id: uuid.UUID, data: DeliveryProviderServiceStatusUpdate
+    ) -> DeliveryProviderServiceStatusDTO:
+        provider, schedules = self._provider_schedules_for_user(user_id)
+        self._repo.set_service_manually_enabled(provider.id, data.manually_enabled)
+        return self._build_service_status(provider.id, schedules)
+
+    def _provider_schedules_for_user(
+        self, user_id: uuid.UUID
+    ) -> tuple[DeliveryProviderDTO, list[DeliveryProviderScheduleDTO]]:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+
+        provider, _member_role = found
+        schedules = list(self._repo.list_schedules(provider.id))
+        if not schedules:
+            self._repo.seed_default_schedules(provider.id)
+            schedules = list(self._repo.list_schedules(provider.id))
+        return provider, schedules
+
+    def _build_service_status(
+        self,
+        provider_id: uuid.UUID,
+        schedules: list[DeliveryProviderScheduleDTO],
+    ) -> DeliveryProviderServiceStatusDTO:
+        manually_enabled = self._repo.get_service_manually_enabled(provider_id)
+        timezone = self._repo.get_provider_timezone(provider_id)
+        resolved = resolve_service_status(
+            manually_enabled=manually_enabled,
+            schedules=schedules,
+            timezone=timezone,
+        )
+        return DeliveryProviderServiceStatusDTO(
+            manually_enabled=resolved.manually_enabled,
+            within_schedule=resolved.within_schedule,
+            service_active=resolved.service_active,
+            status_reason=resolved.status_reason,
+            next_change_at=resolved.next_change_at,
+            timezone=resolved.timezone,
+        )
