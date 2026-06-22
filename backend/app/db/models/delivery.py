@@ -39,6 +39,9 @@ class DeliveryProvider(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         String(64), nullable=False, server_default="America/Mexico_City"
     )
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="draft")
+    service_manually_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     members: Mapped[list["DeliveryProviderMember"]] = relationship(
@@ -137,6 +140,7 @@ class DeliveryProviderSchedule(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("delivery_providers.id", ondelete="CASCADE"),
         nullable=False,
     )
+    schedule_kind: Mapped[str] = mapped_column(String, nullable=False, server_default="regular")
     day_of_week: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     opens_at: Mapped[time] = mapped_column(Time, nullable=False)
     closes_at: Mapped[time] = mapped_column(Time, nullable=False)
@@ -144,8 +148,17 @@ class DeliveryProviderSchedule(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     delivery_provider: Mapped["DeliveryProvider"] = relationship(back_populates="schedules")
 
     __table_args__ = (
+        CheckConstraint(
+            "schedule_kind IN ('regular', 'night')",
+            name="schedule_kind_allowed",
+        ),
         CheckConstraint("day_of_week BETWEEN 0 AND 6", name="day_of_week_range"),
-        Index("ix_delivery_provider_schedules_lookup", "delivery_provider_id", "day_of_week"),
+        Index(
+            "ix_delivery_provider_schedules_lookup",
+            "delivery_provider_id",
+            "schedule_kind",
+            "day_of_week",
+        ),
     )
 
 
