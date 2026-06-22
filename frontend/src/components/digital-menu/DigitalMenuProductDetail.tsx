@@ -9,10 +9,12 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
-import type { OptionGroup, Product } from '@/lib/api/types';
+import type { OptionGroup, Product, Promotion } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
 import { attachDragOverlay } from '@/lib/dragOverlay';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
+import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
+import { PromotionCountdown } from '@/components/digital-menu/PromotionCountdown';
 import {
   bundleComplementExcludedBadge,
   bundleComplementExcludedTitle,
@@ -58,6 +60,9 @@ type AddToCartPayload = {
 type DigitalMenuProductDetailProps = {
   product: Product;
   discount?: MenuProductDiscountInfo | null;
+  timeLimitedPromotion?: Promotion | null;
+  promotionTimezone?: string;
+  countdownContext?: PromotionCountdownContext;
   bundleComplementRules?: BundleComplementRules | null;
   heroCollapsed: boolean;
   onHeroCollapsedChange: (collapsed: boolean) => void;
@@ -129,6 +134,9 @@ function formatCollapsedGroupSummary(
 export function DigitalMenuProductDetail({
   product,
   discount,
+  timeLimitedPromotion = null,
+  promotionTimezone,
+  countdownContext,
   bundleComplementRules = null,
   heroCollapsed,
   onHeroCollapsedChange,
@@ -327,6 +335,14 @@ export function DigitalMenuProductDetail({
                 <LocalOfferOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
                 <span>{discount.offerSlogan}</span>
               </p>
+            ) : null}
+            {timeLimitedPromotion && promotionTimezone ? (
+              <PromotionCountdown
+                promotion={timeLimitedPromotion}
+                timezone={promotionTimezone}
+                countdownContext={countdownContext}
+                variant="detail"
+              />
             ) : null}
           </div>
 
