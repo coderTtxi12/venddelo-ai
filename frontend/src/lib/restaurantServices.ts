@@ -3,7 +3,7 @@ import type { RestaurantPaymentMethod, RestaurantSchedule } from '@/lib/api/type
 export type RestaurantServiceType = 'takeout' | 'delivery';
 
 export const RESTAURANT_SERVICE_LABELS: Record<RestaurantServiceType, string> = {
-  takeout: 'Recoger en tienda',
+  takeout: 'Recoger en local',
   delivery: 'Entrega a domicilio',
 };
 
@@ -14,6 +14,9 @@ export const DASHBOARD_SCHEDULE_SERVICE_TYPES: RestaurantServiceType[] = ['takeo
 
 /** Horarios informativos en el panel (gestionados por el proveedor de entrega). */
 export const DASHBOARD_INFO_SCHEDULE_SERVICE_TYPES: RestaurantServiceType[] = ['delivery'];
+
+/** Horarios visibles en el menú digital público (solo atención en restaurante). */
+export const PUBLIC_MENU_SCHEDULE_SERVICE_TYPES: RestaurantServiceType[] = ['takeout'];
 
 function isServiceType(value: string): value is RestaurantServiceType {
   return value === 'takeout' || value === 'delivery';
