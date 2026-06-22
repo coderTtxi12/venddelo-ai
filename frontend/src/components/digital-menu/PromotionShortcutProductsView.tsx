@@ -6,7 +6,9 @@ import type { Product, Promotion } from '@/lib/api/types';
 import { ProductList } from '@/components/digital-menu/menuProductUi';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
 import { productsParticipatingInPromotion } from '@/lib/promotions/promotionShortcuts';
+import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
+import { PromotionCountdown } from '@/components/digital-menu/PromotionCountdown';
 import { DIGITAL_MENU_PINNED_BAR_HEIGHT_PX } from '@/lib/digital-menu/layout';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import detailStyles from './DigitalMenuProductDetail.module.css';
@@ -16,6 +18,9 @@ type PromotionShortcutProductsViewProps = {
   promotion: Promotion;
   products: Product[];
   productDiscounts: Map<string, MenuProductDiscountInfo>;
+  productTimeLimitedPromotions?: Map<string, Promotion>;
+  timezone: string;
+  countdownContext?: PromotionCountdownContext;
   heroCollapsed: boolean;
   onHeroCollapsedChange: (collapsed: boolean) => void;
   scrollRootRef: RefObject<HTMLDivElement | null>;
@@ -29,6 +34,9 @@ export function PromotionShortcutProductsView({
   promotion,
   products,
   productDiscounts,
+  productTimeLimitedPromotions,
+  timezone,
+  countdownContext,
   heroCollapsed,
   onHeroCollapsedChange,
   scrollRootRef,
@@ -103,6 +111,13 @@ export function PromotionShortcutProductsView({
             : `${participating.length} platillos participan`}
         </p>
 
+        <PromotionCountdown
+          promotion={promotion}
+          timezone={timezone}
+          countdownContext={countdownContext}
+          variant="detail"
+        />
+
         {participating.length === 0 ? (
           <p className={styles.empty}>No hay platillos disponibles en esta promoción.</p>
         ) : (
@@ -113,6 +128,9 @@ export function PromotionShortcutProductsView({
                 layout={isTabletLayout ? 'tablet' : 'vertical'}
                 products={participating}
                 productDiscounts={productDiscounts}
+                productTimeLimitedPromotions={productTimeLimitedPromotions}
+                promotionTimezone={timezone}
+                countdownContext={countdownContext}
                 onProductClick={onProductClick}
               />
             </div>
