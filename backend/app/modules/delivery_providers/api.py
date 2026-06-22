@@ -8,6 +8,7 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderDTO,
     DeliveryProviderMeResponse,
     DeliveryProviderOnboardingSubmit,
+    DeliveryProviderProfileUpdate,
 )
 from app.modules.delivery_providers.service import DeliveryProviderService
 from app.modules.users.schemas import UserDTO
@@ -41,3 +42,12 @@ def submit_delivery_provider_onboarding(
     service: DeliveryProviderService = Depends(_service),
 ) -> DeliveryProviderDTO:
     return service.submit_onboarding(user.id, data)
+
+
+@router.patch("/me", response_model=DeliveryProviderDTO)
+def update_my_delivery_provider(
+    data: DeliveryProviderProfileUpdate,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> DeliveryProviderDTO:
+    return service.update_profile(user.id, data)
