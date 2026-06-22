@@ -10,6 +10,7 @@ import {
   productsForCategory,
 } from '@/components/digital-menu/menuProductUi';
 import { PromotionShortcutBanners } from '@/components/digital-menu/PromotionShortcutBanners';
+import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import { RestaurantHoursDisplay } from '@/components/digital-menu/RestaurantHoursDisplay';
 import { RestaurantLocationSection } from '@/components/digital-menu/RestaurantLocationSection';
@@ -31,7 +32,10 @@ type PublicDesktopMenuLayoutProps = {
   schedules: RestaurantSchedule[];
   enabledServices: RestaurantServiceType[];
   productDiscounts: Map<string, MenuProductDiscountInfo>;
+  productTimeLimitedPromotions: Map<string, Promotion>;
   promotionShortcuts: Promotion[];
+  promotionTimezone: string;
+  countdownContext: PromotionCountdownContext;
   logoUrl: string | null;
   coverUrl: string | null;
   activeCategoryId: string | null;
@@ -53,7 +57,10 @@ export function PublicDesktopMenuLayout({
   schedules,
   enabledServices,
   productDiscounts,
+  productTimeLimitedPromotions,
   promotionShortcuts,
+  promotionTimezone,
+  countdownContext,
   logoUrl,
   coverUrl,
   activeCategoryId,
@@ -162,6 +169,8 @@ export function PublicDesktopMenuLayout({
                     key={cat.id}
                     promotions={promotionShortcuts}
                     viewport="desktop"
+                    timezone={promotionTimezone}
+                    countdownContext={countdownContext}
                     onSelect={onPromotionSelect}
                     title={cat.name}
                     sectionId={`menu-section-${cat.id}`}
@@ -213,6 +222,9 @@ export function PublicDesktopMenuLayout({
                                 <ProductPrice
                                   product={product}
                                   discount={productDiscounts.get(product.id)}
+                                  timeLimitedPromotion={productTimeLimitedPromotions.get(product.id)}
+                                  promotionTimezone={promotionTimezone}
+                                  countdownContext={countdownContext}
                                 />
                               </div>
                             </div>
@@ -259,6 +271,9 @@ export function PublicDesktopMenuLayout({
                               <ProductPrice
                                 product={product}
                                 discount={productDiscounts.get(product.id)}
+                                timeLimitedPromotion={productTimeLimitedPromotions.get(product.id)}
+                                promotionTimezone={promotionTimezone}
+                                countdownContext={countdownContext}
                               />
                             </div>
                           </div>
