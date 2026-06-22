@@ -9,6 +9,7 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import type { OptionGroup, Product, Promotion } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
 import { attachDragOverlay } from '@/lib/dragOverlay';
@@ -31,10 +32,11 @@ import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import { PRODUCT_UNAVAILABLE_LABEL } from '@/components/digital-menu/menuProductUi';
 import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
 import {
-  canAddProductToCart,
   computeLineTotal,
   createEmptySelections,
   getGroupSelection,
+  getIncompleteRequiredGroups,
+  incompleteRequiredGroupsMessage,
   isGroupSelectionComplete,
   isItemSelected,
   toggleOptionSelection,
@@ -150,7 +152,9 @@ export function DigitalMenuProductDetail({
   onReorderItems,
 }: DigitalMenuProductDetailProps) {
   const heroSentinelRef = useRef<HTMLDivElement>(null);
+  const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const addFeedbackTimerRef = useRef<number | null>(null);
+  const validationScrollTimerRef = useRef<number | null>(null);
   const [dragGroupId, setDragGroupId] = useState<string | null>(null);
   const [dropGroupId, setDropGroupId] = useState<string | null>(null);
   const [dragItemId, setDragItemId] = useState<string | null>(null);
@@ -160,6 +164,8 @@ export function DigitalMenuProductDetail({
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [justAdded, setJustAdded] = useState(false);
   const [notes, setNotes] = useState('');
+  const [selectionValidationAttempted, setSelectionValidationAttempted] = useState(false);
+  const [addBtnAttention, setAddBtnAttention] = useState(false);
 
   const imageUrl = storagePublicUrl(product.image_path);
   const groups = activeOptionGroups(product);
@@ -170,10 +176,23 @@ export function DigitalMenuProductDetail({
       ? discount.finalPrice
       : product.price_cents / 100;
 
-  const canAdd = useMemo(
-    () => isAvailable && canAddProductToCart(groups, selections),
-    [isAvailable, groups, selections],
+  const incompleteRequiredGroups = useMemo(
+    () => getIncompleteRequiredGroups(groups, selections),
+    [groups, selections],
   );
+  const canAdd = useMemo(
+    () => isAvailable && incompleteRequiredGroups.length === 0,
+    [isAvailable, incompleteRequiredGroups],
+  );
+  const selectionValidationMessage = useMemo(
+    () => incompleteRequiredGroupsMessage(incompleteRequiredGroups),
+    [incompleteRequiredGroups],
+  );
+  const showSelectionValidation =
+    selectionValidationAttempted && incompleteRequiredGroups.length > 0;
+  const highlightedGroupIds = showSelectionValidation
+    ? incompleteRequiredGroups.map((group) => group.id)
+    : [];
   const lineTotal = useMemo(
     () => computeLineTotal(unitPrice, groups, selections, quantity),
     [unitPrice, groups, selections, quantity],
@@ -184,9 +203,15 @@ export function DigitalMenuProductDetail({
     setSelections(createEmptySelections());
     setExpandedGroups({});
     setNotes('');
+    setSelectionValidationAttempted(false);
+    setAddBtnAttention(false);
     if (addFeedbackTimerRef.current != null) {
       window.clearTimeout(addFeedbackTimerRef.current);
       addFeedbackTimerRef.current = null;
+    }
+    if (validationScrollTimerRef.current != null) {
+      window.clearTimeout(validationScrollTimerRef.current);
+      validationScrollTimerRef.current = null;
     }
   }, [product.id]);
 
@@ -194,6 +219,9 @@ export function DigitalMenuProductDetail({
     () => () => {
       if (addFeedbackTimerRef.current != null) {
         window.clearTimeout(addFeedbackTimerRef.current);
+      }
+      if (validationScrollTimerRef.current != null) {
+        window.clearTimeout(validationScrollTimerRef.current);
       }
     },
     [],
@@ -263,8 +291,45 @@ export function DigitalMenuProductDetail({
 
   const isGroupExpanded = (groupId: string) => expandedGroups[groupId] !== false;
 
+  const revealIncompleteSelections = () => {
+    const incomplete = getIncompleteRequiredGroups(groups, selections);
+    if (incomplete.length === 0) return;
+
+    setSelectionValidationAttempted(true);
+    setExpandedGroups((current) => {
+      const next = { ...current };
+      for (const group of incomplete) {
+        next[group.id] = true;
+      }
+      return next;
+    });
+    setAddBtnAttention(true);
+    window.setTimeout(() => setAddBtnAttention(false), 520);
+
+    if (enableHaptics) {
+      triggerHaptic('selection');
+    }
+
+    const firstGroupId = incomplete[0]?.id;
+    if (validationScrollTimerRef.current != null) {
+      window.clearTimeout(validationScrollTimerRef.current);
+    }
+    validationScrollTimerRef.current = window.setTimeout(() => {
+      const target = firstGroupId ? groupRefs.current[firstGroupId] : null;
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      validationScrollTimerRef.current = null;
+    }, 80);
+  };
+
   const handleAddToCart = () => {
-    if (!canAdd || !onAddToCart) return;
+    if (!onAddToCart || !isAvailable) return;
+
+    if (!canAdd) {
+      revealIncompleteSelections();
+      return;
+    }
+
+    setSelectionValidationAttempted(false);
 
     if (enableHaptics) {
       triggerHaptic('success');
@@ -360,16 +425,21 @@ export function DigitalMenuProductDetail({
                   product.currency,
                 );
 
+                const needsAttention = highlightedGroupIds.includes(group.id);
+
                 return (
                   <div
                     key={group.id}
+                    ref={(node) => {
+                      groupRefs.current[group.id] = node;
+                    }}
                     className={`${styles.optionGroupSortable} ${
                       dragGroupId === group.id ? styles.optionGroupDragging : ''
                     } ${
                       dropGroupId === group.id && dragGroupId !== group.id
                         ? styles.optionGroupDropTarget
                         : ''
-                    }`}
+                    } ${needsAttention ? styles.optionGroupNeedsAttention : ''}`}
                     onDragOver={
                       canReorder
                         ? (e) => {
@@ -432,8 +502,9 @@ export function DigitalMenuProductDetail({
                     <section
                       className={`${styles.optionGroupCard} ${
                         isCollapsed ? styles.optionGroupCardCollapsed : ''
-                      }`}
+                      } ${needsAttention ? styles.optionGroupCardNeedsAttention : ''}`}
                       aria-label={group.title}
+                      aria-invalid={needsAttention || undefined}
                     >
                       {isCollapsed ? (
                         <button
@@ -661,6 +732,17 @@ export function DigitalMenuProductDetail({
       <footer
         className={`${styles.detailFooter} ${isTabletLayout ? menuStyles.publicTablet : ''}`}
       >
+        {showSelectionValidation && selectionValidationMessage ? (
+          <div
+            id={`product-add-validation-${product.id}`}
+            className={styles.addValidationBanner}
+            role="alert"
+            aria-live="assertive"
+          >
+            <InfoOutlinedIcon className={styles.addValidationIcon} sx={{ fontSize: 20 }} aria-hidden />
+            <p className={styles.addValidationText}>{selectionValidationMessage}</p>
+          </div>
+        ) : null}
         <div
           className={`${styles.detailFooterInner} ${
             !isAvailable ? styles.detailFooterInnerUnavailable : ''
@@ -696,10 +778,15 @@ export function DigitalMenuProductDetail({
           <button
             type="button"
             className={`${styles.addBtn} ${canAdd && onAddToCart ? styles.addBtnReady : ''} ${
-              justAdded ? styles.addBtnAdded : ''
+              isAvailable && onAddToCart && !canAdd ? styles.addBtnActionable : ''
+            } ${justAdded ? styles.addBtnAdded : ''} ${
+              addBtnAttention ? styles.addBtnAttention : ''
             } ${!isAvailable ? styles.addBtnUnavailable : ''}`}
-            disabled={!canAdd || !onAddToCart}
+            disabled={!isAvailable || !onAddToCart}
             aria-disabled={!canAdd || !onAddToCart}
+            aria-describedby={
+              showSelectionValidation ? `product-add-validation-${product.id}` : undefined
+            }
             onClick={handleAddToCart}
           >
             <span className={styles.addBtnLabel}>
