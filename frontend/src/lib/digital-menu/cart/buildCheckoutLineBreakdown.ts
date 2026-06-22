@@ -3,6 +3,7 @@ import { getGroupSelection } from '@/components/digital-menu/productOptionSelect
 import type { CartQuoteLine } from '@/lib/api/public';
 import type { Product, Promotion } from '@/lib/api/types';
 import { isPromotionEffective } from '@/lib/promotions/effective';
+import { PROMO_WARNING_COMPLEMENT_EXCLUDED } from '@/lib/promotions/bundlePromoEligibility';
 import {
   isCatalogProductDiscountPromotion,
   PRODUCT_CATALOG_DISCOUNT_PREFIX,
@@ -117,8 +118,12 @@ function catalogDiscountPerUnitCents(product: Product, promotion: Promotion): nu
   return 0;
 }
 
-function discountedBaseCents(product: Product, promotion: Promotion): number {
-  return Math.max(0, product.price_cents - catalogDiscountPerUnitCents(product, promotion));
+function isBundleAppliedOnLine(promotion: Promotion, quoteLine: CartQuoteLine): boolean {
+  return (
+    promotion.id === quoteLine.applied_promotion_id &&
+    quoteLine.discount_cents > 0 &&
+    quoteLine.badge != null
+  );
 }
 
 function bundleNotAppliedReason(promotion: Promotion, quantity: number): string | null {
@@ -129,24 +134,29 @@ function bundleNotAppliedReason(promotion: Promotion, quantity: number): string 
   return null;
 }
 
-function computeBundleDiscountCents(
-  quantity: number,
-  discountedBaseCents: number,
-  optionsCentsPerUnit: number,
+function bundleNotAppliedReasonForLine(
   promotion: Promotion,
+  quantity: number,
+  quoteLine: CartQuoteLine,
+): string | null {
+  if (
+    lineHasComplementExcludedWarning(quoteLine) &&
+    (promotion.option_item_ids?.length ?? 0) > 0
+  ) {
+    return 'Complemento fuera de la promoción';
+  }
+  return bundleNotAppliedReason(promotion, quantity);
+}
+
+function lineHasComplementExcludedWarning(quoteLine: CartQuoteLine): boolean {
+  return quoteLine.promo_warnings?.includes(PROMO_WARNING_COMPLEMENT_EXCLUDED) ?? false;
+}
+
+function quoteLineDiscountCents(
+  subtotalBeforeDiscountCents: number,
+  quoteLine: CartQuoteLine,
 ): number {
-  const getQ = promotion.bundle?.get_quantity ?? 2;
-  const payQ = promotion.bundle?.pay_quantity ?? 1;
-  if (quantity < getQ) return 0;
-
-  const unitFull = discountedBaseCents + optionsCentsPerUnit;
-  const bundleFullSubtotal = unitFull * quantity;
-  const freeUnits = Math.floor(quantity / getQ) * (getQ - payQ);
-  const paidUnits = quantity - freeUnits;
-  const bundleLineTotal =
-    paidUnits * (discountedBaseCents + optionsCentsPerUnit) + freeUnits * optionsCentsPerUnit;
-
-  return Math.max(0, bundleFullSubtotal - bundleLineTotal);
+  return Math.max(0, subtotalBeforeDiscountCents - quoteLine.line_total_cents);
 }
 
 function computePercentOrAmountDiscountCents(
@@ -190,9 +200,6 @@ function allocateStackedDiscounts(
   );
 
   const catalogPerUnit = catalogPromo ? catalogDiscountPerUnitCents(product, catalogPromo) : 0;
-  const bundleBase = catalogPromo
-    ? discountedBaseCents(product, catalogPromo)
-    : product.price_cents;
 
   const bundlePromos = promotions.filter(
     (promotion) =>
@@ -201,34 +208,18 @@ function allocateStackedDiscounts(
       promotionAppliesToProduct(promotion, product),
   );
 
-  const appliedBundle =
-    bundlePromos.find((promotion) => promotion.id === quoteLine.applied_promotion_id) ??
-    bundlePromos.find((promotion) => {
-      const badge = bundleShortBadge(promotion);
-      return badge != null && quoteLine.badge != null && badge === quoteLine.badge;
-    }) ??
-    bundlePromos.find((promotion) => {
-      const discount = computeBundleDiscountCents(
-        quantity,
-        bundleBase,
-        optionsCentsPerUnit,
-        promotion,
-      );
-      return discount > 0 && quoteLine.discount_cents > 0;
-    });
+  const appliedBundle = bundlePromos.find(
+    (promotion) => promotion.id === quoteLine.applied_promotion_id,
+  );
 
   let catalogCents = catalogPerUnit * quantity;
   let bundleCents = 0;
 
   if (appliedBundle) {
-    bundleCents = computeBundleDiscountCents(
-      quantity,
-      bundleBase,
-      optionsCentsPerUnit,
-      appliedBundle,
-    );
+    bundleCents = actualTotalDiscount;
     if (bundleCents > 0) {
       bundleByPromoId.set(appliedBundle.id, bundleCents);
+      catalogCents = 0;
     }
   }
 
@@ -287,6 +278,9 @@ function buildDiscountDetails(
   );
 
   const details: CheckoutDiscountDetail[] = [];
+  const bundleAppliedOnLine = promotions.some(
+    (promotion) => isBundlePromo(promotion) && isBundleAppliedOnLine(promotion, quoteLine),
+  );
 
   for (const promotion of promotions) {
     if (!isRelevantLinePromo(promotion)) continue;
@@ -294,6 +288,7 @@ function buildDiscountDetails(
     if (!promotionAppliesToProduct(promotion, product)) continue;
 
     if (isCatalogProductDiscountPromotion(promotion, product.id)) {
+      if (bundleAppliedOnLine) continue;
       const discountCents = allocation.catalogCents;
       details.push({
         promotionId: promotion.id,
@@ -307,14 +302,20 @@ function buildDiscountDetails(
     }
 
     if (isBundlePromo(promotion)) {
-      const discountCents = allocation.bundleByPromoId.get(promotion.id) ?? 0;
+      const isAppliedOnLine = isBundleAppliedOnLine(promotion, quoteLine);
+      const lineDiscountCents = isAppliedOnLine
+        ? quoteLineDiscountCents(subtotalBeforeDiscountCents, quoteLine)
+        : 0;
+
       details.push({
         promotionId: promotion.id,
         label: promoDisplayLabel(promotion),
         badge: bundleShortBadge(promotion),
-        discountCents,
-        applied: discountCents > 0,
-        notAppliedReason: discountCents > 0 ? null : bundleNotAppliedReason(promotion, quantity),
+        discountCents: lineDiscountCents,
+        applied: isAppliedOnLine,
+        notAppliedReason: isAppliedOnLine
+          ? null
+          : bundleNotAppliedReasonForLine(promotion, quantity, quoteLine),
       });
       continue;
     }
@@ -469,8 +470,12 @@ export function buildCheckoutLineBreakdowns(
       subtotalBeforeDiscountCents,
       discountCents,
       lineTotalCents: quoteLine.line_total_cents,
-      promoBadge: quoteLine.badge,
-      promoLabel: quoteLine.badge ?? promotionDisplayName(appliedPromo),
+      promoBadge:
+        quoteLine.discount_cents > 0 && quoteLine.badge ? quoteLine.badge : null,
+      promoLabel:
+        quoteLine.discount_cents > 0 && quoteLine.badge
+          ? quoteLine.badge
+          : promotionDisplayName(appliedPromo),
       discountDetails,
       promoWarnings: quoteLine.promo_warnings ?? [],
     };
