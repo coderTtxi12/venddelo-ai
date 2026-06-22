@@ -1,0 +1,119 @@
+.countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.countdownBanner {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  z-index: 2;
+  padding: 0.35rem 0.55rem;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+
+.countdownDetail {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--dm-price, #ca8a04) 35%, var(--dm-border, #e2e8f0));
+  background: color-mix(in srgb, var(--dm-price, #ca8a04) 10%, var(--dm-surface, #fff));
+  color: var(--dm-text, #111827);
+}
+
+.countdownIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--dm-price, #ca8a04);
+}
+
+.countdownBanner .countdownIcon {
+  color: #fcd34d;
+}
+
+.countdownCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.countdownLabel {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dm-text-secondary, #64748b);
+}
+
+.countdownBanner .countdownLabel {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.countdownDigits {
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  color: var(--dm-price, #ca8a04);
+}
+
+.countdownBanner .countdownDigits {
+  font-size: 0.78rem;
+  color: #fde68a;
+}
+
+.countdownDetail .countdownDigits {
+  font-size: 1.05rem;
+}
+
+.countdownCompact {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dm-price, #ca8a04) 14%, var(--dm-surface, #fff));
+  border: 1px solid color-mix(in srgb, var(--dm-price, #ca8a04) 30%, var(--dm-border, #e2e8f0));
+  gap: 0.2rem;
+}
+
+.countdownCompact .countdownCopy {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.countdownCompact .countdownDigits {
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .countdownUrgent .countdownDigits {
+    animation: promoCountdownPulse 1.8s ease-in-out infinite;
+  }
+}
+
+@keyframes promoCountdownPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .countdownUrgent .countdownDigits {
+    animation: none;
+  }
+}
