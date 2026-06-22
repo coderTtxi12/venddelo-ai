@@ -2,18 +2,22 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
+import { DeliveryProviderHoursEditor } from '@/components/settings/DeliveryProviderHoursEditor';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
 import { ServiceZoneMapDrawer } from '@/components/onboarding/ServiceZoneMapDrawer';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
 import { useAuth } from '@/hooks/useAuth';
 import {
   getMyDeliveryProvider,
+  listMyDeliveryProviderSchedules,
+  setMyDeliveryProviderSchedules,
   updateMyDeliveryProvider,
 } from '@/lib/api/deliveryProviders';
 import { ApiError } from '@/lib/api/types';
 import { prepareImageForUpload } from '@/lib/image/convertToWebp';
 import { createDefaultOnboardingData } from '@/lib/onboarding/defaults';
 import type { OnboardingData } from '@/lib/onboarding/types';
+import type { DeliveryProviderSchedule } from '@/lib/api/types';
 import {
   buildProfileUpdatePayload,
   providerProfileFromApi,
@@ -44,6 +48,11 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [slug, setSlug] = useState<string | null>(null);
+  const [schedules, setSchedules] = useState<DeliveryProviderSchedule[]>([]);
+  const [schedulesLoading, setSchedulesLoading] = useState(true);
+  const [schedulesSaving, setSchedulesSaving] = useState(false);
+  const [scheduleSuccess, setScheduleSuccess] = useState<string | null>(null);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
@@ -79,6 +88,33 @@ export default function SettingsPage() {
     }
 
     void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSchedules() {
+      if (!accessToken) return;
+      setSchedulesLoading(true);
+      setScheduleError(null);
+
+      try {
+        const rows = await listMyDeliveryProviderSchedules(accessToken);
+        if (!cancelled) setSchedules(rows);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) {
+          setScheduleError('No se pudieron cargar los horarios de reparto.');
+        }
+      } finally {
+        if (!cancelled) setSchedulesLoading(false);
+      }
+    }
+
+    void loadSchedules();
     return () => {
       cancelled = true;
     };
@@ -143,6 +179,33 @@ export default function SettingsPage() {
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveSchedules = async (payload: Parameters<typeof setMyDeliveryProviderSchedules>[1]) => {
+    if (!accessToken) {
+      setScheduleError('No hay sesión activa. Inicia sesión de nuevo.');
+      return;
+    }
+
+    setSchedulesSaving(true);
+    setScheduleError(null);
+    setScheduleSuccess(null);
+
+    try {
+      await setMyDeliveryProviderSchedules(accessToken, payload);
+      const updated = await listMyDeliveryProviderSchedules(accessToken);
+      setSchedules(updated);
+      setScheduleSuccess('Horarios guardados correctamente.');
+    } catch (err) {
+      console.error(err);
+      if (err instanceof ApiError) {
+        setScheduleError(err.message);
+      } else {
+        setScheduleError('No se pudieron guardar los horarios. Intenta de nuevo.');
+      }
+    } finally {
+      setSchedulesSaving(false);
     }
   };
 
@@ -338,6 +401,39 @@ export default function SettingsPage() {
                 onPolygonChange={handleServiceZonePolygonChange}
               />
             </div>
+          </section>
+
+          <section className={styles.panel} aria-labelledby="settings-hours">
+            <h2 id="settings-hours" className={styles.panelTitle}>
+              Horarios de reparto
+            </h2>
+            <p className={styles.panelHint}>
+              Configura tu horario diurno y nocturno. Los restaurantes verán cuándo aceptas
+              entregas.
+            </p>
+            {scheduleError ? (
+              <div className={styles.errorBanner} role="alert">
+                {scheduleError}
+              </div>
+            ) : null}
+            {scheduleSuccess ? (
+              <div className={styles.successBanner} role="status">
+                {scheduleSuccess}
+              </div>
+            ) : null}
+            {schedulesLoading ? (
+              <p className={styles.loading} role="status">
+                Cargando horarios…
+              </p>
+            ) : (
+              <div className={styles.hoursWrap}>
+                <DeliveryProviderHoursEditor
+                  schedules={schedules}
+                  saving={schedulesSaving}
+                  onSave={handleSaveSchedules}
+                />
+              </div>
+            )}
           </section>
         </>
       )}
