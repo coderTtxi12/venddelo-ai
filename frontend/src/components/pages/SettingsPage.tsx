@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RestaurantHoursFooter } from '@/components/digital-menu/RestaurantHoursFooter';
+import { DashboardRestaurantHours } from '@/components/settings/DashboardRestaurantHours';
 import { RestaurantLocationMapPicker } from '@/components/settings/RestaurantLocationMapPicker';
 import type { RestaurantLocationMapPickerHandle } from '@/components/settings/RestaurantLocationMapPicker';
 import { RestaurantPlaceAutocomplete } from '@/components/settings/RestaurantPlaceAutocomplete';
@@ -387,13 +387,7 @@ export default function SettingsPage() {
     }
   };
 
-  const enabledServiceTypes = useMemo(
-    () =>
-      RESTAURANT_SERVICE_ORDER.filter((type) =>
-        type === 'takeout' ? takeoutEnabled : deliveryEnabled,
-      ),
-    [takeoutEnabled, deliveryEnabled],
-  );
+  const hasScheduleContent = takeoutEnabled || deliveryEnabled;
 
   const logoUrl = storagePublicUrl(restaurant?.logo_path ?? null);
 
@@ -669,17 +663,19 @@ export default function SettingsPage() {
           Horarios de servicio
         </h2>
         <p className={styles.panelHint}>
-          Configura días y turnos por tipo de entrega. Los cambios de horario se guardan aparte.
+          Configura el horario de recoger en tienda y consulta el de entrega a domicilio. Los
+          cambios de horario se guardan aparte.
         </p>
         <div className={styles.hoursWrap}>
-          {enabledServiceTypes.length === 0 ? (
+          {!hasScheduleContent ? (
             <p className={styles.empty}>
-              Habilita recoger en tienda o entrega a domicilio para configurar horarios.
+              Habilita recoger en tienda o entrega a domicilio para ver los horarios.
             </p>
           ) : (
-            <RestaurantHoursFooter
+            <DashboardRestaurantHours
               schedules={schedules}
-              serviceTypes={enabledServiceTypes}
+              takeoutEnabled={takeoutEnabled}
+              deliveryEnabled={deliveryEnabled}
               onSave={async (payload) => {
                 if (!accessToken || !restaurantId) return;
                 await setRestaurantSchedules(accessToken, restaurantId, payload);
