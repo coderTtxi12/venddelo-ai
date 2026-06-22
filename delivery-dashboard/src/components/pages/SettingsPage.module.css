@@ -432,6 +432,68 @@
   background: var(--color-bg);
 }
 
+.fieldLabel {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.readonlyField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg);
+}
+
+.readonlyLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.readonlyValue {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.mapWrap {
+  margin-top: 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  overflow: hidden;
+  min-height: 360px;
+}
+
+.logoActions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.logoActions .secondaryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.successBanner {
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .errorBanner {
   padding: 0.75rem 0.9rem;
   border-radius: 12px;
