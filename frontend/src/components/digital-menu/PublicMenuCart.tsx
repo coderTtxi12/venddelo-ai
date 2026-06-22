@@ -9,9 +9,12 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { cartItemCount, lineTotalCents } from '@/lib/digital-menu/cart/cartMath';
+import { resolveCartLinePromoDisplay } from '@/lib/digital-menu/cart/cartLinePromoDisplay';
 import { useCheckoutCartQuote } from '@/lib/digital-menu/cart/useCheckoutCartQuote';
 import type { PublicMenuCartLine } from '@/lib/digital-menu/cart/types';
 import type { Product, Promotion } from '@/lib/api/types';
+import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
+import { promoWarningLabel } from '@/lib/promotions/bundlePromoEligibility';
 import { formatMoney } from '@/lib/currency';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
@@ -24,6 +27,7 @@ type PublicMenuCartProps = {
   validProductIds: ReadonlySet<string>;
   products: Product[];
   promotions: Promotion[];
+  productDiscounts: Map<string, MenuProductDiscountInfo>;
   currency: string;
   onBack: () => void;
   onUpdateQuantity: (lineId: string, quantity: number) => void;
@@ -137,6 +141,7 @@ export function PublicMenuCart({
   validProductIds,
   products,
   promotions,
+  productDiscounts,
   currency,
   onBack,
   onUpdateQuantity,
@@ -164,6 +169,11 @@ export function PublicMenuCart({
     quote != null ? (quote.subtotal_before_discount_cents - quote.total_cents) / 100 : 0;
   const itemCount = cartItemCount(lines);
   const canContinue = lines.length > 0 && allLinesValid && !quoteLoading;
+
+  const productsById = useMemo(
+    () => new Map(products.map((product) => [product.id, product])),
+    [products],
+  );
 
   const linesKey = useMemo(
     () =>
@@ -250,13 +260,31 @@ export function PublicMenuCart({
             {lines.map((line, lineIndex) => {
               const imageUrl = storagePublicUrl(line.imagePath);
               const listTotal = lineTotalCents(line) / 100;
+              const product = productsById.get(line.productId);
+              const localPromo = resolveCartLinePromoDisplay(
+                line,
+                product,
+                productDiscounts.get(line.productId),
+              );
               const quotedLine = quote?.lines[lineIndex];
               const quotedTotalCents = quotedLineTotalsCents?.[lineIndex];
-              const hasPromo =
-                quotedTotalCents != null && quotedTotalCents < lineTotalCents(line);
+              const hasQuotedPromo = (quotedLine?.discount_cents ?? 0) > 0;
               const total =
                 quotedTotalCents != null ? quotedTotalCents / 100 : listTotal;
-              const promoBadge = quotedLine?.badge;
+              const promoBadge = promosApplied
+                ? hasQuotedPromo
+                  ? quotedLine?.badge
+                  : null
+                : localPromo.badge;
+              const showOriginalPrice = promosApplied
+                ? hasQuotedPromo
+                : localPromo.hasCatalogDiscount;
+              const originalTotal = promosApplied
+                ? listTotal
+                : localPromo.originalLineTotalCents != null
+                  ? localPromo.originalLineTotalCents / 100
+                  : null;
+              const promoWarnings = quotedLine?.promo_warnings ?? [];
               const expanded = !collapsedLineIds.has(line.id);
               const panelId = `cart-line-${line.id}`;
 
@@ -279,12 +307,14 @@ export function PublicMenuCart({
                       <div className={styles.lineTopActions}>
                         {!expanded ? (
                           <span className={styles.lineCollapsedPrice}>
-                            {hasPromo ? (
+                            {showOriginalPrice && originalTotal != null ? (
                               <>
                                 <span className={styles.linePriceOriginal}>
-                                  {formatMoney(listTotal, line.currency)}
+                                  {formatMoney(originalTotal, line.currency)}
                                 </span>
-                                <span>{formatMoney(total, line.currency)}</span>
+                                <span className={styles.linePriceSale}>
+                                  {formatMoney(total, line.currency)}
+                                </span>
                               </>
                             ) : (
                               formatMoney(total, line.currency)
@@ -316,6 +346,20 @@ export function PublicMenuCart({
                         </button>
                       </div>
                     </div>
+
+                    {promoWarnings.length > 0 ? (
+                      <div className={styles.linePromoWarnings}>
+                        {promoWarnings.map((warning) => {
+                          const label = promoWarningLabel(warning);
+                          if (!label) return null;
+                          return (
+                            <p key={warning} className={styles.linePromoWarning}>
+                              {label}
+                            </p>
+                          );
+                        })}
+                      </div>
+                    ) : null}
 
                     {expanded ? (
                       <div id={panelId}>
@@ -363,12 +407,14 @@ export function PublicMenuCart({
                             </button>
                           </div>
                           <span className={styles.linePrice}>
-                            {hasPromo ? (
+                            {showOriginalPrice && originalTotal != null ? (
                               <>
                                 <span className={styles.linePriceOriginal}>
-                                  {formatMoney(listTotal, line.currency)}
+                                  {formatMoney(originalTotal, line.currency)}
                                 </span>
-                                <span>{formatMoney(total, line.currency)}</span>
+                                <span className={styles.linePriceSale}>
+                                  {formatMoney(total, line.currency)}
+                                </span>
                               </>
                             ) : (
                               formatMoney(total, line.currency)
