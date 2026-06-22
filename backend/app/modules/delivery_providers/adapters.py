@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import UTC, datetime
+from collections.abc import Sequence
+from datetime import UTC, datetime, time
 
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -10,10 +11,22 @@ from sqlalchemy.orm import Session
 from app.db.models.delivery import (
     DeliveryProvider,
     DeliveryProviderMember,
+    DeliveryProviderSchedule,
     DeliveryProviderZone,
 )
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
-from app.modules.delivery_providers.schemas import DeliveryProviderDTO, DeliveryProviderZoneDTO, GeoJsonPolygon
+from app.modules.delivery_providers.schemas import (
+    DeliveryProviderDTO,
+    DeliveryProviderScheduleCreate,
+    DeliveryProviderScheduleDTO,
+    DeliveryProviderZoneDTO,
+    GeoJsonPolygon,
+)
+
+DEFAULT_SCHEDULE_ROWS: tuple[tuple[str, time, time], ...] = (
+    ("regular", time(9, 0), time(21, 0)),
+    ("night", time(21, 0), time(22, 0)),
+)
 
 
 class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
@@ -103,6 +116,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         )
         self._session.flush()
         self._session.refresh(provider)
+        self.seed_default_schedules(provider.id)
         return DeliveryProviderDTO.model_validate(provider)
 
     def set_logo_path(self, provider_id: uuid.UUID, logo_path: str) -> None:
@@ -223,3 +237,77 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         self._session.flush()
         self._session.refresh(provider)
         return DeliveryProviderDTO.model_validate(provider)
+
+    def list_schedules(self, provider_id: uuid.UUID) -> Sequence[DeliveryProviderScheduleDTO]:
+        rows = self._session.scalars(
+            select(DeliveryProviderSchedule)
+            .where(DeliveryProviderSchedule.delivery_provider_id == provider_id)
+            .order_by(
+                DeliveryProviderSchedule.schedule_kind.asc(),
+                DeliveryProviderSchedule.day_of_week.asc(),
+                DeliveryProviderSchedule.opens_at.asc(),
+            )
+        ).all()
+        return [DeliveryProviderScheduleDTO.model_validate(row) for row in rows]
+
+    def set_schedules(
+        self,
+        provider_id: uuid.UUID,
+        schedules: Sequence[DeliveryProviderScheduleCreate],
+    ) -> None:
+        self._session.query(DeliveryProviderSchedule).filter_by(
+            delivery_provider_id=provider_id
+        ).delete()
+        for entry in schedules:
+            self._session.add(
+                DeliveryProviderSchedule(
+                    delivery_provider_id=provider_id,
+                    schedule_kind=entry.schedule_kind,
+                    day_of_week=entry.day_of_week,
+                    opens_at=entry.opens_at,
+                    closes_at=entry.closes_at,
+                )
+            )
+        self._session.flush()
+
+    def seed_default_schedules(self, provider_id: uuid.UUID) -> None:
+        existing = self._session.scalar(
+            select(DeliveryProviderSchedule.id)
+            .where(DeliveryProviderSchedule.delivery_provider_id == provider_id)
+            .limit(1)
+        )
+        if existing is not None:
+            return
+
+        for day_of_week in range(7):
+            for schedule_kind, opens_at, closes_at in DEFAULT_SCHEDULE_ROWS:
+                self._session.add(
+                    DeliveryProviderSchedule(
+                        delivery_provider_id=provider_id,
+                        schedule_kind=schedule_kind,
+                        day_of_week=day_of_week,
+                        opens_at=opens_at,
+                        closes_at=closes_at,
+                    )
+                )
+        self._session.flush()
+
+    def get_service_manually_enabled(self, provider_id: uuid.UUID) -> bool:
+        provider = self._session.get(DeliveryProvider, provider_id)
+        if provider is None:
+            raise ValueError("Delivery provider not found")
+        return provider.service_manually_enabled
+
+    def set_service_manually_enabled(self, provider_id: uuid.UUID, enabled: bool) -> bool:
+        provider = self._session.get(DeliveryProvider, provider_id)
+        if provider is None:
+            raise ValueError("Delivery provider not found")
+        provider.service_manually_enabled = enabled
+        self._session.flush()
+        return provider.service_manually_enabled
+
+    def get_provider_timezone(self, provider_id: uuid.UUID) -> str:
+        provider = self._session.get(DeliveryProvider, provider_id)
+        if provider is None:
+            raise ValueError("Delivery provider not found")
+        return provider.timezone
