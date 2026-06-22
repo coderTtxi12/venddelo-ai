@@ -88,17 +88,34 @@ export function getSelectedOptionLabels(group: OptionGroup, selectedIds: string[
   return group.items.filter((item) => selected.has(item.id)).map((item) => item.label);
 }
 
+/** Required option groups that still need a valid selection. */
+export function getIncompleteRequiredGroups(
+  groups: OptionGroup[],
+  selections: OptionSelections,
+): OptionGroup[] {
+  return groups.filter(
+    (group) =>
+      group.required &&
+      !isGroupRequirementMet(group, getGroupSelection(selections, group.id)),
+  );
+}
+
+/** Customer-facing message listing incomplete required groups. */
+export function incompleteRequiredGroupsMessage(groups: OptionGroup[]): string {
+  if (groups.length === 0) return '';
+  if (groups.length === 1) {
+    return `Elige en «${groups[0].title}» para continuar`;
+  }
+  const titles = groups.map((group) => `«${group.title}»`).join(', ');
+  return `Falta elegir en: ${titles}`;
+}
+
 /** True when every required option group has a valid selection. */
 export function canAddProductToCart(
   groups: OptionGroup[],
   selections: OptionSelections,
 ): boolean {
-  const requiredGroups = groups.filter((group) => group.required);
-  if (requiredGroups.length === 0) return true;
-
-  return requiredGroups.every((group) =>
-    isGroupRequirementMet(group, getGroupSelection(selections, group.id)),
-  );
+  return getIncompleteRequiredGroups(groups, selections).length === 0;
 }
 
 /** Sum of price_delta_cents for all selected items (per unit). */
