@@ -13,6 +13,8 @@ type RestaurantHoursDisplayProps = {
   serviceTypes?: RestaurantServiceType[];
   className?: string;
   variant?: 'default' | 'sidebar';
+  showHeader?: boolean;
+  readOnly?: boolean;
 };
 
 function DayHoursReadout({ day }: { day: ServiceHoursBlock['days'][number] }) {
@@ -43,10 +45,12 @@ function ServiceHoursReadout({
   block,
   expanded,
   onToggle,
+  readOnly = false,
 }: {
   block: ServiceHoursBlock;
   expanded: boolean;
   onToggle: () => void;
+  readOnly?: boolean;
 }) {
   const panelId = `hours-readout-${block.serviceType}`;
   const openDays = block.days.filter((day) => !day.isClosed).length;
@@ -58,7 +62,9 @@ function ServiceHoursReadout({
         : `${openDays} ${openDays === 1 ? 'día abierto' : 'días abiertos'}`;
 
   return (
-    <div className={`${styles.hoursBlock} ${expanded ? styles.hoursBlockOpen : ''}`}>
+    <div
+      className={`${styles.hoursBlock} ${expanded ? styles.hoursBlockOpen : ''} ${readOnly ? styles.hoursBlockReadOnly : ''}`}
+    >
       <button
         type="button"
         className={styles.serviceToggle}
@@ -67,7 +73,10 @@ function ServiceHoursReadout({
         onClick={onToggle}
       >
         <span className={styles.serviceToggleMain}>
-          <span className={styles.serviceTitle}>{block.label}</span>
+          <span className={styles.serviceTitle}>
+            {block.label}
+            {readOnly ? <span className={styles.readOnlyBadge}>Solo lectura</span> : null}
+          </span>
           {!expanded ? <span className={styles.serviceSummary}>{summary}</span> : null}
         </span>
         <span className={`${styles.chevron} ${expanded ? styles.chevronExpanded : ''}`}>
@@ -91,35 +100,40 @@ export function RestaurantHoursDisplay({
   serviceTypes,
   className,
   variant = 'default',
+  showHeader = true,
+  readOnly = false,
 }: RestaurantHoursDisplayProps) {
   const blocks = buildRestaurantHoursBlocks(schedules, serviceTypes ?? []);
   const [expandedBlocks, setExpandedBlocks] = useState<Record<RestaurantServiceType, boolean>>({
-    delivery: true,
     takeout: false,
+    delivery: false,
   });
 
   if (blocks.length === 0) return null;
 
   return (
     <section
-      className={`${styles.hoursSection} ${variant === 'sidebar' ? styles.hoursSectionSidebar : ''} ${className ?? ''}`.trim()}
+      className={`${styles.hoursSection} ${variant === 'sidebar' ? styles.hoursSectionSidebar : ''} ${readOnly ? styles.hoursSectionReadOnly : ''} ${className ?? ''}`.trim()}
       aria-label="Horario del restaurante"
     >
-      <div className={styles.hoursHeader}>
-        <AccessTimeOutlinedIcon className={styles.hoursIcon} aria-hidden />
-        <div className={styles.hoursHeading}>
-          <h2 className={styles.hoursTitle}>Horarios de Servicio</h2>
-          {variant === 'default' ? (
-            <p className={styles.hoursHint}>Consulta nuestros horarios por tipo de entrega.</p>
-          ) : null}
+      {showHeader ? (
+        <div className={styles.hoursHeader}>
+          <AccessTimeOutlinedIcon className={styles.hoursIcon} aria-hidden />
+          <div className={styles.hoursHeading}>
+            <h2 className={styles.hoursTitle}>Horarios de Servicio</h2>
+            {variant === 'default' ? (
+              <p className={styles.hoursHint}>Consulta nuestros horarios por tipo de entrega.</p>
+            ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className={styles.hoursBlocks}>
         {blocks.map((block) => (
           <ServiceHoursReadout
             key={block.serviceType}
             block={block}
+            readOnly={readOnly}
             expanded={expandedBlocks[block.serviceType]}
             onToggle={() =>
               setExpandedBlocks((current) => ({
