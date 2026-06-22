@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, time
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+DeliveryProviderScheduleKind = Literal["regular", "night"]
 
 
 class GeoJsonPolygon(BaseModel):
@@ -37,6 +40,7 @@ class DeliveryProviderDTO(BaseModel):
     logo_path: str | None
     timezone: str
     status: str
+    service_manually_enabled: bool
     submitted_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -67,3 +71,29 @@ class DeliveryProviderMeResponse(BaseModel):
     provider: DeliveryProviderDTO | None
     member_role: str | None = None
     primary_zone: DeliveryProviderZoneDTO | None = None
+
+
+class DeliveryProviderScheduleCreate(BaseModel):
+    schedule_kind: DeliveryProviderScheduleKind
+    day_of_week: int = Field(ge=0, le=6)
+    opens_at: time
+    closes_at: time
+
+
+class DeliveryProviderScheduleDTO(DeliveryProviderScheduleCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+
+
+class DeliveryProviderServiceStatusDTO(BaseModel):
+    manually_enabled: bool
+    within_schedule: bool
+    service_active: bool
+    status_reason: Literal["active", "manual_off", "outside_schedule"]
+    next_change_at: datetime | None = None
+    timezone: str
+
+
+class DeliveryProviderServiceStatusUpdate(BaseModel):
+    manually_enabled: bool
