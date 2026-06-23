@@ -125,6 +125,39 @@ def test_public_menu_and_order(client, engine):
 
 
 @requires_db
+def test_public_checkout_config(client, engine):
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restaurant = uow.restaurants.add(
+            RestaurantCreate(
+                name="Checkout",
+                subdomain="checkout-pub",
+                status="published",
+                takeout_enabled=True,
+                delivery_enabled=True,
+            ),
+            owner_id=OWNER,
+        )
+        uow.restaurants.set_payment_methods(
+            restaurant.id,
+            [
+                PaymentMethodCreate(method="cash", service_type="takeout"),
+                PaymentMethodCreate(method="transfer", service_type="delivery"),
+            ],
+        )
+        uow.commit()
+
+    resp = client.get("/api/v1/public/restaurants/checkout-pub/checkout-config")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["takeout_enabled"] is True
+    assert body["delivery_enabled"] is True
+    methods = {(entry["method"], entry["service_type"]) for entry in body["payment_methods"]}
+    assert ("cash", "takeout") in methods
+    assert ("transfer", "delivery") in methods
+
+
+@requires_db
 def test_restaurant_description_patch_and_public(client, engine):
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     with SqlAlchemyUnitOfWork(factory) as uow:
