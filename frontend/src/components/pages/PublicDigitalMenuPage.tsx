@@ -25,6 +25,7 @@ import {
   getPublicRestaurant,
   getPublicRestaurantPromotions,
   getPublicRestaurantSchedules,
+  type PublicMenu,
   type PublicPromotionsContext,
   type PublicRestaurant,
 } from '@/lib/api/public';
@@ -106,9 +107,35 @@ function CartHeaderButton({
 
 type PublicDigitalMenuPageProps = {
   subdomain: string;
+  initialRestaurant?: PublicRestaurant | null;
+  initialMenu?: PublicMenu | null;
 };
 
-export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPageProps) {
+function resolveInitialCriticalState(
+  initialRestaurant?: PublicRestaurant | null,
+  initialMenu?: PublicMenu | null,
+) {
+  if (!initialRestaurant || !initialMenu) return null;
+
+  const sortedCategories = sortCategories(initialMenu.categories);
+  return {
+    restaurant: initialRestaurant,
+    categories: sortedCategories,
+    products: filterPublicMenuProducts(initialMenu.products),
+    activeCategoryId: sortedCategories[0]?.id ?? null,
+  };
+}
+
+export default function PublicDigitalMenuPage({
+  subdomain,
+  initialRestaurant = null,
+  initialMenu = null,
+}: PublicDigitalMenuPageProps) {
+  const initialCritical = useMemo(
+    () => resolveInitialCriticalState(initialRestaurant, initialMenu),
+    [initialRestaurant, initialMenu],
+  );
+  const hasServerPrefetch = initialCritical != null;
   const mobileScrollRef = useRef<HTMLDivElement>(null);
   const desktopScrollRef = useRef<HTMLDivElement>(null);
   const heroSentinelRef = useRef<HTMLDivElement>(null);
