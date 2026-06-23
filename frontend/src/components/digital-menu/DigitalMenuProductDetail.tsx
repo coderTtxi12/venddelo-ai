@@ -15,6 +15,7 @@ import { formatMoney } from '@/lib/currency';
 import { attachDragOverlay } from '@/lib/dragOverlay';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
 import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
+import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
 import { PromotionCountdown } from '@/components/digital-menu/PromotionCountdown';
 import {
   bundleComplementExcludedBadge,
@@ -353,7 +354,11 @@ export function DigitalMenuProductDetail({
             {imageUrl ? (
               <img src={imageUrl} alt={product.name} className={styles.heroImage} />
             ) : (
-              <div className={styles.heroPlaceholder} aria-hidden />
+              <ProductImagePlaceholder
+                name={product.name}
+                variant="hero"
+                className={styles.heroPlaceholder}
+              />
             )}
             <div
               className={styles.heroFloatBar}

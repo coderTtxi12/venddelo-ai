@@ -3,6 +3,7 @@ import { formatMoney } from '@/lib/currency';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
 import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
+import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
 import { PromotionCountdown } from '@/components/digital-menu/PromotionCountdown';
 import styles from '../pages/DigitalMenuPage.module.css';
 
@@ -42,7 +43,7 @@ export function ProductListThumb({ product, className }: { product: Product; cla
       {url ? (
         <img src={url} alt="" className={styles.productThumbMedia} />
       ) : (
-        <div className={styles.productThumbMedia} aria-hidden />
+        <ProductImagePlaceholder name={product.name} className={styles.productThumbMedia} />
       )}
       {unavailable ? (
         <span className={styles.productThumbUnavailableOverlay} aria-hidden>

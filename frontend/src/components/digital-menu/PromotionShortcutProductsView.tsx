@@ -8,6 +8,7 @@ import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscou
 import { productsParticipatingInPromotion } from '@/lib/promotions/promotionShortcuts';
 import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
+import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
 import { PromotionCountdown } from '@/components/digital-menu/PromotionCountdown';
 import { DIGITAL_MENU_PINNED_BAR_HEIGHT_PX } from '@/lib/digital-menu/layout';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
@@ -80,7 +81,11 @@ export function PromotionShortcutProductsView({
           {imageUrl ? (
             <img src={imageUrl} alt="" className={detailStyles.heroImage} />
           ) : (
-            <div className={detailStyles.heroPlaceholder} aria-hidden />
+            <ProductImagePlaceholder
+              name={promotion.name}
+              variant="hero"
+              className={detailStyles.heroPlaceholder}
+            />
           )}
           <div
             className={detailStyles.heroFloatBar}

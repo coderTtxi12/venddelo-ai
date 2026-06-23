@@ -16,6 +16,7 @@ import type { PublicMenuCartLine } from '@/lib/digital-menu/cart/types';
 import { promoWarningLabel } from '@/lib/promotions/bundlePromoEligibility';
 import { formatMoney } from '@/lib/currency';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
+import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import styles from './PublicMenuCheckoutSummary.module.css';
 
@@ -169,7 +170,11 @@ function CheckoutLineCard({
         {imageUrl ? (
           <img src={imageUrl} alt="" className={styles.thumb} />
         ) : (
-          <div className={styles.thumbPlaceholder} aria-hidden />
+          <ProductImagePlaceholder
+            name={cartLine.productName}
+            variant="compact"
+            className={styles.thumb}
+          />
         )}
 
         <div className={styles.lineHeaderCopy}>
