@@ -475,12 +475,7 @@ export default function SettingsPage() {
     }
   };
 
-  const saveSchedules = async (payload: RestaurantScheduleCreateInput[]) => {
-    if (!accessToken || !restaurantId) return;
-    await setRestaurantSchedules(accessToken, restaurantId, payload);
-    const updated = await listRestaurantSchedules(accessToken, restaurantId);
-    setSchedules(updated);
-  };
+  const hasScheduleContent = takeoutEnabled || deliveryEnabled;
 
   const logoUrl = storagePublicUrl(restaurant?.logo_path ?? null);
 

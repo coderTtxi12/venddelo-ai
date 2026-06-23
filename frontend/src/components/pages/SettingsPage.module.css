@@ -459,6 +459,11 @@
   padding: 0.75rem;
 }
 
+.hoursWrap :global(.infoDisplay .hoursSection),
+.hoursWrap :global(.embeddedDisplay .hoursSection) {
+  padding: 0;
+}
+
 .mapPreview {
   border: 1px solid var(--color-border);
   border-radius: 12px;
