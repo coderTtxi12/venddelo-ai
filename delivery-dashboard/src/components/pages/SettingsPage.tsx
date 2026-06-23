@@ -9,7 +9,9 @@ import { PanelPageShell } from '@/components/pages/PanelPageShell';
 import { useAuth } from '@/hooks/useAuth';
 import {
   getMyDeliveryProvider,
+  listMyDeliveryProviderPaymentMethods,
   listMyDeliveryProviderSchedules,
+  setMyDeliveryProviderPaymentMethods,
   setMyDeliveryProviderSchedules,
   updateMyDeliveryProvider,
 } from '@/lib/api/deliveryProviders';
@@ -24,6 +26,15 @@ import {
   validateProviderProfile,
 } from '@/lib/settings/providerProfile';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
+import {
+  createDefaultPaymentState,
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_METHOD_ORDER,
+  paymentMethodsToState,
+  stateToPaymentUpdates,
+  type PaymentMethodKey,
+  type PaymentMethodState,
+} from '@/lib/payment/providerPaymentConfig';
 import styles from './SettingsPage.module.css';
 
 async function fileToStoredImage(file: File): Promise<{ dataUrl: string; fileName: string }> {
@@ -53,6 +64,11 @@ export default function SettingsPage() {
   const [schedulesSaving, setSchedulesSaving] = useState(false);
   const [scheduleSuccess, setScheduleSuccess] = useState<string | null>(null);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [paymentState, setPaymentState] = useState<PaymentMethodState>(createDefaultPaymentState);
+  const [paymentsLoading, setPaymentsLoading] = useState(true);
+  const [paymentsSaving, setPaymentsSaving] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
@@ -115,6 +131,37 @@ export default function SettingsPage() {
     }
 
     void loadSchedules();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPayments() {
+      if (!accessToken) return;
+      setPaymentsLoading(true);
+      setPaymentError(null);
+
+      try {
+        const rows = await listMyDeliveryProviderPaymentMethods(accessToken);
+        if (!cancelled) {
+          setPaymentState(
+            rows.length > 0 ? paymentMethodsToState(rows) : createDefaultPaymentState(),
+          );
+        }
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) {
+          setPaymentError('No se pudieron cargar los métodos de pago.');
+        }
+      } finally {
+        if (!cancelled) setPaymentsLoading(false);
+      }
+    }
+
+    void loadPayments();
     return () => {
       cancelled = true;
     };
@@ -206,6 +253,39 @@ export default function SettingsPage() {
       }
     } finally {
       setSchedulesSaving(false);
+    }
+  };
+
+  const handlePaymentToggle = async (method: PaymentMethodKey, enabled: boolean) => {
+    if (!accessToken) {
+      setPaymentError('No hay sesión activa. Inicia sesión de nuevo.');
+      return;
+    }
+
+    const previous = paymentState;
+    const nextState = { ...paymentState, [method]: enabled };
+    setPaymentsSaving(true);
+    setPaymentError(null);
+    setPaymentSuccess(null);
+
+    try {
+      const updated = await setMyDeliveryProviderPaymentMethods(
+        accessToken,
+        stateToPaymentUpdates(nextState),
+      );
+      setPaymentState(paymentMethodsToState(updated));
+      setPaymentSuccess('Métodos de pago actualizados.');
+      window.setTimeout(() => setPaymentSuccess(null), 4000);
+    } catch (err) {
+      console.error(err);
+      setPaymentState(previous);
+      if (err instanceof ApiError) {
+        setPaymentError(err.message);
+      } else {
+        setPaymentError('No se pudieron guardar los métodos de pago.');
+      }
+    } finally {
+      setPaymentsSaving(false);
     }
   };
 
@@ -401,6 +481,60 @@ export default function SettingsPage() {
                 onPolygonChange={handleServiceZonePolygonChange}
               />
             </div>
+          </section>
+
+          <section className={styles.panel} aria-labelledby="settings-payments">
+            <h2 id="settings-payments" className={styles.panelTitle}>
+              Métodos de pago
+            </h2>
+            <p className={styles.panelHint}>
+              Indica qué formas de pago aceptas al cobrar la entrega al cliente.
+            </p>
+            {paymentError ? (
+              <div className={styles.errorBanner} role="alert">
+                {paymentError}
+              </div>
+            ) : null}
+            {paymentSuccess ? (
+              <div className={styles.successBanner} role="status">
+                {paymentSuccess}
+              </div>
+            ) : null}
+            {paymentsLoading ? (
+              <p className={styles.loading} role="status">
+                Cargando métodos de pago…
+              </p>
+            ) : (
+              <div className={styles.paymentGrid}>
+                <div className={styles.paymentBlock}>
+                  <h3 className={styles.paymentBlockTitle}>Cobro en entrega</h3>
+                  <div className={styles.paymentRows}>
+                    {PAYMENT_METHOD_ORDER.map((method) => (
+                      <div key={method} className={styles.paymentRow}>
+                        <span className={styles.paymentName}>{PAYMENT_METHOD_LABELS[method]}</span>
+                        <label className={styles.switch}>
+                          <input
+                            type="checkbox"
+                            checked={paymentState[method]}
+                            disabled={paymentsSaving}
+                            aria-label={PAYMENT_METHOD_LABELS[method]}
+                            onChange={(event) => {
+                              void handlePaymentToggle(method, event.target.checked);
+                            }}
+                          />
+                          <span className={styles.slider} aria-hidden />
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            {paymentsSaving ? (
+              <p className={styles.savingHint} role="status">
+                Guardando métodos de pago…
+              </p>
+            ) : null}
           </section>
 
           <section className={styles.panel} aria-labelledby="settings-hours">
