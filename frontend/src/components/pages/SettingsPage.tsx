@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   checkRestaurantSubdomainAvailability,
   getRestaurant,
+  getRestaurantDeliveryPartnership,
   listRestaurantPaymentMethods,
   listRestaurantSchedules,
   setRestaurantPaymentMethods,
@@ -469,12 +470,15 @@ export default function SettingsPage() {
       if (updatedRestaurant.delivery_enabled) {
         setDeliveryPartnershipLoading(true);
         setDeliveryPartnershipError(null);
+        const deliveryJustEnabled = !restaurant?.delivery_enabled;
         try {
-          const partnership = await syncRestaurantDeliveryPartnership(
-            accessToken,
-            restaurantId,
-            updatedRestaurant.delivery_enabled,
-          );
+          const partnership = deliveryJustEnabled
+            ? await syncRestaurantDeliveryPartnership(
+                accessToken,
+                restaurantId,
+                updatedRestaurant.delivery_enabled,
+              )
+            : (await getRestaurantDeliveryPartnership(accessToken, restaurantId)).partnership;
           setDeliveryPartnership(partnership);
           if (isActiveDeliveryPartnership(partnership)) {
             const providerConfig = await fetchActiveDeliveryProviderConfig(
@@ -830,11 +834,9 @@ export default function SettingsPage() {
             className={`${styles.textarea} ${styles.addressTextarea}`}
             rows={2}
             value={location.address}
-            onChange={(e) => {
-              setLocation((prev) => ({ ...prev, address: e.target.value }));
-              setSaveOk(false);
-            }}
+            readOnly
             placeholder="Calle, colonia, ciudad"
+            aria-readonly="true"
           />
         </label>
 
