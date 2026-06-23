@@ -1,14 +1,15 @@
 'use client';
 
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { RestaurantHoursDisplay } from '@/components/digital-menu/RestaurantHoursDisplay';
 import { RestaurantHoursFooter } from '@/components/digital-menu/RestaurantHoursFooter';
-import type { RestaurantSchedule, RestaurantScheduleCreateInput } from '@/lib/api/types';
+import { DeliveryProviderHoursDisplay } from '@/components/settings/DeliveryProviderHoursDisplay';
+import type {
+  DeliveryProviderSchedule,
+  RestaurantSchedule,
+  RestaurantScheduleCreateInput,
+} from '@/lib/api/types';
 import { mergeScheduleSavePreservingDelivery } from '@/lib/restaurantScheduleHours';
-import {
-  DASHBOARD_INFO_SCHEDULE_SERVICE_TYPES,
-  DASHBOARD_SCHEDULE_SERVICE_TYPES,
-} from '@/lib/restaurantServices';
+import { DASHBOARD_SCHEDULE_SERVICE_TYPES } from '@/lib/restaurantServices';
 import styles from './DashboardRestaurantHours.module.css';
 
 type DashboardRestaurantHoursProps = {
@@ -18,6 +19,8 @@ type DashboardRestaurantHoursProps = {
   section?: 'takeout' | 'delivery' | 'both';
   saving?: boolean;
   onSave?: (payload: RestaurantScheduleCreateInput[]) => Promise<void>;
+  deliveryProviderSchedules?: DeliveryProviderSchedule[] | null;
+  deliveryPartnershipActive?: boolean;
 };
 
 export function DashboardRestaurantHours({
@@ -27,6 +30,8 @@ export function DashboardRestaurantHours({
   section = 'both',
   saving = false,
   onSave,
+  deliveryProviderSchedules = null,
+  deliveryPartnershipActive = false,
 }: DashboardRestaurantHoursProps) {
   const showTakeout =
     (section === 'takeout' || section === 'both') && takeoutEnabled && onSave != null;
@@ -65,18 +70,19 @@ export function DashboardRestaurantHours({
             <div className={styles.providerNoticeBody}>
               <p className={styles.providerNoticeTitle}>Horario gestionado por el proveedor</p>
               <p className={styles.providerNoticeText}>
-                Los horarios de entrega a domicilio los define tu proveedor de entrega.
+                {deliveryPartnershipActive
+                  ? 'Los horarios de entrega a domicilio los define tu proveedor de entrega.'
+                  : 'Los horarios estarán disponibles cuando tu proveedor de entrega apruebe la solicitud.'}
               </p>
             </div>
           </aside>
 
-          <RestaurantHoursDisplay
-            schedules={schedules}
-            serviceTypes={DASHBOARD_INFO_SCHEDULE_SERVICE_TYPES}
-            showHeader={section !== 'delivery' && !showTakeout}
-            readOnly
-            className={showTakeout ? styles.infoDisplay : styles.embeddedDisplay}
-          />
+          {deliveryPartnershipActive && deliveryProviderSchedules ? (
+            <DeliveryProviderHoursDisplay
+              schedules={deliveryProviderSchedules}
+              className={showTakeout ? styles.infoDisplay : styles.embeddedDisplay}
+            />
+          ) : null}
         </section>
       ) : null}
     </div>

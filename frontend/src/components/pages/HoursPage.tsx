@@ -10,7 +10,13 @@ import {
   listRestaurantSchedules,
   setRestaurantSchedules,
 } from '@/lib/api/restaurants';
-import type { Restaurant, RestaurantDeliveryPartnership, RestaurantSchedule } from '@/lib/api/types';
+import type {
+  DeliveryProviderSchedule,
+  Restaurant,
+  RestaurantDeliveryPartnership,
+  RestaurantSchedule,
+} from '@/lib/api/types';
+import { fetchActiveDeliveryProviderConfig } from '@/lib/fetchActiveDeliveryProviderConfig';
 import { syncRestaurantDeliveryPartnership } from '@/lib/syncDeliveryPartnership';
 import { resolveSupplierIdByEmail } from '@/services/db';
 import { legacyDb as db } from '@/services/legacyDb';
@@ -25,6 +31,9 @@ export default function HoursPage() {
   const [deliveryPartnership, setDeliveryPartnership] = useState<RestaurantDeliveryPartnership | null>(
     null,
   );
+  const [deliveryProviderSchedules, setDeliveryProviderSchedules] = useState<
+    DeliveryProviderSchedule[] | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -73,12 +82,29 @@ export default function HoursPage() {
               restaurantData.delivery_enabled,
             );
             if (!cancelled) setDeliveryPartnership(partnership);
+
+            if (partnership?.status === 'active') {
+              const providerConfig = await fetchActiveDeliveryProviderConfig(
+                accessToken,
+                rid,
+                partnership,
+              );
+              if (!cancelled) {
+                setDeliveryProviderSchedules(providerConfig?.schedules ?? null);
+              }
+            } else if (!cancelled) {
+              setDeliveryProviderSchedules(null);
+            }
           } catch (partnershipError) {
             console.error(partnershipError);
-            if (!cancelled) setDeliveryPartnership(null);
+            if (!cancelled) {
+              setDeliveryPartnership(null);
+              setDeliveryProviderSchedules(null);
+            }
           }
         } else {
           setDeliveryPartnership(null);
+          setDeliveryProviderSchedules(null);
         }
       } catch (error) {
         console.error(error);
@@ -167,6 +193,8 @@ export default function HoursPage() {
                     schedules={schedules}
                     takeoutEnabled={restaurant.takeout_enabled}
                     deliveryEnabled={restaurant.delivery_enabled}
+                    deliveryProviderSchedules={deliveryProviderSchedules}
+                    deliveryPartnershipActive={deliveryPartnership?.status === 'active'}
                   />
                 </div>
               </div>

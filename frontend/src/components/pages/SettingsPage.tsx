@@ -19,14 +19,24 @@ import {
   setRestaurantSchedules,
   updateRestaurant,
 } from '@/lib/api/restaurants';
-import type { Restaurant, RestaurantDeliveryPartnership, RestaurantSchedule } from '@/lib/api/types';
+import type {
+  DeliveryProviderSchedule,
+  Restaurant,
+  RestaurantDeliveryPartnership,
+  RestaurantSchedule,
+} from '@/lib/api/types';
 import { ApiError } from '@/lib/api/types';
+import {
+  fetchActiveDeliveryProviderConfig,
+  isActiveDeliveryPartnership,
+} from '@/lib/fetchActiveDeliveryProviderConfig';
 import {
   createDefaultPaymentMatrix,
   matrixToPaymentCreates,
   PAYMENT_METHOD_LABELS,
   PAYMENT_METHOD_ORDER,
   paymentMethodsToMatrix,
+  providerPaymentMethodsToDeliveryMatrix,
   type PaymentMethodMatrix,
 } from '@/lib/restaurantPaymentConfig';
 import {
@@ -140,6 +150,9 @@ export default function SettingsPage() {
   );
   const [deliveryPartnershipLoading, setDeliveryPartnershipLoading] = useState(false);
   const [deliveryPartnershipError, setDeliveryPartnershipError] = useState<string | null>(null);
+  const [deliveryProviderSchedules, setDeliveryProviderSchedules] = useState<
+    DeliveryProviderSchedule[] | null
+  >(null);
   const [paymentMatrix, setPaymentMatrix] = useState<PaymentMethodMatrix>(
     createDefaultPaymentMatrix(),
   );
@@ -206,6 +219,10 @@ export default function SettingsPage() {
         setDeliveryEnabled(restaurantData.delivery_enabled);
         setDeliveryPartnershipError(null);
 
+        let nextPaymentMatrix =
+          paymentRows.length > 0 ? paymentMethodsToMatrix(paymentRows) : createDefaultPaymentMatrix();
+        let nextProviderSchedules: DeliveryProviderSchedule[] | null = null;
+
         if (restaurantData.delivery_enabled) {
           setDeliveryPartnershipLoading(true);
           try {
@@ -215,6 +232,21 @@ export default function SettingsPage() {
               restaurantData.delivery_enabled,
             );
             if (!cancelled) setDeliveryPartnership(partnership);
+
+            if (isActiveDeliveryPartnership(partnership)) {
+              const providerConfig = await fetchActiveDeliveryProviderConfig(
+                accessToken,
+                rid,
+                partnership,
+              );
+              if (providerConfig) {
+                nextProviderSchedules = providerConfig.schedules;
+                nextPaymentMatrix = {
+                  ...nextPaymentMatrix,
+                  delivery: providerPaymentMethodsToDeliveryMatrix(providerConfig.paymentMethods),
+                };
+              }
+            }
           } catch (partnershipError) {
             console.error(partnershipError);
             if (!cancelled) {
@@ -230,9 +262,10 @@ export default function SettingsPage() {
           setDeliveryPartnership(null);
         }
 
-        setPaymentMatrix(
-          paymentRows.length > 0 ? paymentMethodsToMatrix(paymentRows) : createDefaultPaymentMatrix(),
-        );
+        if (!cancelled) {
+          setPaymentMatrix(nextPaymentMatrix);
+          setDeliveryProviderSchedules(nextProviderSchedules);
+        }
         setSchedules(scheduleRows);
       } catch (error) {
         console.error(error);
@@ -404,7 +437,9 @@ export default function SettingsPage() {
         await setRestaurantPaymentMethods(
           accessToken,
           restaurantId,
-          matrixToPaymentCreates(paymentMatrix),
+          matrixToPaymentCreates(paymentMatrix, {
+            serviceTypes: deliveryPartnershipActive ? ['takeout'] : ['takeout', 'delivery'],
+          }),
         );
       } catch (paymentError) {
         console.error(paymentError);
@@ -441,6 +476,22 @@ export default function SettingsPage() {
             updatedRestaurant.delivery_enabled,
           );
           setDeliveryPartnership(partnership);
+          if (isActiveDeliveryPartnership(partnership)) {
+            const providerConfig = await fetchActiveDeliveryProviderConfig(
+              accessToken,
+              restaurantId,
+              partnership,
+            );
+            if (providerConfig) {
+              setDeliveryProviderSchedules(providerConfig.schedules);
+              setPaymentMatrix((prev) => ({
+                ...prev,
+                delivery: providerPaymentMethodsToDeliveryMatrix(providerConfig.paymentMethods),
+              }));
+            }
+          } else {
+            setDeliveryProviderSchedules(null);
+          }
           if (!partnership) {
             setDeliveryPartnershipError(
               'No se pudo registrar la solicitud con Mexy Reparto. Intenta guardar de nuevo.',
@@ -457,6 +508,7 @@ export default function SettingsPage() {
         }
       } else {
         setDeliveryPartnership(null);
+        setDeliveryProviderSchedules(null);
         setDeliveryPartnershipError(null);
       }
     } catch (error) {
@@ -476,6 +528,7 @@ export default function SettingsPage() {
   };
 
   const hasScheduleContent = takeoutEnabled || deliveryEnabled;
+  const deliveryPartnershipActive = isActiveDeliveryPartnership(deliveryPartnership);
 
   const logoUrl = storagePublicUrl(restaurant?.logo_path ?? null);
 
@@ -729,11 +782,15 @@ export default function SettingsPage() {
         </h2>
         <p className={styles.panelHint}>
           Habilita o deshabilita métodos de pago por tipo de entrega.
+          {deliveryPartnershipActive
+            ? ' Los métodos de entrega a domicilio los define tu proveedor de reparto.'
+            : null}
         </p>
         <div className={styles.paymentGrid}>
           {(['takeout', 'delivery'] as const).map((serviceType) => {
             const serviceEnabled =
               serviceType === 'takeout' ? takeoutEnabled : deliveryEnabled;
+            const providerManaged = serviceType === 'delivery' && deliveryPartnershipActive;
             return (
               <div key={serviceType} className={styles.paymentBlock}>
                 <h3 className={styles.paymentBlockTitle}>{RESTAURANT_SERVICE_LABELS[serviceType]}</h3>
@@ -743,7 +800,7 @@ export default function SettingsPage() {
                       <span className={styles.paymentName}>{PAYMENT_METHOD_LABELS[method]}</span>
                       <Switch
                         checked={paymentMatrix[serviceType][method]}
-                        disabled={!serviceEnabled}
+                        disabled={!serviceEnabled || providerManaged}
                         ariaLabel={`${PAYMENT_METHOD_LABELS[method]} — ${RESTAURANT_SERVICE_LABELS[serviceType]}`}
                         onChange={(next) => setPaymentEnabled(serviceType, method, next)}
                       />
@@ -807,6 +864,8 @@ export default function SettingsPage() {
               schedules={schedules}
               takeoutEnabled={takeoutEnabled}
               deliveryEnabled={deliveryEnabled}
+              deliveryProviderSchedules={deliveryProviderSchedules}
+              deliveryPartnershipActive={deliveryPartnershipActive}
               onSave={async (payload) => {
                 if (!accessToken || !restaurantId) return;
                 await setRestaurantSchedules(accessToken, restaurantId, payload);
