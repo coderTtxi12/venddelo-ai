@@ -129,6 +129,67 @@
   margin: 0;
 }
 
+.searchWrap {
+  padding: 0 16px;
+}
+
+.searchTrigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--dm-border, #e2e8f0);
+  border-radius: 999px;
+  background: var(--dm-bg, #f8fafc);
+  color: var(--dm-text-secondary, #64748b);
+  font-size: 0.84rem;
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  cursor: pointer;
+  text-align: left;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .searchTrigger {
+    transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+  }
+}
+
+.searchTrigger:hover {
+  background: var(--dm-surface, #fff);
+  border-color: var(--dm-primary, #111827);
+  color: var(--dm-text, #111827);
+}
+
+.searchTrigger:focus-visible {
+  outline: 2px solid var(--dm-primary, #111827);
+  outline-offset: 2px;
+}
+
+.searchTriggerIcon {
+  flex-shrink: 0;
+}
+
+.searchTriggerLabel {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.searchShortcut {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-family: inherit;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--dm-border, #e2e8f0);
+  background: var(--dm-surface, #fff);
+  color: var(--dm-text-secondary, #94a3b8);
+}
+
 .categoryNav {
   display: flex;
   flex-direction: column;
