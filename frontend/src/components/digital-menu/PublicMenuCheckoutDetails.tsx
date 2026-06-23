@@ -259,7 +259,7 @@ export function PublicMenuCheckoutDetails({
 
         <section className={styles.section} aria-labelledby="checkout-service-heading">
           <h2 id="checkout-service-heading" className={styles.sectionTitle}>
-            ¿Cómo lo quieres?
+            Selecciona el tipo de entrega
           </h2>
           {availableServices.length === 1 ? (
             <p className={styles.sectionHint}>
