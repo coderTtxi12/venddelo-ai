@@ -200,6 +200,131 @@ def test_enabling_delivery_later_creates_mexy_request(client, engine):
 
 
 @requires_db
+def test_updating_address_does_not_create_new_mexy_request(client, engine):
+    provider_id = _create_mexy_provider(client)
+
+    create_resp = client.post(
+        "/api/v1/restaurants",
+        json={
+            "name": "Address Update",
+            "subdomain": "address-update",
+            "delivery_enabled": True,
+            "address": "Av. Juárez 100, CDMX",
+            "latitude": 19.4326,
+            "longitude": -99.1332,
+        },
+        headers=AUTH,
+    )
+    restaurant_id = uuid.UUID(create_resp.json()["id"])
+
+    patch_resp = client.patch(
+        f"/api/v1/restaurants/{restaurant_id}",
+        json={
+            "address": "Av. Reforma 222, CDMX",
+            "latitude": 19.426,
+            "longitude": -99.1678,
+        },
+        headers=AUTH,
+    )
+    assert patch_resp.status_code == 200
+
+    request_resp = client.post(
+        f"/api/v1/restaurants/{restaurant_id}/delivery-partnership/request",
+        headers=AUTH,
+    )
+    assert request_resp.status_code == 200
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        links = session.scalars(
+            select(RestaurantDeliveryProvider).where(
+                RestaurantDeliveryProvider.restaurant_id == restaurant_id,
+                RestaurantDeliveryProvider.delivery_provider_id == provider_id,
+            )
+        ).all()
+        assert len(links) == 1
+        assert links[0].status == "pending"
+
+
+@requires_db
+def test_accepting_partnership_clears_duplicate_pending_requests(client, engine):
+    provider_id = _create_mexy_provider(client)
+
+    create_resp = client.post(
+        "/api/v1/restaurants",
+        json={
+            "name": "Wild Rooster",
+            "subdomain": "wild-rooster-dup",
+            "delivery_enabled": True,
+            "address": "Calle Principal 1",
+        },
+        headers=AUTH,
+    )
+    restaurant_id = uuid.UUID(create_resp.json()["id"])
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        from app.db.models.delivery import DeliveryProvider
+
+        legacy_provider = DeliveryProvider(
+            name="Mexy Legacy",
+            legal_name="Mexy Legacy",
+            slug="mexy",
+            status="active",
+            timezone="America/Mexico_City",
+            service_manually_enabled=True,
+        )
+        session.add(legacy_provider)
+        session.flush()
+        session.add(
+            RestaurantDeliveryProvider(
+                restaurant_id=restaurant_id,
+                delivery_provider_id=legacy_provider.id,
+                status="pending",
+                is_default=False,
+            )
+        )
+        session.commit()
+
+    from app.api.deps import get_auth
+    from app.core.security import AuthenticatedUser, AuthPort
+    from app.main import app
+
+    class MexyAuth(AuthPort):
+        def verify_token(self, token: str) -> AuthenticatedUser:
+            return AuthenticatedUser(id=MEXY_USER, email="mexy@example.com")
+
+    app.dependency_overrides[get_auth] = MexyAuth
+
+    listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
+    assert listed.status_code == 200
+    assert len(listed.json()) == 1
+    assert listed.json()[0]["restaurant"]["name"] == "Wild Rooster"
+    link_id = listed.json()[0]["id"]
+
+    accepted = client.post(
+        f"/api/v1/delivery-providers/me/partnership-requests/{link_id}/accept",
+        headers=AUTH,
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["status"] == "active"
+
+    with factory() as session:
+        links = session.scalars(
+            select(RestaurantDeliveryProvider).where(
+                RestaurantDeliveryProvider.restaurant_id == restaurant_id,
+            )
+        ).all()
+        assert len(links) == 1
+        assert links[0].status == "active"
+        assert links[0].delivery_provider_id == provider_id
+
+    app.dependency_overrides[get_auth] = lambda: __import__(
+        "tests.api.test_api_v1", fromlist=["FakeAuth"]
+    ).FakeAuth(OWNER)
+
+
+@requires_db
 def test_delivery_provider_member_sees_platform_requests_with_non_mexy_slug(client, engine):
     create_resp = client.post(
         "/api/v1/restaurants",
