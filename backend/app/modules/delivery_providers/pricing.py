@@ -233,7 +233,7 @@ def quote_delivery_fee(
     if bracket is None:
         return PricingQuote(
             available=False,
-            reason=f"Distancia fuera de cobertura (máx. {config.outside_polygon.max_distance_km:g} km)",
+            reason=f"Distancia fuera de cobertura de reparto (máx. {config.outside_polygon.max_distance_km:g} km)",
             total_cents=0,
             repa_cents=0,
             mexy_cents=0,
