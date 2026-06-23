@@ -8,6 +8,8 @@ export type RequestOptions = {
   token?: string | null;
   headers?: Record<string, string>;
   idempotencyKey?: string;
+  cache?: RequestCache;
+  next?: NextFetchRequestConfig;
 };
 
 export async function apiRequest<T>(
@@ -36,6 +38,8 @@ export async function apiRequest<T>(
     response = await fetch(`${API_URL}${path}`, {
       method: options.method ?? (options.body !== undefined ? 'POST' : 'GET'),
       headers,
+      cache: options.cache,
+      next: options.next,
       body:
         options.body === undefined
           ? undefined
