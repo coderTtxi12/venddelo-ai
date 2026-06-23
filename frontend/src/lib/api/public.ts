@@ -1,5 +1,7 @@
 import { apiRequest } from './client';
 import type { Category, Product, Promotion, RestaurantSchedule } from './types';
+import type { PaymentMethodKey } from '@/lib/restaurantPaymentConfig';
+import type { RestaurantServiceType } from '@/lib/restaurantServices';
 
 export type PublicRestaurant = {
   name: string;
@@ -68,6 +70,40 @@ export type CartQuoteInput = {
   }[];
 };
 
+export type PublicCheckoutPaymentMethod = {
+  method: PaymentMethodKey;
+  service_type: RestaurantServiceType;
+};
+
+export type PublicDeliveryService = {
+  available: boolean;
+  reason: string | null;
+  partnership_status: 'none' | 'pending' | 'active' | 'suspended';
+  provider_name: string | null;
+};
+
+export type PublicCheckoutConfig = {
+  takeout_enabled: boolean;
+  delivery_enabled: boolean;
+  payment_methods: PublicCheckoutPaymentMethod[];
+  delivery_service: PublicDeliveryService | null;
+};
+
+export type PublicDeliveryQuote = {
+  available: boolean;
+  reason: string | null;
+  delivery_fee_cents: number;
+  inside_polygon: boolean;
+  distance_km: number | null;
+  provider_name: string | null;
+  partnership_status: 'none' | 'pending' | 'active' | 'suspended';
+};
+
+export type PublicDeliveryQuoteInput = {
+  latitude: number;
+  longitude: number;
+};
+
 export function getPublicRestaurant(subdomain: string) {
   return apiRequest<PublicRestaurant>(`/public/restaurants/${encodeURIComponent(subdomain)}`);
 }
@@ -94,6 +130,19 @@ export function getPublicRestaurantPromotions(subdomain: string) {
 export function quoteCart(subdomain: string, data: CartQuoteInput) {
   return apiRequest<CartQuote>(
     `/public/restaurants/${encodeURIComponent(subdomain)}/cart/quote`,
+    { method: 'POST', body: data },
+  );
+}
+
+export function getPublicCheckoutConfig(subdomain: string) {
+  return apiRequest<PublicCheckoutConfig>(
+    `/public/restaurants/${encodeURIComponent(subdomain)}/checkout-config`,
+  );
+}
+
+export function quotePublicDelivery(subdomain: string, data: PublicDeliveryQuoteInput) {
+  return apiRequest<PublicDeliveryQuote>(
+    `/public/restaurants/${encodeURIComponent(subdomain)}/delivery-quote`,
     { method: 'POST', body: data },
   );
 }
