@@ -152,12 +152,6 @@ function lineHasComplementExcludedWarning(quoteLine: CartQuoteLine): boolean {
   return quoteLine.promo_warnings?.includes(PROMO_WARNING_COMPLEMENT_EXCLUDED) ?? false;
 }
 
-function quoteLineDiscountCents(
-  subtotalBeforeDiscountCents: number,
-  quoteLine: CartQuoteLine,
-): number {
-  return Math.max(0, subtotalBeforeDiscountCents - quoteLine.line_total_cents);
-}
 
 function computePercentOrAmountDiscountCents(
   promotion: Promotion,
@@ -201,51 +195,44 @@ function allocateStackedDiscounts(
 
   const catalogPerUnit = catalogPromo ? catalogDiscountPerUnitCents(product, catalogPromo) : 0;
 
-  const bundlePromos = promotions.filter(
+  const appliedBundle = promotions.find(
     (promotion) =>
       isBundlePromo(promotion) &&
       isPromotionEffective(promotion, now, timezone) &&
-      promotionAppliesToProduct(promotion, product),
+      promotionAppliesToProduct(promotion, product) &&
+      promotion.id === quoteLine.applied_promotion_id,
   );
-
-  const appliedBundle = bundlePromos.find(
-    (promotion) => promotion.id === quoteLine.applied_promotion_id,
-  );
-
-  let catalogCents = catalogPerUnit * quantity;
-  let bundleCents = 0;
 
   if (appliedBundle) {
-    bundleCents = actualTotalDiscount;
+    // Backend stacks catalog base discount before bundle pairing (_discounted_base_cents).
+    const catalogCents =
+      catalogPerUnit > 0
+        ? Math.min(catalogPerUnit * quantity, actualTotalDiscount)
+        : 0;
+    const bundleCents = actualTotalDiscount - catalogCents;
     if (bundleCents > 0) {
       bundleByPromoId.set(appliedBundle.id, bundleCents);
-      catalogCents = 0;
     }
+    return { catalogCents, bundleByPromoId, linePromoById };
   }
 
-  const allocated = catalogCents + bundleCents;
+  const appliedLinePromo = quoteLine.applied_promotion_id
+    ? promotions.find((promotion) => promotion.id === quoteLine.applied_promotion_id)
+    : undefined;
 
-  if (allocated > actualTotalDiscount && allocated > 0) {
-    catalogCents = Math.max(0, actualTotalDiscount - bundleCents);
-  } else if (allocated < actualTotalDiscount) {
-    if (bundleCents > 0) {
-      catalogCents = actualTotalDiscount - bundleCents;
-    } else if (catalogPromo) {
-      catalogCents = actualTotalDiscount;
-    } else {
-      const appliedLinePromo = promotions.find(
-        (promotion) => promotion.id === quoteLine.applied_promotion_id,
-      );
-      if (appliedLinePromo && isPercentOrAmountPromo(appliedLinePromo)) {
-        linePromoById.set(appliedLinePromo.id, actualTotalDiscount);
-      }
-      catalogCents = 0;
-    }
+  if (
+    appliedLinePromo &&
+    isCatalogProductDiscountPromotion(appliedLinePromo, product.id)
+  ) {
+    return { catalogCents: actualTotalDiscount, bundleByPromoId, linePromoById };
   }
 
-  if (catalogCents < 0) catalogCents = 0;
+  if (appliedLinePromo && isPercentOrAmountPromo(appliedLinePromo)) {
+    linePromoById.set(appliedLinePromo.id, actualTotalDiscount);
+    return { catalogCents: 0, bundleByPromoId, linePromoById };
+  }
 
-  return { catalogCents, bundleByPromoId, linePromoById };
+  return { catalogCents: 0, bundleByPromoId, linePromoById };
 }
 
 function buildDiscountDetails(
@@ -278,9 +265,6 @@ function buildDiscountDetails(
   );
 
   const details: CheckoutDiscountDetail[] = [];
-  const bundleAppliedOnLine = promotions.some(
-    (promotion) => isBundlePromo(promotion) && isBundleAppliedOnLine(promotion, quoteLine),
-  );
 
   for (const promotion of promotions) {
     if (!isRelevantLinePromo(promotion)) continue;
@@ -288,7 +272,6 @@ function buildDiscountDetails(
     if (!promotionAppliesToProduct(promotion, product)) continue;
 
     if (isCatalogProductDiscountPromotion(promotion, product.id)) {
-      if (bundleAppliedOnLine) continue;
       const discountCents = allocation.catalogCents;
       details.push({
         promotionId: promotion.id,
@@ -303,16 +286,16 @@ function buildDiscountDetails(
 
     if (isBundlePromo(promotion)) {
       const isAppliedOnLine = isBundleAppliedOnLine(promotion, quoteLine);
-      const lineDiscountCents = isAppliedOnLine
-        ? quoteLineDiscountCents(subtotalBeforeDiscountCents, quoteLine)
+      const discountCents = isAppliedOnLine
+        ? (allocation.bundleByPromoId.get(promotion.id) ?? 0)
         : 0;
 
       details.push({
         promotionId: promotion.id,
         label: promoDisplayLabel(promotion),
         badge: bundleShortBadge(promotion),
-        discountCents: lineDiscountCents,
-        applied: isAppliedOnLine,
+        discountCents,
+        applied: isAppliedOnLine && discountCents > 0,
         notAppliedReason: isAppliedOnLine
           ? null
           : bundleNotAppliedReasonForLine(promotion, quantity, quoteLine),
