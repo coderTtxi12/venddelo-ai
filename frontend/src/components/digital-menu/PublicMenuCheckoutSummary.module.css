@@ -72,6 +72,49 @@
   min-height: 0;
 }
 
+.fulfillmentCard {
+  margin: 0.75rem 1rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--dm-border, #e2e8f0);
+  border-radius: var(--dm-radius-card, 14px);
+  background: var(--dm-surface, #fff);
+}
+
+.fulfillmentTitle {
+  margin: 0 0 0.65rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--dm-text, #111827);
+}
+
+.fulfillmentList {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.fulfillmentRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 0.65rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.fulfillmentLabel {
+  margin: 0;
+  color: var(--dm-text-secondary, #64748b);
+}
+
+.fulfillmentValue {
+  margin: 0;
+  font-weight: 600;
+  color: var(--dm-text, #111827);
+  text-align: right;
+  word-break: break-word;
+}
+
 .lineList {
   list-style: none;
   margin: 0;
@@ -427,6 +470,11 @@
     margin: 0 auto;
   }
 
+  .fulfillmentCard {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+
   .lineList {
     padding: 0;
     gap: 1rem;
@@ -492,6 +540,11 @@
   padding: 1rem 24px 2rem;
   max-width: none;
   width: 100%;
+  margin: 0;
+}
+
+.checkoutSummary.publicTablet .fulfillmentCard {
+  grid-column: 1 / -1;
   margin: 0;
 }
 

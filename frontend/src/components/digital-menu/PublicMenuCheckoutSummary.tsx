@@ -13,8 +13,13 @@ import {
 } from '@/lib/digital-menu/cart/buildCheckoutLineBreakdown';
 import { cartItemCount } from '@/lib/digital-menu/cart/cartMath';
 import type { PublicMenuCartLine } from '@/lib/digital-menu/cart/types';
+import type { CheckoutFulfillment } from '@/lib/digital-menu/checkout/fulfillment';
 import { promoWarningLabel } from '@/lib/promotions/bundlePromoEligibility';
 import { formatMoney } from '@/lib/currency';
+import {
+  PAYMENT_METHOD_LABELS,
+} from '@/lib/restaurantPaymentConfig';
+import { RESTAURANT_SERVICE_LABELS } from '@/lib/restaurantServices';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
@@ -26,9 +31,54 @@ type PublicMenuCheckoutSummaryProps = {
   products: Product[];
   promotions: Promotion[];
   currency: string;
+  fulfillment: CheckoutFulfillment;
   onBack: () => void;
   isTabletLayout?: boolean;
 };
+
+function FulfillmentSummary({
+  fulfillment,
+  currency,
+}: {
+  fulfillment: CheckoutFulfillment;
+  currency: string;
+}) {
+  return (
+    <section className={styles.fulfillmentCard} aria-label="Detalles de entrega y pago">
+      <h2 className={styles.fulfillmentTitle}>Detalles del pedido</h2>
+      <dl className={styles.fulfillmentList}>
+        <div className={styles.fulfillmentRow}>
+          <dt className={styles.fulfillmentLabel}>Tipo de pedido</dt>
+          <dd className={styles.fulfillmentValue}>
+            {RESTAURANT_SERVICE_LABELS[fulfillment.serviceType]}
+          </dd>
+        </div>
+        {fulfillment.serviceType === 'delivery' ? (
+          <div className={styles.fulfillmentRow}>
+            <dt className={styles.fulfillmentLabel}>Dirección</dt>
+            <dd className={styles.fulfillmentValue}>{fulfillment.deliveryAddress.trim()}</dd>
+          </div>
+        ) : null}
+        {fulfillment.serviceType === 'delivery' && fulfillment.deliveryFeeCents != null ? (
+          <div className={styles.fulfillmentRow}>
+            <dt className={styles.fulfillmentLabel}>Envío</dt>
+            <dd className={styles.fulfillmentValue}>
+              {formatMoney(fulfillment.deliveryFeeCents / 100, currency)}
+            </dd>
+          </div>
+        ) : null}
+        {fulfillment.paymentMethod ? (
+          <div className={styles.fulfillmentRow}>
+            <dt className={styles.fulfillmentLabel}>Método de pago</dt>
+            <dd className={styles.fulfillmentValue}>
+              {PAYMENT_METHOD_LABELS[fulfillment.paymentMethod]}
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+    </section>
+  );
+}
 
 function PriceRow({
   label,
@@ -71,6 +121,7 @@ function TotalsPanel({
   orderDiscount,
   orderPromoLabel,
   total,
+  deliveryFee = 0,
   variant,
 }: {
   currency: string;
@@ -80,9 +131,11 @@ function TotalsPanel({
   orderDiscount: number;
   orderPromoLabel: string | null;
   total: number;
+  deliveryFee?: number;
   variant: 'mobile' | 'desktop';
 }) {
   const itemLabel = itemCount === 1 ? '1 artículo' : `${itemCount} artículos`;
+  const grandTotal = total + deliveryFee;
   const cardClass =
     variant === 'desktop'
       ? `${styles.totalsCard} ${styles.totalsCardDesktop}`
@@ -96,7 +149,7 @@ function TotalsPanel({
         <div className={styles.mobileTotalsHeader}>
           <div>
             <p className={styles.totalsFinalLabel}>Total final</p>
-            <p className={styles.totalsFinalValue}>{formatMoney(total, currency)}</p>
+            <p className={styles.totalsFinalValue}>{formatMoney(grandTotal, currency)}</p>
           </div>
           <span className={styles.totalsRowValue}>{itemLabel}</span>
         </div>
@@ -130,6 +183,13 @@ function TotalsPanel({
             </span>
           </div>
         ) : null}
+
+        {deliveryFee > 0 ? (
+          <div className={styles.totalsRow}>
+            <span className={styles.totalsRowLabel}>Envío</span>
+            <span className={styles.totalsRowValue}>{formatMoney(deliveryFee, currency)}</span>
+          </div>
+        ) : null}
       </div>
 
       {variant === 'desktop' ? (
@@ -137,10 +197,12 @@ function TotalsPanel({
           <div className={styles.totalsDivider} aria-hidden />
           <div>
             <p className={styles.totalsFinalLabel}>Total final</p>
-            <p className={styles.totalsFinalValue}>{formatMoney(total, currency)}</p>
+            <p className={styles.totalsFinalValue}>{formatMoney(grandTotal, currency)}</p>
           </div>
           <p className={styles.totalsNote}>
-            Impuestos y envío se confirman al completar el pedido.
+            {deliveryFee > 0
+              ? 'El envío ya está incluido en el total final.'
+              : 'El costo de envío se confirma al enviar el pedido.'}
           </p>
         </>
       ) : null}
@@ -302,6 +364,7 @@ export function PublicMenuCheckoutSummary({
   products,
   promotions,
   currency,
+  fulfillment,
   onBack,
   isTabletLayout = false,
 }: PublicMenuCheckoutSummaryProps) {
@@ -342,6 +405,10 @@ export function PublicMenuCheckoutSummary({
     ? promotionsById.get(quote.applied_order_promotion_id)
     : undefined;
   const orderPromoLabel = promotionDisplayName(orderPromo);
+  const deliveryFee =
+    fulfillment.serviceType === 'delivery' && fulfillment.deliveryFeeCents != null
+      ? fulfillment.deliveryFeeCents / 100
+      : 0;
 
   const toggleLine = (lineId: string) => {
     setCollapsedLineIds((prev) => {
@@ -361,20 +428,22 @@ export function PublicMenuCheckoutSummary({
         <button
           type="button"
           className={styles.backBtn}
-          aria-label="Volver al carrito"
+          aria-label="Volver a completar pedido"
           onClick={onBack}
         >
           <ArrowBackIcon fontSize="small" />
         </button>
         <div className={styles.headerCopy}>
-          <h1 className={styles.title}>Tu cuenta</h1>
+          <h1 className={styles.title}>Confirmar pedido</h1>
           <p className={styles.headerMeta}>
-            {itemCount === 1 ? '1 artículo' : `${itemCount} artículos`} · promociones aplicadas
+            {itemCount === 1 ? '1 artículo' : `${itemCount} artículos`} · revisa antes de enviar
           </p>
         </div>
       </header>
 
       <div className={styles.body}>
+        <FulfillmentSummary fulfillment={fulfillment} currency={currency} />
+
         <ul className={styles.lineList} aria-label="Desglose del pedido">
           {lineBreakdowns.map((breakdown) => (
             <CheckoutLineCard
@@ -396,6 +465,7 @@ export function PublicMenuCheckoutSummary({
             orderDiscount={orderDiscount}
             orderPromoLabel={orderPromoLabel}
             total={total}
+            deliveryFee={deliveryFee}
             variant="desktop"
           />
         </aside>
@@ -410,6 +480,7 @@ export function PublicMenuCheckoutSummary({
           orderDiscount={orderDiscount}
           orderPromoLabel={orderPromoLabel}
           total={total}
+          deliveryFee={deliveryFee}
           variant="mobile"
         />
       </footer>
