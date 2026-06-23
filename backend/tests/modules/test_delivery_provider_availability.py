@@ -45,6 +45,34 @@ def test_resolve_service_status_manual_off_overrides_schedule():
     assert resolved.status_reason == "manual_off"
 
 
+def test_is_within_schedule_early_morning_slot():
+    schedules = [_slot(1, "01:00:00", "21:00:00")]
+    # Tuesday 1:40 a.m. in Mexico City
+    now = datetime(2026, 6, 23, 7, 40, tzinfo=UTC)
+
+    assert is_within_schedule(
+        schedules,
+        timezone="America/Mexico_City",
+        now=now,
+    )
+
+
+def test_resolve_service_status_active_with_early_morning_schedule():
+    schedules = [_slot(1, "01:00:00", "21:00:00")]
+    now = datetime(2026, 6, 23, 7, 40, tzinfo=UTC)
+
+    resolved = resolve_service_status(
+        manually_enabled=True,
+        schedules=schedules,
+        timezone="America/Mexico_City",
+        now=now,
+    )
+
+    assert resolved.within_schedule is True
+    assert resolved.service_active is True
+    assert resolved.status_reason == "active"
+
+
 def test_resolve_service_status_outside_schedule():
     schedules = [_slot(0, "09:00:00", "21:00:00")]
     now = datetime(2026, 6, 22, 5, 0, tzinfo=UTC)
