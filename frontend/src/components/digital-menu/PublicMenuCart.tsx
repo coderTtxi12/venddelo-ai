@@ -19,8 +19,35 @@ import { formatMoney } from '@/lib/currency';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
+import { PublicMenuCheckoutDetails } from './PublicMenuCheckoutDetails';
 import { PublicMenuCheckoutSummary } from './PublicMenuCheckoutSummary';
+import {
+  type CheckoutFulfillment,
+  EMPTY_DELIVERY_LOCATION,
+} from '@/lib/digital-menu/checkout/fulfillment';
+import {
+  readCheckoutPreferencesFromStorage,
+  toStoredCheckoutPreferences,
+  writeCheckoutPreferencesToStorage,
+} from '@/lib/digital-menu/checkout/preferencesStorage';
 import styles from './PublicMenuCart.module.css';
+
+type CheckoutStep = 'cart' | 'fulfillment' | 'summary';
+
+function createFallbackFulfillment(subdomain: string): CheckoutFulfillment {
+  const saved = readCheckoutPreferencesFromStorage(subdomain);
+  if (saved) {
+    return {
+      ...saved,
+      deliveryFeeCents: null,
+    };
+  }
+  return {
+    serviceType: 'delivery',
+    ...EMPTY_DELIVERY_LOCATION,
+    paymentMethod: null,
+  };
+}
 
 type PublicMenuCartProps = {
   subdomain: string;
@@ -113,7 +140,7 @@ function CartOrderSummary({
             {quoteLoading
               ? 'Aplicando promociones…'
               : promosApplied
-                ? 'Ver cuenta'
+                ? 'Completar pedido'
                 : 'Continuar'}
           </span>
           {!quoteLoading && variant === 'desktop' ? (
@@ -129,7 +156,7 @@ function CartOrderSummary({
         </p>
       ) : (
         <p className={styles.summaryNote}>
-          Impuestos y envío se confirman al completar el pedido.
+          El envío se confirma al completar el pedido.
         </p>
       )}
     </div>
@@ -149,8 +176,16 @@ export function PublicMenuCart({
   onRemoveLine,
   isTabletLayout = false,
 }: PublicMenuCartProps) {
-  const [showCheckoutSummary, setShowCheckoutSummary] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>('cart');
+  const [fulfillment, setFulfillment] = useState<CheckoutFulfillment>(() =>
+    createFallbackFulfillment(subdomain),
+  );
   const [collapsedLineIds, setCollapsedLineIds] = useState<Set<string>>(() => new Set());
+
+  const handleFulfillmentChange = (next: CheckoutFulfillment) => {
+    setFulfillment(next);
+    writeCheckoutPreferencesToStorage(subdomain, toStoredCheckoutPreferences(next));
+  };
 
   const {
     displaySubtotalCents,
@@ -190,9 +225,10 @@ export function PublicMenuCart({
   );
 
   useEffect(() => {
-    setShowCheckoutSummary(false);
+    setCheckoutStep('cart');
+    setFulfillment(createFallbackFulfillment(subdomain));
     setCollapsedLineIds(new Set());
-  }, [linesKey]);
+  }, [linesKey, subdomain]);
 
   const toggleLine = (lineId: string) => {
     setCollapsedLineIds((prev) => {
@@ -208,17 +244,28 @@ export function PublicMenuCart({
 
   const handleContinue = async () => {
     if (!canContinue) return;
-    if (promosApplied && quote) {
-      setShowCheckoutSummary(true);
-      return;
+    if (!promosApplied) {
+      const result = await applyPromotions();
+      if (!result) return;
     }
-    const result = await applyPromotions();
-    if (result) {
-      setShowCheckoutSummary(true);
-    }
+    setCheckoutStep('fulfillment');
   };
 
-  if (showCheckoutSummary && quote) {
+  if (checkoutStep === 'fulfillment') {
+    return (
+      <PublicMenuCheckoutDetails
+        subdomain={subdomain}
+        fulfillment={fulfillment}
+        onFulfillmentChange={handleFulfillmentChange}
+        onBack={() => setCheckoutStep('cart')}
+        onContinue={() => setCheckoutStep('summary')}
+        currency={currency}
+        isTabletLayout={isTabletLayout}
+      />
+    );
+  }
+
+  if (checkoutStep === 'summary' && quote) {
     return (
       <PublicMenuCheckoutSummary
         lines={lines}
@@ -226,7 +273,8 @@ export function PublicMenuCart({
         products={products}
         promotions={promotions}
         currency={currency}
-        onBack={() => setShowCheckoutSummary(false)}
+        fulfillment={fulfillment}
+        onBack={() => setCheckoutStep('fulfillment')}
         isTabletLayout={isTabletLayout}
       />
     );
