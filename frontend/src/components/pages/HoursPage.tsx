@@ -97,6 +97,13 @@ export default function HoursPage() {
   const hasScheduleContent =
     restaurant?.takeout_enabled || restaurant?.delivery_enabled;
 
+  async function saveSchedules(payload: Parameters<typeof setRestaurantSchedules>[2]) {
+    if (!accessToken || !restaurantId) return;
+    await setRestaurantSchedules(accessToken, restaurantId, payload);
+    const updated = await listRestaurantSchedules(accessToken, restaurantId);
+    setSchedules(updated);
+  }
+
   if (loading || authLoading) {
     return (
       <div className={styles.page}>
@@ -135,20 +142,35 @@ export default function HoursPage() {
           </p>
         ) : (
           <div className={styles.hoursWrap}>
-            {restaurant.delivery_enabled ? (
-              <DeliveryPartnershipStatus partnership={deliveryPartnership} />
+            {restaurant.takeout_enabled ? (
+              <div className={styles.takeoutBlock}>
+                <DashboardRestaurantHours
+                  section="takeout"
+                  schedules={schedules}
+                  takeoutEnabled={restaurant.takeout_enabled}
+                  deliveryEnabled={restaurant.delivery_enabled}
+                  onSave={saveSchedules}
+                />
+              </div>
             ) : null}
-            <DashboardRestaurantHours
-              schedules={schedules}
-              takeoutEnabled={restaurant.takeout_enabled}
-              deliveryEnabled={restaurant.delivery_enabled}
-              onSave={async (payload) => {
-                if (!accessToken || !restaurantId) return;
-                await setRestaurantSchedules(accessToken, restaurantId, payload);
-                const updated = await listRestaurantSchedules(accessToken, restaurantId);
-                setSchedules(updated);
-              }}
-            />
+
+            {restaurant.delivery_enabled ? (
+              <div
+                className={
+                  restaurant.takeout_enabled ? styles.deliveryBlock : styles.deliveryBlockOnly
+                }
+              >
+                <DeliveryPartnershipStatus partnership={deliveryPartnership} />
+                <div className={styles.deliveryHoursEmbed}>
+                  <DashboardRestaurantHours
+                    section="delivery"
+                    schedules={schedules}
+                    takeoutEnabled={restaurant.takeout_enabled}
+                    deliveryEnabled={restaurant.delivery_enabled}
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </section>

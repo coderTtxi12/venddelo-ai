@@ -43,6 +43,62 @@
   overflow: hidden;
 }
 
+.deliveryBlock,
+.deliveryBlockOnly {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.75rem;
+}
+
+.deliveryBlock {
+  border-top: 1px solid var(--color-border);
+}
+
+.deliveryBlock > :first-child,
+.deliveryBlockOnly > :first-child {
+  margin-top: 0;
+}
+
+.deliveryHoursEmbed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.deliveryHoursEmbed :global(.deliverySection) {
+  gap: 0.65rem;
+}
+
+.deliveryHoursEmbed :global(.providerNotice) {
+  margin: 0;
+  padding: 0.85rem 0.95rem;
+  gap: 0.75rem;
+}
+
+.deliveryHoursEmbed :global(.providerNoticeIcon) {
+  width: 2.1rem;
+  height: 2.1rem;
+}
+
+.deliveryHoursEmbed :global(.deliverySection) {
+  padding-left: 0;
+  padding-right: 0;
+  padding-bottom: 0.25rem;
+}
+
+.deliveryHoursEmbed :global(.embeddedDisplay .hoursSection) {
+  padding: 0;
+}
+
+.deliveryHoursEmbed :global(.embeddedDisplay .hoursBlocks) {
+  padding: 0;
+}
+
+.takeoutBlock {
+  display: block;
+}
+
 .hoursWrap :global(.hoursSection) {
   margin-top: 0;
   border-top: none;
