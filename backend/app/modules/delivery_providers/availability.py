@@ -61,6 +61,20 @@ def is_within_schedule(
     return False
 
 
+def is_within_regular_schedule(
+    schedules: list[DeliveryProviderScheduleDTO],
+    *,
+    timezone: str,
+    now: datetime | None = None,
+) -> bool:
+    return is_within_schedule(
+        schedules,
+        timezone=timezone,
+        now=now,
+        schedule_kinds=frozenset({"regular"}),
+    )
+
+
 def _slots_for_day(
     schedules: list[DeliveryProviderScheduleDTO],
     day_index: int,
