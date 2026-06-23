@@ -1,0 +1,38 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.text {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.textCollapsed {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.textExpanded {
+  display: block;
+}
+
+.toggleBtn {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.toggleBtn:hover {
+  color: color-mix(in srgb, var(--color-primary) 80%, #000);
+}

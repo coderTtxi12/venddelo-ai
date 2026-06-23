@@ -1,0 +1,19 @@
+.card {
+  border-color: color-mix(in srgb, #16a34a 22%, var(--color-border));
+}
+
+.card:hover {
+  border-color: color-mix(in srgb, #16a34a 40%, var(--color-border));
+}
+
+.activeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: color-mix(in srgb, #16a34a 12%, transparent);
+  color: #15803d;
+}
