@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType, type FormEvent } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CreditCardOutlinedIcon from '@mui/icons-material/CreditCardOutlined';
 import BoltOutlinedIcon from '@mui/icons-material/BoltOutlined';
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
+import type { SvgIconProps } from '@mui/material/SvgIcon';
 import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined';
 import { getPublicCheckoutConfig, type PublicCheckoutConfig } from '@/lib/api/public';
 import {
@@ -35,7 +36,7 @@ import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import { CheckoutDeliveryAddressPicker } from './CheckoutDeliveryAddressPicker';
 import styles from './PublicMenuCheckoutDetails.module.css';
 
-const SERVICE_ICONS: Record<RestaurantServiceType, typeof StorefrontOutlinedIcon> = {
+const SERVICE_ICONS: Record<RestaurantServiceType, ComponentType<SvgIconProps>> = {
   takeout: StorefrontOutlinedIcon,
   delivery: BoltOutlinedIcon,
 };
