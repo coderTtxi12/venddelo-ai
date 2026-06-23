@@ -240,7 +240,7 @@ export default function PublicDigitalMenuPage({
       }
     }
 
-    async function load() {
+    async function loadCritical() {
       setLoading(true);
       setLoadError(null);
 
@@ -281,11 +281,22 @@ export default function PublicDigitalMenuPage({
       }
     }
 
-    void load();
+    async function bootstrap() {
+      if (hasServerPrefetch) {
+        setIsInteractive(true);
+        void loadSecondaryData();
+        return;
+      }
+
+      await loadCritical();
+      if (!cancelled) setIsInteractive(true);
+    }
+
+    void bootstrap();
     return () => {
       cancelled = true;
     };
-  }, [subdomain]);
+  }, [subdomain, hasServerPrefetch]);
 
   const effectiveNow = useMemo(
     () => new Date(promotionsContext?.server_now ?? restaurant?.server_now ?? Date.now()),
