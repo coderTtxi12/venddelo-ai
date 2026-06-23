@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime, time
 
-from sqlalchemy import select, text
+from sqlalchemy import or_, select, text
 from sqlalchemy.orm import Session
 
 from app.db.models.delivery import (
@@ -20,9 +20,11 @@ from app.db.models.delivery import (
 from app.db.models.restaurant import Restaurant
 from app.db.models.user import User
 from app.modules.delivery_providers.constants import (
+    MEXY_LEGACY_SLUG,
     MEXY_PROVIDER_NAME,
     MEXY_PROVIDER_SLUG,
     MEXY_PROVIDER_SLUG_PREFIX,
+    is_mexy_provider_slug,
 )
 from app.modules.delivery_providers.pricing import (
     config_from_json,
@@ -192,6 +194,38 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             center_lat=row["center_lat"],
             center_lng=row["center_lng"],
         )
+
+    def point_in_primary_zone(
+        self, provider_id: uuid.UUID, latitude: float, longitude: float
+    ) -> bool:
+        row = (
+            self._session.execute(
+                text(
+                    """
+                    SELECT ST_Contains(
+                        boundary::geometry,
+                        ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)
+                    ) AS inside
+                    FROM delivery_provider_zones
+                    WHERE delivery_provider_id = :provider_id
+                      AND is_active = true
+                      AND boundary IS NOT NULL
+                    ORDER BY priority ASC, created_at ASC
+                    LIMIT 1
+                    """
+                ),
+                {
+                    "provider_id": str(provider_id),
+                    "lat": latitude,
+                    "lng": longitude,
+                },
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            return False
+        return bool(row["inside"])
 
     def update_profile(
         self,
@@ -492,7 +526,29 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             ),
         )
 
+    def _mexy_slug_clause(self):
+        return or_(
+            DeliveryProvider.slug == MEXY_LEGACY_SLUG,
+            DeliveryProvider.slug.startswith(MEXY_PROVIDER_SLUG_PREFIX),
+        )
+
     def get_mexy_provider_id(self) -> uuid.UUID | None:
+        operational = self._session.scalar(
+            select(DeliveryProvider.id)
+            .join(
+                DeliveryProviderMember,
+                DeliveryProviderMember.delivery_provider_id == DeliveryProvider.id,
+            )
+            .where(
+                DeliveryProviderMember.is_active.is_(True),
+                self._mexy_slug_clause(),
+            )
+            .order_by(DeliveryProvider.created_at.desc())
+            .limit(1)
+        )
+        if operational is not None:
+            return operational
+
         exact = self._session.scalar(
             select(DeliveryProvider.id).where(DeliveryProvider.slug == MEXY_PROVIDER_SLUG).limit(1)
         )
@@ -500,19 +556,18 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             return exact
         return self._session.scalar(
             select(DeliveryProvider.id)
-            .where(DeliveryProvider.slug.startswith(MEXY_PROVIDER_SLUG_PREFIX))
+            .where(self._mexy_slug_clause())
             .order_by(DeliveryProvider.created_at.asc())
             .limit(1)
         )
 
     def get_mexy_provider_ids(self) -> Sequence[uuid.UUID]:
-        return list(
-            self._session.scalars(
-                select(DeliveryProvider.id)
-                .where(DeliveryProvider.slug.startswith(MEXY_PROVIDER_SLUG_PREFIX))
-                .order_by(DeliveryProvider.created_at.asc())
-            ).all()
-        )
+        rows = self._session.scalars(
+            select(DeliveryProvider.id)
+            .where(self._mexy_slug_clause())
+            .order_by(DeliveryProvider.created_at.asc())
+        ).all()
+        return list(rows)
 
     def user_is_mexy_courier(self, user_id: uuid.UUID) -> bool:
         member_id = self._session.scalar(
@@ -524,7 +579,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             .where(
                 DeliveryProviderMember.user_id == user_id,
                 DeliveryProviderMember.is_active.is_(True),
-                DeliveryProvider.slug.startswith(MEXY_PROVIDER_SLUG_PREFIX),
+                self._mexy_slug_clause(),
             )
             .limit(1)
         )
@@ -634,12 +689,43 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         if link.status != "pending":
             raise ValidationError("Esta solicitud ya fue procesada")
 
+        self._resolve_duplicate_mexy_partnerships_before_accept(
+            restaurant_id=link.restaurant_id,
+            keep_link_id=link.id,
+        )
+
         now = datetime.now(UTC)
         link.status = "active"
         link.is_default = True
         link.activated_at = now
         self._session.flush()
         return self._partnership_dto_from_row(link, restaurant, owner_display_name)
+
+    def _resolve_duplicate_mexy_partnerships_before_accept(
+        self,
+        *,
+        restaurant_id: uuid.UUID,
+        keep_link_id: uuid.UUID,
+    ) -> None:
+        siblings = self._session.scalars(
+            select(RestaurantDeliveryProvider)
+            .join(
+                DeliveryProvider,
+                DeliveryProvider.id == RestaurantDeliveryProvider.delivery_provider_id,
+            )
+            .where(
+                RestaurantDeliveryProvider.restaurant_id == restaurant_id,
+                RestaurantDeliveryProvider.id != keep_link_id,
+                self._mexy_slug_clause(),
+            )
+        ).all()
+
+        for sibling in siblings:
+            if sibling.status == "pending":
+                self._session.delete(sibling)
+            elif sibling.status == "active":
+                sibling.is_default = False
+                sibling.status = "suspended"
 
     def reject_partnership_request(self, link_id: uuid.UUID, provider_id: uuid.UUID) -> None:
         from app.core.exceptions import NotFoundError, ValidationError
@@ -667,10 +753,6 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
     def get_mexy_partnership_for_restaurant(
         self, restaurant_id: uuid.UUID
     ) -> RestaurantDeliveryPartnershipDTO | None:
-        provider_id = self.get_mexy_provider_id()
-        if provider_id is None:
-            return None
-
         row = self._session.execute(
             select(RestaurantDeliveryProvider, DeliveryProvider)
             .join(
@@ -679,13 +761,18 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             )
             .where(
                 RestaurantDeliveryProvider.restaurant_id == restaurant_id,
-                RestaurantDeliveryProvider.delivery_provider_id == provider_id,
+                self._mexy_slug_clause(),
             )
+            .order_by(RestaurantDeliveryProvider.created_at.desc())
+            .limit(1)
         ).first()
         if row is None:
             return None
 
         link, provider = row
+        if not is_mexy_provider_slug(provider.slug):
+            return None
+
         return RestaurantDeliveryPartnershipDTO(
             id=link.id,
             provider_name=provider.name,
