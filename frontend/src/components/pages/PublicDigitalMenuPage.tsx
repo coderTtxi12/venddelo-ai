@@ -672,7 +672,7 @@ export default function PublicDigitalMenuPage({
   const closeDetailView = selectedProduct ? closeProduct : closePromotion;
   const showDetailChrome = Boolean(selectedProduct || selectedPromotion) && !showCart;
 
-  if (loading) {
+  if ((!isInteractive || loading) && !loadError) {
     return (
       <div className={styles.publicShell}>
         <p className={styles.stateText}>Cargando menú…</p>
