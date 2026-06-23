@@ -169,18 +169,6 @@ export function PublicMenuCheckoutDetails({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deliveryQuote]);
 
-  useEffect(() => {
-    if (!deliverySelectable && fulfillment.serviceType === 'delivery') {
-      if (!availableServices.includes('takeout')) return;
-      persistFulfillment({
-        ...fulfillment,
-        serviceType: 'takeout',
-        ...EMPTY_DELIVERY_LOCATION,
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deliverySelectable, config]);
-
   const paymentMethods = useMemo(
     () => (config ? enabledPaymentMethodsForService(config, fulfillment.serviceType) : []),
     [config, fulfillment.serviceType],
@@ -289,10 +277,7 @@ export function PublicMenuCheckoutDetails({
             {availableServices.map((serviceType) => {
               const Icon = SERVICE_ICONS[serviceType];
               const selected = fulfillment.serviceType === serviceType;
-              const readOnly =
-                availableServices.length === 1 ||
-                (serviceType === 'delivery' && !deliverySelectable);
-              const disabled = serviceType === 'delivery' && !deliverySelectable;
+              const readOnly = availableServices.length === 1;
 
               return (
                 <button
@@ -300,16 +285,10 @@ export function PublicMenuCheckoutDetails({
                   type="button"
                   role="radio"
                   aria-checked={selected}
-                  aria-disabled={disabled}
                   className={`${styles.serviceOption} ${
                     selected ? styles.serviceOptionSelected : ''
-                  } ${readOnly ? styles.serviceOptionReadOnly : ''} ${
-                    disabled ? styles.serviceOptionDisabled : ''
-                  }`}
-                  onClick={() => {
-                    if (disabled) return;
-                    handleServiceChange(serviceType);
-                  }}
+                  } ${readOnly ? styles.serviceOptionReadOnly : ''}`}
+                  onClick={() => handleServiceChange(serviceType)}
                   disabled={readOnly && !selected}
                 >
                   <Icon className={styles.serviceOptionIcon} aria-hidden />
@@ -320,14 +299,14 @@ export function PublicMenuCheckoutDetails({
               );
             })}
           </div>
-          {!deliverySelectable && deliveryServiceReason ? (
+          {fulfillment.serviceType === 'delivery' && !deliverySelectable && deliveryServiceReason ? (
             <p className={styles.deliveryAlert} role="alert">
               {deliveryServiceReason}
             </p>
           ) : null}
         </section>
 
-        {fulfillment.serviceType === 'delivery' ? (
+        {fulfillment.serviceType === 'delivery' && deliverySelectable ? (
           <section className={styles.section} aria-labelledby="checkout-address-heading">
             <h2 id="checkout-address-heading" className={styles.sectionTitle}>
               ¿A dónde lo llevamos?
