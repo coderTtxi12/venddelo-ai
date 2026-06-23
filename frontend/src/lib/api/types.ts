@@ -74,6 +74,22 @@ export type RestaurantDeliveryPartnershipResponse = {
   partnership: RestaurantDeliveryPartnership | null;
 };
 
+export type DeliveryProviderScheduleKind = 'regular' | 'night';
+
+export type DeliveryProviderSchedule = {
+  id: string;
+  schedule_kind: DeliveryProviderScheduleKind;
+  day_of_week: number;
+  opens_at: string;
+  closes_at: string;
+};
+
+export type DeliveryProviderPaymentMethod = {
+  id: string;
+  method: 'cash' | 'transfer' | 'card_terminal';
+  enabled: boolean;
+};
+
 export type RestaurantScheduleCreateInput = {
   service_type: 'takeout' | 'delivery';
   day_of_week: number;

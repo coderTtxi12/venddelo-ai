@@ -1,6 +1,8 @@
 import { apiRequest } from './client';
 import type {
   CursorPage,
+  DeliveryProviderPaymentMethod,
+  DeliveryProviderSchedule,
   Restaurant,
   RestaurantDeliveryPartnershipResponse,
   RestaurantPaymentMethod,
@@ -143,5 +145,19 @@ export function requestRestaurantDeliveryPartnership(token: string, restaurantId
       method: 'POST',
       token,
     },
+  );
+}
+
+export function listActiveDeliveryProviderSchedules(token: string, restaurantId: string) {
+  return apiRequest<DeliveryProviderSchedule[]>(
+    `/restaurants/${restaurantId}/delivery-partnership/schedules`,
+    { token },
+  );
+}
+
+export function listActiveDeliveryProviderPaymentMethods(token: string, restaurantId: string) {
+  return apiRequest<DeliveryProviderPaymentMethod[]>(
+    `/restaurants/${restaurantId}/delivery-partnership/payment-methods`,
+    { token },
   );
 }
