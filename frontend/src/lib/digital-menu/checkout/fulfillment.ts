@@ -166,8 +166,6 @@ export function reconcileCheckoutFulfillment(
   let serviceType = fulfillment.serviceType;
   if (!services.includes(serviceType)) {
     serviceType = services.includes('delivery') && deliverySelectable ? 'delivery' : services[0]!;
-  } else if (serviceType === 'delivery' && !deliverySelectable) {
-    serviceType = services.includes('takeout') ? 'takeout' : services[0]!;
   }
 
   const methods = enabledPaymentMethodsForService(config, serviceType);
