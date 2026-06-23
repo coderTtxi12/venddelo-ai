@@ -98,12 +98,74 @@ class SqlAlchemyPromotionRepository(PromotionRepository):
             )
         )
 
+    def _product_ids_by_promotion_batch(
+        self, promotion_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[uuid.UUID]]:
+        if not promotion_ids:
+            return {}
+        rows = self._session.execute(
+            select(promotion_products.c.promotion_id, promotion_products.c.product_id).where(
+                promotion_products.c.promotion_id.in_(promotion_ids)
+            )
+        ).all()
+        result: dict[uuid.UUID, list[uuid.UUID]] = {promotion_id: [] for promotion_id in promotion_ids}
+        for row in rows:
+            result[row.promotion_id].append(row.product_id)
+        return result
+
+    def _category_ids_by_promotion_batch(
+        self, promotion_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[uuid.UUID]]:
+        if not promotion_ids:
+            return {}
+        rows = self._session.execute(
+            select(promotion_categories.c.promotion_id, promotion_categories.c.category_id).where(
+                promotion_categories.c.promotion_id.in_(promotion_ids)
+            )
+        ).all()
+        result: dict[uuid.UUID, list[uuid.UUID]] = {promotion_id: [] for promotion_id in promotion_ids}
+        for row in rows:
+            result[row.promotion_id].append(row.category_id)
+        return result
+
+    def _option_item_ids_by_promotion_batch(
+        self, promotion_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[uuid.UUID]]:
+        if not promotion_ids:
+            return {}
+        rows = self._session.execute(
+            select(
+                promotion_option_items.c.promotion_id,
+                promotion_option_items.c.option_item_id,
+            ).where(promotion_option_items.c.promotion_id.in_(promotion_ids))
+        ).all()
+        result: dict[uuid.UUID, list[uuid.UUID]] = {promotion_id: [] for promotion_id in promotion_ids}
+        for row in rows:
+            result[row.promotion_id].append(row.option_item_id)
+        return result
+
     def _to_dto(self, obj: Promotion) -> PromotionDTO:
         dto = PromotionDTO.model_validate(obj)
         dto.product_ids = self._product_ids(obj.id)
         dto.category_ids = self._category_ids(obj.id)
         dto.option_item_ids = self._option_item_ids(obj.id)
         return enrich_promotion_dto(dto)
+
+    def _to_dtos_batch(self, objs: list[Promotion]) -> list[PromotionDTO]:
+        if not objs:
+            return []
+        promotion_ids = [obj.id for obj in objs]
+        products_by_promotion = self._product_ids_by_promotion_batch(promotion_ids)
+        categories_by_promotion = self._category_ids_by_promotion_batch(promotion_ids)
+        option_items_by_promotion = self._option_item_ids_by_promotion_batch(promotion_ids)
+        dtos: list[PromotionDTO] = []
+        for obj in objs:
+            dto = PromotionDTO.model_validate(obj)
+            dto.product_ids = products_by_promotion.get(obj.id, [])
+            dto.category_ids = categories_by_promotion.get(obj.id, [])
+            dto.option_item_ids = option_items_by_promotion.get(obj.id, [])
+            dtos.append(enrich_promotion_dto(dto))
+        return dtos
 
     def add(self, data: PromotionCreate) -> PromotionDTO:
         payload = _storage_fields_from_create(data)
@@ -145,7 +207,7 @@ class SqlAlchemyPromotionRepository(PromotionRepository):
         rows = rows[: params.limit]
         next_cursor = encode_keyset_cursor(rows[-1].created_at, rows[-1].id) if has_more else None
         return CursorPage(
-            items=[self._to_dto(r) for r in rows],
+            items=self._to_dtos_batch(rows),
             next_cursor=next_cursor,
             has_more=has_more,
         )
