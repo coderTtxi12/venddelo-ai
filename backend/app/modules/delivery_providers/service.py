@@ -326,7 +326,7 @@ class DeliveryProviderService:
             parsed,
             inside_polygon=data.inside_polygon,
             distance_km=data.distance_km,
-            is_night=data.is_night,
+            is_night=data.is_night if data.inside_polygon else False,
             weather_mode=weather_mode,
         )
         return DeliveryPricingQuoteDTO(
