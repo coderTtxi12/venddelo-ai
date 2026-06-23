@@ -17,7 +17,7 @@ export const WEEKDAY_LABELS = [
 export const SCHEDULE_KIND_ORDER: DeliveryProviderScheduleKind[] = ['regular', 'night'];
 
 export const SCHEDULE_KIND_LABELS: Record<DeliveryProviderScheduleKind, string> = {
-  regular: 'Horario diurno',
+  regular: 'Horario de día',
   night: 'Horario nocturno',
 };
 
