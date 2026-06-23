@@ -542,8 +542,8 @@ export default function SettingsPage() {
               Horarios de reparto
             </h2>
             <p className={styles.panelHint}>
-              Configura tu horario diurno y nocturno. Los restaurantes verán cuándo aceptas
-              entregas.
+              Configura tu horario diurno y nocturno. El turno nocturno solo aplica dentro de tu
+              polígono de cobertura; fuera de él solo cuenta el horario diurno.
             </p>
             {scheduleError ? (
               <div className={styles.errorBanner} role="alert">
