@@ -11,6 +11,7 @@ import { PromotionShortcutProductsView } from '@/components/digital-menu/Promoti
 import { PublicDesktopMenuLayout } from '@/components/digital-menu/PublicDesktopMenuLayout';
 import { PublicMenuCart } from '@/components/digital-menu/PublicMenuCart';
 import { PublicMenuCartBar } from '@/components/digital-menu/PublicMenuCartBar';
+import { PublicMenuSearch } from '@/components/digital-menu/PublicMenuSearch';
 import type { OptionSelections } from '@/components/digital-menu/productOptionSelection';
 import {
   sortCategories,
@@ -130,6 +131,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
   const [productHeroCollapsed, setProductHeroCollapsed] = useState(false);
   const [promotionHeroCollapsed, setPromotionHeroCollapsed] = useState(false);
   const [showCart, setShowCart] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   const cart = usePublicMenuCart(subdomain);
 
@@ -553,6 +555,28 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
     setShowCart(false);
   }, []);
 
+  const openSearch = useCallback(() => {
+    setShowSearch(true);
+  }, []);
+
+  const closeSearch = useCallback(() => {
+    setShowSearch(false);
+  }, []);
+
+  useEffect(() => {
+    if (loading || loadError) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setShowSearch((current) => !current);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [loading, loadError]);
+
   const handleAddToCart = useCallback(
     (payload: { quantity: number; selections: OptionSelections; lineTotal: number; notes: string }) => {
       if (!selectedProduct) return;
@@ -684,9 +708,14 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
                 <span className={menuStyles.compactIconBtn} aria-label="Compartir">
                   <IosShareOutlinedIcon fontSize="small" />
                 </span>
-                <span className={menuStyles.compactIconBtn} aria-label="Buscar">
+                <button
+                  type="button"
+                  className={menuStyles.compactIconBtn}
+                  aria-label="Buscar en el menú"
+                  onClick={openSearch}
+                >
                   <SearchOutlinedIcon fontSize="small" />
-                </span>
+                </button>
               </div>
             </header>
           )}
@@ -783,9 +812,14 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
                         <span className={menuStyles.floatIconBtn} aria-label="Compartir">
                           <IosShareOutlinedIcon fontSize="small" />
                         </span>
-                        <span className={menuStyles.floatIconBtn} aria-label="Buscar">
+                        <button
+                          type="button"
+                          className={menuStyles.floatIconBtn}
+                          aria-label="Buscar en el menú"
+                          onClick={openSearch}
+                        >
                           <SearchOutlinedIcon fontSize="small" />
-                        </span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -927,6 +961,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
           onProductClick={openProduct}
           cartItemCount={cart.itemCount}
           onOpenCart={openCart}
+          onOpenSearch={openSearch}
           themeStyle={menuThemeStyle}
         >
           {showCart ? (
@@ -990,6 +1025,22 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
           isTabletLayout={isTabletLayout}
         />
       ) : null}
+
+      <PublicMenuSearch
+        open={showSearch}
+        onClose={closeSearch}
+        products={products}
+        categories={displayCategories}
+        promotions={promotionsContext?.items ?? []}
+        productDiscounts={productDiscounts}
+        productTimeLimitedPromotions={productTimeLimitedPromotions}
+        promotionTimezone={promotionTimezone}
+        countdownContext={promotionCountdownContext}
+        onProductSelect={openProduct}
+        onPromotionSelect={openPromotion}
+        onCategorySelect={isDesktopLayout ? handleDesktopCategorySelect : scrollToCategory}
+        themeStyle={menuThemeStyle}
+      />
     </div>
   );
 }
