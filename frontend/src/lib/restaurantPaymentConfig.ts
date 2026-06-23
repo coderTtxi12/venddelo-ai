@@ -1,4 +1,4 @@
-import type { RestaurantPaymentMethod } from '@/lib/api/types';
+import type { DeliveryProviderPaymentMethod, RestaurantPaymentMethod } from '@/lib/api/types';
 import type { RestaurantServiceType } from '@/lib/restaurantServices';
 
 export const PAYMENT_METHOD_ORDER = ['cash', 'transfer', 'card_terminal'] as const;
@@ -44,9 +44,29 @@ export function paymentMethodsToMatrix(
   return matrix;
 }
 
-export function matrixToPaymentCreates(matrix: PaymentMethodMatrix): PaymentMethodCreateInput[] {
+export function providerPaymentMethodsToDeliveryMatrix(
+  methods: DeliveryProviderPaymentMethod[],
+): PaymentMethodMatrix['delivery'] {
+  const delivery: PaymentMethodMatrix['delivery'] = {
+    cash: false,
+    transfer: false,
+    card_terminal: false,
+  };
+  for (const entry of methods) {
+    if (entry.method === 'cash' || entry.method === 'transfer' || entry.method === 'card_terminal') {
+      delivery[entry.method] = entry.enabled;
+    }
+  }
+  return delivery;
+}
+
+export function matrixToPaymentCreates(
+  matrix: PaymentMethodMatrix,
+  options?: { serviceTypes?: RestaurantServiceType[] },
+): PaymentMethodCreateInput[] {
+  const serviceTypes = options?.serviceTypes ?? (['takeout', 'delivery'] as const);
   const rows: PaymentMethodCreateInput[] = [];
-  for (const serviceType of ['takeout', 'delivery'] as const) {
+  for (const serviceType of serviceTypes) {
     for (const method of PAYMENT_METHOD_ORDER) {
       rows.push({
         method,
