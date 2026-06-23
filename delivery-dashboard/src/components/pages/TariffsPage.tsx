@@ -264,6 +264,15 @@ export default function TariffsPage() {
     }
   };
 
+  const selectSimInside = (inside: boolean) => {
+    setSimInside(inside);
+    if (!inside) {
+      setSimNight(false);
+    }
+    setQuote(null);
+    setSimError(null);
+  };
+
   const handleSimulate = useCallback(async () => {
     if (!accessToken) {
       setSimError('No hay sesión activa. Inicia sesión de nuevo.');
