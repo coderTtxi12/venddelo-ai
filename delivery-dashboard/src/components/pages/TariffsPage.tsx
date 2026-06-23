@@ -431,7 +431,8 @@ export default function TariffsPage() {
                 </h2>
                 <p className={styles.panelHint}>
                   Define tramos de distancia de ruta y sus tarifas. REPA = repartidor, MEXY =
-                  comisión plataforma, Restaurante = total cobrado.
+                  comisión plataforma, Restaurante = total cobrado. Solo disponible en horario
+                  diurno (el turno nocturno no aplica fuera del polígono).
                 </p>
               </div>
               <button type="button" className={styles.addRowBtn} onClick={addBracketRow}>
