@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 import uuid
 
 from pydantic import BaseModel, Field
@@ -68,3 +68,37 @@ class CartQuoteDTO(BaseModel):
     order_discount_cents: int
     total_cents: int
     applied_order_promotion_id: uuid.UUID | None = None
+
+
+class PublicCheckoutPaymentMethodDTO(BaseModel):
+    method: str
+    service_type: str
+
+
+class PublicDeliveryServiceDTO(BaseModel):
+    available: bool
+    reason: str | None = None
+    partnership_status: Literal["none", "pending", "active", "suspended"] = "none"
+    provider_name: str | None = None
+
+
+class PublicCheckoutConfigDTO(BaseModel):
+    takeout_enabled: bool
+    delivery_enabled: bool
+    payment_methods: list[PublicCheckoutPaymentMethodDTO] = Field(default_factory=list)
+    delivery_service: PublicDeliveryServiceDTO | None = None
+
+
+class PublicDeliveryQuoteInput(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
+class PublicDeliveryQuoteDTO(BaseModel):
+    available: bool
+    reason: str | None = None
+    delivery_fee_cents: int = 0
+    inside_polygon: bool = False
+    distance_km: float | None = None
+    provider_name: str | None = None
+    partnership_status: Literal["none", "pending", "active", "suspended"] = "none"
