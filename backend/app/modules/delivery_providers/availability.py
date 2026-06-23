@@ -33,17 +33,27 @@ def _is_time_in_slot(current: time, opens_at: time, closes_at: time) -> bool:
     return opens_at <= current < closes_at
 
 
+def _schedules_for_kinds(
+    schedules: list[DeliveryProviderScheduleDTO],
+    schedule_kinds: frozenset[str] | None,
+) -> list[DeliveryProviderScheduleDTO]:
+    if schedule_kinds is None:
+        return schedules
+    return [slot for slot in schedules if slot.schedule_kind in schedule_kinds]
+
+
 def is_within_schedule(
     schedules: list[DeliveryProviderScheduleDTO],
     *,
     timezone: str,
     now: datetime | None = None,
+    schedule_kinds: frozenset[str] | None = None,
 ) -> bool:
     local_now = (now or datetime.now(UTC)).astimezone(ZoneInfo(timezone))
     day_index = local_now.weekday()
     current_time = local_now.time().replace(microsecond=0)
 
-    for slot in schedules:
+    for slot in _schedules_for_kinds(schedules, schedule_kinds):
         if slot.day_of_week != day_index:
             continue
         if _is_time_in_slot(current_time, slot.opens_at, slot.closes_at):
