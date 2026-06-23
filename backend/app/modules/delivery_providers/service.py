@@ -8,17 +8,33 @@ import uuid
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.core.storage import StoragePort
 from app.modules.delivery_providers.availability import resolve_service_status
+from app.modules.delivery_providers.pricing import (
+    config_from_json,
+    quote_delivery_fee,
+    validate_pricing_config,
+)
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryProviderDTO,
     DeliveryProviderMeResponse,
     DeliveryProviderOnboardingSubmit,
+    DeliveryProviderPaymentMethodCreate,
+    DeliveryProviderPaymentMethodDTO,
+    DeliveryProviderPricingConfigDTO,
+    DeliveryProviderPricingResponse,
+    DeliveryProviderPricingUpdate,
     DeliveryProviderProfileUpdate,
     DeliveryProviderScheduleCreate,
     DeliveryProviderScheduleDTO,
     DeliveryProviderServiceStatusDTO,
     DeliveryProviderServiceStatusUpdate,
+    DeliveryProviderWeatherModeUpdate,
+    DeliveryPricingQuoteDTO,
+    DeliveryPricingSimulateRequest,
+    DeliveryWeatherMode,
 )
+
+PAYMENT_METHOD_KEYS: frozenset[str] = frozenset({"cash", "transfer", "card_terminal"})
 
 
 class DeliveryProviderService:
@@ -168,6 +184,37 @@ class DeliveryProviderService:
         self._validate_schedules(schedules)
         self._repo.set_schedules(provider.id, schedules)
 
+    def list_payment_methods(self, user_id: uuid.UUID) -> list[DeliveryProviderPaymentMethodDTO]:
+        provider = self._require_provider(user_id)
+        rows = list(self._repo.list_payment_methods(provider.id))
+        if not rows:
+            self._repo.seed_default_payment_methods(provider.id)
+            rows = list(self._repo.list_payment_methods(provider.id))
+        return rows
+
+    def set_payment_methods(
+        self,
+        user_id: uuid.UUID,
+        methods: list[DeliveryProviderPaymentMethodCreate],
+    ) -> list[DeliveryProviderPaymentMethodDTO]:
+        provider = self._require_provider(user_id)
+        self._validate_payment_methods(methods)
+        self._repo.set_payment_methods(provider.id, methods)
+        return list(self._repo.list_payment_methods(provider.id))
+
+    def _validate_payment_methods(self, methods: list[DeliveryProviderPaymentMethodCreate]) -> None:
+        if len(methods) != len(PAYMENT_METHOD_KEYS):
+            raise ValidationError("Debes enviar los tres métodos de pago")
+
+        seen: set[str] = set()
+        for entry in methods:
+            if entry.method in seen:
+                raise ValidationError(f"Método de pago duplicado: {entry.method}")
+            seen.add(entry.method)
+
+        if seen != PAYMENT_METHOD_KEYS:
+            raise ValidationError("Los métodos de pago deben ser efectivo, transferencia y terminal")
+
     def _validate_schedules(self, schedules: list[DeliveryProviderScheduleCreate]) -> None:
         for entry in schedules:
             if entry.opens_at >= entry.closes_at:
@@ -220,3 +267,93 @@ class DeliveryProviderService:
             next_change_at=resolved.next_change_at,
             timezone=resolved.timezone,
         )
+
+    def get_pricing(self, user_id: uuid.UUID) -> DeliveryProviderPricingResponse:
+        provider = self._require_provider(user_id)
+        config = self._load_pricing_config(provider.id)
+        weather_mode = self._repo.get_weather_mode(provider.id)
+        return DeliveryProviderPricingResponse(
+            weather_mode=weather_mode,  # type: ignore[arg-type]
+            config=config,
+        )
+
+    def update_pricing(
+        self, user_id: uuid.UUID, data: DeliveryProviderPricingUpdate
+    ) -> DeliveryProviderPricingResponse:
+        provider = self._require_provider(user_id)
+        parsed = config_from_json(
+            {
+                "inside_polygon": data.config.inside_polygon.model_dump(),
+                "outside_polygon": data.config.outside_polygon.model_dump(),
+            }
+        )
+        try:
+            validate_pricing_config(parsed)
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from exc
+
+        saved = self._repo.set_pricing_config(provider.id, data.config)
+        weather_mode = self._repo.get_weather_mode(provider.id)
+        return DeliveryProviderPricingResponse(
+            weather_mode=weather_mode,  # type: ignore[arg-type]
+            config=saved,
+        )
+
+    def update_weather_mode(
+        self, user_id: uuid.UUID, data: DeliveryProviderWeatherModeUpdate
+    ) -> DeliveryProviderPricingResponse:
+        provider = self._require_provider(user_id)
+        self._repo.set_weather_mode(provider.id, data.weather_mode)
+        return self.get_pricing(user_id)
+
+    def simulate_pricing(
+        self, user_id: uuid.UUID, data: DeliveryPricingSimulateRequest
+    ) -> DeliveryPricingQuoteDTO:
+        provider = self._require_provider(user_id)
+        config_dto = self._load_pricing_config(provider.id)
+        parsed = config_from_json(
+            {
+                "inside_polygon": config_dto.inside_polygon.model_dump(),
+                "outside_polygon": config_dto.outside_polygon.model_dump(),
+            }
+        )
+        weather_mode: DeliveryWeatherMode = (
+            data.weather_mode
+            if data.weather_mode is not None
+            else self._repo.get_weather_mode(provider.id)  # type: ignore[assignment]
+        )
+        quote = quote_delivery_fee(
+            parsed,
+            inside_polygon=data.inside_polygon,
+            distance_km=data.distance_km,
+            is_night=data.is_night,
+            weather_mode=weather_mode,
+        )
+        return DeliveryPricingQuoteDTO(
+            available=quote.available,
+            reason=quote.reason,
+            total_cents=quote.total_cents,
+            repa_cents=quote.repa_cents,
+            mexy_cents=quote.mexy_cents,
+            restaurant_cents=quote.restaurant_cents,
+            inside_polygon=quote.inside_polygon,
+            distance_km=quote.distance_km,
+            weather_mode=quote.weather_mode,
+            is_night=quote.is_night,
+        )
+
+    def _require_provider(self, user_id: uuid.UUID) -> DeliveryProviderDTO:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, _member_role = found
+        return provider
+
+    def _load_pricing_config(self, provider_id: uuid.UUID) -> DeliveryProviderPricingConfigDTO:
+        config = self._repo.get_pricing_config(provider_id)
+        if config is None:
+            self._repo.seed_default_pricing_config(provider_id)
+            config = self._repo.get_pricing_config(provider_id)
+        if config is None:
+            raise NotFoundError("No se encontró configuración de tarifas")
+        return config

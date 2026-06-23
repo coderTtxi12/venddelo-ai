@@ -324,3 +324,76 @@ def test_delivery_provider_service_status_toggle(client):
     )
     assert on.status_code == 200
     assert on.json()["manually_enabled"] is True
+
+
+@requires_db
+def test_delivery_provider_pricing_defaults_and_simulate(client):
+    create = client.post(
+        "/api/v1/delivery-providers/onboarding",
+        json=ONBOARDING_PAYLOAD,
+        headers=AUTH,
+    )
+    assert create.status_code == 201
+
+    pricing = client.get("/api/v1/delivery-providers/me/pricing", headers=AUTH)
+    assert pricing.status_code == 200
+    body = pricing.json()
+    assert body["weather_mode"] == "none"
+    assert body["config"]["inside_polygon"]["day_cents"] == 3500
+    assert len(body["config"]["outside_polygon"]["brackets"]) == 18
+
+    simulate_inside = client.post(
+        "/api/v1/delivery-providers/me/pricing/simulate",
+        json={"inside_polygon": True, "is_night": False},
+        headers=AUTH,
+    )
+    assert simulate_inside.status_code == 200
+    assert simulate_inside.json()["total_cents"] == 3500
+
+    simulate_outside = client.post(
+        "/api/v1/delivery-providers/me/pricing/simulate",
+        json={"inside_polygon": False, "distance_km": 8.5, "weather_mode": "light"},
+        headers=AUTH,
+    )
+    assert simulate_outside.status_code == 200
+    assert simulate_outside.json()["total_cents"] == 12500
+
+    weather = client.patch(
+        "/api/v1/delivery-providers/me/pricing/weather-mode",
+        json={"weather_mode": "heavy"},
+        headers=AUTH,
+    )
+    assert weather.status_code == 200
+    assert weather.json()["weather_mode"] == "heavy"
+
+
+@requires_db
+def test_delivery_provider_payment_methods_defaults_and_update(client):
+    create = client.post(
+        "/api/v1/delivery-providers/onboarding",
+        json=ONBOARDING_PAYLOAD,
+        headers=AUTH,
+    )
+    assert create.status_code == 201
+
+    listed = client.get("/api/v1/delivery-providers/me/payment-methods", headers=AUTH)
+    assert listed.status_code == 200
+    rows = listed.json()
+    assert len(rows) == 3
+    methods = {row["method"]: row["enabled"] for row in rows}
+    assert methods == {"cash": True, "transfer": True, "card_terminal": True}
+
+    updated = client.put(
+        "/api/v1/delivery-providers/me/payment-methods",
+        json=[
+            {"method": "cash", "enabled": True},
+            {"method": "transfer", "enabled": False},
+            {"method": "card_terminal", "enabled": True},
+        ],
+        headers=AUTH,
+    )
+    assert updated.status_code == 200, updated.text
+    after = {row["method"]: row["enabled"] for row in updated.json()}
+    assert after["transfer"] is False
+    assert after["cash"] is True
+    assert after["card_terminal"] is True
