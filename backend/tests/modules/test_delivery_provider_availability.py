@@ -74,6 +74,40 @@ def test_resolve_service_status_active_with_early_morning_schedule():
     assert resolved.status_reason == "active"
 
 
+def test_is_within_regular_schedule_ignores_night_slots():
+    schedules = [
+        _slot(0, "09:00:00", "21:00:00", "regular"),
+        _slot(0, "21:00:00", "22:00:00", "night"),
+    ]
+    # Monday 9:30 p.m. Mexico City — night only
+    now = datetime(2026, 6, 23, 3, 30, tzinfo=UTC)
+
+    assert not is_within_regular_schedule(
+        schedules,
+        timezone="America/Mexico_City",
+        now=now,
+    )
+    assert is_within_schedule(
+        schedules,
+        timezone="America/Mexico_City",
+        now=now,
+    )
+
+
+def test_is_within_regular_schedule_during_day():
+    schedules = [
+        _slot(0, "09:00:00", "21:00:00", "regular"),
+        _slot(0, "21:00:00", "22:00:00", "night"),
+    ]
+    now = datetime(2026, 6, 22, 18, 0, tzinfo=UTC)
+
+    assert is_within_regular_schedule(
+        schedules,
+        timezone="America/Mexico_City",
+        now=now,
+    )
+
+
 def test_resolve_service_status_outside_schedule():
     schedules = [_slot(0, "09:00:00", "21:00:00")]
     now = datetime(2026, 6, 22, 5, 0, tzinfo=UTC)
