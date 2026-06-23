@@ -10,7 +10,18 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { cartItemCount, lineTotalCents } from '@/lib/digital-menu/cart/cartMath';
 import { resolveCartLinePromoDisplay } from '@/lib/digital-menu/cart/cartLinePromoDisplay';
-import { useCheckoutCartQuote } from '@/lib/digital-menu/cart/useCheckoutCartQuote';
+import { useCheckoutCartQuote, GENERIC_CART_AVAILABILITY_ERROR } from '@/lib/digital-menu/cart/useCheckoutCartQuote';
+import {
+  cartAvailabilityIssueMessage,
+  formatCartAvailabilityMessages,
+  groupCartAvailabilityIssuesByLine,
+  type CartAvailabilityIssue,
+} from '@/lib/digital-menu/cart/validateCartAvailability';
+import {
+  fallbackCartAvailabilityIssues,
+  fetchFreshMenuAvailabilityContext,
+  validateCartAgainstMenu,
+} from '@/lib/digital-menu/cart/freshMenuAvailability';
 import type { PublicMenuCartLine } from '@/lib/digital-menu/cart/types';
 import type { Product, Promotion } from '@/lib/api/types';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
@@ -70,8 +81,10 @@ function CartOrderSummary({
   promoSavings,
   currency,
   quoteError,
+  availabilityErrors,
   promosApplied,
   quoteLoading,
+  continueLoading,
   onContinue,
   canContinue,
   variant,
@@ -82,8 +95,10 @@ function CartOrderSummary({
   promoSavings: number;
   currency: string;
   quoteError: string | null;
+  availabilityErrors: string[];
   promosApplied: boolean;
   quoteLoading: boolean;
+  continueLoading: boolean;
   onContinue: () => void;
   canContinue: boolean;
   variant: 'mobile' | 'desktop';
@@ -98,7 +113,16 @@ function CartOrderSummary({
         <h2 className={styles.summaryTitle}>Resumen del pedido</h2>
       ) : null}
 
-      {quoteError ? (
+      {availabilityErrors.length > 0 ? (
+        <div className={styles.quoteError} role="alert">
+          <p className={styles.quoteErrorLead}>Antes de continuar:</p>
+          <ul className={styles.quoteErrorList}>
+            {availabilityErrors.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+        </div>
+      ) : quoteError ? (
         <p className={styles.quoteError} role="alert">
           {quoteError}
         </p>
@@ -132,16 +156,18 @@ function CartOrderSummary({
         <button
           type="button"
           className={styles.checkoutBtn}
-          disabled={!canContinue || quoteLoading}
-          aria-busy={quoteLoading}
+          disabled={!canContinue || quoteLoading || continueLoading}
+          aria-busy={quoteLoading || continueLoading}
           onClick={onContinue}
         >
           <span>
             {quoteLoading
               ? 'Aplicando promociones…'
-              : promosApplied
-                ? 'Completar pedido'
-                : 'Continuar'}
+              : continueLoading
+                ? 'Revisando carrito…'
+                : promosApplied
+                  ? 'Completar pedido'
+                  : 'Continuar'}
           </span>
           {!quoteLoading && variant === 'desktop' ? (
             <ArrowForwardIcon sx={{ fontSize: 18 }} aria-hidden />
@@ -181,6 +207,9 @@ export function PublicMenuCart({
     createFallbackFulfillment(subdomain),
   );
   const [collapsedLineIds, setCollapsedLineIds] = useState<Set<string>>(() => new Set());
+  const [availabilityChecked, setAvailabilityChecked] = useState(false);
+  const [displayedIssues, setDisplayedIssues] = useState<CartAvailabilityIssue[]>([]);
+  const [continueLoading, setContinueLoading] = useState(false);
 
   const handleFulfillmentChange = (next: CheckoutFulfillment) => {
     setFulfillment(next);
@@ -195,7 +224,6 @@ export function PublicMenuCart({
     loading: quoteLoading,
     error: quoteError,
     applyPromotions,
-    allLinesValid,
   } = useCheckoutCartQuote(subdomain, lines, validProductIds);
 
   const subtotal = displaySubtotalCents / 100;
@@ -204,12 +232,20 @@ export function PublicMenuCart({
   const totalPromoSavings =
     quote != null ? (quote.subtotal_before_discount_cents - quote.total_cents) / 100 : 0;
   const itemCount = cartItemCount(lines);
-  const canContinue = lines.length > 0 && allLinesValid && !quoteLoading;
+  const canContinue = lines.length > 0 && !quoteLoading && !continueLoading;
 
-  const productsById = useMemo(
-    () => new Map(products.map((product) => [product.id, product])),
-    [products],
+  const displayedIssuesByLine = useMemo(
+    () => groupCartAvailabilityIssuesByLine(displayedIssues),
+    [displayedIssues],
   );
+
+  const summaryAvailabilityMessages = useMemo(
+    () => (availabilityChecked ? formatCartAvailabilityMessages(displayedIssues) : []),
+    [availabilityChecked, displayedIssues],
+  );
+
+  const summaryQuoteError =
+    quoteError && quoteError !== GENERIC_CART_AVAILABILITY_ERROR ? quoteError : null;
 
   const linesKey = useMemo(
     () =>
@@ -228,7 +264,21 @@ export function PublicMenuCart({
     setCheckoutStep('cart');
     setFulfillment(createFallbackFulfillment(subdomain));
     setCollapsedLineIds(new Set());
+    setAvailabilityChecked(false);
+    setDisplayedIssues([]);
+    setContinueLoading(false);
   }, [linesKey, subdomain]);
+
+  const revealAvailabilityIssues = (issues: CartAvailabilityIssue[]) => {
+    setDisplayedIssues(issues);
+    setCollapsedLineIds((prev) => {
+      const next = new Set(prev);
+      for (const issue of issues) {
+        next.delete(issue.lineId);
+      }
+      return next;
+    });
+  };
 
   const toggleLine = (lineId: string) => {
     setCollapsedLineIds((prev) => {
@@ -244,10 +294,39 @@ export function PublicMenuCart({
 
   const handleContinue = async () => {
     if (!canContinue) return;
+    setAvailabilityChecked(true);
+    setContinueLoading(true);
+
+    let freshMenu;
+    try {
+      freshMenu = await fetchFreshMenuAvailabilityContext(subdomain);
+    } catch {
+      freshMenu = {
+        products,
+        productsById: new Map(products.map((product) => [product.id, product])),
+        validProductIds: new Set(validProductIds),
+      };
+    }
+
+    const issues = validateCartAgainstMenu(lines, freshMenu);
+    if (issues.length > 0) {
+      revealAvailabilityIssues(issues);
+      setContinueLoading(false);
+      return;
+    }
+
+    setDisplayedIssues([]);
+
     if (!promosApplied) {
       const result = await applyPromotions();
-      if (!result) return;
+      if (!result) {
+        revealAvailabilityIssues(fallbackCartAvailabilityIssues(lines, freshMenu.validProductIds));
+        setContinueLoading(false);
+        return;
+      }
     }
+
+    setContinueLoading(false);
     setCheckoutStep('fulfillment');
   };
 
@@ -309,7 +388,7 @@ export function PublicMenuCart({
             {lines.map((line, lineIndex) => {
               const imageUrl = storagePublicUrl(line.imagePath);
               const listTotal = lineTotalCents(line) / 100;
-              const product = productsById.get(line.productId);
+              const product = products.find((entry) => entry.id === line.productId);
               const localPromo = resolveCartLinePromoDisplay(
                 line,
                 product,
@@ -334,11 +413,19 @@ export function PublicMenuCart({
                   ? localPromo.originalLineTotalCents / 100
                   : null;
               const promoWarnings = quotedLine?.promo_warnings ?? [];
+              const lineAvailabilityIssues = availabilityChecked
+                ? (displayedIssuesByLine.get(line.id) ?? [])
+                : [];
               const expanded = !collapsedLineIds.has(line.id);
               const panelId = `cart-line-${line.id}`;
 
               return (
-                <li key={line.id} className={styles.lineCard}>
+                <li
+                  key={line.id}
+                  className={`${styles.lineCard} ${
+                    lineAvailabilityIssues.length > 0 ? styles.lineCardUnavailable : ''
+                  }`}
+                >
                   {imageUrl ? (
                     <img src={imageUrl} alt="" className={styles.thumb} />
                   ) : (
@@ -411,6 +498,16 @@ export function PublicMenuCart({
                             </p>
                           );
                         })}
+                      </div>
+                    ) : null}
+
+                    {lineAvailabilityIssues.length > 0 ? (
+                      <div className={styles.lineAvailabilityErrors} role="alert">
+                        {lineAvailabilityIssues.map((issue) => (
+                          <p key={`${issue.kind}-${issue.lineId}-${issue.kind === 'complement' ? issue.itemLabel : 'product'}`} className={styles.lineAvailabilityError}>
+                            {cartAvailabilityIssueMessage(issue, 'line')}
+                          </p>
+                        ))}
                       </div>
                     ) : null}
 
@@ -489,12 +586,14 @@ export function PublicMenuCart({
               subtotalBefore={subtotalBefore}
               promoSavings={totalPromoSavings}
               currency={currency}
-              quoteError={quoteError}
+              quoteError={summaryQuoteError}
+              availabilityErrors={summaryAvailabilityMessages}
               promosApplied={promosApplied}
               quoteLoading={quoteLoading}
-          onContinue={() => void handleContinue()}
-          canContinue={canContinue}
-          variant="desktop"
+              continueLoading={continueLoading}
+              onContinue={() => void handleContinue()}
+              canContinue={canContinue}
+              variant="desktop"
         />
           </aside>
         </div>
@@ -508,9 +607,11 @@ export function PublicMenuCart({
             subtotalBefore={subtotalBefore}
             promoSavings={totalPromoSavings}
             currency={currency}
-            quoteError={quoteError}
+            quoteError={summaryQuoteError}
+            availabilityErrors={summaryAvailabilityMessages}
             promosApplied={promosApplied}
             quoteLoading={quoteLoading}
+            continueLoading={continueLoading}
             onContinue={() => void handleContinue()}
             canContinue={canContinue}
             variant="mobile"
