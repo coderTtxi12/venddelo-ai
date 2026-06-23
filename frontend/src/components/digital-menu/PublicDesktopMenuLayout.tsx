@@ -1,6 +1,8 @@
 'use client';
 
 import type { CSSProperties, MutableRefObject } from 'react';
+import { useEffect, useState } from 'react';
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import type { Category, Product, Promotion, RestaurantSchedule } from '@/lib/api/types';
 import {
   ProductListThumb,
@@ -46,6 +48,7 @@ type PublicDesktopMenuLayoutProps = {
   onProductClick: (productId: string) => void;
   cartItemCount?: number;
   onOpenCart?: () => void;
+  onOpenSearch?: () => void;
   children?: React.ReactNode;
   themeStyle?: CSSProperties;
 };
@@ -71,9 +74,19 @@ export function PublicDesktopMenuLayout({
   onProductClick,
   cartItemCount = 0,
   onOpenCart,
+  onOpenSearch,
   children,
   themeStyle,
 }: PublicDesktopMenuLayoutProps) {
+  const [searchShortcut, setSearchShortcut] = useState('⌘K');
+
+  useEffect(() => {
+    const isApple =
+      typeof navigator !== 'undefined' &&
+      /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+    setSearchShortcut(isApple ? '⌘K' : 'Ctrl+K');
+  }, []);
+
   return (
     <div className={styles.layout} style={themeStyle}>
       <aside className={styles.sidebar} aria-label="Información y categorías">
@@ -112,6 +125,23 @@ export function PublicDesktopMenuLayout({
                   services={enabledServices}
                   className={styles.restaurantServiceList}
                 />
+              </div>
+            ) : null}
+
+            {onOpenSearch ? (
+              <div className={styles.searchWrap}>
+                <button
+                  type="button"
+                  className={styles.searchTrigger}
+                  onClick={onOpenSearch}
+                  aria-label="Buscar en el menú"
+                >
+                  <SearchOutlinedIcon fontSize="small" className={styles.searchTriggerIcon} aria-hidden />
+                  <span className={styles.searchTriggerLabel}>Buscar en el menú</span>
+                  <kbd className={styles.searchShortcut} aria-hidden>
+                    {searchShortcut}
+                  </kbd>
+                </button>
               </div>
             ) : null}
 
