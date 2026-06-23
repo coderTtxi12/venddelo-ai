@@ -18,6 +18,8 @@ class DeliveryPartnershipService:
         self._repo = repo
 
     def ensure_mexy_request_for_restaurant(self, restaurant_id: uuid.UUID) -> bool:
+        if self._repo.get_mexy_partnership_for_restaurant(restaurant_id) is not None:
+            return False
         provider_id = self._repo.get_or_create_mexy_provider_id()
         return self._repo.ensure_partnership_request(restaurant_id, provider_id)
 
@@ -72,15 +74,15 @@ class DeliveryPartnershipService:
     def list_pending_requests(self, user_id: uuid.UUID) -> list[DeliveryPartnershipRequestDTO]:
         self._require_delivery_provider_member(user_id)
 
-        seen: set[uuid.UUID] = set()
-        requests: list[DeliveryPartnershipRequestDTO] = []
+        by_restaurant: dict[uuid.UUID, DeliveryPartnershipRequestDTO] = {}
         for provider_id in self._repo.get_mexy_provider_ids():
             for request in self._repo.list_pending_partnership_requests(provider_id):
-                if request.id in seen:
-                    continue
-                seen.add(request.id)
-                requests.append(request)
-        return requests
+                restaurant_id = request.restaurant.id
+                existing = by_restaurant.get(restaurant_id)
+                if existing is None or request.created_at > existing.created_at:
+                    by_restaurant[restaurant_id] = request
+
+        return sorted(by_restaurant.values(), key=lambda item: item.created_at, reverse=True)
 
     def list_active_requests(self, user_id: uuid.UUID) -> list[DeliveryPartnershipRequestDTO]:
         self._require_delivery_provider_member(user_id)
