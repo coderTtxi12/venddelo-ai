@@ -189,6 +189,9 @@ export function PublicMenuCheckoutDetails({
         (!deliverySelectable ? deliveryServiceReason : null)
       : null;
 
+  const showPaymentSection =
+    fulfillment.serviceType !== 'delivery' || deliverySelectable;
+
   const handleServiceChange = (serviceType: RestaurantServiceType) => {
     if (!config || !availableServices.includes(serviceType)) return;
     const nextPaymentMethods = enabledPaymentMethodsForService(config, serviceType);
