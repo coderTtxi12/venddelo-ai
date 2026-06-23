@@ -356,8 +356,8 @@ export function PublicMenuCheckoutDetails({
                   {deliveryQuote.inside_polygon
                     ? 'Dentro de la zona de cobertura.'
                     : deliveryQuote.distance_km != null
-                      ? `${deliveryQuote.distance_km.toFixed(1)} km de ruta`
-                      : 'Fuera del polígono de cobertura'}
+                      ? `${deliveryQuote.distance_km.toFixed(1)} km de ruta · solo horario diurno`
+                      : 'Fuera del polígono de cobertura · solo horario diurno'}
                 </span>
               </div>
             ) : null}
