@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     rate_limit_window_seconds: int = 60
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+    google_maps_api_key: str | None = None
     translation_cache_ttl_seconds: int = 3600
     cors_origins: str = "http://localhost:3000"
     menu_public_domain: str = "venddelo.ai"
