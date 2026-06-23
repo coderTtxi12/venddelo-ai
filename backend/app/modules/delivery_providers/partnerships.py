@@ -6,6 +6,8 @@ from app.core.exceptions import ForbiddenError, NotFoundError
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
+    DeliveryProviderPaymentMethodDTO,
+    DeliveryProviderScheduleDTO,
     RestaurantDeliveryPartnershipDTO,
     RestaurantDeliveryPartnershipResponse,
 )
@@ -36,6 +38,36 @@ class DeliveryPartnershipService:
     ) -> RestaurantDeliveryPartnershipResponse:
         partnership = self._repo.get_mexy_partnership_for_restaurant(restaurant_id)
         return RestaurantDeliveryPartnershipResponse(partnership=partnership)
+
+    def get_active_provider_schedules(
+        self, restaurant_id: uuid.UUID
+    ) -> list[DeliveryProviderScheduleDTO]:
+        provider_id = self._active_partnership_provider_id(restaurant_id)
+        if provider_id is None:
+            return []
+        rows = list(self._repo.list_schedules(provider_id))
+        if not rows:
+            self._repo.seed_default_schedules(provider_id)
+            rows = list(self._repo.list_schedules(provider_id))
+        return rows
+
+    def get_active_provider_payment_methods(
+        self, restaurant_id: uuid.UUID
+    ) -> list[DeliveryProviderPaymentMethodDTO]:
+        provider_id = self._active_partnership_provider_id(restaurant_id)
+        if provider_id is None:
+            return []
+        rows = list(self._repo.list_payment_methods(provider_id))
+        if not rows:
+            self._repo.seed_default_payment_methods(provider_id)
+            rows = list(self._repo.list_payment_methods(provider_id))
+        return rows
+
+    def _active_partnership_provider_id(self, restaurant_id: uuid.UUID) -> uuid.UUID | None:
+        partnership = self._repo.get_mexy_partnership_for_restaurant(restaurant_id)
+        if partnership is None or partnership.status != "active":
+            return None
+        return self._repo.get_mexy_provider_id()
 
     def list_pending_requests(self, user_id: uuid.UUID) -> list[DeliveryPartnershipRequestDTO]:
         self._require_delivery_provider_member(user_id)
