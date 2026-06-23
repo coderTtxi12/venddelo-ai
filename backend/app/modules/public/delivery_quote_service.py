@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.infra.maps.google_distance_matrix import DistanceMatrixError, fetch_driving_distance_km
 from app.modules.delivery_providers.availability import (
     is_night_schedule,
+    is_within_regular_schedule,
     resolve_service_status,
 )
 from app.modules.delivery_providers.pricing import (
@@ -255,9 +256,29 @@ class PublicDeliveryQuoteService:
 
         schedules = list(self._repo.list_schedules(provider_id))
         timezone = self._repo.get_provider_timezone(provider_id)
-        quote_now = now or datetime.now(UTC)
         weather_mode: DeliveryWeatherMode = self._repo.get_weather_mode(provider_id)  # type: ignore[assignment]
-        is_night = is_night_schedule(schedules, timezone=timezone, now=quote_now)
+
+        if not inside_polygon and not is_within_regular_schedule(
+            schedules, timezone=timezone, now=quote_now
+        ):
+            return ResolvedDeliveryQuote(
+                available=False,
+                reason=(
+                    "Las entregas fuera de cobertura solo están disponibles "
+                    "en horario diurno."
+                ),
+                delivery_fee_cents=0,
+                inside_polygon=False,
+                distance_km=distance_km,
+                provider_name=provider_name,
+                partnership_status=status,
+            )
+
+        is_night = (
+            is_night_schedule(schedules, timezone=timezone, now=quote_now)
+            if inside_polygon
+            else False
+        )
 
         quote = quote_delivery_fee(
             parsed,
