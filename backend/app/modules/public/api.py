@@ -17,10 +17,18 @@ from app.modules.promotions.effective import resolve_timezone
 from app.modules.promotions.pricing import CartLineInput, price_cart
 from app.modules.promotions.schemas import PromotionDTO
 from app.modules.promotions.service import PromotionService
+from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
+from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
+from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
 from app.modules.public.schemas import (
     CartQuoteDTO,
     CartQuoteInput,
     CartQuoteLineDTO,
+    PublicCheckoutConfigDTO,
+    PublicCheckoutPaymentMethodDTO,
+    PublicDeliveryQuoteDTO,
+    PublicDeliveryQuoteInput,
+    PublicDeliveryServiceDTO,
     PublicPromotionsContextDTO,
     PublicRestaurantDTO,
 )
@@ -62,6 +70,16 @@ def _order_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> OrderService
 
 def _promotion_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> PromotionService:
     return PromotionService(uow.promotions)
+
+
+def _partnership_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeliveryPartnershipService:
+    return DeliveryPartnershipService(SqlAlchemyDeliveryProviderRepository(uow.session))
+
+
+def _public_delivery_quote_service(
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> PublicDeliveryQuoteService:
+    return PublicDeliveryQuoteService(SqlAlchemyDeliveryProviderRepository(uow.session))
 
 
 def _public_restaurant(uow: SqlAlchemyUnitOfWork, subdomain: str):
@@ -136,6 +154,85 @@ def get_public_restaurant_promotions(
         timezone=restaurant.timezone,
         local_now=local_now,
         items=items,
+    )
+
+
+@router.get("/restaurants/{subdomain}/checkout-config", response_model=PublicCheckoutConfigDTO)
+def get_public_checkout_config(
+    subdomain: str,
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+    partnership: DeliveryPartnershipService = Depends(_partnership_service),
+    delivery_quote_service: PublicDeliveryQuoteService = Depends(_public_delivery_quote_service),
+) -> PublicCheckoutConfigDTO:
+    restaurant = _public_restaurant(uow, subdomain)
+    restaurant_methods = list(uow.restaurants.list_payment_methods(restaurant.id))
+    payment_methods: list[PublicCheckoutPaymentMethodDTO] = []
+
+    if restaurant.takeout_enabled:
+        for pm in restaurant_methods:
+            if pm.service_type == "takeout" and pm.enabled:
+                payment_methods.append(
+                    PublicCheckoutPaymentMethodDTO(method=pm.method, service_type="takeout")
+                )
+
+    delivery_service: PublicDeliveryServiceDTO | None = None
+    if restaurant.delivery_enabled:
+        resolved = delivery_quote_service.resolve_delivery_service(restaurant)
+        delivery_service = PublicDeliveryServiceDTO(
+            available=resolved.available,
+            reason=resolved.reason,
+            partnership_status=resolved.partnership_status,
+            provider_name=resolved.provider_name,
+        )
+
+        if resolved.available:
+            provider_methods = partnership.get_active_provider_payment_methods(restaurant.id)
+            if provider_methods:
+                for pm in provider_methods:
+                    if pm.enabled:
+                        payment_methods.append(
+                            PublicCheckoutPaymentMethodDTO(
+                                method=pm.method, service_type="delivery"
+                            )
+                        )
+            else:
+                for pm in restaurant_methods:
+                    if pm.service_type == "delivery" and pm.enabled:
+                        payment_methods.append(
+                            PublicCheckoutPaymentMethodDTO(
+                                method=pm.method, service_type="delivery"
+                            )
+                        )
+
+    return PublicCheckoutConfigDTO(
+        takeout_enabled=restaurant.takeout_enabled,
+        delivery_enabled=restaurant.delivery_enabled,
+        payment_methods=payment_methods,
+        delivery_service=delivery_service,
+    )
+
+
+@router.post("/restaurants/{subdomain}/delivery-quote", response_model=PublicDeliveryQuoteDTO)
+def quote_public_delivery(
+    subdomain: str,
+    data: PublicDeliveryQuoteInput,
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+    delivery_quote_service: PublicDeliveryQuoteService = Depends(_public_delivery_quote_service),
+) -> PublicDeliveryQuoteDTO:
+    restaurant = _public_restaurant(uow, subdomain)
+    quote = delivery_quote_service.quote_delivery(
+        restaurant,
+        delivery_latitude=data.latitude,
+        delivery_longitude=data.longitude,
+    )
+    return PublicDeliveryQuoteDTO(
+        available=quote.available,
+        reason=quote.reason,
+        delivery_fee_cents=quote.delivery_fee_cents,
+        inside_polygon=quote.inside_polygon,
+        distance_km=quote.distance_km,
+        provider_name=quote.provider_name,
+        partnership_status=quote.partnership_status,
     )
 
 
