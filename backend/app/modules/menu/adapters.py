@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, func, insert, select, tuple_, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.pagination import (
     CursorPage,
@@ -41,12 +41,71 @@ def _category_sort_indices(session: Session, product_id: uuid.UUID) -> dict[str,
     return {str(row.category_id): row.sort_index for row in rows}
 
 
-def _product_to_dto(obj: Product, session: Session) -> ProductDTO:
+def _category_sort_indices_batch(
+    session: Session, product_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, dict[str, int]]:
+    if not product_ids:
+        return {}
+    rows = session.execute(
+        select(
+            product_categories.c.product_id,
+            product_categories.c.category_id,
+            product_categories.c.sort_index,
+        ).where(product_categories.c.product_id.in_(product_ids))
+    ).all()
+    result: dict[uuid.UUID, dict[str, int]] = {product_id: {} for product_id in product_ids}
+    for row in rows:
+        result[row.product_id][str(row.category_id)] = row.sort_index
+    return result
+
+
+def _product_to_dto(
+    obj: Product,
+    session: Session | None = None,
+    *,
+    category_sort_indices: dict[str, int] | None = None,
+) -> ProductDTO:
     dto = ProductDTO.model_validate(obj)
     dto.category_ids = [c.id for c in obj.categories]
-    dto.category_sort_indices = _category_sort_indices(session, obj.id)
+    if category_sort_indices is not None:
+        dto.category_sort_indices = category_sort_indices
+    else:
+        if session is None:
+            raise ValueError("session is required when category_sort_indices is not provided")
+        dto.category_sort_indices = _category_sort_indices(session, obj.id)
     dto.option_groups = [OptionGroupDTO.model_validate(g) for g in obj.option_groups]
     return dto
+
+
+def _products_to_dtos(session: Session, products: list[Product]) -> list[ProductDTO]:
+    sort_map = _category_sort_indices_batch(session, [product.id for product in products])
+    return [
+        _product_to_dto(product, category_sort_indices=sort_map.get(product.id, {}))
+        for product in products
+    ]
+
+
+def _load_menu_products(
+    session: Session,
+    restaurant_id: uuid.UUID,
+    *,
+    published_only: bool,
+) -> list[Product]:
+    stmt = (
+        select(Product)
+        .where(Product.restaurant_id == restaurant_id)
+        .options(
+            selectinload(Product.categories),
+            selectinload(Product.option_groups).selectinload(OptionGroup.items),
+        )
+        .order_by(Product.is_active.desc(), Product.created_at, Product.id)
+    )
+    if published_only:
+        stmt = stmt.where(
+            Product.is_published.is_(True),
+            Product.approval_status == "approved",
+        )
+    return list(session.scalars(stmt))
 
 
 class SqlAlchemyMenuRepository(MenuRepository):
@@ -297,21 +356,15 @@ class SqlAlchemyMenuRepository(MenuRepository):
                 .order_by(Category.sort_index, Category.created_at)
             )
         )
-        products = list(
-            self._session.scalars(
-                select(Product)
-                .where(
-                    Product.restaurant_id == restaurant_id,
-                    Product.is_published.is_(True),
-                    Product.approval_status == "approved",
-                )
-                .order_by(Product.is_active.desc(), Product.created_at, Product.id)
-            )
+        products = _load_menu_products(
+            self._session,
+            restaurant_id,
+            published_only=True,
         )
         return FullMenuDTO(
             restaurant_id=restaurant_id,
             categories=[CategoryDTO.model_validate(c) for c in categories],
-            products=[_product_to_dto(p, self._session) for p in products],
+            products=_products_to_dtos(self._session, products),
         )
 
     def get_preview_menu(self, restaurant_id: uuid.UUID) -> FullMenuDTO:
@@ -325,19 +378,15 @@ class SqlAlchemyMenuRepository(MenuRepository):
                 .order_by(Category.sort_index, Category.created_at)
             )
         )
-        products = list(
-            self._session.scalars(
-                select(Product)
-                .where(
-                    Product.restaurant_id == restaurant_id,
-                )
-                .order_by(Product.is_active.desc(), Product.created_at, Product.id)
-            )
+        products = _load_menu_products(
+            self._session,
+            restaurant_id,
+            published_only=False,
         )
         return FullMenuDTO(
             restaurant_id=restaurant_id,
             categories=[CategoryDTO.model_validate(c) for c in categories],
-            products=[_product_to_dto(p, self._session) for p in products],
+            products=_products_to_dtos(self._session, products),
         )
 
     def set_category_product_order(
