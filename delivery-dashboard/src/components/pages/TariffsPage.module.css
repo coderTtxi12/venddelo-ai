@@ -347,6 +347,13 @@
   gap: 0.85rem;
 }
 
+.simFieldHint {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
 .toggleGroup {
   display: flex;
   flex-wrap: wrap;
