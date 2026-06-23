@@ -103,3 +103,8 @@ export function buildWhatsappE164(data: OnboardingData): string {
   const country = findCountryByIso(data.whatsappCountryIso);
   return formatE164(country.dialCode, data.whatsappLocal);
 }
+
+export function buildOwnerPhoneE164(data: OnboardingData): string {
+  const country = findCountryByIso(data.ownerPhoneCountryIso);
+  return formatE164(country.dialCode, data.ownerPhoneLocal);
+}

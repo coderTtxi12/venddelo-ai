@@ -8,7 +8,7 @@ import { matrixToPaymentCreates } from '@/lib/restaurantPaymentConfig';
 import { buildOnboardingSchedulePayload } from '@/lib/onboarding/schedule';
 import { normalizeSubdomainInput } from '@/lib/restaurantSubdomain';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
-import { buildRestaurantDescription, buildWhatsappE164 } from './validation';
+import { buildRestaurantDescription, buildOwnerPhoneE164, buildWhatsappE164 } from './validation';
 import type { OnboardingData } from './types';
 
 function dataUrlToFile(dataUrl: string, fileName: string): File {
@@ -47,6 +47,8 @@ export async function submitOnboarding(
     longitude: data.location.longitude,
     place_id: data.location.placeId,
     whatsapp_phone: buildWhatsappE164(data),
+    owner_contact_name: data.ownerName.trim(),
+    owner_phone: buildOwnerPhoneE164(data),
     takeout_enabled: data.takeoutEnabled,
     delivery_enabled: data.deliveryEnabled,
   });

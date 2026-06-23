@@ -4,6 +4,7 @@ import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
 import { DashboardRestaurantHours } from '@/components/settings/DashboardRestaurantHours';
+import { DeliveryPartnershipStatus } from '@/components/settings/DeliveryPartnershipStatus';
 import { RestaurantLocationMapPicker } from '@/components/settings/RestaurantLocationMapPicker';
 import type { RestaurantLocationMapPickerHandle } from '@/components/settings/RestaurantLocationMapPicker';
 import { RestaurantPlaceAutocomplete } from '@/components/settings/RestaurantPlaceAutocomplete';
@@ -18,7 +19,7 @@ import {
   setRestaurantSchedules,
   updateRestaurant,
 } from '@/lib/api/restaurants';
-import type { Restaurant, RestaurantSchedule } from '@/lib/api/types';
+import type { Restaurant, RestaurantDeliveryPartnership, RestaurantSchedule } from '@/lib/api/types';
 import { ApiError } from '@/lib/api/types';
 import {
   createDefaultPaymentMatrix,
@@ -42,6 +43,7 @@ import {
 } from '@/lib/restaurantServices';
 import { DEFAULT_COUNTRY_ISO } from '@/lib/phone/countryDialCodes';
 import { buildPhoneE164, parseE164Phone } from '@/lib/phone/parseE164';
+import { syncRestaurantDeliveryPartnership } from '@/lib/syncDeliveryPartnership';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
 import { resolveSupplierIdByEmail } from '@/services/db';
@@ -133,6 +135,11 @@ export default function SettingsPage() {
   });
   const [takeoutEnabled, setTakeoutEnabled] = useState(true);
   const [deliveryEnabled, setDeliveryEnabled] = useState(true);
+  const [deliveryPartnership, setDeliveryPartnership] = useState<RestaurantDeliveryPartnership | null>(
+    null,
+  );
+  const [deliveryPartnershipLoading, setDeliveryPartnershipLoading] = useState(false);
+  const [deliveryPartnershipError, setDeliveryPartnershipError] = useState<string | null>(null);
   const [paymentMatrix, setPaymentMatrix] = useState<PaymentMethodMatrix>(
     createDefaultPaymentMatrix(),
   );
@@ -197,6 +204,32 @@ export default function SettingsPage() {
         setWhatsappTouched(false);
         setTakeoutEnabled(restaurantData.takeout_enabled);
         setDeliveryEnabled(restaurantData.delivery_enabled);
+        setDeliveryPartnershipError(null);
+
+        if (restaurantData.delivery_enabled) {
+          setDeliveryPartnershipLoading(true);
+          try {
+            const partnership = await syncRestaurantDeliveryPartnership(
+              accessToken,
+              rid,
+              restaurantData.delivery_enabled,
+            );
+            if (!cancelled) setDeliveryPartnership(partnership);
+          } catch (partnershipError) {
+            console.error(partnershipError);
+            if (!cancelled) {
+              setDeliveryPartnership(null);
+              setDeliveryPartnershipError(
+                'No se pudo enviar la solicitud a Mexy Reparto. Intenta guardar de nuevo.',
+              );
+            }
+          } finally {
+            if (!cancelled) setDeliveryPartnershipLoading(false);
+          }
+        } else {
+          setDeliveryPartnership(null);
+        }
+
         setPaymentMatrix(
           paymentRows.length > 0 ? paymentMethodsToMatrix(paymentRows) : createDefaultPaymentMatrix(),
         );
@@ -397,6 +430,35 @@ export default function SettingsPage() {
       setWhatsappLocal(savedWhatsapp.localNumber);
       setWhatsappTouched(false);
       setSaveOk(true);
+
+      if (updatedRestaurant.delivery_enabled) {
+        setDeliveryPartnershipLoading(true);
+        setDeliveryPartnershipError(null);
+        try {
+          const partnership = await syncRestaurantDeliveryPartnership(
+            accessToken,
+            restaurantId,
+            updatedRestaurant.delivery_enabled,
+          );
+          setDeliveryPartnership(partnership);
+          if (!partnership) {
+            setDeliveryPartnershipError(
+              'No se pudo registrar la solicitud con Mexy Reparto. Intenta guardar de nuevo.',
+            );
+          }
+        } catch (partnershipError) {
+          console.error(partnershipError);
+          setDeliveryPartnership(null);
+          setDeliveryPartnershipError(
+            'No se pudo enviar la solicitud a Mexy Reparto. Intenta guardar de nuevo.',
+          );
+        } finally {
+          setDeliveryPartnershipLoading(false);
+        }
+      } else {
+        setDeliveryPartnership(null);
+        setDeliveryPartnershipError(null);
+      }
     } catch (error) {
       console.error(error);
       if (error instanceof ApiError && error.code === 'conflict') {
@@ -413,7 +475,12 @@ export default function SettingsPage() {
     }
   };
 
-  const hasScheduleContent = takeoutEnabled || deliveryEnabled;
+  const saveSchedules = async (payload: RestaurantScheduleCreateInput[]) => {
+    if (!accessToken || !restaurantId) return;
+    await setRestaurantSchedules(accessToken, restaurantId, payload);
+    const updated = await listRestaurantSchedules(accessToken, restaurantId);
+    setSchedules(updated);
+  };
 
   const logoUrl = storagePublicUrl(restaurant?.logo_path ?? null);
 
@@ -652,6 +719,13 @@ export default function SettingsPage() {
             }}
           />
         </div>
+        {deliveryEnabled ? (
+          <DeliveryPartnershipStatus
+            partnership={deliveryPartnership}
+            loading={deliveryPartnershipLoading}
+            requestError={deliveryPartnershipError}
+          />
+        ) : null}
       </section>
 
       <section className={styles.panel} aria-labelledby="settings-payments">

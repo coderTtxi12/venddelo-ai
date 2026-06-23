@@ -41,6 +41,8 @@ export type Restaurant = {
   digital_menu_limited_time_category_enabled: boolean;
   digital_menu_limited_time_category_name: string;
   whatsapp_phone: string | null;
+  owner_contact_name: string | null;
+  owner_phone: string | null;
   color_palette: string | null;
   takeout_enabled: boolean;
   delivery_enabled: boolean;
@@ -56,6 +58,20 @@ export type RestaurantSchedule = {
   day_of_week: number;
   opens_at: string;
   closes_at: string;
+};
+
+export type RestaurantDeliveryPartnership = {
+  id: string;
+  provider_name: string;
+  provider_slug: string;
+  status: 'pending' | 'active' | 'suspended';
+  is_default: boolean;
+  created_at: string;
+  activated_at: string | null;
+};
+
+export type RestaurantDeliveryPartnershipResponse = {
+  partnership: RestaurantDeliveryPartnership | null;
 };
 
 export type RestaurantScheduleCreateInput = {

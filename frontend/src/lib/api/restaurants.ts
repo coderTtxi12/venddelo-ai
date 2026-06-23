@@ -2,6 +2,7 @@ import { apiRequest } from './client';
 import type {
   CursorPage,
   Restaurant,
+  RestaurantDeliveryPartnershipResponse,
   RestaurantPaymentMethod,
   RestaurantSchedule,
   RestaurantScheduleCreateInput,
@@ -21,6 +22,8 @@ export function createRestaurant(
     longitude?: number | null;
     place_id?: string | null;
     whatsapp_phone?: string | null;
+    owner_contact_name?: string | null;
+    owner_phone?: string | null;
     takeout_enabled?: boolean;
     delivery_enabled?: boolean;
   },
@@ -124,4 +127,21 @@ export function setRestaurantPaymentMethods(
     token,
     body: methods,
   });
+}
+
+export function getRestaurantDeliveryPartnership(token: string, restaurantId: string) {
+  return apiRequest<RestaurantDeliveryPartnershipResponse>(
+    `/restaurants/${restaurantId}/delivery-partnership`,
+    { token },
+  );
+}
+
+export function requestRestaurantDeliveryPartnership(token: string, restaurantId: string) {
+  return apiRequest<RestaurantDeliveryPartnershipResponse>(
+    `/restaurants/${restaurantId}/delivery-partnership/request`,
+    {
+      method: 'POST',
+      token,
+    },
+  );
 }

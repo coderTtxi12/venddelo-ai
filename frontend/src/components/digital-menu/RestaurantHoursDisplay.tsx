@@ -115,10 +115,10 @@ export function RestaurantHoursDisplay({
 }: RestaurantHoursDisplayProps) {
   const blocks = buildRestaurantHoursBlocks(schedules, serviceTypes ?? []);
   const hideServiceLabel = flat && blocks.length === 1;
-  const [expandedBlocks, setExpandedBlocks] = useState<Record<RestaurantServiceType, boolean>>({
-    takeout: false,
+  const [expandedBlocks, setExpandedBlocks] = useState<Record<RestaurantServiceType, boolean>>(() => ({
+    takeout: flat,
     delivery: false,
-  });
+  }));
 
   if (blocks.length === 0) return null;
 

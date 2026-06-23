@@ -3,13 +3,15 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { DashboardRestaurantHours } from '@/components/settings/DashboardRestaurantHours';
+import { DeliveryPartnershipStatus } from '@/components/settings/DeliveryPartnershipStatus';
 import { useAuth } from '@/hooks/useAuth';
 import {
   getRestaurant,
   listRestaurantSchedules,
   setRestaurantSchedules,
 } from '@/lib/api/restaurants';
-import type { Restaurant, RestaurantSchedule } from '@/lib/api/types';
+import type { Restaurant, RestaurantDeliveryPartnership, RestaurantSchedule } from '@/lib/api/types';
+import { syncRestaurantDeliveryPartnership } from '@/lib/syncDeliveryPartnership';
 import { resolveSupplierIdByEmail } from '@/services/db';
 import { legacyDb as db } from '@/services/legacyDb';
 import styles from './HoursPage.module.css';
@@ -20,6 +22,9 @@ export default function HoursPage() {
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [schedules, setSchedules] = useState<RestaurantSchedule[]>([]);
+  const [deliveryPartnership, setDeliveryPartnership] = useState<RestaurantDeliveryPartnership | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -59,6 +64,22 @@ export default function HoursPage() {
         setRestaurantId(rid);
         setRestaurant(restaurantData);
         setSchedules(scheduleRows);
+
+        if (restaurantData.delivery_enabled) {
+          try {
+            const partnership = await syncRestaurantDeliveryPartnership(
+              accessToken,
+              rid,
+              restaurantData.delivery_enabled,
+            );
+            if (!cancelled) setDeliveryPartnership(partnership);
+          } catch (partnershipError) {
+            console.error(partnershipError);
+            if (!cancelled) setDeliveryPartnership(null);
+          }
+        } else {
+          setDeliveryPartnership(null);
+        }
       } catch (error) {
         console.error(error);
         if (!cancelled) setLoadError('No se pudo cargar el horario del restaurante.');
@@ -114,6 +135,9 @@ export default function HoursPage() {
           </p>
         ) : (
           <div className={styles.hoursWrap}>
+            {restaurant.delivery_enabled ? (
+              <DeliveryPartnershipStatus partnership={deliveryPartnership} />
+            ) : null}
             <DashboardRestaurantHours
               schedules={schedules}
               takeoutEnabled={restaurant.takeout_enabled}
