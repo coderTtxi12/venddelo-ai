@@ -1,4 +1,6 @@
+import type { ComponentType } from 'react';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
+import type { SvgIconProps } from '@mui/material/SvgIcon';
 import BoltOutlinedIcon from '@mui/icons-material/BoltOutlined';
 import {
   RESTAURANT_SERVICE_LABELS,
@@ -6,7 +8,7 @@ import {
 } from '@/lib/restaurantServices';
 import styles from './RestaurantServiceChips.module.css';
 
-const SERVICE_ICONS: Record<RestaurantServiceType, typeof StorefrontOutlinedIcon> = {
+const SERVICE_ICONS: Record<RestaurantServiceType, ComponentType<SvgIconProps>> = {
   takeout: StorefrontOutlinedIcon,
   delivery: BoltOutlinedIcon,
 };
