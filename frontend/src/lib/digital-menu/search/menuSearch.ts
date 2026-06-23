@@ -1,6 +1,6 @@
-import type { Category, Product, Promotion } from '@/lib/api/types';
+import type { Category, Product } from '@/lib/api/types';
 
-export type MenuSearchHitKind = 'product' | 'promotion' | 'category';
+export type MenuSearchHitKind = 'product' | 'category';
 
 export type MenuSearchHit = {
   id: string;
@@ -10,7 +10,6 @@ export type MenuSearchHit = {
   matchLabels: string[];
   score: number;
   product?: Product;
-  promotion?: Promotion;
   category?: Category;
 };
 
@@ -18,8 +17,6 @@ export type MenuSearchInput = {
   query: string;
   products: Product[];
   categories: Category[];
-  promotions: Promotion[];
-  productDiscounts?: Map<string, unknown>;
 };
 
 const MATCH_LABELS = {
@@ -27,7 +24,6 @@ const MATCH_LABELS = {
   description: 'Descripción',
   complement: 'Complemento',
   category: 'Categoría',
-  promotion: 'Promoción',
 } as const;
 
 function normalizeSearchText(value: string): string {
@@ -67,30 +63,7 @@ function scoreTextMatch(haystack: string, tokens: string[]): number {
   return score;
 }
 
-function buildCategoryNameMap(categories: Category[]): Map<string, string> {
-  return new Map(categories.map((category) => [category.id, category.name]));
-}
-
-function promotionsForProduct(product: Product, promotions: Promotion[]): Promotion[] {
-  return promotions.filter((promotion) => {
-    if (promotion.scope === 'product') {
-      return promotion.product_ids?.includes(product.id) ?? false;
-    }
-    if (promotion.scope === 'category') {
-      const promoCategoryIds = promotion.category_ids ?? [];
-      return product.category_ids.some((categoryId) => promoCategoryIds.includes(categoryId));
-    }
-    return false;
-  });
-}
-
-function searchProducts(
-  products: Product[],
-  categories: Category[],
-  promotions: Promotion[],
-  tokens: string[],
-): MenuSearchHit[] {
-  const categoryNames = buildCategoryNameMap(categories);
+function searchProducts(products: Product[], tokens: string[]): MenuSearchHit[] {
   const hits: MenuSearchHit[] = [];
 
   for (const product of products) {
@@ -124,57 +97,16 @@ function searchProducts(
       }
     }
 
-    const productCategoryNames = product.category_ids
-      .map((categoryId) => categoryNames.get(categoryId))
-      .filter((name): name is string => Boolean(name));
-
-    for (const categoryName of productCategoryNames) {
-      if (textMatchesTokens(categoryName, tokens)) {
-        matchLabels.add(MATCH_LABELS.category);
-        score += scoreTextMatch(categoryName, tokens);
-      }
-    }
-
-    for (const promotion of promotionsForProduct(product, promotions)) {
-      if (textMatchesTokens(promotion.name, tokens)) {
-        matchLabels.add(MATCH_LABELS.promotion);
-        score += scoreTextMatch(promotion.name, tokens);
-      }
-    }
-
     if (matchLabels.size === 0) continue;
-
-    const categorySubtitle =
-      productCategoryNames.length > 0 ? productCategoryNames.join(' · ') : undefined;
 
     hits.push({
       id: `product:${product.id}`,
       kind: 'product',
       title: product.name,
-      subtitle: product.description?.trim() || categorySubtitle,
+      subtitle: product.description?.trim() || undefined,
       matchLabels: Array.from(matchLabels),
       score,
       product,
-    });
-  }
-
-  return hits;
-}
-
-function searchPromotions(promotions: Promotion[], tokens: string[]): MenuSearchHit[] {
-  const hits: MenuSearchHit[] = [];
-
-  for (const promotion of promotions) {
-    if (!textMatchesTokens(promotion.name, tokens)) continue;
-
-    hits.push({
-      id: `promotion:${promotion.id}`,
-      kind: 'promotion',
-      title: promotion.name,
-      subtitle: 'Promoción',
-      matchLabels: [MATCH_LABELS.promotion],
-      score: scoreTextMatch(promotion.name, tokens) * 1.5,
-      promotion,
     });
   }
 
@@ -185,31 +117,15 @@ function searchCategories(categories: Category[], tokens: string[]): MenuSearchH
   const hits: MenuSearchHit[] = [];
 
   for (const category of categories) {
-    const nameMatches = textMatchesTokens(category.name, tokens);
-    const descriptionMatches =
-      category.description != null && textMatchesTokens(category.description, tokens);
-
-    if (!nameMatches && !descriptionMatches) continue;
-
-    const matchLabels: string[] = [];
-    let score = 0;
-
-    if (nameMatches) {
-      matchLabels.push(MATCH_LABELS.category);
-      score += scoreTextMatch(category.name, tokens) * 1.2;
-    }
-    if (descriptionMatches && category.description) {
-      matchLabels.push(MATCH_LABELS.description);
-      score += scoreTextMatch(category.description, tokens);
-    }
+    if (!textMatchesTokens(category.name, tokens)) continue;
 
     hits.push({
       id: `category:${category.id}`,
       kind: 'category',
       title: category.name,
-      subtitle: category.description?.trim() || 'Categoría',
-      matchLabels,
-      score,
+      subtitle: 'Categoría',
+      matchLabels: [MATCH_LABELS.category],
+      score: scoreTextMatch(category.name, tokens) * 1.2,
       category,
     });
   }
@@ -221,13 +137,12 @@ export function searchMenu(input: MenuSearchInput): MenuSearchHit[] {
   const tokens = tokenizeQuery(input.query);
   if (tokens.length === 0) return [];
 
-  const productHits = searchProducts(input.products, input.categories, input.promotions, tokens);
-  const promotionHits = searchPromotions(input.promotions, tokens);
+  const productHits = searchProducts(input.products, tokens);
   const categoryHits = searchCategories(input.categories, tokens);
 
   const deduped = new Map<string, MenuSearchHit>();
 
-  for (const hit of [...productHits, ...promotionHits, ...categoryHits]) {
+  for (const hit of [...productHits, ...categoryHits]) {
     const existing = deduped.get(hit.id);
     if (!existing || hit.score > existing.score) {
       deduped.set(hit.id, hit);
