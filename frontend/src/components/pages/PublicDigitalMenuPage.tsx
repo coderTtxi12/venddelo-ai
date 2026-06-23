@@ -185,16 +185,33 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
   useEffect(() => {
     let cancelled = false;
 
+    async function loadSecondaryData() {
+      try {
+        const [scheduleRows, promotionContext] = await Promise.all([
+          getPublicRestaurantSchedules(subdomain),
+          getPublicRestaurantPromotions(subdomain),
+        ]);
+
+        if (cancelled) return;
+
+        setSchedules(scheduleRows);
+        setPromotionsContext(promotionContext);
+        writePromotionsCache(subdomain, promotionContext);
+      } catch (error) {
+        if (!cancelled) {
+          console.error('No se pudieron cargar horarios o promociones del menú público.', error);
+        }
+      }
+    }
+
     async function load() {
       setLoading(true);
       setLoadError(null);
 
       try {
-        const [restaurantData, menuData, scheduleRows, promotionContext] = await Promise.all([
+        const [restaurantData, menuData] = await Promise.all([
           getPublicRestaurant(subdomain),
           getPublicMenu(subdomain),
-          getPublicRestaurantSchedules(subdomain),
-          getPublicRestaurantPromotions(subdomain),
         ]);
 
         if (cancelled) return;
@@ -203,10 +220,9 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
         setRestaurant(restaurantData);
         setCategories(sortedCategories);
         setProducts(filterPublicMenuProducts(menuData.products));
-        setSchedules(scheduleRows);
-        setPromotionsContext(promotionContext);
-        writePromotionsCache(subdomain, promotionContext);
         setActiveCategoryId(sortedCategories[0]?.id ?? null);
+
+        void loadSecondaryData();
       } catch (error) {
         if (!cancelled) {
           if (error instanceof ApiError) {
