@@ -43,10 +43,7 @@ class MenuCacheService:
         if restaurant is None:
             raise NotFoundError("Restaurant not found")
 
-        if restaurant.status == "published":
-            menu = self._menu.get_full_menu(restaurant.id)
-        else:
-            menu = self._menu.get_preview_menu(restaurant.id)
+        menu = self._menu.get_full_menu(restaurant.id)
         self._cache.set(key, menu.model_dump_json(), self._ttl)
         logger.info(
             "menu cache populated subdomain=%s locale=%s ttl_seconds=%s",
