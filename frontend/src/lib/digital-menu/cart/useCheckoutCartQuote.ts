@@ -7,9 +7,11 @@ import { cartLinesToQuoteInput } from './cartQuotePayload';
 import { cartSubtotalCents } from './cartMath';
 import type { PublicMenuCartLine } from './types';
 
+export const GENERIC_CART_AVAILABILITY_ERROR = 'Actualiza tu carrito para continuar.';
+
 function quoteErrorMessage(err: unknown): string {
   if (err instanceof ApiError && err.httpStatus === 404) {
-    return 'Algunos productos ya no están disponibles. Actualiza el carrito.';
+    return GENERIC_CART_AVAILABILITY_ERROR;
   }
   return 'No se pudieron aplicar las promociones. Inténtalo de nuevo.';
 }
@@ -50,7 +52,7 @@ export function useCheckoutCartQuote(
   }, [linesKey]);
 
   const applyPromotions = useCallback(async (): Promise<CartQuote | null> => {
-    if (lines.length === 0 || !allLinesValid) return null;
+    if (lines.length === 0) return null;
 
     setLoading(true);
     setError(null);
@@ -69,7 +71,7 @@ export function useCheckoutCartQuote(
       setLoading(false);
       return null;
     }
-  }, [allLinesValid, lines, subdomain]);
+  }, [lines, subdomain]);
 
   const quotedLineTotalsCents = useMemo(() => {
     if (!quote) return null;
