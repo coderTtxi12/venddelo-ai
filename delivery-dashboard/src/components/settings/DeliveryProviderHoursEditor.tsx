@@ -237,9 +237,10 @@ export function DeliveryProviderHoursEditor({
           <h3 id="provider-hours-title" className={styles.hoursTitle}>
             Horarios de reparto
           </h3>
-          <p className={styles.hoursHint}>
+            <p className={styles.hoursHint}>
             Define cuándo aceptas pedidos. Por defecto: diurno 9:00 a.m.–9:00 p.m. y nocturno
-            9:00 p.m.–10:00 p.m., todos los días.
+            9:00 p.m.–10:00 p.m., todos los días. El horario nocturno solo aplica dentro de tu
+            zona de cobertura; fuera del polígono solo cuenta el horario diurno.
           </p>
         </div>
       </div>
