@@ -79,7 +79,12 @@ class PublicDeliveryQuoteService:
     def __init__(self, repo: DeliveryProviderRepository) -> None:
         self._repo = repo
 
-    def resolve_delivery_service(self, restaurant: RestaurantDTO) -> ResolvedDeliveryService:
+    def resolve_delivery_service(
+        self,
+        restaurant: RestaurantDTO,
+        *,
+        now: datetime | None = None,
+    ) -> ResolvedDeliveryService:
         if not restaurant.delivery_enabled:
             return ResolvedDeliveryService(
                 available=False,
@@ -120,6 +125,7 @@ class PublicDeliveryQuoteService:
             manually_enabled=self._repo.get_service_manually_enabled(provider_id),
             schedules=schedules,
             timezone=timezone,
+            now=now,
         )
         if not service_status.service_active:
             return ResolvedDeliveryService(
@@ -155,7 +161,8 @@ class PublicDeliveryQuoteService:
         delivery_longitude: float,
         now: datetime | None = None,
     ) -> ResolvedDeliveryQuote:
-        service = self.resolve_delivery_service(restaurant)
+        quote_now = now or datetime.now(UTC)
+        service = self.resolve_delivery_service(restaurant, now=quote_now)
         partnership = self._repo.get_mexy_partnership_for_restaurant(restaurant.id)
         status = _partnership_status(partnership)
         provider_name = partnership.provider_name if partnership else None
