@@ -47,6 +47,11 @@ class DeliveryProviderRepository(ABC):
     def get_primary_zone(self, provider_id: uuid.UUID) -> DeliveryProviderZoneDTO | None: ...
 
     @abstractmethod
+    def point_in_primary_zone(
+        self, provider_id: uuid.UUID, latitude: float, longitude: float
+    ) -> bool: ...
+
+    @abstractmethod
     def update_profile(
         self,
         provider_id: uuid.UUID,
