@@ -59,3 +59,49 @@ def test_list_active_excludes_soft_deleted(session):
     ids = [p.id for p in page.items]
     assert keep.id in ids
     assert gone.id not in ids
+
+
+@requires_db
+def test_list_active_bounded_query_count(session, engine):
+    from sqlalchemy import event
+
+    r = _restaurant(session, "promo-query-count")
+    menu = SqlAlchemyMenuRepository(session)
+    cat = menu.add_category(CategoryCreate(restaurant_id=r.id, name="Cat"))
+    product = menu.add_product(
+        ProductCreate(
+            restaurant_id=r.id,
+            name="P",
+            price_cents=1000,
+            category_ids=[cat.id],
+        )
+    )
+    repo = SqlAlchemyPromotionRepository(session)
+    for index in range(10):
+        repo.add(
+            PromotionCreate(
+                restaurant_id=r.id,
+                name=f"Promo {index}",
+                type="percent",
+                scope="product",
+                percent=10,
+                product_ids=[product.id],
+                category_ids=[cat.id],
+            )
+        )
+
+    query_count = {"n": 0}
+
+    def before_cursor_execute(
+        conn, cursor, statement, parameters, context, executemany
+    ) -> None:
+        query_count["n"] += 1
+
+    event.listen(engine, "before_cursor_execute", before_cursor_execute)
+    try:
+        page = repo.list_active(r.id, PaginationParams(limit=20))
+        assert len(page.items) == 10
+        assert all(product.id in promo.product_ids for promo in page.items)
+        assert query_count["n"] <= 8
+    finally:
+        event.remove(engine, "before_cursor_execute", before_cursor_execute)
