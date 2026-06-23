@@ -48,6 +48,11 @@ export function getProductVisibilityState(product: VisibilityFields): ProductVis
   return 'hidden';
 }
 
+/** Listed on the public menu (En menú or Inactivo — not Draft). */
+export function isPublicMenuDisplayed(product: VisibilityFields): boolean {
+  return isPublicMenuListed(product);
+}
+
 /** Product is visible in the public menu and can be ordered. */
 export function isLiveMenuVisible(product: VisibilityFields): boolean {
   const active = product.is_active ?? product.isActive ?? false;
