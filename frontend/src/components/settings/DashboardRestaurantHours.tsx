@@ -15,25 +15,28 @@ type DashboardRestaurantHoursProps = {
   schedules: RestaurantSchedule[];
   takeoutEnabled: boolean;
   deliveryEnabled: boolean;
+  section?: 'takeout' | 'delivery' | 'both';
   saving?: boolean;
-  onSave: (payload: RestaurantScheduleCreateInput[]) => Promise<void>;
+  onSave?: (payload: RestaurantScheduleCreateInput[]) => Promise<void>;
 };
 
 export function DashboardRestaurantHours({
   schedules,
   takeoutEnabled,
   deliveryEnabled,
+  section = 'both',
   saving = false,
   onSave,
 }: DashboardRestaurantHoursProps) {
-  const hasEditableTakeout = takeoutEnabled;
-  const hasInfoDelivery = deliveryEnabled;
+  const showTakeout =
+    (section === 'takeout' || section === 'both') && takeoutEnabled && onSave != null;
+  const showDelivery = (section === 'delivery' || section === 'both') && deliveryEnabled;
 
-  if (!hasEditableTakeout && !hasInfoDelivery) return null;
+  if (!showTakeout && !showDelivery) return null;
 
   return (
     <div className={styles.wrap}>
-      {hasEditableTakeout ? (
+      {showTakeout ? (
         <RestaurantHoursFooter
           schedules={schedules}
           serviceTypes={DASHBOARD_SCHEDULE_SERVICE_TYPES}
@@ -44,9 +47,12 @@ export function DashboardRestaurantHours({
         />
       ) : null}
 
-      {hasInfoDelivery ? (
-        <section className={styles.deliverySection} aria-labelledby="delivery-hours-heading">
-          {hasEditableTakeout ? (
+      {showDelivery ? (
+        <section
+          className={`${styles.deliverySection} ${showTakeout ? styles.deliverySectionInset : ''}`}
+          aria-labelledby={showTakeout ? 'delivery-hours-heading' : undefined}
+        >
+          {showTakeout ? (
             <h3 id="delivery-hours-heading" className={styles.deliverySectionTitle}>
               Entrega a domicilio
             </h3>
@@ -67,9 +73,9 @@ export function DashboardRestaurantHours({
           <RestaurantHoursDisplay
             schedules={schedules}
             serviceTypes={DASHBOARD_INFO_SCHEDULE_SERVICE_TYPES}
-            showHeader={!hasEditableTakeout}
+            showHeader={section !== 'delivery' && !showTakeout}
             readOnly
-            className={hasEditableTakeout ? styles.infoDisplay : undefined}
+            className={showTakeout ? styles.infoDisplay : styles.embeddedDisplay}
           />
         </section>
       ) : null}
