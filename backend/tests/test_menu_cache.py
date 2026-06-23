@@ -3,7 +3,7 @@ import fakeredis
 from app.infra.cache.menu_cache import MenuCacheService, menu_cache_key
 from app.infra.redis.cache import RedisCacheAdapter
 from app.modules.menu.adapters import SqlAlchemyMenuRepository
-from app.modules.menu.schemas import FullMenuDTO
+from app.modules.menu.schemas import CategoryCreate, FullMenuDTO, ProductCreate, ProductUpdate
 from app.modules.menu.service import MenuService
 from app.modules.restaurants.adapters import SqlAlchemyRestaurantRepository
 from app.modules.restaurants.schemas import RestaurantCreate
@@ -27,3 +27,55 @@ def test_menu_cache_hit(session):
 
     got = svc.get_public_menu("cached")
     assert got.restaurant_id == r.id
+
+
+@requires_db
+def test_menu_cache_excludes_draft_products_for_unpublished_restaurant(session):
+    client = fakeredis.FakeRedis(decode_responses=True)
+    cache = RedisCacheAdapter(client)
+    restaurants = SqlAlchemyRestaurantRepository(session)
+    menu_repo = SqlAlchemyMenuRepository(session)
+    restaurant = restaurants.add(
+        RestaurantCreate(name="Draft Resto", subdomain="draft-menu", status="draft"),
+        owner_id=None,
+    )
+    category = menu_repo.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Burgers"),
+    )
+    menu_repo.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Secret Draft",
+            price_cents=1000,
+            category_ids=[category.id],
+        )
+    )
+    menu_repo.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="On Menu",
+            price_cents=1200,
+            approval_status="approved",
+            is_published=True,
+            category_ids=[category.id],
+        )
+    )
+    inactive = menu_repo.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Inactive",
+            price_cents=900,
+            approval_status="approved",
+            is_published=True,
+            category_ids=[category.id],
+        )
+    )
+    menu_repo.update_product(inactive.id, ProductUpdate(is_active=False))
+
+    menu_svc = MenuService(menu_repo)
+    svc = MenuCacheService(cache, restaurants, menu_svc, ttl_seconds=300)
+
+    got = svc.get_public_menu("draft-menu")
+    names = [product.name for product in got.products]
+
+    assert names == ["On Menu", "Inactive"]
