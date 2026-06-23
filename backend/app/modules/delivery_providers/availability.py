@@ -102,6 +102,26 @@ def _next_schedule_boundary(
     return min(future).astimezone(UTC)
 
 
+def is_night_schedule(
+    schedules: list[DeliveryProviderScheduleDTO],
+    *,
+    timezone: str,
+    now: datetime | None = None,
+) -> bool:
+    local_now = (now or datetime.now(UTC)).astimezone(ZoneInfo(timezone))
+    day_index = local_now.weekday()
+    current_time = local_now.time().replace(microsecond=0)
+
+    for slot in schedules:
+        if slot.day_of_week != day_index:
+            continue
+        if slot.schedule_kind != "night":
+            continue
+        if _is_time_in_slot(current_time, slot.opens_at, slot.closes_at):
+            return True
+    return False
+
+
 def resolve_service_status(
     *,
     manually_enabled: bool,
