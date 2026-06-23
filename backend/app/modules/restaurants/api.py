@@ -48,6 +48,15 @@ def _maybe_request_mexy_delivery(
         partnership.ensure_mexy_request_for_restaurant(restaurant.id)
 
 
+def _maybe_request_mexy_delivery_on_enable(
+    previous: RestaurantDTO,
+    updated: RestaurantDTO,
+    partnership: DeliveryPartnershipService,
+) -> None:
+    if updated.delivery_enabled and not previous.delivery_enabled:
+        partnership.ensure_mexy_request_for_restaurant(updated.id)
+
+
 @router.post("", response_model=RestaurantDTO, status_code=status.HTTP_201_CREATED)
 def create_restaurant(
     data: RestaurantCreate,
@@ -103,7 +112,7 @@ def update_restaurant(
     partnership: DeliveryPartnershipService = Depends(_partnership_service),
 ) -> RestaurantDTO:
     updated = service.update(restaurant.id, data)
-    _maybe_request_mexy_delivery(updated, partnership)
+    _maybe_request_mexy_delivery_on_enable(restaurant, updated, partnership)
     return updated
 
 
