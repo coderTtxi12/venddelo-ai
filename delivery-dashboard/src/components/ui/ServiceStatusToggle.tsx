@@ -7,9 +7,12 @@ import styles from './ServiceStatusToggle.module.css';
 function statusCopy(
   statusReason: DeliveryProviderServiceStatusReason,
   serviceActive: boolean,
+  withinSchedule: boolean,
 ): { label: string; hint: string } {
   if (serviceActive) {
-    return { label: 'Servicio activo', hint: 'Recibiendo pedidos' };
+    return withinSchedule
+      ? { label: 'Servicio activo', hint: 'Recibiendo pedidos' }
+      : { label: 'Servicio activo', hint: 'Fuera del horario habitual' };
   }
 
   switch (statusReason) {
@@ -35,7 +38,11 @@ export default function ServiceStatusToggle() {
 
   if (!status) return null;
 
-  const copy = statusCopy(status.status_reason, status.service_active);
+  const copy = statusCopy(
+    status.status_reason,
+    status.service_active,
+    status.within_schedule,
+  );
   const dotClass = saving
     ? styles.statusDotPending
     : status.service_active
