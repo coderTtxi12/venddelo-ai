@@ -46,6 +46,8 @@ class Restaurant(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
         Text, nullable=False, server_default="Por tiempo limitado"
     )
     whatsapp_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    owner_contact_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    owner_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     subdomain: Mapped[str] = mapped_column(String(63), nullable=False)
     color_palette: Mapped[str | None] = mapped_column(String(50), nullable=True)
     original_language: Mapped[str] = mapped_column(String(10), nullable=False, server_default="es")

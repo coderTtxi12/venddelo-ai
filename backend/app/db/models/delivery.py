@@ -17,7 +17,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -42,6 +42,7 @@ class DeliveryProvider(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     service_manually_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="true"
     )
+    weather_mode: Mapped[str] = mapped_column(String, nullable=False, server_default="none")
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     members: Mapped[list["DeliveryProviderMember"]] = relationship(
@@ -62,12 +63,25 @@ class DeliveryProvider(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     assignments: Mapped[list["DeliveryAssignment"]] = relationship(
         back_populates="delivery_provider"
     )
+    pricing_config: Mapped["DeliveryProviderPricingConfig | None"] = relationship(
+        back_populates="delivery_provider",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    payment_methods: Mapped[list["DeliveryProviderPaymentMethod"]] = relationship(
+        back_populates="delivery_provider",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         UniqueConstraint("slug", name="uq_delivery_providers_slug"),
         CheckConstraint(
             "status IN ('draft','pending_review','active','rejected','suspended')",
             name="status_allowed",
+        ),
+        CheckConstraint(
+            "weather_mode IN ('none','light','heavy','intense')",
+            name="weather_mode_allowed",
         ),
         Index("ix_delivery_providers_status", "status"),
     )
@@ -211,6 +225,21 @@ class DeliveryProviderTariff(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
 
+class DeliveryProviderPricingConfig(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "delivery_provider_pricing_configs"
+
+    delivery_provider_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_providers.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    inside_polygon: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    outside_polygon: Mapped[dict] = mapped_column(JSONB, nullable=False)
+
+    delivery_provider: Mapped["DeliveryProvider"] = relationship(back_populates="pricing_config")
+
+
 class RestaurantDeliveryProvider(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "restaurant_delivery_providers"
 
@@ -244,6 +273,33 @@ class RestaurantDeliveryProvider(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             unique=True,
             postgresql_where=text("is_default = true AND status = 'active'"),
         ),
+    )
+
+
+class DeliveryProviderPaymentMethod(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "delivery_provider_payment_methods"
+
+    delivery_provider_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_providers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    method: Mapped[str] = mapped_column(String, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+
+    delivery_provider: Mapped["DeliveryProvider"] = relationship(back_populates="payment_methods")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "delivery_provider_id",
+            "method",
+            name="uq_delivery_provider_payment_method",
+        ),
+        CheckConstraint(
+            "method IN ('cash','transfer','card_terminal')",
+            name="delivery_payment_method_allowed",
+        ),
+        Index("ix_delivery_provider_payment_methods_lookup", "delivery_provider_id"),
     )
 
 
