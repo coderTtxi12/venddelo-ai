@@ -400,3 +400,91 @@ def test_provider_lists_accepts_and_rejects_partnership_requests(client, engine)
     app.dependency_overrides[get_auth] = lambda: __import__(
         "tests.api.test_api_v1", fromlist=["FakeAuth"]
     ).FakeAuth(OWNER)
+
+
+@requires_db
+def test_restaurant_reads_provider_schedules_and_payments_when_partnership_active(client, engine):
+    from app.api.deps import get_auth
+    from app.core.security import AuthenticatedUser, AuthPort
+    from app.main import app
+
+    class MexyAuth(AuthPort):
+        def verify_token(self, token: str) -> AuthenticatedUser:
+            return AuthenticatedUser(id=MEXY_USER, email="mexy@example.com")
+
+    _create_mexy_provider(client)
+
+    app.dependency_overrides[get_auth] = lambda: __import__(
+        "tests.api.test_api_v1", fromlist=["FakeAuth"]
+    ).FakeAuth(OWNER)
+
+    create_resp = client.post(
+        "/api/v1/restaurants",
+        json={
+            "name": "Provider Data Bistro",
+            "subdomain": "provider-data-bistro",
+            "delivery_enabled": True,
+        },
+        headers=AUTH,
+    )
+    restaurant_id = create_resp.json()["id"]
+
+    app.dependency_overrides[get_auth] = MexyAuth
+    listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
+    link_id = listed.json()[0]["id"]
+    client.post(
+        f"/api/v1/delivery-providers/me/partnership-requests/{link_id}/accept",
+        headers=AUTH,
+    )
+
+    app.dependency_overrides[get_auth] = lambda: __import__(
+        "tests.api.test_api_v1", fromlist=["FakeAuth"]
+    ).FakeAuth(OWNER)
+
+    schedules_resp = client.get(
+        f"/api/v1/restaurants/{restaurant_id}/delivery-partnership/schedules",
+        headers=AUTH,
+    )
+    assert schedules_resp.status_code == 200
+    schedules = schedules_resp.json()
+    assert len(schedules) > 0
+    assert schedules[0]["schedule_kind"] in ("regular", "night")
+
+    payments_resp = client.get(
+        f"/api/v1/restaurants/{restaurant_id}/delivery-partnership/payment-methods",
+        headers=AUTH,
+    )
+    assert payments_resp.status_code == 200
+    payments = payments_resp.json()
+    assert len(payments) == 3
+    assert {entry["method"] for entry in payments} == {"cash", "transfer", "card_terminal"}
+
+
+@requires_db
+def test_restaurant_provider_data_empty_when_partnership_pending(client, engine):
+    _create_mexy_provider(client)
+
+    create_resp = client.post(
+        "/api/v1/restaurants",
+        json={
+            "name": "Pending Bistro",
+            "subdomain": "pending-bistro",
+            "delivery_enabled": True,
+        },
+        headers=AUTH,
+    )
+    restaurant_id = create_resp.json()["id"]
+
+    schedules_resp = client.get(
+        f"/api/v1/restaurants/{restaurant_id}/delivery-partnership/schedules",
+        headers=AUTH,
+    )
+    assert schedules_resp.status_code == 200
+    assert schedules_resp.json() == []
+
+    payments_resp = client.get(
+        f"/api/v1/restaurants/{restaurant_id}/delivery-partnership/payment-methods",
+        headers=AUTH,
+    )
+    assert payments_resp.status_code == 200
+    assert payments_resp.json() == []
