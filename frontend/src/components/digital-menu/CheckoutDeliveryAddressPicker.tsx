@@ -10,6 +10,7 @@ import {
   loadGoogleMapsPlaces,
   reverseGeocodeCoordinates,
 } from '@/lib/loadGoogleMapsPlaces';
+import { dismissMobileKeyboard, scrollElementIntoViewAfterKeyboard } from '@/lib/mobileKeyboard';
 import styles from './CheckoutDeliveryAddressPicker.module.css';
 
 export type DeliveryLocationValue = {
@@ -46,6 +47,8 @@ export function CheckoutDeliveryAddressPicker({
   showValidation = false,
 }: CheckoutDeliveryAddressPickerProps) {
   const autocompleteHostRef = useRef<HTMLDivElement>(null);
+  const mapShellRef = useRef<HTMLDivElement>(null);
+  const shouldScrollToMapRef = useRef(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
@@ -72,6 +75,8 @@ export function CheckoutDeliveryAddressPicker({
 
   const handlePlaceSelected = useCallback(
     (place: { address: string; latitude: number; longitude: number; placeId: string | null }) => {
+      shouldScrollToMapRef.current = true;
+      dismissMobileKeyboard(autocompleteHostRef.current);
       onChangeRef.current({
         address: place.address,
         latitude: place.latitude,
@@ -197,6 +202,16 @@ export function CheckoutDeliveryAddressPicker({
       cancelled = true;
     };
   }, [apiKeyMissing, handlePlaceSelected]);
+
+  useEffect(() => {
+    if (!hasCoords || !shouldScrollToMapRef.current) return;
+
+    shouldScrollToMapRef.current = false;
+    const frame = window.requestAnimationFrame(() => {
+      scrollElementIntoViewAfterKeyboard(mapShellRef.current);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [hasCoords, value.latitude, value.longitude]);
 
   useEffect(() => {
     if (!hasCoords || value.latitude == null || value.longitude == null) {
@@ -357,7 +372,7 @@ export function CheckoutDeliveryAddressPicker({
             </p>
           </div>
 
-          <div className={styles.mapShell} aria-label="Mapa de entrega">
+          <div className={styles.mapShell} ref={mapShellRef} aria-label="Mapa de entrega">
             {mapState === 'loading' || geocoding ? (
               <p className={styles.mapOverlay}>
                 {geocoding ? 'Actualizando ubicación…' : 'Cargando mapa…'}
