@@ -2,6 +2,7 @@ from datetime import UTC, datetime, time
 from uuid import uuid4
 
 from app.modules.delivery_providers.availability import (
+    is_within_regular_schedule,
     is_within_schedule,
     resolve_service_status,
 )
