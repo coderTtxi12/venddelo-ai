@@ -11,6 +11,8 @@ import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
 import StarOutlineOutlinedIcon from '@mui/icons-material/StarOutlineOutlined';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
+import HandshakeOutlinedIcon from '@mui/icons-material/HandshakeOutlined';
+import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import styles from './Sidebar.module.css';
 
@@ -29,6 +31,8 @@ const navItems: NavItem[] = [
   { label: 'Reseñas', path: '/reviews', icon: <StarOutlineOutlinedIcon fontSize="small" />, badge: 14 },
   { label: 'Analíticas', path: '/analytics', icon: <BarChartOutlinedIcon fontSize="small" /> },
   { label: 'Marketing', path: '/marketing', icon: <CampaignOutlinedIcon fontSize="small" /> },
+  { label: 'Restaurantes', path: '/partnerships', icon: <HandshakeOutlinedIcon fontSize="small" /> },
+  { label: 'Tarifas', path: '/tariffs', icon: <LocalShippingOutlinedIcon fontSize="small" /> },
   { label: 'Configuración', path: '/settings', icon: <SettingsOutlinedIcon fontSize="small" /> },
 ];
 

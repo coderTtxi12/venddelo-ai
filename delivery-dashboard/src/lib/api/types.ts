@@ -95,3 +95,97 @@ export type DeliveryProviderServiceStatus = {
 export type DeliveryProviderServiceStatusUpdate = {
   manually_enabled: boolean;
 };
+
+export type DeliveryPaymentMethodKey = 'cash' | 'transfer' | 'card_terminal';
+
+export type DeliveryProviderPaymentMethod = {
+  id: string;
+  method: DeliveryPaymentMethodKey;
+  enabled: boolean;
+};
+
+export type DeliveryProviderPaymentMethodUpdate = {
+  method: DeliveryPaymentMethodKey;
+  enabled: boolean;
+};
+
+export type DeliveryWeatherMode = 'none' | 'light' | 'heavy' | 'intense';
+
+export type OutsideTariffBracket = {
+  min_km: number;
+  max_km: number;
+  repa_cents: number;
+  mexy_cents: number;
+  restaurant_cents: number;
+  rain_light_cents: number;
+  rain_heavy_cents: number;
+};
+
+export type DeliveryProviderPricingConfig = {
+  inside_polygon: {
+    day_cents: number;
+    night_cents: number;
+  };
+  outside_polygon: {
+    max_distance_km: number;
+    brackets: OutsideTariffBracket[];
+  };
+};
+
+export type DeliveryProviderPricingResponse = {
+  weather_mode: DeliveryWeatherMode;
+  config: DeliveryProviderPricingConfig;
+};
+
+export type DeliveryProviderPricingUpdate = {
+  config: DeliveryProviderPricingConfig;
+};
+
+export type DeliveryProviderWeatherModeUpdate = {
+  weather_mode: DeliveryWeatherMode;
+};
+
+export type DeliveryPricingSimulateRequest = {
+  inside_polygon: boolean;
+  distance_km?: number | null;
+  is_night?: boolean;
+  weather_mode?: DeliveryWeatherMode | null;
+};
+
+export type DeliveryPricingQuote = {
+  available: boolean;
+  reason: string | null;
+  total_cents: number;
+  repa_cents: number;
+  mexy_cents: number;
+  restaurant_cents: number;
+  inside_polygon: boolean;
+  distance_km: number | null;
+  weather_mode: DeliveryWeatherMode;
+  is_night: boolean;
+};
+
+export type DeliveryPartnershipRestaurant = {
+  id: string;
+  name: string;
+  subdomain: string;
+  description: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  whatsapp_phone: string | null;
+  owner_display_name: string | null;
+  owner_phone: string | null;
+  logo_path: string | null;
+  status: string;
+  delivery_enabled: boolean;
+};
+
+export type DeliveryPartnershipRequest = {
+  id: string;
+  status: 'pending' | 'active' | 'suspended';
+  is_default: boolean;
+  created_at: string;
+  activated_at: string | null;
+  restaurant: DeliveryPartnershipRestaurant;
+};

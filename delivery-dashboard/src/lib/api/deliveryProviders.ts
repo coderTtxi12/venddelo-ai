@@ -2,11 +2,18 @@ import { apiRequest } from './client';
 import type {
   DeliveryProvider,
   DeliveryProviderMeResponse,
+  DeliveryProviderPricingResponse,
+  DeliveryProviderPricingUpdate,
+  DeliveryProviderPaymentMethod,
+  DeliveryProviderPaymentMethodUpdate,
   DeliveryProviderProfileUpdate,
   DeliveryProviderSchedule,
   DeliveryProviderScheduleCreateInput,
   DeliveryProviderServiceStatus,
   DeliveryProviderServiceStatusUpdate,
+  DeliveryProviderWeatherModeUpdate,
+  DeliveryPricingQuote,
+  DeliveryPricingSimulateRequest,
 } from './types';
 
 export function getMyDeliveryProvider(token: string) {
@@ -36,6 +43,23 @@ export function setMyDeliveryProviderSchedules(
   });
 }
 
+export function listMyDeliveryProviderPaymentMethods(token: string) {
+  return apiRequest<DeliveryProviderPaymentMethod[]>('/delivery-providers/me/payment-methods', {
+    token,
+  });
+}
+
+export function setMyDeliveryProviderPaymentMethods(
+  token: string,
+  methods: DeliveryProviderPaymentMethodUpdate[],
+) {
+  return apiRequest<DeliveryProviderPaymentMethod[]>('/delivery-providers/me/payment-methods', {
+    method: 'PUT',
+    token,
+    body: methods,
+  });
+}
+
 export function getMyDeliveryProviderServiceStatus(token: string) {
   return apiRequest<DeliveryProviderServiceStatus>('/delivery-providers/me/service-status', {
     token,
@@ -48,6 +72,43 @@ export function updateMyDeliveryProviderServiceStatus(
 ) {
   return apiRequest<DeliveryProviderServiceStatus>('/delivery-providers/me/service-status', {
     method: 'PATCH',
+    token,
+    body,
+  });
+}
+
+export function getMyDeliveryProviderPricing(token: string) {
+  return apiRequest<DeliveryProviderPricingResponse>('/delivery-providers/me/pricing', { token });
+}
+
+export function updateMyDeliveryProviderPricing(
+  token: string,
+  body: DeliveryProviderPricingUpdate,
+) {
+  return apiRequest<DeliveryProviderPricingResponse>('/delivery-providers/me/pricing', {
+    method: 'PUT',
+    token,
+    body,
+  });
+}
+
+export function updateMyDeliveryProviderWeatherMode(
+  token: string,
+  body: DeliveryProviderWeatherModeUpdate,
+) {
+  return apiRequest<DeliveryProviderPricingResponse>('/delivery-providers/me/pricing/weather-mode', {
+    method: 'PATCH',
+    token,
+    body,
+  });
+}
+
+export function simulateMyDeliveryProviderPricing(
+  token: string,
+  body: DeliveryPricingSimulateRequest,
+) {
+  return apiRequest<DeliveryPricingQuote>('/delivery-providers/me/pricing/simulate', {
+    method: 'POST',
     token,
     body,
   });

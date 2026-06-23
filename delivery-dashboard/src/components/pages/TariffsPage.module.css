@@ -1,0 +1,455 @@
+.page {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.subtitle {
+  margin-top: 0.35rem;
+  font-size: 0.92rem;
+  color: var(--color-text-secondary);
+  max-width: 46rem;
+  line-height: 1.45;
+}
+
+.primaryBtn {
+  border: none;
+  border-radius: 12px;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 800;
+  padding: 0.65rem 1.1rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.panel {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.panelHint {
+  margin: -0.35rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.panelHeaderRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.addRowBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  padding: 0.45rem 0.75rem;
+  min-height: 40px;
+  background: var(--color-bg);
+  color: var(--color-primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.addRowBtn:hover {
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+}
+
+.maxDistanceLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 220px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.maxDistanceInput {
+  width: 100%;
+  min-height: 40px;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.maxDistanceInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.weatherRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.weatherBtn {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  min-height: 40px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.weatherBtn:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+}
+
+.weatherBtnActive {
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.weatherBtnDanger {
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.weatherBtnDanger.weatherBtnActive {
+  background: #fef2f2;
+}
+
+.weatherSuccessBanner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.35;
+  animation: weatherSuccessIn 0.2s ease;
+}
+
+.weatherSuccessIcon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: #16a34a;
+}
+
+.weatherSavingHint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+@keyframes weatherSuccessIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.tableWrap {
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 980px;
+}
+
+.table th,
+.table td {
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-bg);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-secondary);
+}
+
+.table td {
+  font-size: 0.82rem;
+}
+
+.table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--color-bg) 65%, var(--color-surface));
+}
+
+.kmCell {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.kmInput {
+  width: 100%;
+  min-width: 64px;
+  min-height: 36px;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  background: var(--color-surface);
+}
+
+.kmInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.actionCell {
+  width: 44px;
+  text-align: center;
+}
+
+.removeRowBtn {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.removeRowBtn:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.removeRowBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cellInput {
+  width: 100%;
+  min-width: 72px;
+  min-height: 36px;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  background: var(--color-surface);
+}
+
+.cellInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.simGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.toggleGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.toggleChip {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.45rem 0.75rem;
+  min-height: 40px;
+  background: var(--color-bg);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toggleChipActive {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.quoteCard {
+  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, var(--color-border));
+  border-radius: 12px;
+  padding: 0.85rem;
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+}
+
+.quoteTotal {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--color-text);
+}
+
+.quoteMeta {
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.quoteBreakdown {
+  margin-top: 0.65rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.quoteRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+}
+
+.quoteUnavailable {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.successBanner,
+.errorBanner,
+.loading {
+  font-size: 0.85rem;
+}
+
+.successBanner {
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+  font-weight: 600;
+}
+
+.errorBanner {
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.loading {
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 900px) {
+  .grid2,
+  .simGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weatherBtn,
+  .toggleChip {
+    transition: none;
+  }
+
+  .weatherSuccessBanner {
+    animation: none;
+  }
+}
