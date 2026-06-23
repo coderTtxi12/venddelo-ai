@@ -219,6 +219,21 @@
   color: var(--color-text-secondary, #64748b);
 }
 
+.lineAvailabilityErrors {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.lineAvailabilityError {
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
 .quoteError {
   margin: 0 0 0.65rem;
   padding: 0.55rem 0.65rem;
@@ -227,6 +242,23 @@
   color: #92400e;
   font-size: 0.8rem;
   line-height: 1.4;
+}
+
+.quoteErrorLead {
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+}
+
+.quoteErrorList {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.lineCardUnavailable {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.06);
 }
 
 .pricingNotice {
