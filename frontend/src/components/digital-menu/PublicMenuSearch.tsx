@@ -3,7 +3,6 @@
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import CloseIcon from '@mui/icons-material/Close';
-import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import ViewListOutlinedIcon from '@mui/icons-material/ViewListOutlined';
 import type { Category, Product, Promotion } from '@/lib/api/types';
@@ -19,7 +18,6 @@ import {
   searchMenu,
   type MenuSearchHit,
 } from '@/lib/digital-menu/search/menuSearch';
-import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import styles from './PublicMenuSearch.module.css';
 
 type PublicMenuSearchProps = {
@@ -27,13 +25,11 @@ type PublicMenuSearchProps = {
   onClose: () => void;
   products: Product[];
   categories: Category[];
-  promotions: Promotion[];
   productDiscounts: Map<string, MenuProductDiscountInfo>;
   productTimeLimitedPromotions: Map<string, Promotion>;
   promotionTimezone: string;
   countdownContext: PromotionCountdownContext;
   onProductSelect: (productId: string) => void;
-  onPromotionSelect: (promotionId: string) => void;
   onCategorySelect: (categoryId: string) => void;
   themeStyle?: CSSProperties;
 };
@@ -65,16 +61,6 @@ function ResultRow({
       >
         {hit.kind === 'product' && product ? (
           <ProductListThumb product={product} className={styles.resultThumb} />
-        ) : hit.kind === 'promotion' && hit.promotion?.image_path ? (
-          <img
-            src={storagePublicUrl(hit.promotion.image_path) ?? ''}
-            alt=""
-            className={styles.promotionThumb}
-          />
-        ) : hit.kind === 'promotion' ? (
-          <span className={styles.promotionThumb} aria-hidden>
-            <LocalOfferOutlinedIcon fontSize="small" />
-          </span>
         ) : (
           <span className={styles.categoryThumb} aria-hidden>
             <ViewListOutlinedIcon fontSize="small" />
@@ -118,13 +104,11 @@ export function PublicMenuSearch({
   onClose,
   products,
   categories,
-  promotions,
   productDiscounts,
   productTimeLimitedPromotions,
   promotionTimezone,
   countdownContext,
   onProductSelect,
-  onPromotionSelect,
   onCategorySelect,
   themeStyle,
 }: PublicMenuSearchProps) {
@@ -172,9 +156,8 @@ export function PublicMenuSearch({
         query: deferredQuery,
         products,
         categories,
-        promotions,
       }),
-    [deferredQuery, products, categories, promotions],
+    [deferredQuery, products, categories],
   );
 
   const suggestions = useMemo(() => getMenuSearchSuggestions(categories), [categories]);
@@ -186,10 +169,6 @@ export function PublicMenuSearch({
     onClose();
     if (hit.kind === 'product' && hit.product) {
       onProductSelect(hit.product.id);
-      return;
-    }
-    if (hit.kind === 'promotion' && hit.promotion) {
-      onPromotionSelect(hit.promotion.id);
       return;
     }
     if (hit.kind === 'category' && hit.category) {
@@ -223,7 +202,7 @@ export function PublicMenuSearch({
               id={`${titleId}-input`}
               type="search"
               className={styles.searchInput}
-              placeholder="Buscar productos, complementos, categorías..."
+              placeholder="Buscar productos, categorías, complementos..."
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               autoComplete="off"
@@ -254,7 +233,7 @@ export function PublicMenuSearch({
             <div className={styles.emptyState}>
               <p className={styles.emptyTitle}>¿Qué te gustaría pedir?</p>
               <p className={styles.emptyHint}>
-                Busca por nombre, descripción, complementos, categorías o promociones.
+                Busca por nombre de producto, descripción, complemento o categoría.
               </p>
               {suggestions.length > 0 ? (
                 <div className={styles.suggestions} aria-label="Sugerencias de búsqueda">
