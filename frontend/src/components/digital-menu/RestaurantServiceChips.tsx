@@ -1,5 +1,5 @@
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
-import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlined';
+import BoltOutlinedIcon from '@mui/icons-material/BoltOutlined';
 import {
   RESTAURANT_SERVICE_LABELS,
   type RestaurantServiceType,
@@ -8,7 +8,7 @@ import styles from './RestaurantServiceChips.module.css';
 
 const SERVICE_ICONS: Record<RestaurantServiceType, typeof StorefrontOutlinedIcon> = {
   takeout: StorefrontOutlinedIcon,
-  delivery: DeliveryDiningOutlinedIcon,
+  delivery: BoltOutlinedIcon,
 };
 
 type RestaurantServiceChipsProps = {
