@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
@@ -39,9 +39,20 @@ function isNavActive(pathname: string, path: string): boolean {
   return pathname === path || pathname.startsWith(`${path}/`);
 }
 
+/** Por debajo de este ancho el sidebar arranca compactado. */
+const SIDEBAR_COMPACT_MAX_WIDTH = 1024;
+
+function shouldSidebarStartCollapsed(width: number): boolean {
+  return width < SIDEBAR_COMPACT_MAX_WIDTH;
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    setIsCollapsed(shouldSidebarStartCollapsed(window.innerWidth));
+  }, []);
 
   return (
     <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}>
