@@ -9,6 +9,8 @@ from app.api.deps import (
 )
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
+from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
+from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
 from app.modules.restaurants.schemas import (
     PaymentMethodCreate,
     PaymentMethodDTO,
@@ -19,6 +21,7 @@ from app.modules.restaurants.schemas import (
     ScheduleDTO,
     SubdomainAvailabilityDTO,
 )
+from app.modules.delivery_providers.schemas import RestaurantDeliveryPartnershipResponse
 from app.modules.restaurants.service import RestaurantService
 from app.modules.users.schemas import UserDTO
 
@@ -29,13 +32,28 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> RestaurantService:
     return RestaurantService(uow.restaurants)
 
 
+def _partnership_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeliveryPartnershipService:
+    return DeliveryPartnershipService(SqlAlchemyDeliveryProviderRepository(uow.session))
+
+
+def _maybe_request_mexy_delivery(
+    restaurant: RestaurantDTO,
+    partnership: DeliveryPartnershipService,
+) -> None:
+    if restaurant.delivery_enabled:
+        partnership.ensure_mexy_request_for_restaurant(restaurant.id)
+
+
 @router.post("", response_model=RestaurantDTO, status_code=status.HTTP_201_CREATED)
 def create_restaurant(
     data: RestaurantCreate,
     user: UserDTO = Depends(get_synced_user),
     service: RestaurantService = Depends(_service),
+    partnership: DeliveryPartnershipService = Depends(_partnership_service),
 ) -> RestaurantDTO:
-    return service.create(user.id, data)
+    restaurant = service.create(user.id, data)
+    _maybe_request_mexy_delivery(restaurant, partnership)
+    return restaurant
 
 
 @router.get("", response_model=CursorPage[RestaurantDTO])
@@ -78,8 +96,11 @@ def update_restaurant(
     data: RestaurantUpdate,
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: RestaurantService = Depends(_service),
+    partnership: DeliveryPartnershipService = Depends(_partnership_service),
 ) -> RestaurantDTO:
-    return service.update(restaurant.id, data)
+    updated = service.update(restaurant.id, data)
+    _maybe_request_mexy_delivery(updated, partnership)
+    return updated
 
 
 @router.delete("/{restaurant_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -122,3 +143,28 @@ def list_payment_methods(
     service: RestaurantService = Depends(_service),
 ) -> list[PaymentMethodDTO]:
     return service.list_payment_methods(restaurant.id)
+
+
+@router.get(
+    "/{restaurant_id}/delivery-partnership",
+    response_model=RestaurantDeliveryPartnershipResponse,
+)
+def get_restaurant_delivery_partnership(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    partnership: DeliveryPartnershipService = Depends(_partnership_service),
+) -> RestaurantDeliveryPartnershipResponse:
+    return partnership.get_mexy_partnership_status(restaurant.id)
+
+
+@router.post(
+    "/{restaurant_id}/delivery-partnership/request",
+    response_model=RestaurantDeliveryPartnershipResponse,
+)
+def request_restaurant_delivery_partnership(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    partnership: DeliveryPartnershipService = Depends(_partnership_service),
+) -> RestaurantDeliveryPartnershipResponse:
+    return partnership.request_mexy_partnership(
+        restaurant.id,
+        delivery_enabled=restaurant.delivery_enabled,
+    )
