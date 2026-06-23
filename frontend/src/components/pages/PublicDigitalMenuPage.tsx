@@ -50,6 +50,10 @@ import {
 import { PUBLIC_MENU_SCHEDULE_SERVICE_TYPES, resolveRestaurantServices } from '@/lib/restaurantServices';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { buildAddToCartInput } from '@/lib/digital-menu/cart/buildCartLine';
+import {
+  filterOrderableProducts,
+  filterPublicMenuProducts,
+} from '@/lib/digital-menu/orderableProducts';
 import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
 import { scrollCategoryTabIntoView, getCategoryScrollAnchorPosition, getSectionOffsetTop } from '@/lib/digital-menu/categoryScrollSpy';
 import { cartSubtotalCents as sumCartSubtotalCents } from '@/lib/digital-menu/cart/cartMath';
@@ -136,7 +140,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
   const cart = usePublicMenuCart(subdomain);
 
   const validProductIds = useMemo(
-    () => new Set(products.map((product) => product.id)),
+    () => new Set(filterOrderableProducts(products).map((product) => product.id)),
     [products],
   );
 
@@ -198,7 +202,7 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
         const sortedCategories = sortCategories(menuData.categories);
         setRestaurant(restaurantData);
         setCategories(sortedCategories);
-        setProducts(menuData.products);
+        setProducts(filterPublicMenuProducts(menuData.products));
         setSchedules(scheduleRows);
         setPromotionsContext(promotionContext);
         writePromotionsCache(subdomain, promotionContext);
@@ -1031,13 +1035,11 @@ export default function PublicDigitalMenuPage({ subdomain }: PublicDigitalMenuPa
         onClose={closeSearch}
         products={products}
         categories={displayCategories}
-        promotions={promotionsContext?.items ?? []}
         productDiscounts={productDiscounts}
         productTimeLimitedPromotions={productTimeLimitedPromotions}
         promotionTimezone={promotionTimezone}
         countdownContext={promotionCountdownContext}
         onProductSelect={openProduct}
-        onPromotionSelect={openPromotion}
         onCategorySelect={isDesktopLayout ? handleDesktopCategorySelect : scrollToCategory}
         themeStyle={menuThemeStyle}
       />
