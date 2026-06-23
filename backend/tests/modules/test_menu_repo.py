@@ -1,4 +1,8 @@
-from app.modules.menu.adapters import SqlAlchemyMenuRepository
+from app.modules.menu.adapters import (
+    SqlAlchemyMenuRepository,
+    _category_sort_indices,
+    _category_sort_indices_batch,
+)
 from app.modules.menu.schemas import (
     CategoryCreate,
     CategoryUpdate,
@@ -170,3 +174,78 @@ def test_full_menu_only_published_approved(session):
     names = [p.name for p in menu.products]
     assert names == ["Live"]
     assert len(menu.categories) == 1
+
+
+@requires_db
+def test_category_sort_indices_batch_matches_single(session):
+    r = _restaurant(session, "menu-batch-sort")
+    repo = SqlAlchemyMenuRepository(session)
+    cat = repo.add_category(CategoryCreate(restaurant_id=r.id, name="Cat"))
+    first = repo.add_product(
+        ProductCreate(
+            restaurant_id=r.id,
+            name="First",
+            price_cents=1000,
+            category_ids=[cat.id],
+        )
+    )
+    second = repo.add_product(
+        ProductCreate(
+            restaurant_id=r.id,
+            name="Second",
+            price_cents=1000,
+            category_ids=[cat.id],
+        )
+    )
+    repo.set_category_product_order(cat.id, [second.id, first.id])
+
+    batch = _category_sort_indices_batch(session, [first.id, second.id])
+    assert batch[first.id] == _category_sort_indices(session, first.id)
+    assert batch[second.id] == _category_sort_indices(session, second.id)
+
+
+@requires_db
+def test_get_full_menu_bounded_query_count(session, engine):
+    from sqlalchemy import event
+
+    r = _restaurant(session, "menu-query-count")
+    repo = SqlAlchemyMenuRepository(session)
+    cat = repo.add_category(CategoryCreate(restaurant_id=r.id, name="Cat"))
+
+    for index in range(5):
+        product = repo.add_product(
+            ProductCreate(
+                restaurant_id=r.id,
+                name=f"Product {index}",
+                price_cents=1000 + index,
+                approval_status="approved",
+                is_published=True,
+                category_ids=[cat.id],
+            )
+        )
+        repo.add_option_group(
+            product.id,
+            OptionGroupCreate(
+                title="Extras",
+                selection="single",
+                items=[
+                    OptionItemCreate(label="A", price_delta_cents=0),
+                    OptionItemCreate(label="B", price_delta_cents=100),
+                ],
+            ),
+        )
+
+    query_count = {"n": 0}
+
+    def before_cursor_execute(
+        conn, cursor, statement, parameters, context, executemany
+    ) -> None:
+        query_count["n"] += 1
+
+    event.listen(engine, "before_cursor_execute", before_cursor_execute)
+    try:
+        menu = repo.get_full_menu(r.id)
+        assert len(menu.products) == 5
+        assert query_count["n"] <= 10
+    finally:
+        event.remove(engine, "before_cursor_execute", before_cursor_execute)
