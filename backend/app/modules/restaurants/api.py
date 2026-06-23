@@ -21,7 +21,11 @@ from app.modules.restaurants.schemas import (
     ScheduleDTO,
     SubdomainAvailabilityDTO,
 )
-from app.modules.delivery_providers.schemas import RestaurantDeliveryPartnershipResponse
+from app.modules.delivery_providers.schemas import (
+    DeliveryProviderPaymentMethodDTO,
+    DeliveryProviderScheduleDTO,
+    RestaurantDeliveryPartnershipResponse,
+)
 from app.modules.restaurants.service import RestaurantService
 from app.modules.users.schemas import UserDTO
 
@@ -168,3 +172,25 @@ def request_restaurant_delivery_partnership(
         restaurant.id,
         delivery_enabled=restaurant.delivery_enabled,
     )
+
+
+@router.get(
+    "/{restaurant_id}/delivery-partnership/schedules",
+    response_model=list[DeliveryProviderScheduleDTO],
+)
+def list_active_delivery_provider_schedules(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    partnership: DeliveryPartnershipService = Depends(_partnership_service),
+) -> list[DeliveryProviderScheduleDTO]:
+    return partnership.get_active_provider_schedules(restaurant.id)
+
+
+@router.get(
+    "/{restaurant_id}/delivery-partnership/payment-methods",
+    response_model=list[DeliveryProviderPaymentMethodDTO],
+)
+def list_active_delivery_provider_payment_methods(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    partnership: DeliveryPartnershipService = Depends(_partnership_service),
+) -> list[DeliveryProviderPaymentMethodDTO]:
+    return partnership.get_active_provider_payment_methods(restaurant.id)
