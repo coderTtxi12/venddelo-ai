@@ -1,0 +1,33 @@
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--dm-product-thumb-bg, #f1f5f9);
+  user-select: none;
+}
+
+.initial {
+  display: block;
+  font-family: var(--dm-font-heading, system-ui, sans-serif);
+  font-weight: var(--dm-font-heading-weight, 700);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-align: center;
+  color: color-mix(in srgb, var(--dm-text-secondary, #94a3b8) 75%, var(--dm-text, #111827) 25%);
+  transform: translateY(0.04em);
+}
+
+.thumb .initial {
+  font-size: 2rem;
+}
+
+.compact .initial {
+  font-size: 1.35rem;
+}
+
+.hero .initial {
+  font-size: clamp(3rem, 14vw, 4.75rem);
+}
