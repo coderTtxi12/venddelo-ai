@@ -534,7 +534,7 @@ export default function TariffsPage() {
             </h2>
             <p className={styles.panelHint}>
               Calcula lo que se cobraría con tus tarifas actuales guardadas (usa clima operativo si
-              no eliges uno distinto).
+              no eliges uno distinto). El turno nocturno solo aplica dentro de cobertura.
             </p>
 
             <div className={styles.simGrid}>
@@ -544,14 +544,14 @@ export default function TariffsPage() {
                   <button
                     type="button"
                     className={`${styles.toggleChip} ${simInside ? styles.toggleChipActive : ''}`}
-                    onClick={() => setSimInside(true)}
+                    onClick={() => selectSimInside(true)}
                   >
                     Dentro de cobertura
                   </button>
                   <button
                     type="button"
                     className={`${styles.toggleChip} ${!simInside ? styles.toggleChipActive : ''}`}
-                    onClick={() => setSimInside(false)}
+                    onClick={() => selectSimInside(false)}
                   >
                     Fuera de cobertura
                   </button>
@@ -559,18 +559,21 @@ export default function TariffsPage() {
               </div>
 
               {!simInside ? (
-                <label className={styles.label}>
-                  Distancia de ruta (km)
-                  <input
-                    className={styles.input}
-                    type="number"
-                    min="0"
-                    max={config.outside_polygon.max_distance_km}
-                    step="0.1"
-                    value={simDistance}
-                    onChange={(e) => setSimDistance(e.target.value)}
-                  />
-                </label>
+                <div>
+                  <label className={styles.label}>
+                    Distancia de ruta (km)
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min="0"
+                      max={config.outside_polygon.max_distance_km}
+                      step="0.1"
+                      value={simDistance}
+                      onChange={(e) => setSimDistance(e.target.value)}
+                    />
+                  </label>
+                  <p className={styles.simFieldHint}>Solo horario de día — el turno nocturno no aplica.</p>
+                </div>
               ) : (
                 <div>
                   <span className={styles.label}>Turno</span>
@@ -639,7 +642,7 @@ export default function TariffsPage() {
                     <p className={styles.quoteMeta}>
                       {quote.inside_polygon
                         ? `Dentro de cobertura · ${quote.is_night ? 'Noche' : 'Día'}`
-                        : `Fuera de cobertura · ${quote.distance_km?.toFixed(1)} km de ruta`}
+                        : `Fuera de cobertura · ${quote.distance_km?.toFixed(1)} km de ruta · solo horario diurno`}
                     </p>
                     {!quote.inside_polygon ? (
                       <div className={styles.quoteBreakdown}>
