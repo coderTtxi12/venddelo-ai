@@ -297,7 +297,7 @@ export default function TariffsPage() {
       const result = await simulateMyDeliveryProviderPricing(accessToken, {
         inside_polygon: simInside,
         distance_km: simInside ? null : distance,
-        is_night: simNight,
+        is_night: simInside ? simNight : false,
         weather_mode: simWeather === 'operational' ? null : simWeather,
       });
       setQuote(result);
@@ -394,7 +394,8 @@ export default function TariffsPage() {
               Dentro de cobertura (polígono)
             </h2>
             <p className={styles.panelHint}>
-              Tarifa fija para clientes dentro de tu zona. Mismo precio con cualquier clima.
+              Tarifa fija para clientes dentro de tu zona. Mismo precio con cualquier clima. El
+              turno nocturno aplica solo aquí.
             </p>
             <div className={styles.grid2}>
               <label className={styles.label}>
