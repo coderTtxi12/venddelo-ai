@@ -364,9 +364,10 @@ export function PublicMenuCheckoutDetails({
           </section>
         ) : null}
 
+        {showPaymentSection ? (
         <section className={styles.section} aria-labelledby="checkout-payment-heading">
           <h2 id="checkout-payment-heading" className={styles.sectionTitle}>
-            ¿Cómo pagas?
+            ¿Cómo te gustaría pagar?
           </h2>
           {paymentMethods.length === 0 ? (
             <p className={styles.emptyPayment}>
@@ -407,6 +408,7 @@ export function PublicMenuCheckoutDetails({
             </ul>
           )}
         </section>
+        ) : null}
       </form>
 
       <footer className={styles.footer}>
