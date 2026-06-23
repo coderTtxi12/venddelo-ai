@@ -1,4 +1,4 @@
-import { apiRequest } from './client';
+import { apiRequest, type RequestOptions } from './client';
 import type { Category, Product, Promotion, RestaurantSchedule } from './types';
 import type { PaymentMethodKey } from '@/lib/restaurantPaymentConfig';
 import type { RestaurantServiceType } from '@/lib/restaurantServices';
@@ -104,14 +104,22 @@ export type PublicDeliveryQuoteInput = {
   longitude: number;
 };
 
-export function getPublicRestaurant(subdomain: string) {
-  return apiRequest<PublicRestaurant>(`/public/restaurants/${encodeURIComponent(subdomain)}`);
+export function getPublicRestaurant(subdomain: string, requestOptions?: RequestOptions) {
+  return apiRequest<PublicRestaurant>(
+    `/public/restaurants/${encodeURIComponent(subdomain)}`,
+    requestOptions,
+  );
 }
 
-export function getPublicMenu(subdomain: string, locale = 'default') {
+export function getPublicMenu(
+  subdomain: string,
+  locale = 'default',
+  requestOptions?: RequestOptions,
+) {
   const params = new URLSearchParams({ locale });
   return apiRequest<PublicMenu>(
     `/public/menu/${encodeURIComponent(subdomain)}?${params}`,
+    requestOptions,
   );
 }
 
