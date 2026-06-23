@@ -147,14 +147,23 @@ export default function PublicDigitalMenuPage({
   const isDesktopLayout = viewportBand === 'desktop';
   const isTabletLayout = viewportBand === 'tablet';
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isInteractive, setIsInteractive] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [restaurant, setRestaurant] = useState<PublicRestaurant | null>(null);
-  const [categories, setCategories] = useState<Awaited<ReturnType<typeof getPublicMenu>>['categories']>([]);
-  const [products, setProducts] = useState<Awaited<ReturnType<typeof getPublicMenu>>['products']>([]);
+  const [restaurant, setRestaurant] = useState<PublicRestaurant | null>(
+    initialCritical?.restaurant ?? null,
+  );
+  const [categories, setCategories] = useState<
+    Awaited<ReturnType<typeof getPublicMenu>>['categories']
+  >(initialCritical?.categories ?? []);
+  const [products, setProducts] = useState<Awaited<ReturnType<typeof getPublicMenu>>['products']>(
+    initialCritical?.products ?? [],
+  );
   const [schedules, setSchedules] = useState<Awaited<ReturnType<typeof getPublicRestaurantSchedules>>>([]);
   const [promotionsContext, setPromotionsContext] = useState<PublicPromotionsContext | null>(null);
-  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(
+    initialCritical?.activeCategoryId ?? null,
+  );
   const [heroCollapsed, setHeroCollapsed] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
