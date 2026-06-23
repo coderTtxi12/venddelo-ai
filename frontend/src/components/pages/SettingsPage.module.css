@@ -138,6 +138,13 @@
   overflow-wrap: anywhere;
   word-break: break-word;
   field-sizing: content;
+  resize: none;
+  cursor: default;
+}
+
+.addressTextarea:read-only {
+  background: #f1f5f9;
+  color: var(--color-text);
 }
 
 .subdomainInputWrap {
