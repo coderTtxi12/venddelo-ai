@@ -83,6 +83,22 @@ def _public_delivery_quote_service(
     return PublicDeliveryQuoteService(SqlAlchemyDeliveryProviderRepository(uow.session))
 
 
+def _order_service(
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+    partnership: DeliveryPartnershipService = Depends(_partnership_service),
+    delivery_quotes: PublicDeliveryQuoteService = Depends(_public_delivery_quote_service),
+) -> OrderService:
+    return OrderService(
+        uow.orders,
+        uow.restaurants,
+        uow.menu,
+        uow.idempotency,
+        uow.promotions,
+        partnership=partnership,
+        delivery_quotes=delivery_quotes,
+    )
+
+
 def _public_restaurant(uow: SqlAlchemyUnitOfWork, subdomain: str):
     restaurant = uow.restaurants.get_by_subdomain(subdomain)
     if restaurant is None:
