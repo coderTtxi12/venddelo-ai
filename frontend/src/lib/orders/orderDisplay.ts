@@ -119,6 +119,12 @@ export function formatCents(cents: number, currency = 'MXN'): string {
   return formatMoney(cents / 100, currency);
 }
 
+export {
+  collectOrderDiscountRows,
+  resolveOrderItemDiscounts,
+  type OrderDiscountRow,
+} from '@/lib/orders/orderItemDiscounts';
+
 export function resolveOrderItemDiscountCents(item: OrderItem): number {
   if (item.discount_cents > 0) return item.discount_cents;
   if (item.line_subtotal_cents > item.line_total_cents) {
@@ -128,25 +134,6 @@ export function resolveOrderItemDiscountCents(item: OrderItem): number {
     (sum, discount) => sum + (discount.applied ? discount.discount_cents : 0),
     0,
   );
-}
-
-export function resolveOrderItemDiscounts(item: OrderItem): AppliedOrderDiscount[] {
-  const applied = item.applied_discounts.filter(
-    (discount) => discount.applied && discount.discount_cents > 0,
-  );
-  if (applied.length > 0) return applied;
-
-  const implied = resolveOrderItemDiscountCents(item);
-  if (implied <= 0) return [];
-
-  return [
-    {
-      label: 'Descuento',
-      badge: null,
-      discount_cents: implied,
-      applied: true,
-    },
-  ];
 }
 
 export function sumOrderLineDiscountCents(order: Order): number {
