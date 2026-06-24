@@ -1,5 +1,9 @@
 import type { MenuQrConfig } from './menuQrStudio';
-import { resolveMenuQrBackground } from './menuQrStudio';
+import {
+  MENU_QR_EXPORT_RENDER_SCALE,
+  MENU_QR_PREVIEW_RENDER_SCALE,
+  resolveMenuQrBackground,
+} from './menuQrStudio';
 
 export type MenuQrRenderer = {
   update: (data: string, config: MenuQrConfig) => void;
@@ -13,31 +17,45 @@ export async function createMenuQrRenderer(
 ): Promise<MenuQrRenderer> {
   const { default: QRCodeStyling } = await import('qr-code-styling');
 
-  const qr = new QRCodeStyling(buildQrOptions(data, config));
+  let currentData = data;
+  let currentConfig = config;
+
+  const qr = new QRCodeStyling(
+    buildQrOptions(currentData, currentConfig, MENU_QR_PREVIEW_RENDER_SCALE),
+  );
 
   return {
     update(nextData, nextConfig) {
-      qr.update(buildQrOptions(nextData, nextConfig));
+      currentData = nextData;
+      currentConfig = nextConfig;
+      qr.update(buildQrOptions(currentData, currentConfig, MENU_QR_PREVIEW_RENDER_SCALE));
     },
     appendTo(container) {
       container.replaceChildren();
       qr.append(container);
+      fitCanvasToDisplaySize(container, currentConfig.size);
     },
     async getRawData(extension) {
-      const blob = await qr.getRawData(extension);
+      const exportQr = new QRCodeStyling(
+        buildQrOptions(currentData, currentConfig, MENU_QR_EXPORT_RENDER_SCALE),
+      );
+      const blob = await exportQr.getRawData(extension);
       if (!blob) throw new Error('No se pudo generar la imagen del QR.');
       return blob;
     },
   };
 }
 
-function buildQrOptions(data: string, config: MenuQrConfig) {
+function buildQrOptions(data: string, config: MenuQrConfig, renderScale: number) {
+  const pixelSize = Math.round(config.size * renderScale);
+  const margin = Math.round(config.margin * renderScale);
+
   return {
-    width: config.size,
-    height: config.size,
+    width: pixelSize,
+    height: pixelSize,
     type: 'canvas' as const,
     data,
-    margin: config.margin,
+    margin,
     qrOptions: {
       errorCorrectionLevel: 'H' as const,
     },
@@ -59,9 +77,18 @@ function buildQrOptions(data: string, config: MenuQrConfig) {
   };
 }
 
+function fitCanvasToDisplaySize(container: HTMLElement, displaySize: number) {
+  const canvas = container.querySelector('canvas');
+  if (!(canvas instanceof HTMLCanvasElement)) return;
+
+  canvas.style.width = `${displaySize}px`;
+  canvas.style.height = `${displaySize}px`;
+  canvas.style.maxWidth = '100%';
+  canvas.style.display = 'block';
+}
+
 export async function downloadMenuQrPdf(
   blob: Blob,
-  config: MenuQrConfig,
   fileName: string,
   restaurantName: string,
   menuUrl: string,
@@ -76,7 +103,7 @@ export async function downloadMenuQrPdf(
   });
 
   const pageWidth = doc.internal.pageSize.getWidth();
-  const qrSizeMm = 70;
+  const qrSizeMm = 78;
   const x = (pageWidth - qrSizeMm) / 2;
 
   doc.setFont('helvetica', 'bold');
@@ -87,7 +114,7 @@ export async function downloadMenuQrPdf(
   doc.setFontSize(11);
   doc.text('Escanea para ver el menú', pageWidth / 2, 36, { align: 'center' });
 
-  doc.addImage(dataUrl, 'PNG', x, 44, qrSizeMm, qrSizeMm);
+  doc.addImage(dataUrl, 'PNG', x, 44, qrSizeMm, qrSizeMm, undefined, 'FAST');
 
   doc.setFontSize(9);
   const urlLines = doc.splitTextToSize(menuUrl, pageWidth - 40);
@@ -117,7 +144,7 @@ export async function printMenuQr(
   menuUrl: string,
 ): Promise<void> {
   const dataUrl = await blobToDataUrl(blob);
-  const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=640,height=800');
+  const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=720,height=900');
   if (!printWindow) {
     throw new Error('No se pudo abrir la ventana de impresión. Permite ventanas emergentes.');
   }
@@ -131,7 +158,7 @@ export async function printMenuQr(
       body { font-family: system-ui, sans-serif; text-align: center; padding: 2rem; color: #0f172a; }
       h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
       p { margin: 0.35rem 0; color: #475569; font-size: 0.9rem; }
-      img { width: 240px; height: 240px; margin: 1rem auto; display: block; }
+      img { width: min(320px, 80vw); height: auto; margin: 1rem auto; display: block; image-rendering: auto; }
       .url { font-size: 0.75rem; word-break: break-all; }
       .hint { margin-top: 1rem; font-size: 0.8rem; }
     </style>

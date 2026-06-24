@@ -1,3 +1,5 @@
+import { MENU_QR_PRESET_CATALOG } from './menuQrPresets';
+
 export type MenuQrDotStyle =
   | 'square'
   | 'dots'
@@ -17,9 +19,16 @@ export type MenuQrConfig = {
   dotStyle: MenuQrDotStyle;
   cornerStyle: MenuQrCornerStyle;
   cornerDotStyle: MenuQrCornerStyle;
+  /** Tamaño visual en pantalla (px). El render interno usa escala HD. */
   margin: number;
   size: number;
 };
+
+/** Escala interna del canvas para vista previa nítida en pantallas retina. */
+export const MENU_QR_PREVIEW_RENDER_SCALE = 4;
+
+/** Escala para exportación PNG/JPG/PDF e impresión. */
+export const MENU_QR_EXPORT_RENDER_SCALE = 8;
 
 export const DEFAULT_MENU_QR_CONFIG: MenuQrConfig = {
   dotColor: '#0f172a',
@@ -31,71 +40,18 @@ export const DEFAULT_MENU_QR_CONFIG: MenuQrConfig = {
   cornerStyle: 'extra-rounded',
   cornerDotStyle: 'dot',
   margin: 16,
-  size: 280,
+  size: 320,
 };
 
-export const MENU_QR_PRESETS: { id: string; label: string; config: Partial<MenuQrConfig> }[] = [
-  {
-    id: 'classic',
-    label: 'Clásico',
-    config: {
-      dotColor: '#0f172a',
-      cornerColor: '#0f172a',
-      cornerDotColor: '#0f172a',
-      backgroundColor: '#ffffff',
-      transparentBackground: false,
-      dotStyle: 'square',
-      cornerStyle: 'square',
-      cornerDotStyle: 'square',
-    },
-  },
-  {
-    id: 'rounded',
-    label: 'Redondeado',
-    config: DEFAULT_MENU_QR_CONFIG,
-  },
-  {
-    id: 'brand-warm',
-    label: 'Cálido',
-    config: {
-      dotColor: '#450a0a',
-      cornerColor: '#dc2626',
-      cornerDotColor: '#ca8a04',
-      backgroundColor: '#fff7ed',
-      transparentBackground: false,
-      dotStyle: 'rounded',
-      cornerStyle: 'extra-rounded',
-      cornerDotStyle: 'dot',
-    },
-  },
-  {
-    id: 'mono-green',
-    label: 'Verde delivery',
-    config: {
-      dotColor: '#14532d',
-      cornerColor: '#166534',
-      cornerDotColor: '#15803d',
-      backgroundColor: '#f0fdf4',
-      transparentBackground: false,
-      dotStyle: 'dots',
-      cornerStyle: 'dot',
-      cornerDotStyle: 'dot',
-    },
-  },
-  {
-    id: 'transparent',
-    label: 'Fondo transparente',
-    config: {
-      dotColor: '#0f172a',
-      cornerColor: '#0f172a',
-      cornerDotColor: '#0f172a',
-      transparentBackground: true,
-      dotStyle: 'rounded',
-      cornerStyle: 'extra-rounded',
-      cornerDotStyle: 'dot',
-    },
-  },
-];
+export type MenuQrPreset = {
+  id: string;
+  label: string;
+  /** ui-ux-pro-max product / style reference */
+  theme: string;
+  config: Partial<MenuQrConfig>;
+};
+
+export const MENU_QR_PRESETS: MenuQrPreset[] = MENU_QR_PRESET_CATALOG;
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const normalized = hex.replace('#', '').trim();
@@ -139,6 +95,10 @@ export function getMenuQrContrastRatio(
   const lighter = Math.max(l1, l2);
   const darker = Math.min(l1, l2);
   return (lighter + 0.05) / (darker + 0.05);
+}
+
+export function getMenuQrRenderPixelSize(config: MenuQrConfig, scale: number): number {
+  return Math.round(config.size * scale);
 }
 
 /** ISO/IEC 18004: quiet zone + high contrast — aim for ≥ 4.5:1 when background is opaque. */
@@ -197,4 +157,10 @@ export function getMenuQrScanSafety(config: MenuQrConfig): {
 
 export function resolveMenuQrBackground(config: MenuQrConfig): string {
   return config.transparentBackground ? 'transparent' : config.backgroundColor;
+}
+
+export function mergeMenuQrPreset(presetId: string, current: MenuQrConfig): MenuQrConfig | null {
+  const preset = MENU_QR_PRESETS.find((item) => item.id === presetId);
+  if (!preset) return null;
+  return { ...current, ...preset.config };
 }

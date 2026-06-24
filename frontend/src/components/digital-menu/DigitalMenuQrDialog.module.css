@@ -155,6 +155,14 @@
   height: auto;
 }
 
+.hdMeta {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-secondary, #64748b);
+}
+
 .previewLoading,
 .previewError {
   position: absolute;
@@ -235,24 +243,103 @@
   color: var(--color-text-secondary, #64748b);
 }
 
-.presetRow {
+.presetGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
+}
+
+.controlLabelRow {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.presetSearchRow {
+  position: relative;
+}
+
+.presetSearchIcon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 17px;
+  height: 17px;
+  color: var(--color-text-secondary, #64748b);
+  pointer-events: none;
+}
+
+.presetSearchInput {
+  width: 100%;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 10px;
+  padding: 0.45rem 0.65rem 0.45rem 2rem;
+  font-size: 0.78rem;
+  color: var(--color-text);
+  background: var(--color-surface, #fff);
+  min-height: 38px;
+}
+
+.presetSearchInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.presetEmpty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 8px 0;
+  font-size: 0.76rem;
+  color: var(--color-text-secondary, #64748b);
+  text-align: center;
 }
 
 .presetChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--color-surface, #fff);
   color: var(--color-text, #0f172a);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  padding: 0.28rem 0.65rem;
+  padding: 0.35rem 0.5rem;
   cursor: pointer;
+  text-align: left;
   transition:
     border-color 180ms ease,
-    background-color 180ms ease;
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.presetSwatch {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.presetSwatchDot {
+  position: absolute;
+  inset: 4px;
+  border-radius: 2px;
+}
+
+.presetChipActive {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 
 .presetChip:hover {

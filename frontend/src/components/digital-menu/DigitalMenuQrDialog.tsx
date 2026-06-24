@@ -6,11 +6,16 @@ import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import SmartphoneOutlinedIcon from '@mui/icons-material/SmartphoneOutlined';
 import {
   DEFAULT_MENU_QR_CONFIG,
+  MENU_QR_EXPORT_RENDER_SCALE,
   MENU_QR_PRESETS,
+  MENU_QR_PREVIEW_RENDER_SCALE,
+  getMenuQrRenderPixelSize,
   getMenuQrScanSafety,
+  mergeMenuQrPreset,
   type MenuQrConfig,
   type MenuQrCornerStyle,
   type MenuQrDotStyle,
@@ -56,11 +61,31 @@ export function DigitalMenuQrDialog({
   const previewRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<MenuQrRenderer | null>(null);
   const [config, setConfig] = useState<MenuQrConfig>(DEFAULT_MENU_QR_CONFIG);
+  const [activePresetId, setActivePresetId] = useState<string | null>('rounded');
+  const [presetQuery, setPresetQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
 
   const scanSafety = useMemo(() => getMenuQrScanSafety(config), [config]);
+  const exportPixelSize = useMemo(
+    () => getMenuQrRenderPixelSize(config, MENU_QR_EXPORT_RENDER_SCALE),
+    [config],
+  );
+  const previewPixelSize = useMemo(
+    () => getMenuQrRenderPixelSize(config, MENU_QR_PREVIEW_RENDER_SCALE),
+    [config],
+  );
+
+  const filteredPresets = useMemo(() => {
+    const query = presetQuery.trim().toLowerCase();
+    if (!query) return MENU_QR_PRESETS;
+    return MENU_QR_PRESETS.filter((preset) => {
+      const haystack = `${preset.label} ${preset.theme} ${preset.id}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [presetQuery]);
+
   const fileBaseName = useMemo(
     () =>
       `menu-qr-${restaurantName
@@ -72,13 +97,13 @@ export function DigitalMenuQrDialog({
   );
 
   const patchConfig = useCallback((patch: Partial<MenuQrConfig>) => {
+    setActivePresetId(null);
     setConfig((current) => ({ ...current, ...patch }));
   }, []);
 
   const applyPreset = useCallback((presetId: string) => {
-    const preset = MENU_QR_PRESETS.find((item) => item.id === presetId);
-    if (!preset) return;
-    setConfig((current) => ({ ...current, ...preset.config }));
+    setConfig((current) => mergeMenuQrPreset(presetId, current) ?? current);
+    setActivePresetId(presetId);
   }, []);
 
   useEffect(() => {
@@ -132,6 +157,8 @@ export function DigitalMenuQrDialog({
     if (!open) {
       rendererRef.current = null;
       setConfig(DEFAULT_MENU_QR_CONFIG);
+      setActivePresetId('rounded');
+      setPresetQuery('');
       setRenderError(null);
     }
   }, [open]);
@@ -174,13 +201,13 @@ export function DigitalMenuQrDialog({
     setExporting('pdf');
     try {
       const blob = await getExportBlob('png');
-      await downloadMenuQrPdf(blob, config, `${fileBaseName}.pdf`, restaurantName, menuUrl);
+      await downloadMenuQrPdf(blob, `${fileBaseName}.pdf`, restaurantName, menuUrl);
     } catch (error) {
       console.error(error);
     } finally {
       setExporting(null);
     }
-  }, [config, fileBaseName, getExportBlob, menuUrl, restaurantName]);
+  }, [fileBaseName, getExportBlob, menuUrl, restaurantName]);
 
   const handlePrint = useCallback(async () => {
     setExporting('print');
@@ -240,6 +267,11 @@ export function DigitalMenuQrDialog({
               {renderError ? <p className={styles.previewError}>{renderError}</p> : null}
             </div>
 
+            <p className={styles.hdMeta}>
+              Vista HD {previewPixelSize}×{previewPixelSize}px · exportación{' '}
+              {exportPixelSize}×{exportPixelSize}px
+            </p>
+
             <p className={styles.menuUrl} title={menuUrl}>
               {menuUrl}
             </p>
@@ -255,18 +287,58 @@ export function DigitalMenuQrDialog({
 
           <section className={styles.controlsPanel} aria-label="Personalización del QR">
             <div className={styles.controlGroup}>
-              <span className={styles.controlLabel}>Estilos rápidos</span>
-              <div className={styles.presetRow}>
-                {MENU_QR_PRESETS.map((preset) => (
+              <div className={styles.controlLabelRow}>
+                <span className={styles.controlLabel}>
+                  Temas QR ({filteredPresets.length})
+                </span>
+              </div>
+              <div className={styles.presetSearchRow}>
+                <SearchOutlinedIcon className={styles.presetSearchIcon} aria-hidden />
+                <input
+                  type="search"
+                  className={styles.presetSearchInput}
+                  value={presetQuery}
+                  onChange={(e) => setPresetQuery(e.target.value)}
+                  placeholder="Buscar por cocina, estilo o festividad…"
+                  aria-label="Buscar temas QR"
+                />
+              </div>
+              <div className={styles.presetGrid}>
+                {filteredPresets.length === 0 ? (
+                  <p className={styles.presetEmpty}>No hay temas que coincidan.</p>
+                ) : (
+                  filteredPresets.map((preset) => (
                   <button
                     key={preset.id}
                     type="button"
-                    className={styles.presetChip}
+                    className={`${styles.presetChip} ${
+                      activePresetId === preset.id ? styles.presetChipActive : ''
+                    }`}
+                    title={preset.theme}
                     onClick={() => applyPreset(preset.id)}
                   >
+                    <span
+                      className={styles.presetSwatch}
+                      style={{
+                        background: preset.config.transparentBackground
+                          ? 'linear-gradient(45deg, #e2e8f0 25%, transparent 25%, transparent 75%, #e2e8f0 75%), linear-gradient(45deg, #e2e8f0 25%, transparent 25%, transparent 75%, #e2e8f0 75%)'
+                          : (preset.config.backgroundColor ?? '#ffffff'),
+                        backgroundSize: preset.config.transparentBackground ? '8px 8px' : undefined,
+                        backgroundPosition: preset.config.transparentBackground
+                          ? '0 0, 4px 4px'
+                          : undefined,
+                      }}
+                      aria-hidden
+                    >
+                      <span
+                        className={styles.presetSwatchDot}
+                        style={{ background: preset.config.dotColor ?? '#0f172a' }}
+                      />
+                    </span>
                     {preset.label}
                   </button>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
@@ -349,11 +421,11 @@ export function DigitalMenuQrDialog({
             </label>
 
             <label className={styles.field}>
-              <span>Tamaño ({config.size}px)</span>
+              <span>Tamaño vista ({config.size}px)</span>
               <input
                 type="range"
-                min={220}
-                max={360}
+                min={260}
+                max={400}
                 step={10}
                 value={config.size}
                 onChange={(e) => patchConfig({ size: Number(e.target.value) })}
