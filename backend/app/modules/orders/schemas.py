@@ -44,6 +44,7 @@ class OrderCreate(BaseModel):
     total_cents: int
     applied_order_promotion_id: uuid.UUID | None = None
     delivery_address: str | None = None
+    delivery_fee_cents: int = 0
     status: str = "pending"
     idempotency_key: str | None = None
     note: str | None = None
@@ -66,6 +67,7 @@ class OrderDTO(BaseModel):
     applied_order_promotion_id: uuid.UUID | None = None
     status: str
     delivery_address: str | None = None
+    delivery_fee_cents: int = 0
     idempotency_key: str | None = None
     note: str | None = None
     created_at: datetime
@@ -85,6 +87,7 @@ class PublicOrderInput(BaseModel):
     customer_phone: str
     payment_method: str
     delivery_address: str | None = None
+    delivery_fee_cents: int = 0
     note: str | None = None
     items: list[PublicOrderItemInput]
 

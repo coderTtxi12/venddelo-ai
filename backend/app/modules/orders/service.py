@@ -190,10 +190,20 @@ class OrderService:
                     return OrderDTO.model_validate(existing.response_snapshot)
 
         self._validate_payment_method(restaurant.id, data.type, data.payment_method)
-        order_items, subtotal_before, order_discount, total, order_promo_id = (
+        order_items, subtotal_before, order_discount, lines_total, order_promo_id = (
             self._build_priced_order(restaurant.id, restaurant.timezone, data)
         )
-        lines_subtotal = total + order_discount
+        lines_subtotal = lines_total + order_discount
+
+        delivery_fee_cents = 0
+        if data.type == "delivery":
+            if data.delivery_fee_cents < 0:
+                raise ValidationError("delivery_fee_cents must be >= 0")
+            delivery_fee_cents = data.delivery_fee_cents
+        elif data.delivery_fee_cents > 0:
+            raise ValidationError("delivery_fee_cents is only allowed for delivery orders")
+
+        order_total = lines_total + delivery_fee_cents
 
         order = self._orders.add(
             OrderCreate(
@@ -205,9 +215,10 @@ class OrderService:
                 subtotal_cents=lines_subtotal,
                 subtotal_before_discount_cents=subtotal_before,
                 discount_cents=order_discount,
-                total_cents=total,
+                total_cents=order_total,
                 applied_order_promotion_id=order_promo_id,
                 delivery_address=data.delivery_address,
+                delivery_fee_cents=delivery_fee_cents,
                 note=data.note,
                 idempotency_key=idempotency_key,
                 items=order_items,
