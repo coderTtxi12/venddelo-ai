@@ -57,4 +57,9 @@ def update_order_status(
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: OrderService = Depends(_service),
 ) -> OrderDTO:
-    return service.update_status(restaurant.id, order_id, body.status)
+    return service.update_status(
+        restaurant.id,
+        order_id,
+        body.status,
+        body.cancellation_reason,
+    )

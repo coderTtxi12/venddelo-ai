@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import re
@@ -7,6 +9,7 @@ from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.request_context import RequestIdMiddleware
+from app.infra.realtime.order_hub import get_order_realtime_hub
 from app.middleware.rate_limit import RateLimitMiddleware
 
 
@@ -22,7 +25,16 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
 
-    app = FastAPI(title="Vendelo AI API", version=settings.app_version)
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        import asyncio
+
+        hub = get_order_realtime_hub()
+        hub.bind_loop(asyncio.get_running_loop())
+        yield
+        await hub.shutdown()
+
+    app = FastAPI(title="Vendelo AI API", version=settings.app_version, lifespan=lifespan)
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,

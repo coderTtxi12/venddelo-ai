@@ -43,14 +43,14 @@ class SqlAlchemyOrderRepository(OrderRepository):
         stmt = (
             select(Order)
             .where(Order.restaurant_id == restaurant_id)
-            .order_by(Order.created_at, Order.id)
+            .order_by(Order.created_at.desc(), Order.id.desc())
             .limit(params.limit + 1)
         )
         if status is not None:
             stmt = stmt.where(Order.status == status)
         if params.cursor:
             created_at, last_id = decode_keyset_cursor(params.cursor)
-            stmt = stmt.where(tuple_(Order.created_at, Order.id) > (created_at, last_id))
+            stmt = stmt.where(tuple_(Order.created_at, Order.id) < (created_at, last_id))
         rows = list(self._session.scalars(stmt))
         has_more = len(rows) > params.limit
         rows = rows[: params.limit]
@@ -61,11 +61,19 @@ class SqlAlchemyOrderRepository(OrderRepository):
             has_more=has_more,
         )
 
-    def update_status(self, id: uuid.UUID, status: str) -> OrderDTO | None:
+    def update_status(
+        self,
+        id: uuid.UUID,
+        status: str,
+        *,
+        cancellation_reason: str | None = None,
+    ) -> OrderDTO | None:
         obj = self._session.get(Order, id)
         if obj is None:
             return None
         obj.status = status
+        if cancellation_reason is not None:
+            obj.cancellation_reason = cancellation_reason
         self._session.flush()
         return OrderDTO.model_validate(obj)
 

@@ -13,6 +13,7 @@ from app.modules.menu.schemas import (
     OptionItemCreate,
     ProductCreate,
 )
+from app.modules.promotions.schemas import PromotionCreate
 from app.modules.restaurants.schemas import PaymentMethodCreate, RestaurantCreate
 from tests.api.conftest import OWNER
 from tests.conftest import requires_db
@@ -60,6 +61,7 @@ def test_public_live_menu_order_persists_all_details(client, engine):
                 restaurant_id=restaurant.id,
                 name="BURGER & BONELESS",
                 price_cents=25900,
+                image_path="products/wild-rooster/burger.jpg",
                 approval_status="approved",
                 is_published=True,
                 category_ids=[cat.id],
@@ -92,6 +94,8 @@ def test_public_live_menu_order_persists_all_details(client, engine):
         "customer_phone": "whatsapp",
         "payment_method": "cash",
         "delivery_address": delivery_address,
+        "delivery_latitude": 19.686433560420415,
+        "delivery_longitude": -99.12609887948815,
         "delivery_fee_cents": 5000,
         "note": f"Ref. pedido #{order_ref} | BURGER & BONELESS: sin cebolla",
         "items": [
@@ -117,6 +121,8 @@ def test_public_live_menu_order_persists_all_details(client, engine):
     assert created["customer_phone"] == "whatsapp"
     assert created["payment_method"] == "cash"
     assert created["delivery_address"] == delivery_address
+    assert created["delivery_latitude"] == 19.686433560420415
+    assert created["delivery_longitude"] == -99.12609887948815
     assert created["note"] == order_body["note"]
     assert created["status"] == "pending"
     assert created["idempotency_key"] == idempotency_key
@@ -130,6 +136,8 @@ def test_public_live_menu_order_persists_all_details(client, engine):
     assert item["quantity"] == 1
     assert item["selected_options"] == {str(group_id): [str(option_id)]}
     assert item["line_total_cents"] > 0
+    assert item["product_image_path"] == "products/wild-rooster/burger.jpg"
+    assert isinstance(item["applied_discounts"], list)
 
     list_resp = client.get(
         f"/api/v1/restaurants/{restaurant_id}/orders",
@@ -262,3 +270,98 @@ def test_public_live_menu_order_rejected_when_restaurant_suspended(client, engin
     )
     assert resp.status_code == 400
     assert resp.json()["error"]["message"] == "Restaurant is not accepting orders"
+
+
+@requires_db
+def test_public_live_menu_order_persists_line_and_order_discount_snapshots(client, engine):
+    me = client.get("/api/v1/users/me", headers=AUTH)
+    assert me.status_code == 200
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    subdomain = "wildrooster-promos"
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restaurant = uow.restaurants.add(
+            RestaurantCreate(
+                name="Wild Rooster Promos",
+                subdomain=subdomain,
+                status="published",
+                takeout_enabled=True,
+                delivery_enabled=True,
+            ),
+            owner_id=OWNER,
+        )
+        uow.restaurants.set_payment_methods(
+            restaurant.id,
+            [
+                PaymentMethodCreate(method="cash", service_type="delivery"),
+                PaymentMethodCreate(method="cash", service_type="takeout"),
+            ],
+        )
+        cat = uow.menu.add_category(
+            CategoryCreate(restaurant_id=restaurant.id, name="Combos"),
+        )
+        product = uow.menu.add_product(
+            ProductCreate(
+                restaurant_id=restaurant.id,
+                name="BURGER & BONELESS",
+                price_cents=25900,
+                approval_status="approved",
+                is_published=True,
+                category_ids=[cat.id],
+            )
+        )
+        uow.promotions.add(
+            PromotionCreate(
+                restaurant_id=restaurant.id,
+                name="15% en combos",
+                type="percent",
+                scope="category",
+                percent=15,
+                category_ids=[cat.id],
+            )
+        )
+        uow.promotions.add(
+            PromotionCreate(
+                restaurant_id=restaurant.id,
+                name="$10 off pedido",
+                type="amount",
+                scope="order",
+                amount_cents=1000,
+            )
+        )
+        uow.commit()
+        product_id = product.id
+
+    order_body = {
+        "type": "delivery",
+        "customer_name": "Oliver",
+        "customer_phone": "whatsapp",
+        "payment_method": "cash",
+        "delivery_address": "Tultepec, State of Mexico, Mexico",
+        "delivery_fee_cents": 3500,
+        "items": [{"product_id": str(product_id), "quantity": 1}],
+    }
+
+    create_resp = client.post(f"/api/v1/public/menu/{subdomain}/orders", json=order_body)
+    assert create_resp.status_code == 201, create_resp.text
+    created = create_resp.json()
+
+    item = created["items"][0]
+    assert item["discount_cents"] > 0
+    assert len(item["applied_discounts"]) == 1
+    assert item["applied_discounts"][0]["discount_cents"] == item["discount_cents"]
+    assert item["line_subtotal_cents"] > item["line_total_cents"]
+
+    assert created["subtotal_before_discount_cents"] > created["subtotal_cents"]
+    assert created["discount_cents"] == 1000
+    assert len(created["applied_order_discounts"]) == 1
+    assert created["applied_order_discounts"][0]["discount_cents"] == 1000
+
+    line_discount = created["subtotal_before_discount_cents"] - created["subtotal_cents"]
+    assert line_discount == item["discount_cents"]
+    assert (
+        created["total_cents"]
+        == created["subtotal_cents"] - created["discount_cents"] + created["delivery_fee_cents"]
+    )
+

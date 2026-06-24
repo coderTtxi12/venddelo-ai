@@ -12,15 +12,18 @@ from app.core.pagination import CursorPage, PaginationParams
 from app.modules.menu.repository import MenuRepository
 from app.modules.orders.repository import OrderRepository
 from app.modules.orders.schemas import (
+    AppliedDiscountSnapshot,
     OrderCreate,
     OrderDTO,
     OrderItemCreate,
     PublicOrderInput,
 )
 from app.modules.promotions.effective import resolve_timezone
-from app.modules.promotions.pricing import CartLineInput, price_cart
+from app.modules.promotions.pricing import CATALOG_DISCOUNT_PREFIX, CartLineInput, PricedCartLine, price_cart
 from app.modules.promotions.repository import PromotionRepository
+from app.modules.promotions.schemas import PromotionDTO
 from app.modules.restaurants.repository import RestaurantRepository
+from app.infra.realtime.order_hub import get_order_realtime_hub
 
 _BLOCKED_PUBLIC_ORDER_STATUSES = frozenset({"suspended"})
 _ALLOWED_ORDER_TYPES = {"takeout", "delivery"}
@@ -38,6 +41,48 @@ _STATUS_TRANSITIONS: dict[str, set[str]] = {
 def _hash_public_order(data: PublicOrderInput) -> str:
     payload = json.dumps(data.model_dump(mode="json"), sort_keys=True)
     return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _promo_display_name(promo: PromotionDTO) -> str:
+    if promo.name.startswith(CATALOG_DISCOUNT_PREFIX):
+        return "Descuento de producto"
+    return promo.name
+
+
+def _snapshot_line_discounts(
+    priced: PricedCartLine,
+    promotions: list[PromotionDTO],
+) -> list[AppliedDiscountSnapshot]:
+    if priced.discount_cents <= 0:
+        return []
+    promo = next((p for p in promotions if p.id == priced.applied_promotion_id), None)
+    label = _promo_display_name(promo) if promo else "Descuento"
+    return [
+        AppliedDiscountSnapshot(
+            label=label,
+            badge=priced.badge,
+            discount_cents=priced.discount_cents,
+            applied=True,
+        )
+    ]
+
+
+def _snapshot_order_discounts(
+    order_discount_cents: int,
+    order_promo_id: uuid.UUID | None,
+    promotions: list[PromotionDTO],
+) -> list[AppliedDiscountSnapshot]:
+    if order_discount_cents <= 0:
+        return []
+    promo = next((p for p in promotions if p.id == order_promo_id), None)
+    label = _promo_display_name(promo) if promo else "Descuento en pedido"
+    return [
+        AppliedDiscountSnapshot(
+            label=label,
+            discount_cents=order_discount_cents,
+            applied=True,
+        )
+    ]
 
 
 class OrderService:
@@ -60,6 +105,12 @@ class OrderService:
             idempotency_ttl_seconds or get_settings().order_idempotency_ttl_seconds
         )
 
+    def _publish_order_event(self, restaurant_id: uuid.UUID, event_type: str, order: OrderDTO) -> None:
+        get_order_realtime_hub().publish_sync(
+            restaurant_id,
+            {"type": event_type, "order": order.model_dump(mode="json")},
+        )
+
     def list_for_restaurant(
         self,
         restaurant_id: uuid.UUID,
@@ -75,14 +126,30 @@ class OrderService:
             raise NotFoundError("Order not found")
         return dto
 
-    def update_status(self, restaurant_id: uuid.UUID, order_id: uuid.UUID, status: str) -> OrderDTO:
+    def update_status(
+        self,
+        restaurant_id: uuid.UUID,
+        order_id: uuid.UUID,
+        status: str,
+        cancellation_reason: str | None = None,
+    ) -> OrderDTO:
         order = self.get(restaurant_id, order_id)
         allowed = _STATUS_TRANSITIONS.get(order.status, set())
         if status not in allowed:
             raise ValidationError(f"Cannot transition from {order.status} to {status}")
-        dto = self._orders.update_status(order_id, status)
+        if status == "cancelled":
+            reason = (cancellation_reason or "").strip()
+            if not reason:
+                raise ValidationError("cancellation_reason is required when cancelling an order")
+            cancellation_reason = reason
+        dto = self._orders.update_status(
+            order_id,
+            status,
+            cancellation_reason=cancellation_reason,
+        )
         if dto is None:
             raise NotFoundError("Order not found")
+        self._publish_order_event(restaurant_id, "order.updated", dto)
         return dto
 
     def _validate_payment_method(
@@ -96,7 +163,7 @@ class OrderService:
 
     def _build_priced_order(
         self, restaurant_id: uuid.UUID, timezone: str, data: PublicOrderInput
-    ) -> tuple[list[OrderItemCreate], int, int, int, uuid.UUID | None]:
+    ) -> tuple[list[OrderItemCreate], int, int, int, uuid.UUID | None, list[PromotionDTO]]:
         if not data.items:
             raise ValidationError("Order must contain at least one item")
 
@@ -148,6 +215,7 @@ class OrderService:
                 OrderItemCreate(
                     product_id=product.id,
                     product_name=product.name,
+                    product_image_path=product.image_path,
                     quantity=line_input.quantity,
                     unit_price_cents=unit_with_options,
                     selected_options=line_input.selected_options,
@@ -155,12 +223,20 @@ class OrderService:
                     discount_cents=priced.discount_cents,
                     line_total_cents=priced.line_total_cents,
                     applied_promotion_id=priced.applied_promotion_id,
+                    applied_discounts=_snapshot_line_discounts(priced, promotions),
                 )
             )
 
         subtotal_before = quote.subtotal_before_discount_cents
         total = quote.total_cents
-        return items, subtotal_before, quote.order_discount_cents, total, quote.applied_order_promotion_id
+        return (
+            items,
+            subtotal_before,
+            quote.order_discount_cents,
+            total,
+            quote.applied_order_promotion_id,
+            promotions,
+        )
 
     def create_public(
         self,
@@ -191,7 +267,7 @@ class OrderService:
                     return OrderDTO.model_validate(existing.response_snapshot)
 
         self._validate_payment_method(restaurant.id, data.type, data.payment_method)
-        order_items, subtotal_before, order_discount, lines_total, order_promo_id = (
+        order_items, subtotal_before, order_discount, lines_total, order_promo_id, promotions = (
             self._build_priced_order(restaurant.id, restaurant.timezone, data)
         )
         lines_subtotal = lines_total + order_discount
@@ -206,6 +282,9 @@ class OrderService:
 
         order_total = lines_total + delivery_fee_cents
 
+        delivery_latitude = data.delivery_latitude if data.type == "delivery" else None
+        delivery_longitude = data.delivery_longitude if data.type == "delivery" else None
+
         order = self._orders.add(
             OrderCreate(
                 restaurant_id=restaurant.id,
@@ -218,7 +297,14 @@ class OrderService:
                 discount_cents=order_discount,
                 total_cents=order_total,
                 applied_order_promotion_id=order_promo_id,
+                applied_order_discounts=_snapshot_order_discounts(
+                    order_discount,
+                    order_promo_id,
+                    promotions,
+                ),
                 delivery_address=data.delivery_address,
+                delivery_latitude=delivery_latitude,
+                delivery_longitude=delivery_longitude,
                 delivery_fee_cents=delivery_fee_cents,
                 note=data.note,
                 idempotency_key=idempotency_key,
@@ -233,4 +319,5 @@ class OrderService:
                 order.model_dump(mode="json"),
                 self._idempotency_ttl,
             )
+        self._publish_order_event(restaurant.id, "order.created", order)
         return order

@@ -24,7 +24,13 @@ class OrderRepository(ABC):
     ) -> CursorPage[OrderDTO]: ...
 
     @abstractmethod
-    def update_status(self, id: uuid.UUID, status: str) -> OrderDTO | None: ...
+    def update_status(
+        self,
+        id: uuid.UUID,
+        status: str,
+        *,
+        cancellation_reason: str | None = None,
+    ) -> OrderDTO | None: ...
 
     @abstractmethod
     def get_by_idempotency_key(self, restaurant_id: uuid.UUID, key: str) -> OrderDTO | None: ...

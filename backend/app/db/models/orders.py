@@ -3,6 +3,7 @@ from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -28,6 +29,9 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     customer_name: Mapped[str] = mapped_column(Text, nullable=False)
     customer_phone: Mapped[str] = mapped_column(Text, nullable=False)
     delivery_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    delivery_latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    delivery_longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     payment_method: Mapped[str] = mapped_column(String, nullable=False)
     subtotal_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     discount_cents: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
@@ -39,6 +43,9 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         PG_UUID(as_uuid=True),
         ForeignKey("promotions.id", ondelete="SET NULL"),
         nullable=True,
+    )
+    applied_order_discounts: Mapped[list[Any]] = mapped_column(
+        JSONB, nullable=False, server_default="[]"
     )
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="pending")
     idempotency_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -82,9 +89,13 @@ class OrderItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=True,
     )
     product_name: Mapped[str] = mapped_column(Text, nullable=False)
+    product_image_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     unit_price_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     selected_options: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    applied_discounts: Mapped[list[Any]] = mapped_column(
+        JSONB, nullable=False, server_default="[]"
+    )
     line_subtotal_cents: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     discount_cents: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     line_total_cents: Mapped[int] = mapped_column(Integer, nullable=False)
