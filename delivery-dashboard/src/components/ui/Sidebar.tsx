@@ -13,6 +13,8 @@ import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import HandshakeOutlinedIcon from '@mui/icons-material/HandshakeOutlined';
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
+import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
+import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import styles from './Sidebar.module.css';
 
@@ -23,17 +25,45 @@ interface NavItem {
   badge?: number;
 }
 
-const navItems: NavItem[] = [
-  { label: 'Dashboard', path: '/', icon: <DashboardOutlinedIcon fontSize="small" /> },
-  { label: 'Órdenes', path: '/orders', icon: <ShoppingBagOutlinedIcon fontSize="small" />, badge: 24 },
-  { label: 'Productos', path: '/products', icon: <Inventory2OutlinedIcon fontSize="small" /> },
-  { label: 'Menú Digital', path: '/digital-menu', icon: <QrCode2OutlinedIcon fontSize="small" /> },
-  { label: 'Reseñas', path: '/reviews', icon: <StarOutlineOutlinedIcon fontSize="small" />, badge: 14 },
-  { label: 'Analíticas', path: '/analytics', icon: <BarChartOutlinedIcon fontSize="small" /> },
-  { label: 'Marketing', path: '/marketing', icon: <CampaignOutlinedIcon fontSize="small" /> },
-  { label: 'Restaurantes', path: '/partnerships', icon: <HandshakeOutlinedIcon fontSize="small" /> },
-  { label: 'Tarifas', path: '/tariffs', icon: <LocalShippingOutlinedIcon fontSize="small" /> },
-  { label: 'Configuración', path: '/settings', icon: <SettingsOutlinedIcon fontSize="small" /> },
+interface NavSection {
+  label?: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
+  {
+    items: [
+      { label: 'Dashboard', path: '/', icon: <DashboardOutlinedIcon fontSize="small" /> },
+      { label: 'Órdenes', path: '/orders', icon: <ShoppingBagOutlinedIcon fontSize="small" />, badge: 24 },
+      { label: 'Productos', path: '/products', icon: <Inventory2OutlinedIcon fontSize="small" /> },
+      { label: 'Menú Digital', path: '/digital-menu', icon: <QrCode2OutlinedIcon fontSize="small" /> },
+      { label: 'Reseñas', path: '/reviews', icon: <StarOutlineOutlinedIcon fontSize="small" />, badge: 14 },
+      { label: 'Analíticas', path: '/analytics', icon: <BarChartOutlinedIcon fontSize="small" /> },
+      { label: 'Marketing', path: '/marketing', icon: <CampaignOutlinedIcon fontSize="small" /> },
+      { label: 'Restaurantes', path: '/partnerships', icon: <HandshakeOutlinedIcon fontSize="small" /> },
+      { label: 'Tarifas', path: '/tariffs', icon: <LocalShippingOutlinedIcon fontSize="small" /> },
+    ],
+  },
+  {
+    label: 'Operación',
+    items: [
+      {
+        label: 'Horarios',
+        path: '/horarios',
+        icon: <AccessTimeOutlinedIcon fontSize="small" />,
+      },
+      {
+        label: 'Cerco geográfico',
+        path: '/cerco-geografico',
+        icon: <MapOutlinedIcon fontSize="small" />,
+      },
+    ],
+  },
+  {
+    items: [
+      { label: 'Configuración', path: '/settings', icon: <SettingsOutlinedIcon fontSize="small" /> },
+    ],
+  },
 ];
 
 function isNavActive(pathname: string, path: string): boolean {
@@ -60,22 +90,32 @@ export default function Sidebar() {
       </div>
 
       <nav className={styles.nav}>
-        {navItems.map((item) => {
-          const active = isNavActive(pathname, item.path);
-          return (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={`${styles.navItem} ${active ? styles.active : ''}`}
-            >
-              <span className={styles.icon}>{item.icon}</span>
-              <span className={styles.label}>{item.label}</span>
-              {item.badge != null && (
-                <span className={styles.badge}>{item.badge}</span>
-              )}
-            </Link>
-          );
-        })}
+        {navSections.map((section) => (
+          <div key={section.label ?? 'main'} className={styles.navSection}>
+            {section.label ? (
+              <p className={styles.navSectionLabel} aria-hidden={isCollapsed}>
+                {section.label}
+              </p>
+            ) : null}
+            {section.items.map((item) => {
+              const active = isNavActive(pathname, item.path);
+              return (
+                <Link
+                  key={item.path}
+                  href={item.path}
+                  className={`${styles.navItem} ${active ? styles.active : ''}`}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  <span className={styles.icon}>{item.icon}</span>
+                  <span className={styles.label}>{item.label}</span>
+                  {item.badge != null && (
+                    <span className={styles.badge}>{item.badge}</span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <button type="button" className={styles.addButton}>

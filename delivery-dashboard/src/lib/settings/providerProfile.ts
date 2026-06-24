@@ -35,7 +35,7 @@ export function providerProfileFromApi(response: DeliveryProviderMeResponse): Pr
   };
 }
 
-export function validateProviderProfile(data: ProviderProfileForm): string | null {
+export function validateProviderProfileCore(data: ProviderProfileForm): string | null {
   if (data.companyName.trim().length < 2) {
     return 'Ingresa el nombre de tu empresa de delivery.';
   }
@@ -53,14 +53,26 @@ export function validateProviderProfile(data: ProviderProfileForm): string | nul
   if (whatsappPhone.length < 10) {
     return 'Ingresa un WhatsApp válido de la empresa.';
   }
-  const ring = data.serviceZonePolygon?.coordinates?.[0] ?? [];
-  if (ring.length < 4) {
-    return 'Dibuja el cerco de servicio en el mapa (mínimo 3 puntos).';
-  }
   if (!data.logoDataUrl) {
     return 'Sube el logo de tu empresa.';
   }
   return null;
+}
+
+export function validateServiceZone(
+  data: Pick<ProviderProfileForm, 'serviceZonePolygon'>,
+): string | null {
+  const ring = data.serviceZonePolygon?.coordinates?.[0] ?? [];
+  if (ring.length < 4) {
+    return 'Dibuja el cerco de servicio en el mapa (mínimo 3 puntos).';
+  }
+  return null;
+}
+
+export function validateProviderProfile(data: ProviderProfileForm): string | null {
+  const coreError = validateProviderProfileCore(data);
+  if (coreError) return coreError;
+  return validateServiceZone(data);
 }
 
 export function buildProfileUpdatePayload(data: ProviderProfileForm) {

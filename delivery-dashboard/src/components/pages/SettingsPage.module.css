@@ -60,6 +60,7 @@
   border-radius: 14px;
   background: var(--color-surface);
   padding: 1rem 1.1rem;
+  scroll-margin-top: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
