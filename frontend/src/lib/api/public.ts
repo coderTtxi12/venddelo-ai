@@ -104,6 +104,22 @@ export type PublicDeliveryQuoteInput = {
   longitude: number;
 };
 
+export type PublicOrderItemInput = {
+  product_id: string;
+  quantity: number;
+  selected_options?: Record<string, string[]>;
+};
+
+export type PublicOrderInput = {
+  type: RestaurantServiceType;
+  customer_name: string;
+  customer_phone: string;
+  payment_method: PaymentMethodKey;
+  delivery_address?: string;
+  note?: string;
+  items: PublicOrderItemInput[];
+};
+
 export function getPublicRestaurant(subdomain: string, requestOptions?: RequestOptions) {
   return apiRequest<PublicRestaurant>(
     `/public/restaurants/${encodeURIComponent(subdomain)}`,
@@ -152,5 +168,16 @@ export function quotePublicDelivery(subdomain: string, data: PublicDeliveryQuote
   return apiRequest<PublicDeliveryQuote>(
     `/public/restaurants/${encodeURIComponent(subdomain)}/delivery-quote`,
     { method: 'POST', body: data },
+  );
+}
+
+export function createPublicOrder(
+  subdomain: string,
+  data: PublicOrderInput,
+  idempotencyKey?: string,
+) {
+  return apiRequest<{ id: string }>(
+    `/public/menu/${encodeURIComponent(subdomain)}/orders`,
+    { method: 'POST', body: data, idempotencyKey },
   );
 }
