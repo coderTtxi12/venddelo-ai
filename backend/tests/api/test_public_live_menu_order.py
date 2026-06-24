@@ -157,3 +157,108 @@ def test_public_live_menu_order_persists_all_details(client, engine):
     )
     assert replay.status_code == 201
     assert replay.json()["id"] == created["id"]
+
+
+@requires_db
+def test_public_live_menu_order_allowed_for_draft_restaurant(client, engine):
+    """Draft restaurants can receive orders when the public menu is already reachable."""
+    me = client.get("/api/v1/users/me", headers=AUTH)
+    assert me.status_code == 200
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    subdomain = "wildrooster-draft"
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restaurant = uow.restaurants.add(
+            RestaurantCreate(
+                name="Wild Rooster Draft",
+                subdomain=subdomain,
+                status="draft",
+                takeout_enabled=True,
+                delivery_enabled=False,
+            ),
+            owner_id=OWNER,
+        )
+        uow.restaurants.set_payment_methods(
+            restaurant.id,
+            [PaymentMethodCreate(method="cash", service_type="takeout")],
+        )
+        cat = uow.menu.add_category(
+            CategoryCreate(restaurant_id=restaurant.id, name="Burgers"),
+        )
+        product = uow.menu.add_product(
+            ProductCreate(
+                restaurant_id=restaurant.id,
+                name="Burger",
+                price_cents=10000,
+                approval_status="approved",
+                is_published=True,
+                category_ids=[cat.id],
+            )
+        )
+        product_id = product.id
+        uow.commit()
+
+    resp = client.post(
+        f"/api/v1/public/menu/{subdomain}/orders",
+        json={
+            "type": "takeout",
+            "customer_name": "Oliver",
+            "customer_phone": "whatsapp",
+            "payment_method": "cash",
+            "items": [{"product_id": str(product_id), "quantity": 1}],
+        },
+    )
+    assert resp.status_code == 201, resp.text
+
+
+@requires_db
+def test_public_live_menu_order_rejected_when_restaurant_suspended(client, engine):
+    me = client.get("/api/v1/users/me", headers=AUTH)
+    assert me.status_code == 200
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    subdomain = "wildrooster-suspended"
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restaurant = uow.restaurants.add(
+            RestaurantCreate(
+                name="Wild Rooster Suspended",
+                subdomain=subdomain,
+                status="suspended",
+                takeout_enabled=True,
+            ),
+            owner_id=OWNER,
+        )
+        uow.restaurants.set_payment_methods(
+            restaurant.id,
+            [PaymentMethodCreate(method="cash", service_type="takeout")],
+        )
+        cat = uow.menu.add_category(
+            CategoryCreate(restaurant_id=restaurant.id, name="Burgers"),
+        )
+        product = uow.menu.add_product(
+            ProductCreate(
+                restaurant_id=restaurant.id,
+                name="Burger",
+                price_cents=10000,
+                approval_status="approved",
+                is_published=True,
+                category_ids=[cat.id],
+            )
+        )
+        product_id = product.id
+        uow.commit()
+
+    resp = client.post(
+        f"/api/v1/public/menu/{subdomain}/orders",
+        json={
+            "type": "takeout",
+            "customer_name": "Oliver",
+            "customer_phone": "whatsapp",
+            "payment_method": "cash",
+            "items": [{"product_id": str(product_id), "quantity": 1}],
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"]["message"] == "Restaurant is not accepting orders"

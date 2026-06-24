@@ -22,6 +22,7 @@ from app.modules.promotions.pricing import CartLineInput, price_cart
 from app.modules.promotions.repository import PromotionRepository
 from app.modules.restaurants.repository import RestaurantRepository
 
+_BLOCKED_PUBLIC_ORDER_STATUSES = frozenset({"suspended"})
 _ALLOWED_ORDER_TYPES = {"takeout", "delivery"}
 _ALLOWED_PAYMENT_METHODS = {"cash", "transfer", "card_terminal"}
 _STATUS_TRANSITIONS: dict[str, set[str]] = {
@@ -177,7 +178,7 @@ class OrderService:
         restaurant = self._restaurants.get_by_subdomain(subdomain)
         if restaurant is None:
             raise NotFoundError("Restaurant not found")
-        if restaurant.status != "published":
+        if restaurant.status in _BLOCKED_PUBLIC_ORDER_STATUSES:
             raise ValidationError("Restaurant is not accepting orders")
 
         request_hash = _hash_public_order(data)
