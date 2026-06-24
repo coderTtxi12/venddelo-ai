@@ -9,26 +9,35 @@ import {
 } from '@/lib/restaurantServices';
 import type { StoredCheckoutPreferences } from './preferencesStorage';
 
+/** Phone is confirmed by the customer when they send the WhatsApp message (OlaClick-style). */
+export const WHATSAPP_PENDING_CUSTOMER_PHONE = 'whatsapp';
+
 export type CheckoutFulfillment = {
   serviceType: RestaurantServiceType;
   deliveryAddress: string;
+  deliveryAddressDetails: string;
   deliveryLatitude: number | null;
   deliveryLongitude: number | null;
   deliveryPlaceId: string | null;
   deliveryFeeCents: number | null;
   paymentMethod: PaymentMethodKey | null;
   customerName: string;
-  customerPhone: string;
 };
 
+export function formatDeliveryAddressForOrder(fulfillment: CheckoutFulfillment): string {
+  const address = fulfillment.deliveryAddress.trim();
+  const details = fulfillment.deliveryAddressDetails.trim();
+  if (!details) return address;
+  return `${address}\nReferencias: ${details}`;
+}
+
 export function isCustomerContactComplete(fulfillment: CheckoutFulfillment): boolean {
-  const name = fulfillment.customerName.trim();
-  const phoneDigits = fulfillment.customerPhone.replace(/\D/g, '');
-  return name.length >= 2 && phoneDigits.length >= 8;
+  return fulfillment.customerName.trim().length >= 2;
 }
 
 export const EMPTY_DELIVERY_LOCATION = {
   deliveryAddress: '',
+  deliveryAddressDetails: '',
   deliveryLatitude: null as number | null,
   deliveryLongitude: null as number | null,
   deliveryPlaceId: null as string | null,
@@ -99,7 +108,6 @@ export function createInitialFulfillment(
     ...EMPTY_DELIVERY_LOCATION,
     paymentMethod: paymentMethods[0] ?? null,
     customerName: '',
-    customerPhone: '',
   };
 }
 
@@ -149,19 +157,18 @@ export function resolveCheckoutFulfillmentFromPreferences(
       : (paymentMethods[0] ?? null);
 
   const customerName = saved?.customerName?.trim() ?? '';
-  const customerPhone = saved?.customerPhone?.trim() ?? '';
 
   if (serviceType === 'delivery' && saved && hasStoredDeliveryLocation(saved)) {
     return {
       serviceType,
       deliveryAddress: saved.deliveryAddress,
+      deliveryAddressDetails: saved.deliveryAddressDetails ?? '',
       deliveryLatitude: saved.deliveryLatitude,
       deliveryLongitude: saved.deliveryLongitude,
       deliveryPlaceId: saved.deliveryPlaceId,
       deliveryFeeCents: null,
       paymentMethod,
       customerName,
-      customerPhone,
     };
   }
 
@@ -170,7 +177,6 @@ export function resolveCheckoutFulfillmentFromPreferences(
     ...EMPTY_DELIVERY_LOCATION,
     paymentMethod,
     customerName,
-    customerPhone,
   };
 }
 
@@ -196,13 +202,13 @@ export function reconcileCheckoutFulfillment(
     return {
       serviceType,
       deliveryAddress: fulfillment.deliveryAddress,
+      deliveryAddressDetails: fulfillment.deliveryAddressDetails,
       deliveryLatitude: fulfillment.deliveryLatitude,
       deliveryLongitude: fulfillment.deliveryLongitude,
       deliveryPlaceId: fulfillment.deliveryPlaceId,
       deliveryFeeCents: fulfillment.deliveryFeeCents,
       paymentMethod,
       customerName: fulfillment.customerName,
-      customerPhone: fulfillment.customerPhone,
     };
   }
 
@@ -211,6 +217,5 @@ export function reconcileCheckoutFulfillment(
     ...EMPTY_DELIVERY_LOCATION,
     paymentMethod,
     customerName: fulfillment.customerName,
-    customerPhone: fulfillment.customerPhone,
   };
 }

@@ -3,6 +3,8 @@ import type { Product, Promotion } from '@/lib/api/types';
 import {
   buildCheckoutLineBreakdowns,
   promotionDisplayName,
+  type CheckoutDiscountDetail,
+  type CheckoutLineBreakdown,
 } from '@/lib/digital-menu/cart/buildCheckoutLineBreakdown';
 import type { PublicMenuCartLine } from '@/lib/digital-menu/cart/types';
 import { formatMoney } from '@/lib/currency';
@@ -11,8 +13,11 @@ import {
 } from '@/lib/restaurantPaymentConfig';
 import { RESTAURANT_SERVICE_LABELS } from '@/lib/restaurantServices';
 import type { CheckoutFulfillment } from './fulfillment';
+import { buildGoogleMapsDeliveryUrl } from './buildGoogleMapsDeliveryUrl';
+import { formatCheckoutOrderIdLabel } from './createCheckoutOrderRef';
 
 export type WhatsAppOrderMessageInput = {
+  orderId: string;
   restaurantName: string;
   currency: string;
   lines: PublicMenuCartLine[];
@@ -25,6 +30,35 @@ export type WhatsAppOrderMessageInput = {
 
 function bold(text: string): string {
   return `*${text}*`;
+}
+
+function formatDiscountDetailLine(detail: CheckoutDiscountDetail, currency: string): string {
+  const status = detail.applied
+    ? detail.badge
+      ? `Aplicada · ${detail.badge}`
+      : 'Aplicada'
+    : (detail.notAppliedReason ?? 'No aplicada');
+  const amount =
+    detail.applied && detail.discountCents > 0
+      ? `-${formatMoney(detail.discountCents / 100, currency)}`
+      : '—';
+  return `   - ${detail.label} (${status}): ${amount}`;
+}
+
+function formatLinePromotionRows(breakdown: CheckoutLineBreakdown, currency: string): string[] {
+  if (breakdown.discountDetails.length > 0) {
+    return [
+      '   Promociones:',
+      ...breakdown.discountDetails.map((detail) => formatDiscountDetailLine(detail, currency)),
+    ];
+  }
+
+  if (breakdown.discountCents > 0) {
+    const hint = breakdown.promoLabel ? ` (${breakdown.promoLabel})` : '';
+    return [`   Promo${hint}: -${formatMoney(breakdown.discountCents / 100, currency)}`];
+  }
+
+  return [];
 }
 
 function formatLineOptions(
@@ -48,6 +82,7 @@ function formatLineOptions(
 
 export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): string {
   const {
+    orderId,
     restaurantName,
     currency,
     lines,
@@ -85,15 +120,24 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
 
   const parts: string[] = [
     bold(`Nuevo pedido — ${restaurantName}`),
+    `${bold('Pedido')} ${formatCheckoutOrderIdLabel(orderId)}`,
     '',
     `${bold('Cliente:')} ${fulfillment.customerName.trim()}`,
-    `${bold('Teléfono:')} ${fulfillment.customerPhone.trim()}`,
     '',
     `${bold('Tipo de pedido:')} ${RESTAURANT_SERVICE_LABELS[fulfillment.serviceType]}`,
   ];
 
   if (fulfillment.serviceType === 'delivery') {
     parts.push(`${bold('Dirección:')} ${fulfillment.deliveryAddress.trim()}`);
+    const details = fulfillment.deliveryAddressDetails.trim();
+    if (details) {
+      parts.push(`${bold('Referencias:')} ${details}`);
+    }
+    const mapsUrl = buildGoogleMapsDeliveryUrl(fulfillment);
+    if (mapsUrl) {
+      parts.push(`${bold('Ubicación en mapa:')}`);
+      parts.push(mapsUrl);
+    }
   }
 
   if (fulfillment.paymentMethod) {
@@ -117,12 +161,7 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
 
     parts.push(`   Subtotal: ${formatMoney(breakdown.subtotalBeforeDiscountCents / 100, currency)}`);
 
-    if (breakdown.discountCents > 0) {
-      const promoHint = breakdown.promoLabel ? ` (${breakdown.promoLabel})` : '';
-      parts.push(
-        `   Promo${promoHint}: -${formatMoney(breakdown.discountCents / 100, currency)}`,
-      );
-    }
+    parts.push(...formatLinePromotionRows(breakdown, currency));
 
     parts.push(`   ${bold(`Total artículo: ${formatMoney(breakdown.lineTotalCents / 100, currency)}`)}`, '');
   });
@@ -157,4 +196,16 @@ export function whatsappPhoneDigits(phone: string): string {
 export function buildWhatsAppOrderUrl(phone: string, message: string): string {
   const digits = whatsappPhoneDigits(phone);
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
+
+/** Opens WhatsApp in a new tab without navigating the current page. */
+export function openWhatsAppOrder(phone: string, message: string): void {
+  const url = buildWhatsAppOrderUrl(phone, message);
+  const link = document.createElement('a');
+  link.href = url;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }

@@ -8,11 +8,11 @@ export type StoredCheckoutPreferences = {
   serviceType: RestaurantServiceType;
   paymentMethod: PaymentMethodKey | null;
   deliveryAddress: string;
+  deliveryAddressDetails: string;
   deliveryLatitude: number | null;
   deliveryLongitude: number | null;
   deliveryPlaceId: string | null;
   customerName: string;
-  customerPhone: string;
 };
 
 export function checkoutPreferencesStorageKey(subdomain: string): string {
@@ -48,12 +48,13 @@ function parseStoredCheckoutPreferences(raw: string): StoredCheckoutPreferences 
       serviceType: parsed.serviceType,
       paymentMethod,
       deliveryAddress: typeof parsed.deliveryAddress === 'string' ? parsed.deliveryAddress : '',
+      deliveryAddressDetails:
+        typeof parsed.deliveryAddressDetails === 'string' ? parsed.deliveryAddressDetails : '',
       deliveryLatitude,
       deliveryLongitude,
       deliveryPlaceId:
         typeof parsed.deliveryPlaceId === 'string' ? parsed.deliveryPlaceId : null,
       customerName: typeof parsed.customerName === 'string' ? parsed.customerName : '',
-      customerPhone: typeof parsed.customerPhone === 'string' ? parsed.customerPhone : '',
     };
   } catch {
     return null;
@@ -77,11 +78,11 @@ export function toStoredCheckoutPreferences(
     serviceType: fulfillment.serviceType,
     paymentMethod: fulfillment.paymentMethod,
     deliveryAddress: fulfillment.deliveryAddress,
+    deliveryAddressDetails: fulfillment.deliveryAddressDetails,
     deliveryLatitude: fulfillment.deliveryLatitude,
     deliveryLongitude: fulfillment.deliveryLongitude,
     deliveryPlaceId: fulfillment.deliveryPlaceId,
     customerName: fulfillment.customerName,
-    customerPhone: fulfillment.customerPhone,
   };
 }
 
