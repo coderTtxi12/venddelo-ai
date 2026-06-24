@@ -18,11 +18,23 @@ from app.modules.orders.schemas import (
     OrderItemCreate,
     PublicOrderInput,
 )
-from app.modules.promotions.effective import resolve_timezone
-from app.modules.promotions.pricing import CATALOG_DISCOUNT_PREFIX, CartLineInput, PricedCartLine, price_cart
+from app.modules.promotions.effective import is_promotion_effective, resolve_timezone
+from app.modules.promotions.pricing import (
+    CATALOG_DISCOUNT_PREFIX,
+    CartLineInput,
+    PricedCartLine,
+    _discounted_base_cents,
+    _is_catalog_discount_promo,
+    _is_cross_bundle_promo,
+    price_cart,
+)
 from app.modules.promotions.repository import PromotionRepository
 from app.modules.promotions.schemas import PromotionDTO
+from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
+from app.modules.public.checkout_payments import is_public_payment_method_enabled
+from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
 from app.modules.restaurants.repository import RestaurantRepository
+from app.modules.restaurants.schemas import RestaurantDTO
 from app.infra.realtime.order_hub import get_order_realtime_hub
 
 _BLOCKED_PUBLIC_ORDER_STATUSES = frozenset({"suspended"})
@@ -49,14 +61,80 @@ def _promo_display_name(promo: PromotionDTO) -> str:
     return promo.name
 
 
+def _percent_badge(promo: PromotionDTO) -> str | None:
+    if promo.percent is not None:
+        return f"-{promo.percent}%"
+    return None
+
+
+def _catalog_discount_per_unit_cents(
+    product,
+    promotions: list[PromotionDTO],
+    now_utc: datetime,
+    tz,
+) -> int:
+    base = product.price_cents
+    discounted = _discounted_base_cents(product, promotions, now_utc, tz)
+    return max(0, base - discounted)
+
+
 def _snapshot_line_discounts(
     priced: PricedCartLine,
+    product,
+    quantity: int,
     promotions: list[PromotionDTO],
+    now_utc: datetime,
+    tz,
 ) -> list[AppliedDiscountSnapshot]:
     if priced.discount_cents <= 0:
         return []
-    promo = next((p for p in promotions if p.id == priced.applied_promotion_id), None)
-    label = _promo_display_name(promo) if promo else "Descuento"
+
+    applied_promo = next(
+        (promo for promo in promotions if promo.id == priced.applied_promotion_id),
+        None,
+    )
+    catalog_per_unit = _catalog_discount_per_unit_cents(product, promotions, now_utc, tz)
+    catalog_promo = next(
+        (
+            promo
+            for promo in promotions
+            if _is_catalog_discount_promo(promo, product.id)
+            and is_promotion_effective(promo, now_utc, tz)
+        ),
+        None,
+    )
+
+    if (
+        applied_promo is not None
+        and _is_cross_bundle_promo(applied_promo)
+        and catalog_promo is not None
+        and catalog_per_unit > 0
+    ):
+        catalog_cents = min(catalog_per_unit * quantity, priced.discount_cents)
+        bundle_cents = priced.discount_cents - catalog_cents
+        snapshots: list[AppliedDiscountSnapshot] = []
+
+        if catalog_cents > 0:
+            snapshots.append(
+                AppliedDiscountSnapshot(
+                    label=_promo_display_name(catalog_promo),
+                    badge=_percent_badge(catalog_promo),
+                    discount_cents=catalog_cents,
+                    applied=True,
+                )
+            )
+        if bundle_cents > 0:
+            snapshots.append(
+                AppliedDiscountSnapshot(
+                    label=_promo_display_name(applied_promo),
+                    badge=priced.badge,
+                    discount_cents=bundle_cents,
+                    applied=True,
+                )
+            )
+        return snapshots
+
+    label = _promo_display_name(applied_promo) if applied_promo else "Descuento"
     return [
         AppliedDiscountSnapshot(
             label=label,
