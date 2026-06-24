@@ -76,6 +76,7 @@ export function PublicMenuCheckoutDetails({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [addressTouched, setAddressTouched] = useState(false);
+  const [customerTouched, setCustomerTouched] = useState(false);
   const preferencesHydratedRef = useRef(false);
 
   const persistFulfillment = (next: CheckoutFulfillment) => {
@@ -192,6 +193,16 @@ export function PublicMenuCheckoutDetails({
   const showPaymentSection =
     fulfillment.serviceType !== 'delivery' || deliverySelectable;
 
+  const customerNameError =
+    customerTouched && fulfillment.customerName.trim().length < 2
+      ? 'Ingresa tu nombre (mínimo 2 caracteres).'
+      : null;
+  const customerPhoneDigits = fulfillment.customerPhone.replace(/\D/g, '');
+  const customerPhoneError =
+    customerTouched && customerPhoneDigits.length < 8
+      ? 'Ingresa un teléfono válido (mínimo 8 dígitos).'
+      : null;
+
   const handleServiceChange = (serviceType: RestaurantServiceType) => {
     if (!config || !availableServices.includes(serviceType)) return;
     const nextPaymentMethods = enabledPaymentMethodsForService(config, serviceType);
@@ -210,16 +221,19 @@ export function PublicMenuCheckoutDetails({
           }
         : EMPTY_DELIVERY_LOCATION),
       paymentMethod: keepsPayment ? fulfillment.paymentMethod : (nextPaymentMethods[0] ?? null),
+      customerName: fulfillment.customerName,
+      customerPhone: fulfillment.customerPhone,
     });
     setAddressTouched(false);
   };
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
+    setCustomerTouched(true);
     if (fulfillment.serviceType === 'delivery') {
       setAddressTouched(true);
     }
-    if (!canContinue) return;
+    if (!canContinue || customerNameError || customerPhoneError) return;
     onContinue();
   };
 
@@ -259,6 +273,66 @@ export function PublicMenuCheckoutDetails({
             {loadError}
           </p>
         ) : null}
+
+        <section className={styles.section} aria-labelledby="checkout-contact-heading">
+          <h2 id="checkout-contact-heading" className={styles.sectionTitle}>
+            Tus datos de contacto
+          </h2>
+          <p className={styles.sectionHint}>
+            El restaurante usará estos datos para confirmar tu pedido.
+          </p>
+
+          <div className={styles.contactFields}>
+            <label className={styles.addressField} htmlFor="checkout-customer-name">
+              <span className={styles.fieldLabel}>Nombre</span>
+              <input
+                id="checkout-customer-name"
+                type="text"
+                className={styles.textInput}
+                autoComplete="name"
+                value={fulfillment.customerName}
+                onChange={(event) =>
+                  persistFulfillment({
+                    ...fulfillment,
+                    customerName: event.target.value,
+                  })
+                }
+                onBlur={() => setCustomerTouched(true)}
+                placeholder="Tu nombre"
+              />
+              {customerNameError ? (
+                <p className={styles.fieldError} role="alert">
+                  {customerNameError}
+                </p>
+              ) : null}
+            </label>
+
+            <label className={styles.addressField} htmlFor="checkout-customer-phone">
+              <span className={styles.fieldLabel}>Teléfono</span>
+              <input
+                id="checkout-customer-phone"
+                type="tel"
+                inputMode="tel"
+                className={styles.textInput}
+                autoComplete="tel"
+                value={fulfillment.customerPhone}
+                onChange={(event) =>
+                  persistFulfillment({
+                    ...fulfillment,
+                    customerPhone: event.target.value,
+                  })
+                }
+                onBlur={() => setCustomerTouched(true)}
+                placeholder="55 1234 5678"
+              />
+              {customerPhoneError ? (
+                <p className={styles.fieldError} role="alert">
+                  {customerPhoneError}
+                </p>
+              ) : null}
+            </label>
+          </div>
+        </section>
 
         <section className={styles.section} aria-labelledby="checkout-service-heading">
           <h2 id="checkout-service-heading" className={styles.sectionTitle}>

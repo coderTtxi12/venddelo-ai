@@ -17,7 +17,15 @@ export type CheckoutFulfillment = {
   deliveryPlaceId: string | null;
   deliveryFeeCents: number | null;
   paymentMethod: PaymentMethodKey | null;
+  customerName: string;
+  customerPhone: string;
 };
+
+export function isCustomerContactComplete(fulfillment: CheckoutFulfillment): boolean {
+  const name = fulfillment.customerName.trim();
+  const phoneDigits = fulfillment.customerPhone.replace(/\D/g, '');
+  return name.length >= 2 && phoneDigits.length >= 8;
+}
 
 export const EMPTY_DELIVERY_LOCATION = {
   deliveryAddress: '',
@@ -64,6 +72,7 @@ export function isFulfillmentComplete(
   const services = resolveAvailableServices(config);
   if (!services.includes(fulfillment.serviceType)) return false;
   if (!fulfillment.paymentMethod) return false;
+  if (!isCustomerContactComplete(fulfillment)) return false;
   const allowed = enabledPaymentMethodsForService(config, fulfillment.serviceType);
   if (!allowed.includes(fulfillment.paymentMethod)) return false;
   if (fulfillment.serviceType === 'delivery') {
@@ -89,6 +98,8 @@ export function createInitialFulfillment(
     serviceType,
     ...EMPTY_DELIVERY_LOCATION,
     paymentMethod: paymentMethods[0] ?? null,
+    customerName: '',
+    customerPhone: '',
   };
 }
 
@@ -137,6 +148,9 @@ export function resolveCheckoutFulfillmentFromPreferences(
       ? saved.paymentMethod
       : (paymentMethods[0] ?? null);
 
+  const customerName = saved?.customerName?.trim() ?? '';
+  const customerPhone = saved?.customerPhone?.trim() ?? '';
+
   if (serviceType === 'delivery' && saved && hasStoredDeliveryLocation(saved)) {
     return {
       serviceType,
@@ -146,6 +160,8 @@ export function resolveCheckoutFulfillmentFromPreferences(
       deliveryPlaceId: saved.deliveryPlaceId,
       deliveryFeeCents: null,
       paymentMethod,
+      customerName,
+      customerPhone,
     };
   }
 
@@ -153,6 +169,8 @@ export function resolveCheckoutFulfillmentFromPreferences(
     serviceType,
     ...EMPTY_DELIVERY_LOCATION,
     paymentMethod,
+    customerName,
+    customerPhone,
   };
 }
 
@@ -183,6 +201,8 @@ export function reconcileCheckoutFulfillment(
       deliveryPlaceId: fulfillment.deliveryPlaceId,
       deliveryFeeCents: fulfillment.deliveryFeeCents,
       paymentMethod,
+      customerName: fulfillment.customerName,
+      customerPhone: fulfillment.customerPhone,
     };
   }
 
@@ -190,5 +210,7 @@ export function reconcileCheckoutFulfillment(
     serviceType,
     ...EMPTY_DELIVERY_LOCATION,
     paymentMethod,
+    customerName: fulfillment.customerName,
+    customerPhone: fulfillment.customerPhone,
   };
 }

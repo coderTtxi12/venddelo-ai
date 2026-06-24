@@ -217,6 +217,12 @@
   line-height: 1.25;
 }
 
+.contactFields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
 .addressField {
   display: flex;
   flex-direction: column;

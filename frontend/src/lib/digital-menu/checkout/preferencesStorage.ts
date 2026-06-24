@@ -11,6 +11,8 @@ export type StoredCheckoutPreferences = {
   deliveryLatitude: number | null;
   deliveryLongitude: number | null;
   deliveryPlaceId: string | null;
+  customerName: string;
+  customerPhone: string;
 };
 
 export function checkoutPreferencesStorageKey(subdomain: string): string {
@@ -50,6 +52,8 @@ function parseStoredCheckoutPreferences(raw: string): StoredCheckoutPreferences 
       deliveryLongitude,
       deliveryPlaceId:
         typeof parsed.deliveryPlaceId === 'string' ? parsed.deliveryPlaceId : null,
+      customerName: typeof parsed.customerName === 'string' ? parsed.customerName : '',
+      customerPhone: typeof parsed.customerPhone === 'string' ? parsed.customerPhone : '',
     };
   } catch {
     return null;
@@ -76,6 +80,8 @@ export function toStoredCheckoutPreferences(
     deliveryLatitude: fulfillment.deliveryLatitude,
     deliveryLongitude: fulfillment.deliveryLongitude,
     deliveryPlaceId: fulfillment.deliveryPlaceId,
+    customerName: fulfillment.customerName,
+    customerPhone: fulfillment.customerPhone,
   };
 }
 
