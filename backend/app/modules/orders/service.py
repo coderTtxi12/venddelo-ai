@@ -231,12 +231,47 @@ class OrderService:
         return dto
 
     def _validate_payment_method(
-        self, restaurant_id: uuid.UUID, order_type: str, payment_method: str
+        self,
+        restaurant: RestaurantDTO,
+        order_type: str,
+        payment_method: str,
     ) -> None:
-        methods = self._restaurants.list_payment_methods(restaurant_id)
-        for pm in methods:
-            if pm.method == payment_method and pm.service_type == order_type and pm.enabled:
-                return
+        restaurant_methods = list(self._restaurants.list_payment_methods(restaurant.id))
+        delivery_resolved_available = False
+        provider_methods = []
+
+        if order_type == "delivery":
+            if self._delivery_quotes is not None:
+                delivery_resolved_available = self._delivery_quotes.resolve_delivery_service(
+                    restaurant
+                ).available
+            else:
+                delivery_resolved_available = restaurant.delivery_enabled
+
+            if delivery_resolved_available and self._partnership is not None:
+                provider_methods = self._partnership.get_active_provider_payment_methods(
+                    restaurant.id
+                )
+
+        if is_public_payment_method_enabled(
+            restaurant,
+            restaurant_methods,
+            order_type=order_type,
+            payment_method=payment_method,
+            delivery_resolved_available=delivery_resolved_available,
+            provider_methods=provider_methods,
+        ):
+            return
+
+        if order_type == "delivery":
+            for pm in restaurant_methods:
+                if (
+                    pm.method == payment_method
+                    and pm.service_type == "delivery"
+                    and pm.enabled
+                ):
+                    return
+
         raise ValidationError("Payment method not enabled for this order type")
 
     def _build_priced_order(
@@ -301,7 +336,14 @@ class OrderService:
                     discount_cents=priced.discount_cents,
                     line_total_cents=priced.line_total_cents,
                     applied_promotion_id=priced.applied_promotion_id,
-                    applied_discounts=_snapshot_line_discounts(priced, promotions),
+                    applied_discounts=_snapshot_line_discounts(
+                        priced,
+                        product,
+                        line_input.quantity,
+                        promotions,
+                        now,
+                        tz,
+                    ),
                 )
             )
 
