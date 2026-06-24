@@ -172,6 +172,8 @@ class OrderService:
         idempotency: IdempotencyRepository,
         promotions: PromotionRepository,
         *,
+        partnership: DeliveryPartnershipService | None = None,
+        delivery_quotes: PublicDeliveryQuoteService | None = None,
         idempotency_ttl_seconds: int | None = None,
     ) -> None:
         self._orders = orders
@@ -179,6 +181,8 @@ class OrderService:
         self._menu = menu
         self._idempotency = idempotency
         self._promotions = promotions
+        self._partnership = partnership
+        self._delivery_quotes = delivery_quotes
         self._idempotency_ttl = (
             idempotency_ttl_seconds or get_settings().order_idempotency_ttl_seconds
         )
