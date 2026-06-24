@@ -390,7 +390,7 @@ class OrderService:
                 if existing.response_snapshot:
                     return OrderDTO.model_validate(existing.response_snapshot)
 
-        self._validate_payment_method(restaurant.id, data.type, data.payment_method)
+        self._validate_payment_method(restaurant, data.type, data.payment_method)
         order_items, subtotal_before, order_discount, lines_total, order_promo_id, promotions = (
             self._build_priced_order(restaurant.id, restaurant.timezone, data)
         )
