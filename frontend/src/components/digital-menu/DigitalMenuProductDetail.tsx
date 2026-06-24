@@ -75,6 +75,8 @@ type DigitalMenuProductDetailProps = {
   hideHeroBackButton?: boolean;
   enableHaptics?: boolean;
   isTabletLayout?: boolean;
+  /** Editor preview only: keeps mobile footer/layout when the browser viewport is desktop-wide. */
+  editorPreviewDevice?: 'mobile' | 'tablet' | 'desktop';
   onReorderGroups?: (groups: OptionGroup[]) => Promise<void>;
   onReorderItems?: (groupId: string, group: OptionGroup) => Promise<void>;
 };
@@ -149,9 +151,11 @@ export function DigitalMenuProductDetail({
   hideHeroBackButton = false,
   enableHaptics = false,
   isTabletLayout = false,
+  editorPreviewDevice,
   onReorderGroups,
   onReorderItems,
 }: DigitalMenuProductDetailProps) {
+  const useEditorMobileBand = editorPreviewDevice === 'mobile';
   const heroSentinelRef = useRef<HTMLDivElement>(null);
   const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const addFeedbackTimerRef = useRef<number | null>(null);
@@ -346,7 +350,7 @@ export function DigitalMenuProductDetail({
     }, 1600);
   };
 
-  return (
+  const detailContent = (
     <>
       <div className={`${styles.detailRoot} ${isTabletLayout ? menuStyles.publicTablet : ''}`}>
         <section className={styles.productHero} aria-label={product.name}>
@@ -807,4 +811,10 @@ export function DigitalMenuProductDetail({
       </footer>
     </>
   );
+
+  if (useEditorMobileBand) {
+    return <div className={styles.detailShellEditorMobile}>{detailContent}</div>;
+  }
+
+  return detailContent;
 }

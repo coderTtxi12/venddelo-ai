@@ -1285,3 +1285,168 @@
 .detailFooter.publicTablet .addBtnPrice {
   font-weight: 800;
 }
+
+.detailShellEditorMobile {
+  position: relative;
+  min-height: 100%;
+}
+
+/*
+ * Editor mobile preview runs inside a narrow frame while the browser viewport may be
+ * desktop-wide. Re-apply mobile-band footer styles inside the desktop media query.
+ */
+@media (min-width: 1024px) {
+  .detailShellEditorMobile .detailRoot {
+    padding-bottom: 80px;
+  }
+
+  .detailShellEditorMobile .detailBody {
+    padding: 16px 16px 0;
+    max-width: none;
+    margin: 0;
+    width: auto;
+  }
+
+  .detailShellEditorMobile .productHeroWrap,
+  .detailShellEditorMobile .heroImage,
+  .detailShellEditorMobile .heroPlaceholder {
+    height: var(--dm-cover-height, 168px);
+  }
+
+  .detailShellEditorMobile .detailFooter {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 35;
+    padding: 10px 14px 14px;
+    box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
+    border-top: 1px solid var(--dm-border, #eef2f7);
+  }
+
+  .detailShellEditorMobile .addValidationBanner {
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+  }
+
+  .detailShellEditorMobile .addValidationText {
+    font-size: 0.82rem;
+  }
+
+  .detailShellEditorMobile .detailFooterInner {
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 10px;
+    max-width: none;
+    margin: 0;
+    width: auto;
+  }
+
+  .detailShellEditorMobile .footerQtyBlock {
+    display: contents;
+  }
+
+  .detailShellEditorMobile .footerQtyLabel {
+    display: none;
+  }
+
+  .detailShellEditorMobile .qtyStepper {
+    width: 112px;
+    height: 52px;
+    padding: 0 2px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+  }
+
+  .detailShellEditorMobile .qtyBtn {
+    width: 40px;
+    height: 40px;
+    color: #111827;
+  }
+
+  .detailShellEditorMobile .qtyBtn:hover:not(:disabled) {
+    background: #f1f5f9;
+  }
+
+  .detailShellEditorMobile .qtyValue {
+    font-size: 1.05rem;
+    color: #111827;
+  }
+
+  .detailShellEditorMobile .addBtn {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    max-width: none;
+    height: 52px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 0 16px;
+    border: none;
+    background: #dfe3eb;
+  }
+
+  .detailShellEditorMobile .addBtn:not(.addBtnReady) {
+    background: #dfe3eb;
+    border-color: transparent;
+  }
+
+  .detailShellEditorMobile .addBtn:not(.addBtnReady) .addBtnLabel {
+    color: #5c6478;
+  }
+
+  .detailShellEditorMobile .addBtn:not(.addBtnReady) .addBtnPrice {
+    color: #334155;
+  }
+
+  .detailShellEditorMobile .addBtn:not(.addBtnReady):hover {
+    background: #d4d9e4;
+  }
+
+  .detailShellEditorMobile .addBtn:not(.addBtnReady):hover .addBtnLabel,
+  .detailShellEditorMobile .addBtn:not(.addBtnReady):hover .addBtnPrice {
+    color: #475569;
+  }
+
+  .detailShellEditorMobile .addBtnLabel {
+    font-size: 0.98rem;
+    line-height: 1.1;
+  }
+
+  .detailShellEditorMobile .addBtnPrice {
+    font-size: 0.88rem;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .detailShellEditorMobile .detailFooterInnerUnavailable {
+    justify-content: flex-start;
+  }
+
+  .detailShellEditorMobile .detailFooterInnerUnavailable .addBtnUnavailable {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1px;
+    height: 52px;
+    padding: 0 16px;
+    border: none;
+    background: #e2e8f0;
+  }
+
+  .detailShellEditorMobile .detailFooterInnerUnavailable .addBtnUnavailable .addBtnLabel {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #64748b;
+    line-height: 1.1;
+  }
+}

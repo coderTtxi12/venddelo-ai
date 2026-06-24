@@ -44,6 +44,40 @@
   background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.headerActionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.55rem 0.95rem;
+  min-height: 44px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.headerActionBtn:hover {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+}
+
+.headerActionBtn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .phone.publicRoot {
   width: 100%;
   max-width: 100%;
@@ -107,6 +141,42 @@
   gap: 1.25rem;
   padding: 2rem 1rem 3rem;
   width: 100%;
+}
+
+.editorLayout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+  width: 100%;
+}
+
+.settingsColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.previewColumn {
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .editorLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .settingsColumn {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
 }
 
 .themePanelWrap {

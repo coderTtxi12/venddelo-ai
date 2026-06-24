@@ -51,12 +51,16 @@ function createFallbackFulfillment(subdomain: string): CheckoutFulfillment {
     return {
       ...saved,
       deliveryFeeCents: null,
+      customerName: saved.customerName ?? '',
+      customerPhone: saved.customerPhone ?? '',
     };
   }
   return {
     serviceType: 'delivery',
     ...EMPTY_DELIVERY_LOCATION,
     paymentMethod: null,
+    customerName: '',
+    customerPhone: '',
   };
 }
 
@@ -372,9 +376,6 @@ export function PublicMenuCart({
           {lines.length > 0 ? (
             <p className={styles.headerMeta}>
               {itemCount === 1 ? '1 artículo' : `${itemCount} artículos`}
-              {!promosApplied ? (
-                <span className={styles.headerMetaEstimate}> · total estimado</span>
-              ) : null}
             </p>
           ) : null}
         </div>

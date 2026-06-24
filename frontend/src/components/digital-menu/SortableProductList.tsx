@@ -12,6 +12,7 @@ import {
   productCardClassName,
   type ProductListLayout,
 } from '@/components/digital-menu/menuProductUi';
+import desktopStyles from '@/components/digital-menu/PublicDesktopMenuLayout.module.css';
 import styles from '@/components/pages/DigitalMenuPage.module.css';
 
 export type ProductDragTarget = {
@@ -153,6 +154,40 @@ export function SortableProductList({
 
   if (products.length === 0) {
     return <div className={styles.emptyProducts}>Sin productos en esta categoría</div>;
+  }
+
+  if (layout === 'desktop') {
+    return (
+      <div className={desktopStyles.productGrid}>
+        {products.map((product) => (
+          <SortableProductShell
+            key={product.id}
+            product={product}
+            categoryId={categoryId}
+            dragTarget={dragTarget}
+            dropTarget={dropTarget}
+            onDragTargetChange={onDragTargetChange}
+            onDropTargetChange={onDropTargetChange}
+            onProductDrop={onProductDrop}
+            shellClassName={styles.productSortableVertical}
+          >
+            {renderProductButton(
+              product,
+              desktopStyles.productCard,
+              <>
+                <div className={desktopStyles.productBody}>
+                  <ProductCardContent
+                    product={product}
+                    discount={productDiscounts.get(product.id)}
+                  />
+                </div>
+                <ProductListThumb product={product} className={styles.productThumb} />
+              </>,
+            )}
+          </SortableProductShell>
+        ))}
+      </div>
+    );
   }
 
   if (layout === 'tablet') {

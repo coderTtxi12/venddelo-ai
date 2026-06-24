@@ -150,7 +150,7 @@ export function ProductCardContent({
   return content;
 }
 
-export type ProductListLayout = CategoryDisplayLayout | 'tablet';
+export type ProductListLayout = CategoryDisplayLayout | 'tablet' | 'desktop';
 
 export function productCardClassName(baseClass: string, product: Product): string {
   const classes = [baseClass, styles.productTapTarget];

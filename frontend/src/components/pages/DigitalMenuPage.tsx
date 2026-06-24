@@ -1,17 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined';
-import IosShareOutlinedIcon from '@mui/icons-material/IosShareOutlined';
-import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
-import ViewCarouselOutlinedIcon from '@mui/icons-material/ViewCarouselOutlined';
-import ViewListOutlinedIcon from '@mui/icons-material/ViewListOutlined';
 import { listCategories, listProducts, setCategoryProductOrder, updateCategory, updateOptionGroup, updateOptionItem } from '@/lib/api/menu';
 import { fetchAllPages } from '@/lib/api/pagination';
 import { listAllPromotions } from '@/lib/api/promotions';
-import { getRestaurant, listRestaurantPaymentMethods, listRestaurantSchedules, setRestaurantSchedules, updateRestaurant } from '@/lib/api/restaurants';
+import { getRestaurant, listRestaurantSchedules, updateRestaurant } from '@/lib/api/restaurants';
 import {
   ApiError,
   type Category,
@@ -21,54 +14,39 @@ import {
   type Promotion,
   type Restaurant,
   type RestaurantSchedule,
-  type RestaurantScheduleCreateInput,
-  type RestaurantPaymentMethod,
 } from '@/lib/api/types';
 import { buildMenuProductDiscountMap } from '@/lib/promotions/menuProductDiscount';
+import { buildProductTimeLimitedPromotionMap } from '@/lib/promotions/promotionCountdown';
 import { listLivePromotionShortcuts } from '@/lib/promotions/promotionShortcuts';
 import {
   buildDigitalMenuDisplayCategories,
   digitalMenuSpecialCategoryConfigFromRestaurant,
-  getDigitalMenuSpecialCategoryKind,
   isDigitalMenuSpecialCategoryId,
-  productsForLimitedTimeCategory,
   type DigitalMenuSpecialCategoryConfig,
 } from '@/lib/digital-menu/specialCategories';
 import { arrayMove } from '@/lib/arrayMove';
-import { attachDragOverlay } from '@/lib/dragOverlay';
-import { storagePublicUrl } from '@/lib/storage/publicUrl';
-import { uploadRestaurantAsset } from '@/lib/storage/upload';
-import { DigitalMenuProductDetail } from '@/components/digital-menu/DigitalMenuProductDetail';
+import { DigitalMenuEditorPreview } from '@/components/digital-menu/DigitalMenuEditorPreview';
+import { DigitalMenuQrDialog } from '@/components/digital-menu/DigitalMenuQrDialog';
 import { DigitalMenuSpecialCategoriesPanel } from '@/components/digital-menu/DigitalMenuSpecialCategoriesPanel';
-import { PromotionShortcutBanners } from '@/components/digital-menu/PromotionShortcutBanners';
-import {
-  ProductList,
-  productsForCategory,
-  sortCategories,
-} from '@/components/digital-menu/menuProductUi';
-import { SortableProductList, type ProductDragTarget } from '@/components/digital-menu/SortableProductList';
-import { RestaurantOpenStatusBadge } from '@/components/digital-menu/RestaurantOpenStatusBadge';
-import { RestaurantServiceChips } from '@/components/digital-menu/RestaurantServiceChips';
-import { DashboardRestaurantHours } from '@/components/settings/DashboardRestaurantHours';
-import { RestaurantLocationSection } from '@/components/digital-menu/RestaurantLocationSection';
 import { DigitalMenuThemePicker } from '@/components/digital-menu/DigitalMenuThemePicker';
+import type { ProductDragTarget } from '@/components/digital-menu/SortableProductList';
+import { productsForCategory, sortCategories } from '@/components/digital-menu/menuProductUi';
 import {
   DEFAULT_DIGITAL_MENU_THEME_ID,
-  digitalMenuThemeToStyle,
   getDigitalMenuThemeOrDefault,
   loadDigitalMenuThemeFonts,
+  digitalMenuThemeToStyle,
 } from '@/lib/digital-menu/themes';
 import { resolveRestaurantServices, type RestaurantServiceType } from '@/lib/restaurantServices';
 import { restaurantPublicMenuUrl } from '@/lib/restaurantSubdomain';
-import { DIGITAL_MENU_COVER_HEIGHT_PX, DIGITAL_MENU_PINNED_BAR_HEIGHT_PX } from '@/lib/digital-menu/layout';
+import { storagePublicUrl } from '@/lib/storage/publicUrl';
+import { uploadRestaurantAsset } from '@/lib/storage/upload';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveSupplierIdByEmail } from '@/services/db';
 import { legacyDb as db } from '@/services/legacyDb';
 import styles from './DigitalMenuPage.module.css';
 
 const LAYOUTS: CategoryDisplayLayout[] = ['vertical', 'horizontal', 'grid'];
-const COVER_HEIGHT = DIGITAL_MENU_COVER_HEIGHT_PX;
-const PINNED_BAR_HEIGHT = DIGITAL_MENU_PINNED_BAR_HEIGHT_PX;
 
 function pickRandomLayout(): CategoryDisplayLayout {
   return LAYOUTS[Math.floor(Math.random() * LAYOUTS.length)]!;
@@ -88,25 +66,18 @@ export default function DigitalMenuPage() {
   const [dropCategoryId, setDropCategoryId] = useState<string | null>(null);
   const [productDragTarget, setProductDragTarget] = useState<ProductDragTarget>(null);
   const [productDropTarget, setProductDropTarget] = useState<ProductDragTarget>(null);
-
-  const coverInputRef = useRef<HTMLInputElement>(null);
-  const logoInputRef = useRef<HTMLInputElement>(null);
-  const phoneScrollRef = useRef<HTMLDivElement>(null);
-  const heroSentinelRef = useRef<HTMLDivElement>(null);
-  const scrollRafRef = useRef<number | null>(null);
-  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
-  const [heroCollapsed, setHeroCollapsed] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
   const [themeId, setThemeId] = useState(DEFAULT_DIGITAL_MENU_THEME_ID);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [productHeroCollapsed, setProductHeroCollapsed] = useState(false);
   const [enabledServices, setEnabledServices] = useState<RestaurantServiceType[]>([]);
   const [schedules, setSchedules] = useState<RestaurantSchedule[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<RestaurantPaymentMethod[]>([]);
-  const [savingSchedules, setSavingSchedules] = useState(false);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const menuTheme = useMemo(() => getDigitalMenuThemeOrDefault(themeId), [themeId]);
   const menuThemeStyle = useMemo(() => digitalMenuThemeToStyle(menuTheme), [menuTheme]);
+  const promotionTimezone = 'America/Mexico_City';
 
   useEffect(() => {
     loadDigitalMenuThemeFonts(menuTheme);
@@ -134,27 +105,6 @@ export default function DigitalMenuPage() {
       }
     },
     [accessToken, restaurantId, themeId],
-  );
-
-  const handleSaveSchedules = useCallback(
-    async (payload: RestaurantScheduleCreateInput[]) => {
-      if (!accessToken || !restaurantId) return;
-
-      setSavingSchedules(true);
-      try {
-        await setRestaurantSchedules(accessToken, restaurantId, payload);
-        const updatedSchedules = await listRestaurantSchedules(accessToken, restaurantId);
-        setSchedules(updatedSchedules);
-        setEnabledServices((current) =>
-          resolveRestaurantServices(
-            restaurant ?? { takeout_enabled: true, delivery_enabled: true },
-          ),
-        );
-      } finally {
-        setSavingSchedules(false);
-      }
-    },
-    [accessToken, restaurantId, restaurant],
   );
 
   useEffect(() => {
@@ -187,15 +137,14 @@ export default function DigitalMenuPage() {
         }
 
         const rid = resolved.supplierId;
-        const [restaurantData, categoryRows, productRows, promotionRows, schedules, paymentMethods] =
+        const [restaurantData, categoryRows, productRows, promotionRows, scheduleRows] =
           await Promise.all([
-          getRestaurant(accessToken, rid),
-          fetchAllPages((cursor) => listCategories(accessToken, rid, 100, cursor)),
-          fetchAllPages((cursor) => listProducts(accessToken, rid, 100, cursor)),
-          listAllPromotions(accessToken, rid),
-          listRestaurantSchedules(accessToken, rid),
-          listRestaurantPaymentMethods(accessToken, rid),
-        ]);
+            getRestaurant(accessToken, rid),
+            fetchAllPages((cursor) => listCategories(accessToken, rid, 100, cursor)),
+            fetchAllPages((cursor) => listProducts(accessToken, rid, 100, cursor)),
+            listAllPromotions(accessToken, rid),
+            listRestaurantSchedules(accessToken, rid),
+          ]);
 
         const layoutUpdates: Promise<Category>[] = [];
         const normalizedCategories = sortCategories(categoryRows).map((cat) => {
@@ -217,8 +166,7 @@ export default function DigitalMenuPage() {
 
         setRestaurantId(rid);
         setRestaurant(restaurantData);
-        setSchedules(schedules);
-        setPaymentMethods(paymentMethods);
+        setSchedules(scheduleRows);
         setEnabledServices(resolveRestaurantServices(restaurantData));
         setThemeId(getDigitalMenuThemeOrDefault(restaurantData.digital_menu_theme_id).id);
         setCategories(normalizedCategories);
@@ -246,8 +194,28 @@ export default function DigitalMenuPage() {
   }, [accessToken, authLoading, firebaseUser?.email]);
 
   const productDiscounts = useMemo(
-    () => buildMenuProductDiscountMap(products, promotions, new Date()),
-    [products, promotions],
+    () => buildMenuProductDiscountMap(products, promotions, new Date(), promotionTimezone),
+    [products, promotions, promotionTimezone],
+  );
+
+  const promotionCountdownContext = useMemo(
+    () => ({
+      schedules,
+      enabledServices,
+    }),
+    [schedules, enabledServices],
+  );
+
+  const productTimeLimitedPromotions = useMemo(
+    () =>
+      buildProductTimeLimitedPromotionMap(
+        products,
+        promotions,
+        new Date(),
+        promotionTimezone,
+        promotionCountdownContext,
+      ),
+    [products, promotions, promotionTimezone, promotionCountdownContext],
   );
 
   const specialCategoryConfig = useMemo(
@@ -256,8 +224,8 @@ export default function DigitalMenuPage() {
   );
 
   const promotionShortcuts = useMemo(
-    () => listLivePromotionShortcuts(promotions, products, new Date(), 'America/Mexico_City'),
-    [promotions, products],
+    () => listLivePromotionShortcuts(promotions, products, new Date(), promotionTimezone),
+    [promotions, products, promotionTimezone],
   );
 
   const displayCategories = useMemo(
@@ -469,69 +437,14 @@ export default function DigitalMenuPage() {
     [accessToken, restaurantId],
   );
 
-  const scrollToCategory = useCallback((categoryId: string) => {
-    setActiveCategoryId(categoryId);
-    sectionRefs.current[categoryId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
-
-  const handlePhoneScroll = useCallback(() => {
-    if (scrollRafRef.current != null) return;
-    scrollRafRef.current = requestAnimationFrame(() => {
-      scrollRafRef.current = null;
-      const el = phoneScrollRef.current;
-      if (!el) return;
-      setScrollY(el.scrollTop);
-    });
-  }, []);
-
-  useEffect(() => {
-    setHeroCollapsed(false);
-    setScrollY(0);
-    if (phoneScrollRef.current) phoneScrollRef.current.scrollTop = 0;
-  }, [restaurant?.id]);
-
-  useEffect(() => {
-    const root = phoneScrollRef.current;
-    const sentinel = heroSentinelRef.current;
-    if (!root || !sentinel) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setHeroCollapsed(!entry.isIntersecting);
-      },
-      {
-        root,
-        threshold: 0,
-        rootMargin: `-${PINNED_BAR_HEIGHT}px 0px 0px 0px`,
-      },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [restaurant?.id, loading]);
-
-  const logoUrl = useMemo(() => storagePublicUrl(restaurant?.logo_path), [restaurant?.logo_path]);
-  const coverUrl = useMemo(() => storagePublicUrl(restaurant?.cover_path), [restaurant?.cover_path]);
-  const showFloatControls = !heroCollapsed && scrollY < COVER_HEIGHT * 0.55;
-
-  const selectedProduct = useMemo(
-    () => (selectedProductId ? products.find((p) => p.id === selectedProductId) ?? null : null),
-    [products, selectedProductId],
-  );
-
   const openProduct = useCallback((productId: string) => {
     setSelectedProductId(productId);
     setProductHeroCollapsed(false);
-    if (phoneScrollRef.current) phoneScrollRef.current.scrollTop = 0;
   }, []);
 
   const closeProduct = useCallback(() => {
     setSelectedProductId(null);
     setProductHeroCollapsed(false);
-  }, []);
-
-  const handleProductHeroCollapsedChange = useCallback((collapsed: boolean) => {
-    setProductHeroCollapsed(collapsed);
   }, []);
 
   const handleReorderOptionGroups = useCallback(
@@ -605,6 +518,13 @@ export default function DigitalMenuPage() {
     [accessToken, restaurantId, selectedProductId],
   );
 
+  const logoUrl = useMemo(() => storagePublicUrl(restaurant?.logo_path), [restaurant?.logo_path]);
+  const coverUrl = useMemo(() => storagePublicUrl(restaurant?.cover_path), [restaurant?.cover_path]);
+  const liveMenuUrl = useMemo(
+    () => (restaurant ? restaurantPublicMenuUrl(restaurant.subdomain) : ''),
+    [restaurant],
+  );
+
   if (loading) {
     return (
       <div className={styles.page}>
@@ -638,18 +558,34 @@ export default function DigitalMenuPage() {
             Personaliza portada, logo, nombre, orden de categorías y productos, y cómo se muestran
           </p>
         </div>
-        <a
-          href={restaurantPublicMenuUrl(restaurant.subdomain)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={styles.livePreviewBtn}
-        >
-          Ver en vivo
-        </a>
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.headerActionBtn}
+            onClick={() => setQrDialogOpen(true)}
+          >
+            Mostrar QR
+          </button>
+          <a
+            href={liveMenuUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.livePreviewBtn}
+          >
+            Ver en vivo
+          </a>
+        </div>
       </div>
 
-      <div className={styles.previewLayout}>
-        <div className={styles.themePanelWrap}>
+      <DigitalMenuQrDialog
+        open={qrDialogOpen}
+        onClose={() => setQrDialogOpen(false)}
+        menuUrl={liveMenuUrl}
+        restaurantName={restaurant.name}
+      />
+
+      <div className={styles.editorLayout}>
+        <aside className={styles.settingsColumn}>
           <DigitalMenuThemePicker value={themeId} onChange={handleThemeChange} />
           <DigitalMenuSpecialCategoriesPanel
             config={specialCategoryConfig}
@@ -670,379 +606,61 @@ export default function DigitalMenuPage() {
               void persistSpecialCategoryConfig({ limitedTimeCategoryName: trimmed });
             }}
           />
-        </div>
+        </aside>
 
-        <div className={styles.previewShell}>
-          <div
-            className={styles.phone}
-            style={menuThemeStyle}
-            data-cat-tabs={menuTheme.style.categoryTabStyle}
-          >
-            {selectedProduct ? (
-              <header
-                className={`${styles.compactHeader} ${
-                  productHeroCollapsed ? styles.compactHeaderVisible : ''
-                }`}
-                aria-hidden={!productHeroCollapsed}
-              >
-                <button
-                  type="button"
-                  className={styles.compactIconBtn}
-                  aria-label="Volver al menú"
-                  onClick={closeProduct}
-                >
-                  <ArrowBackIcon fontSize="small" />
-                </button>
-                <span className={styles.compactTitle}>{selectedProduct.name}</span>
-              </header>
-            ) : (
-            <header
-              className={`${styles.compactHeader} ${heroCollapsed ? styles.compactHeaderVisible : ''}`}
-              aria-hidden={!heroCollapsed}
-            >
-              <span className={styles.compactTitle}>{restaurant.name}</span>
-              <div className={styles.headerActions}>
-                <span className={styles.compactIconBtn} aria-label="Compartir">
-                  <IosShareOutlinedIcon fontSize="small" />
-                </span>
-                <span className={styles.compactIconBtn} aria-label="Buscar">
-                  <SearchOutlinedIcon fontSize="small" />
-                </span>
-              </div>
-            </header>
-            )}
-
-            <div
-              ref={phoneScrollRef}
-              className={`${styles.phoneScroll} ${selectedProduct ? styles.phoneScrollDetail : ''}`}
-              onScroll={selectedProduct ? undefined : handlePhoneScroll}
-            >
-              {selectedProduct ? (
-                <DigitalMenuProductDetail
-                  product={selectedProduct}
-                  discount={productDiscounts.get(selectedProduct.id)}
-                  heroCollapsed={productHeroCollapsed}
-                  onHeroCollapsedChange={handleProductHeroCollapsedChange}
-                  scrollRootRef={phoneScrollRef}
-                  onBack={closeProduct}
-                  onAddToCart={() => {
-                    // En el editor no hay carrito real; habilitamos CTA para igualar vista pública.
-                  }}
-                  onReorderGroups={handleReorderOptionGroups}
-                  onReorderItems={handleReorderOptionItems}
-                />
-              ) : (
-              <>
-              <section className={styles.menuHero} aria-label="Información del restaurante">
-              <div className={styles.coverWrap}>
-              {coverUrl ? (
-                <img src={coverUrl} alt="" className={styles.coverImage} />
-              ) : (
-                <div className={styles.coverPlaceholder}>Agregar foto de portada</div>
-              )}
-              <div className={styles.coverScrim} aria-hidden />
-              <div
-                className={styles.coverFloatBar}
-                data-visible={showFloatControls ? 'true' : 'false'}
-                aria-hidden={!showFloatControls}
-              >
-                <div className={styles.headerActions}>
-                  <span className={styles.floatIconBtn} aria-label="Compartir">
-                    <IosShareOutlinedIcon fontSize="small" />
-                  </span>
-                  <span className={styles.floatIconBtn} aria-label="Buscar">
-                    <SearchOutlinedIcon fontSize="small" />
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                className={styles.coverEdit}
-                onClick={() => coverInputRef.current?.click()}
-              >
-                {coverUrl ? 'Cambiar portada' : 'Subir portada'}
-              </button>
-              <input
-                ref={coverInputRef}
-                type="file"
-                accept="image/*"
-                className={styles.hiddenInput}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleAssetUpload('cover', file);
-                  e.target.value = '';
-                }}
-              />
-            </div>
-
-            <div className={styles.restaurantHeader}>
-              <div className={styles.logoRow}>
-                <div className={styles.logoWrap}>
-                  {logoUrl ? (
-                    <img src={logoUrl} alt="" className={styles.logoImage} />
-                  ) : (
-                    <div className={styles.logoPlaceholder}>
-                      {(restaurant.name.trim()[0] ?? '?').toUpperCase()}
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    className={styles.logoEdit}
-                    onClick={() => logoInputRef.current?.click()}
-                  >
-                    {logoUrl ? 'Cambiar logo' : 'Subir logo'}
-                  </button>
-                  <input
-                    ref={logoInputRef}
-                    type="file"
-                    accept="image/*"
-                    className={styles.hiddenInput}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) void handleAssetUpload('logo', file);
-                      e.target.value = '';
-                    }}
-                  />
-                </div>
-                <div className={styles.nameBlock}>
-                  <input
-                    className={styles.restaurantName}
-                    defaultValue={restaurant.name}
-                    key={restaurant.id + restaurant.name}
-                    aria-label="Nombre del restaurante"
-                    onBlur={(e) => void handleNameBlur(e.target.value)}
-                  />
-                  <RestaurantOpenStatusBadge schedules={schedules} services={enabledServices} />
-                </div>
-              </div>
-              <div className={styles.descriptionBlock}>
-                <textarea
-                  className={styles.restaurantDescription}
-                  defaultValue={restaurant.description ?? ''}
-                  key={`${restaurant.id}-desc-${restaurant.description ?? ''}`}
-                  aria-label="Descripción del restaurante"
-                  placeholder="Describe tu restaurante (ej. especialidad, ambiente, historia…)"
-                  rows={2}
-                  onBlur={(e) => void handleDescriptionBlur(e.target.value)}
-                />
-              </div>
-              <RestaurantServiceChips services={enabledServices} />
-              <div ref={heroSentinelRef} className={styles.heroSentinel} aria-hidden />
-            </div>
-              </section>
-
-            {categories.length === 0 ? (
-              <div className={styles.emptyCategories}>
-                Crea categorías en Productos para ver tu menú aquí
-              </div>
-            ) : (
-              <>
-                <div
-                  className={`${styles.categoryBar} ${heroCollapsed ? styles.categoryBarPinned : ''}`}
-                >
-                  {displayCategories.map((cat) => {
-                    const isSpecial = isDigitalMenuSpecialCategoryId(cat.id);
-                    return (
-                    <div
-                      key={cat.id}
-                      className={`${styles.categoryTab} ${
-                        activeCategoryId === cat.id ? styles.categoryTabActive : ''
-                      } ${!isSpecial && dragCategoryId === cat.id ? styles.categoryTabDragging : ''} ${
-                        !isSpecial && dropCategoryId === cat.id && dragCategoryId !== cat.id
-                          ? styles.categoryTabDropTarget
-                          : ''
-                      }`}
-                      onDragOver={(e) => {
-                        if (isSpecial) return;
-                        e.preventDefault();
-                        if (dragCategoryId && dragCategoryId !== cat.id) {
-                          setDropCategoryId(cat.id);
-                        }
-                      }}
-                      onDragLeave={() => {
-                        if (dropCategoryId === cat.id) setDropCategoryId(null);
-                      }}
-                      onDrop={(e) => {
-                        if (isSpecial) return;
-                        e.preventDefault();
-                        void handleCategoryDrop(cat.id);
-                      }}
-                    >
-                      {!isSpecial ? (
-                      <button
-                        type="button"
-                        className={styles.dragHandle}
-                        draggable
-                        aria-label={`Reordenar categoría ${cat.name}`}
-                        title="Arrastrar para reordenar"
-                        onDragStart={(e) => {
-                          const tab = (e.currentTarget as HTMLElement).closest(
-                            `.${styles.categoryTab}`,
-                          );
-                          if (tab instanceof HTMLElement) {
-                            attachDragOverlay(e, tab, {
-                              offsetX: 24,
-                              offsetY: 20,
-                              overlayClassName: styles.dragOverlayClone,
-                              bodyDraggingClassName: styles.bodyDragging,
-                            });
-                          }
-                          e.dataTransfer.effectAllowed = 'move';
-                          e.dataTransfer.setData('text/plain', cat.id);
-                          setDragCategoryId(cat.id);
-                        }}
-                        onDragEnd={() => {
-                          setDragCategoryId(null);
-                          setDropCategoryId(null);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <DragIndicatorIcon sx={{ fontSize: 16 }} />
-                      </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => scrollToCategory(cat.id)}
-                        style={{
-                          border: 'none',
-                          background: 'transparent',
-                          font: 'inherit',
-                          color: 'inherit',
-                          cursor: 'pointer',
-                          padding: 0,
-                        }}
-                      >
-                        {cat.name}
-                      </button>
-                    </div>
-                    );
-                  })}
-                </div>
-
-                {displayCategories.map((cat) => {
-                  const kind = getDigitalMenuSpecialCategoryKind(cat.id);
-
-                  if (kind === 'promotions') {
-                    return (
-                      <PromotionShortcutBanners
-                        key={cat.id}
-                        promotions={promotionShortcuts}
-                        viewport="mobile"
-                        timezone="America/Mexico_City"
-                        onSelect={() => {}}
-                        title={cat.name}
-                        sectionId={`menu-section-${cat.id}`}
-                        categoryId={cat.id}
-                        sectionRef={(el) => {
-                          sectionRefs.current[cat.id] = el;
-                        }}
-                      />
-                    );
-                  }
-
-                  if (kind === 'limited_time') {
-                    const limitedProducts = productsForLimitedTimeCategory(products, productDiscounts);
-                    return (
-                      <section
-                        key={cat.id}
-                        id={`menu-section-${cat.id}`}
-                        ref={(el) => {
-                          sectionRefs.current[cat.id] = el;
-                        }}
-                        className={styles.section}
-                      >
-                        <div className={styles.sectionHeader}>
-                          <h2 className={styles.sectionTitle}>{cat.name}</h2>
-                        </div>
-                        <ProductList
-                          layout="horizontal"
-                          products={limitedProducts}
-                          productDiscounts={productDiscounts}
-                          onProductClick={openProduct}
-                        />
-                      </section>
-                    );
-                  }
-
-                  const layout = cat.display_layout ?? 'vertical';
-                  const catProducts = productsForCategory(products, cat.id);
-                  return (
-                    <section
-                      key={cat.id}
-                      id={`menu-section-${cat.id}`}
-                      ref={(el) => {
-                        sectionRefs.current[cat.id] = el;
-                      }}
-                      className={styles.section}
-                    >
-                      <div className={styles.sectionHeader}>
-                        <h2 className={styles.sectionTitle}>{cat.name}</h2>
-                        <div className={styles.layoutPicker} role="group" aria-label="Vista de productos">
-                          <button
-                            type="button"
-                            className={`${styles.layoutBtn} ${
-                              layout === 'vertical' ? styles.layoutBtnActive : ''
-                            }`}
-                            title="Lista vertical"
-                            onClick={() => void handleLayoutChange(cat.id, 'vertical')}
-                          >
-                            <ViewListOutlinedIcon sx={{ fontSize: 18 }} />
-                          </button>
-                          <button
-                            type="button"
-                            className={`${styles.layoutBtn} ${
-                              layout === 'horizontal' ? styles.layoutBtnActive : ''
-                            }`}
-                            title="Lista horizontal"
-                            onClick={() => void handleLayoutChange(cat.id, 'horizontal')}
-                          >
-                            <ViewCarouselOutlinedIcon sx={{ fontSize: 18 }} />
-                          </button>
-                          <button
-                            type="button"
-                            className={`${styles.layoutBtn} ${
-                              layout === 'grid' ? styles.layoutBtnActive : ''
-                            }`}
-                            title="Cuadrícula"
-                            onClick={() => void handleLayoutChange(cat.id, 'grid')}
-                          >
-                            <GridViewOutlinedIcon sx={{ fontSize: 18 }} />
-                          </button>
-                        </div>
-                      </div>
-                      <SortableProductList
-                        categoryId={cat.id}
-                        layout={layout}
-                        products={catProducts}
-                        productDiscounts={productDiscounts}
-                        dragTarget={productDragTarget}
-                        dropTarget={productDropTarget}
-                        onDragTargetChange={setProductDragTarget}
-                        onDropTargetChange={setProductDropTarget}
-                        onProductDrop={(categoryId, targetProductId) => {
-                          void handleProductDrop(categoryId, targetProductId);
-                        }}
-                        onProductClick={openProduct}
-                      />
-                    </section>
-                  );
-                })}
-              </>
-            )}
-            {restaurant && (restaurant.takeout_enabled || restaurant.delivery_enabled) ? (
-              <DashboardRestaurantHours
-                schedules={schedules}
-                takeoutEnabled={restaurant.takeout_enabled}
-                deliveryEnabled={restaurant.delivery_enabled}
-                saving={savingSchedules}
-                onSave={handleSaveSchedules}
-              />
-            ) : null}
-            <RestaurantLocationSection restaurant={restaurant} />
-              </>
-              )}
-            </div>
-          </div>
+        <div className={styles.previewColumn}>
+          <DigitalMenuEditorPreview
+            restaurant={restaurant}
+            displayCategories={displayCategories}
+            products={products}
+            schedules={schedules}
+            enabledServices={enabledServices}
+            productDiscounts={productDiscounts}
+            productTimeLimitedPromotions={productTimeLimitedPromotions}
+            promotionShortcuts={promotionShortcuts}
+            promotionTimezone={promotionTimezone}
+            countdownContext={promotionCountdownContext}
+            logoUrl={logoUrl}
+            coverUrl={coverUrl}
+            menuThemeStyle={menuThemeStyle}
+            categoryTabStyle={menuTheme.style.categoryTabStyle}
+            activeCategoryId={activeCategoryId}
+            dragCategoryId={dragCategoryId}
+            dropCategoryId={dropCategoryId}
+            productDragTarget={productDragTarget}
+            productDropTarget={productDropTarget}
+            selectedProductId={selectedProductId}
+            productHeroCollapsed={productHeroCollapsed}
+            sectionRefs={sectionRefs}
+            onActiveCategoryChange={setActiveCategoryId}
+            onDragCategoryIdChange={setDragCategoryId}
+            onDropCategoryIdChange={setDropCategoryId}
+            onCategoryDrop={(targetId) => {
+              void handleCategoryDrop(targetId);
+            }}
+            onProductDragTargetChange={setProductDragTarget}
+            onProductDropTargetChange={setProductDropTarget}
+            onProductDrop={(categoryId, targetProductId) => {
+              void handleProductDrop(categoryId, targetProductId);
+            }}
+            onProductClick={openProduct}
+            onProductClose={closeProduct}
+            onProductHeroCollapsedChange={setProductHeroCollapsed}
+            onLayoutChange={(categoryId, layout) => {
+              void handleLayoutChange(categoryId, layout);
+            }}
+            onNameBlur={(value) => {
+              void handleNameBlur(value);
+            }}
+            onDescriptionBlur={(value) => {
+              void handleDescriptionBlur(value);
+            }}
+            onAssetUpload={(folder, file) => {
+              void handleAssetUpload(folder, file);
+            }}
+            onReorderOptionGroups={handleReorderOptionGroups}
+            onReorderOptionItems={handleReorderOptionItems}
+          />
         </div>
       </div>
     </div>
