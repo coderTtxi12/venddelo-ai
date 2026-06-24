@@ -20,6 +20,7 @@ from app.modules.promotions.service import PromotionService
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
 from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
 from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
+from app.modules.public.checkout_payments import enabled_public_payment_methods
 from app.modules.public.schemas import (
     CartQuoteDTO,
     CartQuoteInput,
@@ -166,43 +167,33 @@ def get_public_checkout_config(
 ) -> PublicCheckoutConfigDTO:
     restaurant = _public_restaurant(uow, subdomain)
     restaurant_methods = list(uow.restaurants.list_payment_methods(restaurant.id))
-    payment_methods: list[PublicCheckoutPaymentMethodDTO] = []
-
-    if restaurant.takeout_enabled:
-        for pm in restaurant_methods:
-            if pm.service_type == "takeout" and pm.enabled:
-                payment_methods.append(
-                    PublicCheckoutPaymentMethodDTO(method=pm.method, service_type="takeout")
-                )
 
     delivery_service: PublicDeliveryServiceDTO | None = None
+    delivery_resolved_available = False
+    provider_methods = []
+
     if restaurant.delivery_enabled:
         resolved = delivery_quote_service.resolve_delivery_service(restaurant)
+        delivery_resolved_available = resolved.available
         delivery_service = PublicDeliveryServiceDTO(
             available=resolved.available,
             reason=resolved.reason,
             partnership_status=resolved.partnership_status,
             provider_name=resolved.provider_name,
         )
-
         if resolved.available:
             provider_methods = partnership.get_active_provider_payment_methods(restaurant.id)
-            if provider_methods:
-                for pm in provider_methods:
-                    if pm.enabled:
-                        payment_methods.append(
-                            PublicCheckoutPaymentMethodDTO(
-                                method=pm.method, service_type="delivery"
-                            )
-                        )
-            else:
-                for pm in restaurant_methods:
-                    if pm.service_type == "delivery" and pm.enabled:
-                        payment_methods.append(
-                            PublicCheckoutPaymentMethodDTO(
-                                method=pm.method, service_type="delivery"
-                            )
-                        )
+
+    payment_method_pairs = enabled_public_payment_methods(
+        restaurant,
+        restaurant_methods,
+        delivery_resolved_available=delivery_resolved_available,
+        provider_methods=provider_methods,
+    )
+    payment_methods = [
+        PublicCheckoutPaymentMethodDTO(method=method, service_type=service_type)
+        for method, service_type in payment_method_pairs
+    ]
 
     return PublicCheckoutConfigDTO(
         takeout_enabled=restaurant.takeout_enabled,
