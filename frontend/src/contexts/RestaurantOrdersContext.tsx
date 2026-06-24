@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useNewOrderSoundAlert } from '@/hooks/useNewOrderSoundAlert';
 import { listRestaurantOrders } from '@/lib/api/orders';
 import { fetchAllPages } from '@/lib/api/pagination';
 import type { Order } from '@/lib/api/types';
@@ -44,6 +45,7 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [socketLive, setSocketLive] = useState(false);
+  const alertNewOrder = useNewOrderSoundAlert();
 
   const loadOrders = useCallback(
     async (token: string, rid: string, options?: { silent?: boolean }) => {
@@ -110,7 +112,10 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
   }, [accessToken, authLoading, firebaseUser?.email, loadOrders]);
 
   useKitchenOrdersSocket(restaurantId, accessToken, (event) => {
-    setOrders((current) => applyKitchenOrderSocketEvent(current, event));
+    setOrders((current) => {
+      alertNewOrder(event, current);
+      return applyKitchenOrderSocketEvent(current, event);
+    });
     setSocketLive(true);
   });
 
