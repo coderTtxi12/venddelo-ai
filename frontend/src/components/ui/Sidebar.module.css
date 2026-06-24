@@ -78,6 +78,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  flex-shrink: 0;
 }
 
 .icon svg {
@@ -101,6 +103,41 @@
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
   line-height: 1;
+  min-width: 1.35rem;
+  text-align: center;
+}
+
+.badgeUrgent {
+  background: #dc2626;
+  color: #fff;
+  font-weight: 800;
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+.badgeDot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #dc2626;
+  border: 2px solid var(--color-surface);
+}
+
+.active .badgeUrgent {
+  background: #fff;
+  color: #dc2626;
+}
+
+@keyframes badgePulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
 }
 
 .active .badge {

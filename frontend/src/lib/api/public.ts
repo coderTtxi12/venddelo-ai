@@ -116,6 +116,8 @@ export type PublicOrderInput = {
   customer_phone: string;
   payment_method: PaymentMethodKey;
   delivery_address?: string;
+  delivery_latitude?: number;
+  delivery_longitude?: number;
   delivery_fee_cents?: number;
   note?: string;
   items: PublicOrderItemInput[];

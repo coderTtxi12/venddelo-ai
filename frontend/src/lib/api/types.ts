@@ -195,3 +195,59 @@ export type Promotion = {
   category_ids: string[];
   option_item_ids?: string[];
 };
+
+export type OrderStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'preparing'
+  | 'ready'
+  | 'delivered'
+  | 'cancelled';
+
+export type OrderItem = {
+  id: string;
+  product_id: string | null;
+  product_name: string;
+  product_image_path: string | null;
+  quantity: number;
+  unit_price_cents: number;
+  selected_options: Record<string, string[]> | null;
+  line_subtotal_cents: number;
+  discount_cents: number;
+  line_total_cents: number;
+  applied_promotion_id: string | null;
+  applied_discounts: AppliedOrderDiscount[];
+};
+
+export type AppliedOrderDiscount = {
+  label: string;
+  badge: string | null;
+  discount_cents: number;
+  applied: boolean;
+};
+
+export type Order = {
+  id: string;
+  restaurant_id: string;
+  type: 'takeout' | 'delivery';
+  customer_name: string;
+  customer_phone: string;
+  payment_method: 'cash' | 'transfer' | 'card_terminal';
+  subtotal_cents: number;
+  subtotal_before_discount_cents: number;
+  discount_cents: number;
+  total_cents: number;
+  applied_order_promotion_id: string | null;
+  applied_order_discounts: AppliedOrderDiscount[];
+  status: OrderStatus;
+  delivery_address: string | null;
+  delivery_latitude: number | null;
+  delivery_longitude: number | null;
+  delivery_fee_cents: number;
+  cancellation_reason: string | null;
+  idempotency_key: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+  items: OrderItem[];
+};

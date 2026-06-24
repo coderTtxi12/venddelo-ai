@@ -38,6 +38,10 @@ export function buildPublicOrderInput(
     customer_phone: WHATSAPP_PENDING_CUSTOMER_PHONE,
     payment_method: fulfillment.paymentMethod!,
     delivery_address: deliveryAddress,
+    delivery_latitude:
+      fulfillment.serviceType === 'delivery' ? fulfillment.deliveryLatitude ?? undefined : undefined,
+    delivery_longitude:
+      fulfillment.serviceType === 'delivery' ? fulfillment.deliveryLongitude ?? undefined : undefined,
     delivery_fee_cents: deliveryFeeCents > 0 ? deliveryFeeCents : undefined,
     note: noteParts.length > 0 ? noteParts.join(' | ') : undefined,
     items: lines.map((line) => ({
