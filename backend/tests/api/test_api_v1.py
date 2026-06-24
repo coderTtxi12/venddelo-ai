@@ -154,7 +154,9 @@ def test_public_checkout_config(client, engine):
     assert body["delivery_enabled"] is True
     methods = {(entry["method"], entry["service_type"]) for entry in body["payment_methods"]}
     assert ("cash", "takeout") in methods
-    assert ("transfer", "delivery") in methods
+    assert body["delivery_service"] is not None
+    assert body["delivery_service"]["available"] is False
+    assert ("transfer", "delivery") not in methods
 
 
 @requires_db
