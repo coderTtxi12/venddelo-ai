@@ -11,9 +11,10 @@ import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
 import { listProducts } from '@/lib/api/menu';
+import { listAllPromotions } from '@/lib/api/promotions';
 import { updateRestaurantOrderStatus } from '@/lib/api/orders';
 import { fetchAllPages } from '@/lib/api/pagination';
-import type { Order, OrderItem, OrderStatus, Product } from '@/lib/api/types';
+import type { Order, OrderItem, OrderStatus, Product, Promotion } from '@/lib/api/types';
 import {
   countOrderItems,
   extractOrderRefFromNote,
@@ -29,6 +30,7 @@ import {
   buildOrderTotalsBreakdown,
   splitOrderNote,
 } from '@/lib/orders/orderDisplay';
+import { collectOrderDiscountRows } from '@/lib/orders/orderItemDiscounts';
 import {
   ACTIVE_ORDER_STATUSES,
   canCancelOrder,
@@ -131,13 +133,16 @@ function OrderTicketCard({
 function OrderItemCard({
   item,
   productsById,
+  promotions,
 }: {
   item: OrderItem;
   productsById: ReadonlyMap<string, Product>;
+  promotions: Promotion[];
 }) {
   const options = resolveOrderItemOptions(item, productsById);
   const imageUrl = storagePublicUrl(item.product_image_path);
-  const itemDiscounts = resolveOrderItemDiscounts(item);
+  const product = item.product_id ? productsById.get(item.product_id) : undefined;
+  const itemDiscounts = resolveOrderItemDiscounts(item, { product, promotions });
 
   return (
     <article className={styles.itemCard}>
@@ -197,6 +202,7 @@ function OrderItemCard({
 function OrderDetailContent({
   order,
   productsById,
+  promotions,
   now,
   updating,
   showBack,
@@ -206,6 +212,7 @@ function OrderDetailContent({
 }: {
   order: Order;
   productsById: ReadonlyMap<string, Product>;
+  promotions: Promotion[];
   now: number;
   updating: boolean;
   showBack?: boolean;
@@ -219,6 +226,10 @@ function OrderDetailContent({
   const orderRef = extractOrderRefFromNote(order.note);
   const mapsUrl = buildOrderGoogleMapsUrl(order);
   const totals = buildOrderTotalsBreakdown(order);
+  const lineDiscountRows = useMemo(
+    () => collectOrderDiscountRows(order.items, productsById, promotions),
+    [order.items, productsById, promotions],
+  );
 
   const showActions = meta.nextActionLabel || canCancelOrder(order.status);
 
@@ -294,7 +305,12 @@ function OrderDetailContent({
             Detalle ({itemCount === 1 ? '1 artículo' : `${itemCount} artículos`})
           </h3>
           {order.items.map((item) => (
-            <OrderItemCard key={item.id} item={item} productsById={productsById} />
+            <OrderItemCard
+              key={item.id}
+              item={item}
+              productsById={productsById}
+              promotions={promotions}
+            />
           ))}
         </section>
 
@@ -310,12 +326,25 @@ function OrderDetailContent({
             <span>Subtotal productos</span>
             <span>{formatCents(totals.subtotalBeforeCents)}</span>
           </div>
-          {totals.lineDiscountCents > 0 ? (
-            <div className={`${styles.totalRow} ${styles.totalRowDiscount}`}>
-              <span>Descuentos por artículo</span>
-              <span>-{formatCents(totals.lineDiscountCents)}</span>
-            </div>
-          ) : null}
+          {lineDiscountRows.length > 0
+            ? lineDiscountRows.map((row) => (
+                <div
+                  key={row.key}
+                  className={`${styles.totalRow} ${styles.totalRowDiscount}`}
+                >
+                  <span>
+                    {row.label}
+                    {row.badge ? ` · ${row.badge}` : ''}
+                  </span>
+                  <span>-{formatCents(row.discountCents)}</span>
+                </div>
+              ))
+            : totals.lineDiscountCents > 0 ? (
+                <div className={`${styles.totalRow} ${styles.totalRowDiscount}`}>
+                  <span>Descuentos por artículo</span>
+                  <span>-{formatCents(totals.lineDiscountCents)}</span>
+                </div>
+              ) : null}
           {totals.orderDiscountCents > 0 ? (
             <div className={`${styles.totalRow} ${styles.totalRowDiscount}`}>
               <span>Descuento del pedido</span>
@@ -371,6 +400,7 @@ function OrderDetailContent({
 function OrderDetailPanel({
   order,
   productsById,
+  promotions,
   now,
   updating,
   showBack,
@@ -380,6 +410,7 @@ function OrderDetailPanel({
 }: {
   order: Order | null;
   productsById: ReadonlyMap<string, Product>;
+  promotions: Promotion[];
   now: number;
   updating: boolean;
   showBack?: boolean;
@@ -393,6 +424,7 @@ function OrderDetailPanel({
         <OrderDetailContent
           order={order}
           productsById={productsById}
+          promotions={promotions}
           now={now}
           updating={updating}
           showBack={showBack}
@@ -429,6 +461,7 @@ export function KitchenOrdersView() {
   } = useRestaurantOrders();
 
   const [productsById, setProductsById] = useState<Map<string, Product>>(new Map());
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>(DEFAULT_KITCHEN_STATUS_FILTER);
@@ -466,10 +499,14 @@ export function KitchenOrdersView() {
     let cancelled = false;
     setProductsLoading(true);
 
-    void fetchAllPages((cursor) => listProducts(accessToken, restaurantId, 100, cursor), 100)
-      .then((productRows) => {
+    void Promise.all([
+      fetchAllPages((cursor) => listProducts(accessToken, restaurantId, 100, cursor), 100),
+      listAllPromotions(accessToken, restaurantId),
+    ])
+      .then(([productRows, promotionRows]) => {
         if (cancelled) return;
         setProductsById(new Map(productRows.map((product) => [product.id, product])));
+        setPromotions(promotionRows);
       })
       .catch((error) => {
         console.error(error);
@@ -707,6 +744,7 @@ export function KitchenOrdersView() {
             <OrderDetailPanel
               order={selectedOrder}
               productsById={productsById}
+              promotions={promotions}
               now={now}
               updating={updating}
               onAdvance={handleAdvance}
@@ -721,6 +759,7 @@ export function KitchenOrdersView() {
           <OrderDetailPanel
             order={selectedOrder}
             productsById={productsById}
+            promotions={promotions}
             now={now}
             updating={updating}
             showBack
