@@ -33,6 +33,10 @@ export const FESTIVIDADES_MX_THEMES: DigitalMenuTheme[] = [
     label: 'Patrio',
     description: 'Verde, blanco y rojo de la bandera — mes de la independencia (15-16 sep).',
     bestFor: ['Septiembre', 'Fiestas patrias', 'Menú especial 16 de sep'],
+    context:
+      'Verde, blanco y rojo de la bandera mexicana con Oswald bold. Patriótico y festivo — mes patrio con orgullo nacional.',
+    recommendation:
+      'Menús especiales de septiembre, fiestas patrias, promos del 15-16 de septiembre, chiles en nogada y platillos mexicanos icónicos.',
     designSystemQuery: 'mexico independence day september patriotic green white red',
     typography: {
       headingFont: 'Oswald, system-ui, sans-serif',
@@ -79,6 +83,10 @@ export const FESTIVIDADES_MX_THEMES: DigitalMenuTheme[] = [
     label: 'Grito',
     description: 'Noche del 15 de septiembre: verde profundo, rojo y oro en ambiente nocturno.',
     bestFor: ['Noche del Grito', '15-16 sep', 'Celebración nocturna'],
+    context:
+      'Noche del 15 de septiembre: verde profundo, rojo y oro en ambiente nocturno neubrutalist. Grito, campanas y celebración bajo las estrellas.',
+    recommendation:
+      'Cena del Grito, noche del 15 de septiembre, eventos patrios nocturnos, menús con pozole, tostadas y tequila.',
     designSystemQuery: 'mexico independence night celebration festive dark',
     typography: {
       headingFont: '"Lexend Mega", system-ui, sans-serif',
@@ -125,6 +133,10 @@ export const FESTIVIDADES_MX_THEMES: DigitalMenuTheme[] = [
     label: 'Muertos',
     description: 'Naranja cempasúchil, morado y rosa — ofrenda y papel picado.',
     bestFor: ['1-2 Nov', 'Día de Muertos', 'Ofrendas y pan de muerto'],
+    context:
+      'Naranja cempasúchil, morado y rosa con Alfa Slab One cultural. Ofrenda, papel picado y calaveras — festivo y respetuoso a la tradición mexicana.',
+    recommendation:
+      'Menús del 1-2 de noviembre, pan de muerto, platillos de ofrenda, mole, tamales y bebidas tradicionales de Día de Muertos.',
     designSystemQuery: 'day of the dead dia de muertos mexico',
     typography: {
       headingFont: '"Alfa Slab One", Georgia, serif',
@@ -171,6 +183,10 @@ export const FESTIVIDADES_MX_THEMES: DigitalMenuTheme[] = [
     label: 'Mundial',
     description: 'Verde cancha, oro y tricolor — Copa del Mundo en México.',
     bestFor: ['World Cup 2026', 'Promos deportivas', 'Ver partidos en el local'],
+    context:
+      'Verde cancha, oro y tricolor con Barlow Condensed deportivo. Energía de estadio — Copa del Mundo en México con banderas y goles.',
+    recommendation:
+      'Promos del Mundial 2026, ver partidos en el local, combos para grupos, botanas de bar y menús temáticos deportivos.',
     designSystemQuery: 'mexico world cup 2026 football soccer',
     typography: {
       headingFont: '"Barlow Condensed", system-ui, sans-serif',
@@ -217,6 +233,10 @@ export const FESTIVIDADES_MX_THEMES: DigitalMenuTheme[] = [
     label: 'Navidad',
     description: 'Rojo posada, verde pino y dorado — diciembre mexicano.',
     bestFor: ['Navidad', 'Posadas', 'Cena de fin de año'],
+    context:
+      'Rojo posada, verde pino y dorado con Playfair cálido. Diciembre mexicano — piñatas, ponche y cena familiar.',
+    recommendation:
+      'Navidad, posadas, cena de fin de año, menús con bacalao, romeritos, pierna, ponche y postres navideños.',
     designSystemQuery: 'mexican christmas navidad posada',
     typography: {
       headingFont: '"Playfair Display", Georgia, serif',
@@ -263,6 +283,10 @@ export const FESTIVIDADES_MX_THEMES: DigitalMenuTheme[] = [
     label: '5 Mayo',
     description: 'Tricolor festivo con verde, rojo y oro — batalla de Puebla.',
     bestFor: ['5 de Mayo', 'Promos Puebla', 'Fiesta mexicana'],
+    context:
+      'Tricolor festivo verde, rojo y oro con Fredoka alegre. Batalla de Puebla — fiesta mexicana colorida y accesible.',
+    recommendation:
+      'Promos del 5 de mayo, fiesta mexicana, menús con chiles en nogada, mole poblano, antojitos y margaritas.',
     designSystemQuery: 'cinco de mayo mexico festive',
     typography: {
       headingFont: 'Fredoka, system-ui, sans-serif',
@@ -309,6 +333,10 @@ export const FESTIVIDADES_MX_THEMES: DigitalMenuTheme[] = [
     label: 'Revolución',
     description: 'Tierra, verde oliva y oro viejo — 20 de noviembre.',
     bestFor: ['20 de Nov', 'Revolución mexicana', 'Cocina tradicional'],
+    context:
+      'Tierra, verde oliva y oro viejo con EB Garamond histórico. 20 de noviembre — tradición, dignidad y cocina mexicana de raíz.',
+    recommendation:
+      'Menús del 20 de noviembre, cocina tradicional mexicana, platillos de revolución, mole, barbacoa y comida de pueblo.',
     designSystemQuery: 'revolucion mexicana november',
     typography: {
       headingFont: '"EB Garamond", Georgia, serif',

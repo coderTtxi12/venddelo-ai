@@ -83,6 +83,10 @@ export interface DigitalMenuTheme {
   description: string;
   /** Cuisine / venue hint for restaurateurs */
   bestFor: string[];
+  /** Qué es este tema visualmente — personalidad, paleta y tipografía (copilot / listado). */
+  context: string;
+  /** Qué tipo de menú o restaurante recomendamos para este tema (copilot / listado). */
+  recommendation: string;
   colors: DigitalMenuThemeColors;
   typography: DigitalMenuThemeTypography;
   style: DigitalMenuThemeStyle;

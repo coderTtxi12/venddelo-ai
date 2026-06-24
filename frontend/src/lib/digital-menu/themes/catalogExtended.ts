@@ -29,6 +29,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     label: 'K-BBQ',
     description: 'Rojo intenso y negro carbón con tipografía coreana limpia. Ideal para parrilla coreana.',
     bestFor: ['Korean BBQ', 'Parrilla asiática', 'Hot pot'],
+    context:
+      'Rojo intenso coreano y negro carbón con Noto Sans KR bold. Energía de parrilla asiática moderna — humo, sizzle y mesas compartidas.',
+    recommendation:
+      'Korean BBQ, parrillas coreanas, hot pot, menús con bulgogi, galbi, banchan, soju y combos para compartir.',
     designSystemQuery: 'korean bbq restaurant menu',
     typography: {
       headingFont: '"Noto Sans KR", system-ui, sans-serif',
@@ -75,6 +79,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     label: 'Curry',
     description: 'Azafrán, naranja especiado y dorado cálido con serif editorial.',
     bestFor: ['Comida india', 'Curry house', 'Tandoori'],
+    context:
+      'Azafrán, naranja especiado y dorado cálido con serif editorial. Calor de especias, curry house acogedor y aromas de cardamomo y comino.',
+    recommendation:
+      'Comida india, curry houses, tandoori, menús con butter chicken, naan, biryani, samosas y thali vegetariano.',
     designSystemQuery: 'indian restaurant warm spices',
     typography: {
       headingFont: '"Playfair Display SC", Georgia, serif',
@@ -121,6 +129,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     label: 'Bistro',
     description: 'Marino elegante y acentos dorados — estilo hotel/bistro parisino.',
     bestFor: ['Bistro francés', 'Brasserie', 'Crepes y vinos'],
+    context:
+      'Marino elegante y acentos dorados con Cormorant/Montserrat. Estética parisina de hotel — brasserie refinada con mantel blanco y copa de vino.',
+    recommendation:
+      'Bistros franceses, brasseries, crêperías, menús con croque monsieur, quiche, steak frites, vinos franceses y postres crème brûlée.',
     designSystemQuery: 'french bistro navy gold',
     typography: {
       headingFont: 'Cormorant, Georgia, serif',
@@ -167,6 +179,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     label: 'BBQ',
     description: 'Marrón ahumado y ámbar rústico con tipografía craft handmade.',
     bestFor: ['Smokehouse', 'Parrilla BBQ', 'Costillas y brisket'],
+    context:
+      'Marrón ahumado y ámbar rústico con tipografía craft Amatic SC. Humo de leña, brisket lentamente cocinado y ambiente de smokehouse de carretera.',
+    recommendation:
+      'Smokehouses, BBQ americano, parrillas de costilla y brisket, menús con ribs, pulled pork, mac & cheese y salsa BBQ artesanal.',
     designSystemQuery: 'bbq smokehouse restaurant rustic',
     typography: {
       headingFont: '"Amatic SC", cursive',
@@ -213,6 +229,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     label: 'Vegan',
     description: 'Verde tierra y dorado cosecha — estilo agricultura/plant-based.',
     bestFor: ['Vegan', 'Plant-based', 'Orgánico'],
+    context:
+      'Verde tierra y dorado cosecha con Fraunces/DM Sans. Agricultura consciente, plant-based honesto y sostenibilidad sin ser clínico.',
+    recommendation:
+      'Restaurantes veganos, plant-based, menús sin animales con bowls, hamburguesas veggie, leches vegetales y ingredientes de temporada.',
     designSystemQuery: 'vegan green earth',
     typography: {
       headingFont: 'Fraunces, Georgia, serif',
@@ -259,6 +279,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     label: 'Vino',
     description: 'Borgoña profundo y oro craft — bodega y wine bar.',
     bestFor: ['Wine bar', 'Bodega', 'Tapas y quesos'],
+    context:
+      'Borgoña profundo y oro craft con Cormorant elegante. Ambiente de bodega íntima — corcho, barrica y copas de vino tinto.',
+    recommendation:
+      'Wine bars, bodegas, tapas con quesos y embutidos, menús con tablas de queso, croquetas, jamón ibérico y maridajes.',
     designSystemQuery: 'wine bar brewery restaurant',
     typography: {
       headingFont: 'Cormorant, Georgia, serif',
@@ -305,6 +329,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     label: 'Diner Retro',
     description: 'Estilo retro americano con tipografía pixel y acentos naranja.',
     bestFor: ['Diner', 'Desayunos', 'Comida americana clásica'],
+    context:
+      'Estilo retro americano con tipografía pixel Press Start 2P y acentos naranja. Nostalgia de diner de los 80s, desayunos abundantes y checkered floor vibes.',
+    recommendation:
+      'Diners americanos, desayunos todo el día, menús con pancakes, huevos benedict, milkshakes, hamburguesas clásicas y café refill.',
     designSystemQuery: 'breakfast diner retro american',
     typography: {
       headingFont: '"Press Start 2P", monospace',
@@ -351,6 +379,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     label: 'Mediterráneo',
     description: 'Terracota, oliva y crema — estética nature distilled artesanal.',
     bestFor: ['Griego', 'Turco', 'Falafel', 'Hummus bar'],
+    context:
+      'Terracota, oliva y crema con Cormorant Garamond artesanal. Sol mediterráneo, aceite de oliva y mesas al aire libre — Grecia, Turquía y Levante.',
+    recommendation:
+      'Cocina griega, turca, falafel, hummus bars, menús con gyros, shawarma, mezze, tabbouleh y pan de pita.',
     designSystemQuery: 'middle eastern terracotta gold',
     typography: {
       headingFont: '"Cormorant Garamond", Georgia, serif',
@@ -397,6 +429,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     label: 'Thai',
     description: 'Verde albahaca y naranja tailandés con Noto Sans Thai.',
     bestFor: ['Comida tailandesa', 'Pad thai', 'Street food asiático'],
+    context:
+      'Verde albahaca y naranja tailandés con Noto Sans Thai bold. Frescura picante, wok caliente y street food bangkokense colorido.',
+    recommendation:
+      'Comida tailandesa, pad thai, curries verdes y rojos, tom yum, satay y menús con opciones picantes y hierbas frescas.',
     designSystemQuery: 'thai orange basil green',
     typography: {
       headingFont: '"Noto Sans Thai", system-ui, sans-serif',
@@ -443,6 +479,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     label: 'Ramen',
     description: 'Tonos miso cálidos y tipografía japonesa serif + sans.',
     bestFor: ['Ramen', 'Udon', 'Cocina japonesa casual'],
+    context:
+      'Tonos miso cálidos ámbar y marrón con tipografía japonesa serif + sans. Caldo humeante, fideos al dente y comfort de ramen shop de barrio.',
+    recommendation:
+      'Ramen shops, udon, cocina japonesa casual, menús con tonkotsu, miso, gyoza, chashu y toppings de huevo y nori.',
     designSystemQuery: 'ramen miso warm brown',
     typography: {
       headingFont: '"Noto Serif JP", Georgia, serif',
@@ -489,6 +529,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     label: 'Poke',
     description: 'Cian tropical y verde fresco — glassmorphism hawaiano.',
     bestFor: ['Poke bowl', 'Hawaiian', 'Comida fresca de playa'],
+    context:
+      'Cian tropical y verde fresco con Fredoka amigable. Playa hawaiana, bowls fríos y ingredientes crudos de calidad — fresco como el océano.',
+    recommendation:
+      'Poke bowls, cocina hawaiana, menús con atún crudo, salmón, arroz sushi, edamame, aguacate y bases personalizables.',
     designSystemQuery: 'hawaiian poke tropical fresh',
     typography: {
       headingFont: 'Fredoka, system-ui, sans-serif',
@@ -535,6 +579,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     label: 'Steak',
     description: 'Carbón oscuro, rojo carne y oro — steakhouse premium.',
     bestFor: ['Steakhouse', 'Carnes', 'Asador premium'],
+    context:
+      'Carbón oscuro, rojo carne y oro con Libre Baskerville premium. Steakhouse masculino y sofisticado — corte grueso, vino tinto y mantequilla de hierbas.',
+    recommendation:
+      'Steakhouses, asadores premium, carnes argentinas, menús con ribeye, tomahawk, guarniciones clásicas y vinos robustos.',
     designSystemQuery: 'steakhouse restaurant premium dark',
     typography: {
       headingFont: '"Libre Baskerville", Georgia, serif',

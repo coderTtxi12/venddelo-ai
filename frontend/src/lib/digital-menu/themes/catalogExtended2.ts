@@ -29,6 +29,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES_2: DigitalMenuTheme[] = [
     label: 'Dim Sum',
     description: 'Rojo imperial y dorado con tipografía china serif + sans.',
     bestFor: ['Dim sum', 'Comida china', 'Noodles y arroz'],
+    context:
+      'Rojo imperial y dorado con tipografía china Noto Serif SC. Festividad cantonesa, vapor de bamboo y elegancia de salón chino tradicional.',
+    recommendation:
+      'Dim sum, comida cantonesa, menús con dumplings al vapor, baozi, noodles, arroz frito y té chino.',
     designSystemQuery: 'chinese dim sum restaurant',
     typography: {
       headingFont: '"Noto Serif SC", Georgia, serif',
@@ -75,6 +79,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES_2: DigitalMenuTheme[] = [
     label: 'Perú',
     description: 'Azul costero, amarillo cítrico y acentos latinos vibrantes.',
     bestFor: ['Cevichería', 'Comida peruana', 'Anticuchos'],
+    context:
+      'Azul costero, amarillo cítrico y acentos latinos vibrantes con Libre Baskerville. Frescura peruana, limón ácido y mar en cada plato.',
+    recommendation:
+      'Cevicherías peruanas, anticuchos, menús con ceviche clásico, tiradito, causa limeña, chicha morada y comida criolla.',
     designSystemQuery: 'peruvian ceviche latin',
     typography: {
       headingFont: '"Libre Baskerville", Georgia, serif',
@@ -121,6 +129,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES_2: DigitalMenuTheme[] = [
     label: 'Griego',
     description: 'Azul aegeo y blanco — taverna mediterránea con glassmorphism.',
     bestFor: ['Taverna griega', 'Gyros', 'Ensalada griega'],
+    context:
+      'Azul aegeo y blanco puro con Literata clásica. Taverna griega soleada — columnas, olivos y mesa con vista al mar.',
+    recommendation:
+      'Tavernas griegas, gyros, ensalada griega, menús con souvlaki, moussaka, tzatziki, feta y vino retsina.',
     designSystemQuery: 'greek taverna aegean',
     typography: {
       headingFont: 'Literata, Georgia, serif',
@@ -167,6 +179,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES_2: DigitalMenuTheme[] = [
     label: 'Pho',
     description: 'Caldo cálido y tipografía Be Vietnam Pro — fiel al design system vietnamita.',
     bestFor: ['Pho', 'Banh mi', 'Comida vietnamita'],
+    context:
+      'Caldo cálido ámbar con Be Vietnam Pro — fiel al design system vietnamita. Aroma de anís estrellado, hierbabuena y caldo de hueso largo.',
+    recommendation:
+      'Pho, banh mi, comida vietnamita, menús con sopas de fideos, rollitos primavera, café con leche condensada y hierbas frescas.',
     designSystemQuery: 'vietnamese pho restaurant',
     typography: {
       headingFont: '"Be Vietnam Pro", system-ui, sans-serif',
@@ -213,6 +229,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES_2: DigitalMenuTheme[] = [
     label: 'Helado',
     description: 'Pasteles rosa y lavanda — exaggerated minimalism para heladerías.',
     bestFor: ['Heladería', 'Gelato', 'Postres fríos'],
+    context:
+      'Pasteles rosa y lavanda con Baloo 2 exagerado. Dulce, frío y divertido — como una heladería italiana de colores pastel en verano.',
+    recommendation:
+      'Heladerías, gelaterías, menús con sabores artesanales, paletas, sundaes, waffles con helado y toppings.',
     designSystemQuery: 'gelato ice cream shop pastel',
     typography: {
       headingFont: '"Baloo 2", cursive',
@@ -259,6 +279,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES_2: DigitalMenuTheme[] = [
     label: 'Cubano',
     description: 'Coral caribeño y azul profundo — sándwiches y cocina tropical.',
     bestFor: ['Cubano', 'Caribe', 'Tropical casual'],
+    context:
+      'Coral caribeño y azul profundo con Josefin Sans tropical. Sabor de La Habana — ritmo, sol y sándwich cubano crujiente.',
+    recommendation:
+      'Cocina cubana, caribeña tropical casual, menús con sandwich cubano, ropa vieja, tostones, mojitos y plátanos.',
     designSystemQuery: 'cuban sandwich tropical',
     typography: {
       headingFont: '"Josefin Sans", system-ui, sans-serif',
@@ -305,6 +329,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES_2: DigitalMenuTheme[] = [
     label: 'Tex-Mex',
     description: 'Rosa vibrante y azul engagement — estilo cantina tex-mex.',
     bestFor: ['Tex-Mex', 'Cantina', 'Nachos y fajitas'],
+    context:
+      'Rosa vibrante y azul engagement con Fredoka festiva. Cantina tex-mex ruidosa — nachos, margaritas y música en el fondo.',
+    recommendation:
+      'Tex-Mex, cantinas, menús con fajitas, nachos, queso fundido, burritos grandes, margaritas y combos para grupos.',
     designSystemQuery: 'tex mex cantina vibrant',
     typography: {
       headingFont: 'Fredoka, system-ui, sans-serif',
@@ -351,6 +379,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES_2: DigitalMenuTheme[] = [
     label: 'Truck',
     description: 'Amarillo llamativo y rojo urbano — food truck callejero.',
     bestFor: ['Food truck', 'Street food diurno', 'Festival'],
+    context:
+      'Amarillo llamativo y rojo urbano con Archivo Black bold. Food truck de festival — colores que gritan desde la calle y menú corto pero impactante.',
+    recommendation:
+      'Food trucks, street food diurno, festivales gastronómicos, menús cortos con 5-10 ítems estrella y promos del día.',
     designSystemQuery: 'food truck urban colorful',
     typography: {
       headingFont: '"Archivo Black", system-ui, sans-serif',
@@ -397,6 +429,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES_2: DigitalMenuTheme[] = [
     label: 'Granja',
     description: 'Farm-to-table con verdes tierra y tipografía Lora + Raleway (Organic Biophilic).',
     bestFor: ['Farm-to-table', 'Orgánico', 'Mercado local'],
+    context:
+      'Verdes tierra y tipografía Lora/Raleway orgánica. Farm-to-table honesto — del campo a la mesa, ingredientes de temporada y productores locales.',
+    recommendation:
+      'Farm-to-table, orgánico, mercados locales, menús de temporada con verduras de huerto, carnes de granja y proveedores nombrados.',
     designSystemQuery: 'farm to table organic',
     typography: {
       headingFont: 'Lora, Georgia, serif',
@@ -443,6 +479,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES_2: DigitalMenuTheme[] = [
     label: 'Lounge',
     description: 'Oscuro con oro y acentos rojos — bar lounge nocturno.',
     bestFor: ['Bar lounge', 'Coctelería', 'Música en vivo'],
+    context:
+      'Oscuro con oro y acentos rojos con Cormorant/Montserrat. Bar lounge nocturno — sofás bajos, jazz suave y cocteles de autor.',
+    recommendation:
+      'Bar lounge, coctelería, música en vivo, menús con botanas premium, tablas para compartir, tragos de autor y ambiente after-office.',
     designSystemQuery: 'night club lounge dark',
     typography: {
       headingFont: 'Cormorant, Georgia, serif',
@@ -489,6 +529,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES_2: DigitalMenuTheme[] = [
     label: 'Brunch',
     description: 'Naranja mimosa y dorado — brunch de fin de semana.',
     bestFor: ['Brunch', 'Mimosa bar', 'Desayunos gourmet'],
+    context:
+      'Naranja mimosa y dorado con Playfair Display elegante. Brunch de domingo — mimosas, sol de mañana y mesa larga con amigos.',
+    recommendation:
+      'Brunch, mimosa bar, desayunos gourmet de fin de semana, menús con eggs benedict, french toast, avocado toast y jugos frescos.',
     designSystemQuery: 'brunch bottomless mimosa',
     typography: {
       headingFont: '"Playfair Display", Georgia, serif',
@@ -535,6 +579,10 @@ export const EXTENDED_DIGITAL_MENU_THEMES_2: DigitalMenuTheme[] = [
     label: 'Libanés',
     description: 'Terracota y oliva con nature distilled — mezze y falafel.',
     bestFor: ['Libanés', 'Mezze', 'Shawarma'],
+    context:
+      'Terracota y oliva con EB Garamond artesanal. Mezze del Levante — hummus cremoso, pan árabe caliente y especias de Oriente Medio.',
+    recommendation:
+      'Libanés, mezze, shawarma, menús con falafel, kibbeh, tabbouleh, fatayer y combinados para compartir.',
     designSystemQuery: 'lebanese mezze restaurant',
     typography: {
       headingFont: '"EB Garamond", Georgia, serif',

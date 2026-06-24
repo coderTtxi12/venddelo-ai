@@ -3,6 +3,7 @@ import { EXTENDED_DIGITAL_MENU_THEMES } from './catalogExtended';
 import { EXTENDED_DIGITAL_MENU_THEMES_2 } from './catalogExtended2';
 import { FESTIVIDADES_MX_THEMES } from './catalogFestividades';
 import { DARK_DIGITAL_MENU_THEMES } from './catalogDark';
+import { VENUE_CATEGORY_DIGITAL_MENU_THEMES } from './catalogVenueCategories';
 
 function c(
   colors: Omit<
@@ -38,6 +39,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Aspecto neutro por defecto: blanco, grises slate y tipografía del sistema. El que tenías antes de los temas.',
     bestFor: ['Cualquier restaurante', 'Vista limpia', 'Estilo delivery app'],
+    context:
+      'Tema neutro y limpio con fondo blanco, grises slate y tipografía del sistema. Sin personalidad fuerte: se siente como una app de delivery genérica, legible y familiar.',
+    recommendation:
+      'Menús de cualquier tipo cuando quieres máxima claridad sin distraer del contenido. Ideal como punto de partida o si tu marca aún no tiene identidad visual definida.',
     designSystemQuery: 'neutral default (pre-theme hardcoded preview)',
     typography: {
       headingFont:
@@ -89,6 +94,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Igual que Original, con categorías en verde delivery (#06C167).',
     bestFor: ['Cualquier restaurante', 'Promos', 'Estilo delivery app'],
+    context:
+      'Igual que Original en estructura, pero con acento verde delivery (#06C167) en categorías activas y promociones. Sensación de app de pedidos moderna tipo Uber Eats o Rappi.',
+    recommendation:
+      'Restaurantes con delivery activo, dark kitchens, comida rápida o cualquier menú que quiera transmitir agilidad y pedidos en línea sin cambiar mucho el look base.',
     designSystemQuery: 'neutral default + delivery green category accent #06C167',
     typography: {
       headingFont:
@@ -140,6 +149,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Paleta apetitosa rojo y dorado con tipografía editorial. Ideal como tema base de Venddelo.',
     bestFor: ['Restaurante general', 'Comida casera', 'Menú multigusto'],
+    context:
+      'Paleta apetitosa rojo carmesí y dorado cálido con tipografía editorial Playfair. Transmite calidez gastronómica, tradición y un toque elegante sin ser pretencioso.',
+    recommendation:
+      'Restaurantes de comida casera, fondas, cocina mexicana general, marisquerías familiares o cualquier menú multigusto que busque verse apetitoso y confiable.',
     designSystemQuery: 'restaurant food delivery digital menu mobile',
     typography: {
       headingFont: '"Playfair Display SC", Georgia, serif',
@@ -187,6 +200,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Tonos cálidos y tipografía amigable para tacos, antojitos y cocina mexicana informal.',
     bestFor: ['Taquería', 'Antojitos', 'Food truck mexicano'],
+    context:
+      'Colores cálidos rosa-rojo y azul vibrante con tipografía redondeada Fredoka/Nunito. Sensación juguetona, callejera y muy mexicana — como un puesto de tacos con personalidad.',
+    recommendation:
+      'Taquerías, antojerías, fondas de barrio, food trucks mexicanos, tortas, quesadillas y menús con tacos, gringas, al pastor y bebidas aguas frescas.',
     designSystemQuery: 'mexican taqueria vibrant warm',
     typography: {
       headingFont: 'Fredoka, system-ui, sans-serif',
@@ -234,6 +251,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Elegancia italiana con serif editorial, rosa romántico y acentos dorados.',
     bestFor: ['Trattoria', 'Pastas', 'Vino y cocina italiana'],
+    context:
+      'Elegancia italiana con serif Playfair, rosa romántico y acentos dorados. Sensación de trattoria europea íntima, con luz cálida y ambiente de cena especial.',
+    recommendation:
+      'Trattorias, pastelerías italianas, restaurantes de pasta fresca, vinos por copa y menús con risottos, carpaccios, lasañas y postres tiramisú.',
     designSystemQuery: 'italian trattoria elegant classic',
     typography: {
       headingFont: '"Playfair Display", Georgia, serif',
@@ -281,6 +302,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Minimalismo japonés: mucho blanco, negro profundo y acento dorado discreto.',
     bestFor: ['Sushi bar', 'Ramen', 'Cocina japonesa'],
+    context:
+      'Minimalismo japonés extremo: blanco puro, negro profundo y acento dorado discreto. Mucho espacio en blanco, tipografía Noto JP — calma, precisión y respeto al producto.',
+    recommendation:
+      'Sushi bars, omakase, restaurantes de cocina japonesa premium, menús con nigiri, sashimi, rolls especiales y sake. Funciona cuando las fotos del pescado son protagonistas.',
     designSystemQuery: 'japanese sushi minimal zen',
     typography: {
       headingFont: '"Noto Serif JP", Georgia, serif',
@@ -328,6 +353,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Marrón café, crema cálida y tipografía handmade para coffee shops y panaderías de barrio.',
     bestFor: ['Cafetería', 'Brunch', 'Panadería de especialidad'],
+    context:
+      'Tonos café, crema y ámbar con tipografía handmade Amatic SC. Ambiente acogedor de barrio, artesanal y lento — como una cafetería de especialidad con pan recién horneado.',
+    recommendation:
+      'Cafeterías de especialidad, panaderías artesanales, brunch de fin de semana, menús con espresso, matcha, croissants, avo toast y repostería de mostrador.',
     designSystemQuery: 'coffee cafe artisan cozy',
     typography: {
       headingFont: '"Amatic SC", cursive',
@@ -375,6 +404,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Tipografía contundente y rojo apetitoso para fast food, burgers y wings.',
     bestFor: ['Hamburguesas', 'Fast food', 'Alitas y comfort food'],
+    context:
+      'Tipografía contundente Russo One/Chakra Petch con rojo apetitoso y bloques de alto contraste. Energía de fast food americano, directo y con hambre.',
+    recommendation:
+      'Hamburgueserías gourmet o clásicas, wings, hot dogs, comfort food americano, menús con combos, papas, malteadas y promos 2x1.',
     designSystemQuery: 'burger fast food bold energetic',
     typography: {
       headingFont: '"Russo One", system-ui, sans-serif',
@@ -422,6 +455,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Verdes orgánicos y cyan fresco para bowls, ensaladas y cocina consciente.',
     bestFor: ['Ensaladas', 'Bowls', 'Vegan-friendly', 'Smoothies'],
+    context:
+      'Verdes orgánicos y cyan fresco con formas redondeadas y tipografía Lora/Raleway. Sensación wellness, ligereza y naturaleza — como un bowl bar de moda.',
+    recommendation:
+      'Ensaladerías, bowl bars, menús vegan-friendly, smoothies, jugos cold-pressed, poke saludable y opciones bajas en calorías o plant-based.',
     designSystemQuery: 'healthy salad organic fresh',
     typography: {
       headingFont: 'Lora, Georgia, serif',
@@ -469,6 +506,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Piedra oscura, superficies claras y oro premium para alta cocina y cenas especiales.',
     bestFor: ['Fine dining', 'Chef table', 'Cocina de autor'],
+    context:
+      'Piedra oscura, superficies claras y acentos oro premium con serif Playfair. Estética de alta cocina editorial — sofisticado, reservado y con precios que se sienten especiales.',
+    recommendation:
+      'Fine dining, chef table, cocina de autor, menús degustación, maridajes y restaurantes donde el ticket promedio es alto y la experiencia es el producto.',
     designSystemQuery: 'fine dining luxury dark elegant',
     typography: {
       headingFont: '"Playfair Display", Georgia, serif',
@@ -519,6 +560,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Modo oscuro con acentos neón púrpura y rosa — ideal para street food nocturno y bares.',
     bestFor: ['Street food', 'Night market', 'Bar snacks'],
+    context:
+      'Modo oscuro con acentos neón púrpura y rosa sobre fondo casi negro. Estética urbana nocturna, Bebas Neue condensada — mercado de noche o bar de snacks.',
+    recommendation:
+      'Street food nocturno, night markets, bares de botanas, menús con tacos al pastor de madrugada, wings, nachos y bebidas de bar.',
     designSystemQuery: 'street food urban neon',
     typography: {
       headingFont: '"Bebas Neue", system-ui, sans-serif',
@@ -570,6 +615,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Verde océano y azul costero con serif gastronómico para mariscos y cevicherías.',
     bestFor: ['Mariscos', 'Cevichería', 'Pescadería restaurante'],
+    context:
+      'Verde océano y azul costero con serif gastronómico Playfair SC. Frescura marina, brisa de playa y elegancia costera sin ser informal.',
+    recommendation:
+      'Marisquerías, cevicherías, pescaderías-restaurante, menús con aguachile, cóctel de camarón, pescado zarandeado y micheladas.',
     designSystemQuery: 'seafood coastal restaurant ocean',
     typography: {
       headingFont: '"Playfair Display SC", Georgia, serif',
@@ -617,6 +666,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Rojo tomate, verde albahaca y crema — paleta clásica napolitana (ajustada para legibilidad).',
     bestFor: ['Pizzería', 'Calzones', 'Comida italiana casual'],
+    context:
+      'Rojo tomate, verde albahaca y crema cálida con Cormorant Garamond. Clásico napolitano artesanal — horno de leña, harina y mozzarella.',
+    recommendation:
+      'Pizzerías artesanales, calzones, focaccias, menús italianos casuales con pastas simples, bruschettas y vino de mesa.',
     designSystemQuery: 'pizzeria italian restaurant warm classic',
     typography: {
       headingFont: '"Cormorant Garamond", Georgia, serif',
@@ -664,6 +717,10 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Pasteles suaves, tipografía redondeada y tonos miel-rosa para repostería y postres.',
     bestFor: ['Pastelería', 'Repostería', 'Heladería', 'Postres'],
+    context:
+      'Pasteles suaves rosa y miel con tipografía Pacifico redondeada. Dulce, invitador y con sensación de vitrina de postres — casi puedes oler el azúcar.',
+    recommendation:
+      'Pastelerías, reposterías finas, heladerías artesanales, menús con pasteles, cupcakes, macarons, cafés con postre y pan dulce.',
     designSystemQuery: 'bakery dessert pastel sweet',
     typography: {
       headingFont: 'Pacifico, cursive',
@@ -708,6 +765,7 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
   ...EXTENDED_DIGITAL_MENU_THEMES_2,
   ...DARK_DIGITAL_MENU_THEMES,
   ...FESTIVIDADES_MX_THEMES,
+  ...VENUE_CATEGORY_DIGITAL_MENU_THEMES,
 ];
 
 export const DEFAULT_DIGITAL_MENU_THEME_ID = 'original';

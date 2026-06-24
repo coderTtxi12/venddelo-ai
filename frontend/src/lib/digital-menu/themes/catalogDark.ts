@@ -37,6 +37,10 @@ export const DARK_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Negro absoluto con oro premium — steakhouse, fine dining y menús de alta cocina nocturna.',
     bestFor: ['Fine dining', 'Steakhouse', 'Bar premium'],
+    context:
+      'Negro absoluto con oro premium y serif Playfair SC. Lujo noir — como un menú de steakhouse de alta gama a la luz de velas.',
+    recommendation:
+      'Fine dining nocturno, steakhouse premium, bar de alta cocina, menús con cortes exclusivos, maridajes y experiencias íntimas.',
     designSystemQuery: 'luxury restaurant black gold premium menu dark',
     typography: {
       headingFont: '"Playfair Display SC", Georgia, serif',
@@ -85,6 +89,10 @@ export const DARK_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Negro total con cian eléctrico y magenta — ramen, izakaya y street food japonés nocturno.',
     bestFor: ['Ramen', 'Izakaya', 'Sushi bar nocturno'],
+    context:
+      'Negro total con cian eléctrico y magenta cyberpunk. Shinjuku de noche — neones, ramen de madrugada y estética anime urbana.',
+    recommendation:
+      'Ramen nocturno, izakaya, sushi bar de noche, street food japonés y menús con ambiente cyberpunk o juvenil.',
     designSystemQuery: 'japanese neon tokyo night cyber menu dark',
     typography: {
       headingFont: '"Noto Sans JP", system-ui, sans-serif',
@@ -133,6 +141,10 @@ export const DARK_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Humo y brasas sobre negro puro — BBQ, parrilla y smokehouse con acentos ámbar encendidos.',
     bestFor: ['BBQ', 'Smokehouse', 'Parrilla americana'],
+    context:
+      'Humo y brasas sobre negro puro con Bebas Neue bold. Parrilla americana en la oscuridad — brasas rojas y aroma a madera quemada.',
+    recommendation:
+      'BBQ nocturno, smokehouse, parrilla americana, menús con brisket, ribs ahumadas y sides clásicos en ambiente oscuro.',
     designSystemQuery: 'bbq smokehouse dark ember black menu',
     typography: {
       headingFont: '"Bebas Neue", system-ui, sans-serif',
@@ -181,6 +193,10 @@ export const DARK_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Taquería nocturna: negro absoluto con rosa neón y lima eléctrica — antojitos después del sunset.',
     bestFor: ['Taquería nocturna', 'Antojitos', 'Food truck'],
+    context:
+      'Taquería nocturna con rosa neón y lima eléctrica sobre negro. Antojitos después del sunset — tacos de madrugada con actitud.',
+    recommendation:
+      'Taquería nocturna, antojitos de madrugada, food trucks mexicanos nocturnos, menús con tacos, volcanes y bebidas frías.',
     designSystemQuery: 'mexican taqueria neon dark night',
     typography: {
       headingFont: 'Fredoka, system-ui, sans-serif',
@@ -229,6 +245,10 @@ export const DARK_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Omakase minimalista: negro total, oro tenue y jade neón — experiencia íntima y exclusiva.',
     bestFor: ['Omakase', 'Sushi bar', 'Chef table'],
+    context:
+      'Omakase minimalista: negro total, oro tenue y jade neón. Experiencia íntima y exclusiva — pocos asientos, chef protagonista.',
+    recommendation:
+      'Omakase, sushi bar premium, chef table, menús degustación japoneses con pocos platos curados y precio por persona.',
     designSystemQuery: 'omakase sushi black minimal gold',
     typography: {
       headingFont: '"Noto Serif JP", Georgia, serif',
@@ -277,6 +297,10 @@ export const DARK_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Bar de vinos y coctelería: negro absoluto, burdeos profundo y champagne eléctrico.',
     bestFor: ['Wine bar', 'Coctelería', 'Speakeasy'],
+    context:
+      'Bar de vinos burdeos profundo y champagne eléctrico sobre negro. Speakeasy elegante — copas altas, bajo volumen y ambiente reservado.',
+    recommendation:
+      'Wine bar, coctelería, speakeasy, menús con vinos por copa, charcutería, ostras y tragos clásicos en ambiente oscuro.',
     designSystemQuery: 'wine bar speakeasy dark burgundy black',
     typography: {
       headingFont: 'Cormorant, Georgia, serif',
@@ -325,6 +349,10 @@ export const DARK_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Street food gamer: negro puro, púrpura ultravioleta y cian láser — mercados nocturnos urbanos.',
     bestFor: ['Street food', 'Night market', 'Burger nocturno'],
+    context:
+      'Street food gamer: negro puro, púrpura ultravioleta y cian láser. Mercado nocturno urbano con energía de e-sports y neones.',
+    recommendation:
+      'Street food nocturno, burgers de madrugada, night markets urbanos y menús juveniles con promos gaming o eventos.',
     designSystemQuery: 'gaming neon purple cyber street food dark',
     typography: {
       headingFont: '"Lexend Mega", system-ui, sans-serif',
@@ -373,6 +401,10 @@ export const DARK_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Ramen de madrugada: negro total, rojo linterna y amarillo caldo neón — calidez en la oscuridad.',
     bestFor: ['Ramen', 'Udon', 'Comida caliente nocturna'],
+    context:
+      'Ramen de madrugada con rojo linterna y amarillo caldo neón sobre negro. Calidez de izakaya a las 2am — humeante y reconfortante.',
+    recommendation:
+      'Ramen nocturno, udon, comida caliente de madrugada, menús con caldos, gyoza y cerveza japonesa.',
     designSystemQuery: 'ramen izakaya red lantern dark black',
     typography: {
       headingFont: '"Noto Serif JP", Georgia, serif',
@@ -421,6 +453,10 @@ export const DARK_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Mariscos de profundidad: negro absoluto con turquesa bioluminiscente — ceviche, ostiones y barra cruda nocturna.',
     bestFor: ['Mariscos', 'Cevichería', 'Raw bar'],
+    context:
+      'Mariscos de profundidad: negro absoluto con turquesa bioluminiscente. Océano abisal — crudo elegante bajo luz tenue.',
+    recommendation:
+      'Mariscos premium nocturnos, cevichería de autor, raw bar, menús con ostiones, tiraditos y pescado del día en ambiente oscuro.',
     designSystemQuery: 'seafood ocean bioluminescent dark black menu',
     typography: {
       headingFont: '"Playfair Display SC", Georgia, serif',
@@ -469,6 +505,10 @@ export const DARK_DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
     description:
       'Pizzería nocturna: negro total, rojo tomate ardiente y verde albahaca neón — horno italiano después del anochecer.',
     bestFor: ['Pizzería', 'Trattoria', 'Pasta nocturna'],
+    context:
+      'Pizzería nocturna: negro total, rojo tomate ardiente y verde albahaca neón. Horno italiano después del anochecer — pizza al carbón.',
+    recommendation:
+      'Pizzería nocturna, trattoria de cena, pasta y pizza después de las 8pm, menús con horno de leña y vino tinto.',
     designSystemQuery: 'italian pizzeria dark night tomato neon',
     typography: {
       headingFont: '"Playfair Display SC", Georgia, serif',

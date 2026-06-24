@@ -21,6 +21,9 @@ export {
   loadDigitalMenuThemeFonts,
 } from './applyTheme';
 
+export { buildDigitalMenuThemeSearchText } from './themeSearch';
+export { filterDigitalMenuThemes } from './themeGroups';
+
 export function getDigitalMenuTheme(id: string) {
   return DIGITAL_MENU_THEMES.find((theme) => theme.id === id);
 }
@@ -34,11 +37,15 @@ export function getDigitalMenuThemeOrDefault(id?: string | null) {
 }
 
 export function listDigitalMenuThemes() {
-  return DIGITAL_MENU_THEMES.map(({ id, name, label, description, bestFor }) => ({
-    id,
-    name,
-    label,
-    description,
-    bestFor,
-  }));
+  return DIGITAL_MENU_THEMES.map(
+    ({ id, name, label, description, bestFor, context, recommendation }) => ({
+      id,
+      name,
+      label,
+      description,
+      bestFor,
+      context,
+      recommendation,
+    }),
+  );
 }
