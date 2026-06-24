@@ -66,6 +66,8 @@ function createFallbackFulfillment(subdomain: string): CheckoutFulfillment {
 
 type PublicMenuCartProps = {
   subdomain: string;
+  restaurantName: string;
+  whatsappPhone: string | null;
   lines: PublicMenuCartLine[];
   validProductIds: ReadonlySet<string>;
   products: Product[];
@@ -73,6 +75,7 @@ type PublicMenuCartProps = {
   productDiscounts: Map<string, MenuProductDiscountInfo>;
   currency: string;
   onBack: () => void;
+  onOrderSent: () => void;
   onUpdateQuantity: (lineId: string, quantity: number) => void;
   onRemoveLine: (lineId: string) => void;
   isTabletLayout?: boolean;
@@ -195,6 +198,8 @@ function CartOrderSummary({
 
 export function PublicMenuCart({
   subdomain,
+  restaurantName,
+  whatsappPhone,
   lines,
   validProductIds,
   products,
@@ -202,6 +207,7 @@ export function PublicMenuCart({
   productDiscounts,
   currency,
   onBack,
+  onOrderSent,
   onUpdateQuantity,
   onRemoveLine,
   isTabletLayout = false,
@@ -351,6 +357,9 @@ export function PublicMenuCart({
   if (checkoutStep === 'summary' && quote) {
     return (
       <PublicMenuCheckoutSummary
+        subdomain={subdomain}
+        restaurantName={restaurantName}
+        whatsappPhone={whatsappPhone}
         lines={lines}
         quote={quote}
         products={products}
@@ -358,6 +367,7 @@ export function PublicMenuCart({
         currency={currency}
         fulfillment={fulfillment}
         onBack={() => setCheckoutStep('fulfillment')}
+        onOrderSent={onOrderSent}
         isTabletLayout={isTabletLayout}
       />
     );

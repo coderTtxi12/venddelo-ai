@@ -622,6 +622,11 @@ export default function PublicDigitalMenuPage({
     setShowCart(false);
   }, []);
 
+  const handleOrderSent = useCallback(() => {
+    cart.clearCart();
+    setShowCart(false);
+  }, [cart]);
+
   const openSearch = useCallback(() => {
     setShowSearch(true);
   }, []);
@@ -797,6 +802,8 @@ export default function PublicDigitalMenuPage({
             {showCart ? (
               <PublicMenuCart
                 subdomain={subdomain}
+                restaurantName={restaurant.name}
+                whatsappPhone={restaurant.whatsapp_phone}
                 lines={cart.lines}
                 validProductIds={validProductIds}
                 products={products}
@@ -804,6 +811,7 @@ export default function PublicDigitalMenuPage({
                 productDiscounts={productDiscounts}
                 currency={cartCurrency}
                 onBack={closeCart}
+                onOrderSent={handleOrderSent}
                 onUpdateQuantity={cart.updateLineQuantity}
                 onRemoveLine={cart.removeLine}
                 isTabletLayout={isTabletLayout}
@@ -1034,6 +1042,8 @@ export default function PublicDigitalMenuPage({
           {showCart ? (
             <PublicMenuCart
               subdomain={subdomain}
+              restaurantName={restaurant.name}
+              whatsappPhone={restaurant.whatsapp_phone}
               lines={cart.lines}
               validProductIds={validProductIds}
               products={products}
@@ -1041,6 +1051,7 @@ export default function PublicDigitalMenuPage({
               productDiscounts={productDiscounts}
               currency={cartCurrency}
               onBack={closeCart}
+              onOrderSent={handleOrderSent}
               onUpdateQuantity={cart.updateLineQuantity}
               onRemoveLine={cart.removeLine}
             />

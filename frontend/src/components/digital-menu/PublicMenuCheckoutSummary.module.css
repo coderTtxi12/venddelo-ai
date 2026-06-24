@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  padding-bottom: calc(168px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(240px + env(safe-area-inset-bottom, 0px));
 }
 
 .header {
@@ -420,6 +420,79 @@
   border-top: 1px solid var(--dm-border, #e2e8f0);
   background: color-mix(in srgb, var(--dm-surface, #fff) 94%, transparent);
   backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.sendOrderMobile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.sendOrderDesktop {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+.sendOrderBtn {
+  border: none;
+  border-radius: 999px;
+  min-height: 50px;
+  width: 100%;
+  padding: 0 1.25rem;
+  background: #25d366;
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  touch-action: manipulation;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sendOrderBtn {
+    transition: filter 180ms ease;
+  }
+}
+
+.sendOrderBtn:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.sendOrderBtn:focus-visible {
+  outline: 2px solid var(--dm-primary, #111827);
+  outline-offset: 2px;
+}
+
+.sendOrderBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: color-mix(in srgb, var(--dm-text, #111827) 35%, #25d366);
+}
+
+.sendOrderIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.sendOrderHint {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--dm-text-secondary, #64748b);
+  text-align: center;
+}
+
+.sendOrderDesktop .sendOrderHint {
+  text-align: left;
 }
 
 .totalsCardMobile {
