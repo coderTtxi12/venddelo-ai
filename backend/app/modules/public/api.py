@@ -59,16 +59,6 @@ def _translated_menu(
     )
 
 
-def _order_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> OrderService:
-    return OrderService(
-        uow.orders,
-        uow.restaurants,
-        uow.menu,
-        uow.idempotency,
-        uow.promotions,
-    )
-
-
 def _promotion_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> PromotionService:
     return PromotionService(uow.promotions)
 
