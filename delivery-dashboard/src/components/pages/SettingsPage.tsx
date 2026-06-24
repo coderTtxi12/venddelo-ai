@@ -2,23 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
+import { DeliveryProviderHoursEditor } from '@/components/settings/DeliveryProviderHoursEditor';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
+import { ServiceZoneMapDrawer } from '@/components/onboarding/ServiceZoneMapDrawer';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
 import { useAuth } from '@/hooks/useAuth';
 import {
   getMyDeliveryProvider,
   listMyDeliveryProviderPaymentMethods,
+  listMyDeliveryProviderSchedules,
   setMyDeliveryProviderPaymentMethods,
+  setMyDeliveryProviderSchedules,
   updateMyDeliveryProvider,
 } from '@/lib/api/deliveryProviders';
 import { ApiError } from '@/lib/api/types';
 import { prepareImageForUpload } from '@/lib/image/convertToWebp';
 import { createDefaultOnboardingData } from '@/lib/onboarding/defaults';
 import type { OnboardingData } from '@/lib/onboarding/types';
+import type { DeliveryProviderSchedule } from '@/lib/api/types';
 import {
   buildProfileUpdatePayload,
   providerProfileFromApi,
-  validateProviderProfileCore,
+  validateProviderProfile,
 } from '@/lib/settings/providerProfile';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import {
@@ -54,6 +59,11 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [slug, setSlug] = useState<string | null>(null);
+  const [schedules, setSchedules] = useState<DeliveryProviderSchedule[]>([]);
+  const [schedulesLoading, setSchedulesLoading] = useState(true);
+  const [schedulesSaving, setSchedulesSaving] = useState(false);
+  const [scheduleSuccess, setScheduleSuccess] = useState<string | null>(null);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [paymentState, setPaymentState] = useState<PaymentMethodState>(createDefaultPaymentState);
   const [paymentsLoading, setPaymentsLoading] = useState(true);
   const [paymentsSaving, setPaymentsSaving] = useState(false);
@@ -102,6 +112,33 @@ export default function SettingsPage() {
   useEffect(() => {
     let cancelled = false;
 
+    async function loadSchedules() {
+      if (!accessToken) return;
+      setSchedulesLoading(true);
+      setScheduleError(null);
+
+      try {
+        const rows = await listMyDeliveryProviderSchedules(accessToken);
+        if (!cancelled) setSchedules(rows);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) {
+          setScheduleError('No se pudieron cargar los horarios de reparto.');
+        }
+      } finally {
+        if (!cancelled) setSchedulesLoading(false);
+      }
+    }
+
+    void loadSchedules();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     async function loadPayments() {
       if (!accessToken) return;
       setPaymentsLoading(true);
@@ -136,6 +173,13 @@ export default function SettingsPage() {
     setError(null);
   }, []);
 
+  const handleServiceZonePolygonChange = useCallback(
+    (polygon: OnboardingData['serviceZonePolygon']) => {
+      patchForm({ serviceZonePolygon: polygon });
+    },
+    [patchForm],
+  );
+
   const handleImagePick = async (file: File) => {
     try {
       const stored = await fileToStoredImage(file);
@@ -152,7 +196,7 @@ export default function SettingsPage() {
       return;
     }
 
-    const validationError = validateProviderProfileCore(form);
+    const validationError = validateProviderProfile(form);
     if (validationError) {
       setError(validationError);
       return;
@@ -182,6 +226,33 @@ export default function SettingsPage() {
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveSchedules = async (payload: Parameters<typeof setMyDeliveryProviderSchedules>[1]) => {
+    if (!accessToken) {
+      setScheduleError('No hay sesión activa. Inicia sesión de nuevo.');
+      return;
+    }
+
+    setSchedulesSaving(true);
+    setScheduleError(null);
+    setScheduleSuccess(null);
+
+    try {
+      await setMyDeliveryProviderSchedules(accessToken, payload);
+      const updated = await listMyDeliveryProviderSchedules(accessToken);
+      setSchedules(updated);
+      setScheduleSuccess('Horarios guardados correctamente.');
+    } catch (err) {
+      console.error(err);
+      if (err instanceof ApiError) {
+        setScheduleError(err.message);
+      } else {
+        setScheduleError('No se pudieron guardar los horarios. Intenta de nuevo.');
+      }
+    } finally {
+      setSchedulesSaving(false);
     }
   };
 
@@ -225,7 +296,7 @@ export default function SettingsPage() {
   return (
     <PanelPageShell
       title="Configuración"
-      subtitle="Edita el logo, datos de contacto y métodos de pago de tu empresa de delivery."
+      subtitle="Edita el logo, contacto y zona de reparto de tu empresa de delivery."
       styles={{
         page: styles.page,
         header: styles.header,
@@ -378,6 +449,40 @@ export default function SettingsPage() {
             </div>
           </section>
 
+          <section className={styles.panel} aria-labelledby="settings-zone">
+            <h2 id="settings-zone" className={styles.panelTitle}>
+              Zona de reparto
+            </h2>
+            <p className={styles.panelHint}>
+              Ajusta el nombre y el polígono del área donde realizas entregas.
+            </p>
+            <label className={`${styles.label} ${styles.formGridFull}`}>
+              Nombre de la zona
+              <input
+                className={styles.input}
+                value={form.serviceZoneName}
+                placeholder="Cobertura principal"
+                onChange={(e) => patchForm({ serviceZoneName: e.target.value })}
+              />
+            </label>
+            <div className={styles.mapWrap}>
+              <ServiceZoneMapDrawer
+                polygon={form.serviceZonePolygon}
+                searchAddress={form.serviceZoneSearchAddress}
+                centerLat={form.serviceZoneCenterLat}
+                centerLng={form.serviceZoneCenterLng}
+                onSearchPlaceChange={(place) =>
+                  patchForm({
+                    serviceZoneSearchAddress: place.address,
+                    serviceZoneCenterLat: place.latitude,
+                    serviceZoneCenterLng: place.longitude,
+                  })
+                }
+                onPolygonChange={handleServiceZonePolygonChange}
+              />
+            </div>
+          </section>
+
           <section className={styles.panel} aria-labelledby="settings-payments">
             <h2 id="settings-payments" className={styles.panelTitle}>
               Métodos de pago
@@ -430,6 +535,39 @@ export default function SettingsPage() {
                 Guardando métodos de pago…
               </p>
             ) : null}
+          </section>
+
+          <section className={styles.panel} aria-labelledby="settings-hours">
+            <h2 id="settings-hours" className={styles.panelTitle}>
+              Horarios de reparto
+            </h2>
+            <p className={styles.panelHint}>
+              Configura tu horario diurno y nocturno. El turno nocturno solo aplica dentro de tu
+              polígono de cobertura; fuera de él solo cuenta el horario diurno.
+            </p>
+            {scheduleError ? (
+              <div className={styles.errorBanner} role="alert">
+                {scheduleError}
+              </div>
+            ) : null}
+            {scheduleSuccess ? (
+              <div className={styles.successBanner} role="status">
+                {scheduleSuccess}
+              </div>
+            ) : null}
+            {schedulesLoading ? (
+              <p className={styles.loading} role="status">
+                Cargando horarios…
+              </p>
+            ) : (
+              <div className={styles.hoursWrap}>
+                <DeliveryProviderHoursEditor
+                  schedules={schedules}
+                  saving={schedulesSaving}
+                  onSave={handleSaveSchedules}
+                />
+              </div>
+            )}
           </section>
         </>
       )}
