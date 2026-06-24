@@ -52,7 +52,6 @@ function createFallbackFulfillment(subdomain: string): CheckoutFulfillment {
       ...saved,
       deliveryFeeCents: null,
       customerName: saved.customerName ?? '',
-      customerPhone: saved.customerPhone ?? '',
     };
   }
   return {
@@ -60,7 +59,6 @@ function createFallbackFulfillment(subdomain: string): CheckoutFulfillment {
     ...EMPTY_DELIVERY_LOCATION,
     paymentMethod: null,
     customerName: '',
-    customerPhone: '',
   };
 }
 

@@ -14,9 +14,10 @@ import {
 import { cartItemCount } from '@/lib/digital-menu/cart/cartMath';
 import type { PublicMenuCartLine } from '@/lib/digital-menu/cart/types';
 import { buildPublicOrderInput } from '@/lib/digital-menu/checkout/buildPublicOrderInput';
+import { createCheckoutOrderRef } from '@/lib/digital-menu/checkout/createCheckoutOrderRef';
 import {
-  buildWhatsAppOrderUrl,
   formatWhatsAppOrderMessage,
+  openWhatsAppOrder,
   whatsappPhoneDigits,
 } from '@/lib/digital-menu/checkout/formatWhatsAppOrderMessage';
 import type { CheckoutFulfillment } from '@/lib/digital-menu/checkout/fulfillment';
@@ -78,10 +79,6 @@ function FulfillmentSummary({
           <dd className={styles.fulfillmentValue}>{fulfillment.customerName.trim()}</dd>
         </div>
         <div className={styles.fulfillmentRow}>
-          <dt className={styles.fulfillmentLabel}>Teléfono</dt>
-          <dd className={styles.fulfillmentValue}>{fulfillment.customerPhone.trim()}</dd>
-        </div>
-        <div className={styles.fulfillmentRow}>
           <dt className={styles.fulfillmentLabel}>Tipo de pedido</dt>
           <dd className={styles.fulfillmentValue}>
             {RESTAURANT_SERVICE_LABELS[fulfillment.serviceType]}
@@ -91,6 +88,15 @@ function FulfillmentSummary({
           <div className={styles.fulfillmentRow}>
             <dt className={styles.fulfillmentLabel}>Dirección</dt>
             <dd className={styles.fulfillmentValue}>{fulfillment.deliveryAddress.trim()}</dd>
+          </div>
+        ) : null}
+        {fulfillment.serviceType === 'delivery' &&
+        fulfillment.deliveryAddressDetails.trim() ? (
+          <div className={styles.fulfillmentRow}>
+            <dt className={styles.fulfillmentLabel}>Referencias</dt>
+            <dd className={styles.fulfillmentValue}>
+              {fulfillment.deliveryAddressDetails.trim()}
+            </dd>
           </div>
         ) : null}
         {fulfillment.serviceType === 'delivery' && fulfillment.deliveryFeeCents != null ? (
@@ -509,7 +515,10 @@ export function PublicMenuCheckoutSummary({
   const handleSendOrder = () => {
     if (!canSendOrder || !whatsappPhone || !fulfillment.paymentMethod) return;
 
+    const { orderId, idempotencyKey } = createCheckoutOrderRef();
+
     const message = formatWhatsAppOrderMessage({
+      orderId,
       restaurantName,
       currency,
       lines,
@@ -519,17 +528,11 @@ export function PublicMenuCheckoutSummary({
       promotionsById,
       itemCount,
     });
-    const payload = buildPublicOrderInput(lines, fulfillment);
-    const idempotencyKey =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const payload = buildPublicOrderInput(lines, fulfillment, orderId);
 
     submitPublicOrderBackground(subdomain, payload, idempotencyKey);
+    openWhatsAppOrder(whatsappPhone, message);
     onOrderSent();
-
-    const whatsappUrl = buildWhatsAppOrderUrl(whatsappPhone, message);
-    window.location.href = whatsappUrl;
   };
 
   return (

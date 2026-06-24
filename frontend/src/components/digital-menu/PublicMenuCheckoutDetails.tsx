@@ -9,7 +9,14 @@ import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import type { SvgIconProps } from '@mui/material/SvgIcon';
 import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { getPublicCheckoutConfig, type PublicCheckoutConfig } from '@/lib/api/public';
+import {
+  checkoutFieldHasIssue,
+  checkoutValidationBannerMessage,
+  getCheckoutValidationIssues,
+  type CheckoutValidationIssue,
+} from '@/lib/digital-menu/checkout/checkoutValidation';
 import {
   enabledPaymentMethodsForService,
   EMPTY_DELIVERY_LOCATION,
@@ -77,7 +84,11 @@ export function PublicMenuCheckoutDetails({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [addressTouched, setAddressTouched] = useState(false);
   const [customerTouched, setCustomerTouched] = useState(false);
+  const [validationAttempted, setValidationAttempted] = useState(false);
+  const [continueBtnAttention, setContinueBtnAttention] = useState(false);
   const preferencesHydratedRef = useRef(false);
+  const validationScrollTimerRef = useRef<number | null>(null);
+  const sectionRefs = useRef<Partial<Record<string, HTMLElement | null>>>({});
 
   const persistFulfillment = (next: CheckoutFulfillment) => {
     onFulfillmentChange(next);
@@ -182,7 +193,6 @@ export function PublicMenuCheckoutDetails({
         ? deliveryQuote?.available === true && !deliveryQuoteLoading
         : true,
   });
-  const showAddressError = addressTouched && fulfillment.serviceType === 'delivery' && !canContinue;
   const deliveryBlockingReason =
     fulfillment.serviceType === 'delivery'
       ? deliveryQuoteError ??
@@ -193,15 +203,71 @@ export function PublicMenuCheckoutDetails({
   const showPaymentSection =
     fulfillment.serviceType !== 'delivery' || deliverySelectable;
 
-  const customerNameError =
-    customerTouched && fulfillment.customerName.trim().length < 2
-      ? 'Ingresa tu nombre (mínimo 2 caracteres).'
-      : null;
-  const customerPhoneDigits = fulfillment.customerPhone.replace(/\D/g, '');
-  const customerPhoneError =
-    customerTouched && customerPhoneDigits.length < 8
-      ? 'Ingresa un teléfono válido (mínimo 8 dígitos).'
-      : null;
+  const validationIssues = useMemo(
+    (): CheckoutValidationIssue[] =>
+      getCheckoutValidationIssues({
+        fulfillment,
+        deliverySelectable,
+        deliveryQuoteLoading,
+        deliveryBlockingReason,
+        showPaymentSection,
+      }),
+    [
+      fulfillment,
+      deliverySelectable,
+      deliveryQuoteLoading,
+      deliveryBlockingReason,
+      showPaymentSection,
+    ],
+  );
+
+  const validationBannerMessage = useMemo(
+    () => checkoutValidationBannerMessage(validationIssues),
+    [validationIssues],
+  );
+
+  const showValidationBanner = validationAttempted && validationIssues.length > 0;
+
+  const showCustomerNameError =
+    (customerTouched || validationAttempted) &&
+    checkoutFieldHasIssue(validationIssues, 'customerName');
+
+  const showAddressValidation =
+    (addressTouched || validationAttempted) &&
+    checkoutFieldHasIssue(validationIssues, 'deliveryAddress');
+
+  const showPaymentValidation =
+    validationAttempted && checkoutFieldHasIssue(validationIssues, 'paymentMethod');
+
+  useEffect(() => {
+    return () => {
+      if (validationScrollTimerRef.current != null) {
+        window.clearTimeout(validationScrollTimerRef.current);
+      }
+    };
+  }, []);
+
+  const revealValidationIssues = () => {
+    if (validationIssues.length === 0) return;
+
+    setValidationAttempted(true);
+    setCustomerTouched(true);
+    if (fulfillment.serviceType === 'delivery') {
+      setAddressTouched(true);
+    }
+    setContinueBtnAttention(true);
+    window.setTimeout(() => setContinueBtnAttention(false), 520);
+
+    const firstSectionId = validationIssues[0]?.sectionId;
+    if (validationScrollTimerRef.current != null) {
+      window.clearTimeout(validationScrollTimerRef.current);
+    }
+    validationScrollTimerRef.current = window.setTimeout(() => {
+      const target = firstSectionId ? sectionRefs.current[firstSectionId] : null;
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      validationScrollTimerRef.current = null;
+    }, 80);
+  };
 
   const handleServiceChange = (serviceType: RestaurantServiceType) => {
     if (!config || !availableServices.includes(serviceType)) return;
@@ -214,6 +280,7 @@ export function PublicMenuCheckoutDetails({
       ...(serviceType === 'delivery'
         ? {
             deliveryAddress: fulfillment.deliveryAddress,
+            deliveryAddressDetails: fulfillment.deliveryAddressDetails,
             deliveryLatitude: fulfillment.deliveryLatitude,
             deliveryLongitude: fulfillment.deliveryLongitude,
             deliveryPlaceId: fulfillment.deliveryPlaceId,
@@ -222,18 +289,18 @@ export function PublicMenuCheckoutDetails({
         : EMPTY_DELIVERY_LOCATION),
       paymentMethod: keepsPayment ? fulfillment.paymentMethod : (nextPaymentMethods[0] ?? null),
       customerName: fulfillment.customerName,
-      customerPhone: fulfillment.customerPhone,
     });
     setAddressTouched(false);
+    setValidationAttempted(false);
   };
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    setCustomerTouched(true);
-    if (fulfillment.serviceType === 'delivery') {
-      setAddressTouched(true);
+    if (!canContinue) {
+      revealValidationIssues();
+      return;
     }
-    if (!canContinue || customerNameError || customerPhoneError) return;
+    setValidationAttempted(false);
     onContinue();
   };
 
@@ -274,64 +341,48 @@ export function PublicMenuCheckoutDetails({
           </p>
         ) : null}
 
-        <section className={styles.section} aria-labelledby="checkout-contact-heading">
+        <section
+          ref={(node) => {
+            sectionRefs.current['checkout-contact-heading'] = node;
+          }}
+          className={`${styles.section} ${
+            showCustomerNameError ? styles.sectionNeedsAttention : ''
+          }`}
+          aria-labelledby="checkout-contact-heading"
+        >
           <h2 id="checkout-contact-heading" className={styles.sectionTitle}>
-            Tus datos de contacto
+            ¿Cómo te llamas?
           </h2>
           <p className={styles.sectionHint}>
-            El restaurante usará estos datos para confirmar tu pedido.
+            El restaurante requiere tu nombre para enviar el pedido por WhatsApp.
           </p>
 
-          <div className={styles.contactFields}>
-            <label className={styles.addressField} htmlFor="checkout-customer-name">
-              <span className={styles.fieldLabel}>Nombre</span>
-              <input
-                id="checkout-customer-name"
-                type="text"
-                className={styles.textInput}
-                autoComplete="name"
-                value={fulfillment.customerName}
-                onChange={(event) =>
-                  persistFulfillment({
-                    ...fulfillment,
-                    customerName: event.target.value,
-                  })
-                }
-                onBlur={() => setCustomerTouched(true)}
-                placeholder="Tu nombre"
-              />
-              {customerNameError ? (
-                <p className={styles.fieldError} role="alert">
-                  {customerNameError}
-                </p>
-              ) : null}
-            </label>
-
-            <label className={styles.addressField} htmlFor="checkout-customer-phone">
-              <span className={styles.fieldLabel}>Teléfono</span>
-              <input
-                id="checkout-customer-phone"
-                type="tel"
-                inputMode="tel"
-                className={styles.textInput}
-                autoComplete="tel"
-                value={fulfillment.customerPhone}
-                onChange={(event) =>
-                  persistFulfillment({
-                    ...fulfillment,
-                    customerPhone: event.target.value,
-                  })
-                }
-                onBlur={() => setCustomerTouched(true)}
-                placeholder="55 1234 5678"
-              />
-              {customerPhoneError ? (
-                <p className={styles.fieldError} role="alert">
-                  {customerPhoneError}
-                </p>
-              ) : null}
-            </label>
-          </div>
+          <label className={styles.addressField} htmlFor="checkout-customer-name">
+            <span className={styles.fieldLabel}>Nombre</span>
+            <input
+              id="checkout-customer-name"
+              type="text"
+              className={`${styles.textInput} ${
+                showCustomerNameError ? styles.fieldInputNeedsAttention : ''
+              }`}
+              autoComplete="name"
+              value={fulfillment.customerName}
+              onChange={(event) =>
+                persistFulfillment({
+                  ...fulfillment,
+                  customerName: event.target.value,
+                })
+              }
+              onBlur={() => setCustomerTouched(true)}
+              placeholder="Tu nombre"
+              aria-invalid={showCustomerNameError}
+            />
+            {showCustomerNameError ? (
+              <p className={styles.fieldError} role="alert">
+                Ingresa tu nombre para continuar
+              </p>
+            ) : null}
+          </label>
         </section>
 
         <section className={styles.section} aria-labelledby="checkout-service-heading">
@@ -384,7 +435,15 @@ export function PublicMenuCheckoutDetails({
         </section>
 
         {fulfillment.serviceType === 'delivery' && deliverySelectable ? (
-          <section className={styles.section} aria-labelledby="checkout-address-heading">
+          <section
+            ref={(node) => {
+              sectionRefs.current['checkout-address-heading'] = node;
+            }}
+            className={`${styles.section} ${
+              showAddressValidation ? styles.sectionNeedsAttention : ''
+            }`}
+            aria-labelledby="checkout-address-heading"
+          >
             <h2 id="checkout-address-heading" className={styles.sectionTitle}>
               ¿A dónde lo llevamos?
             </h2>
@@ -395,7 +454,7 @@ export function PublicMenuCheckoutDetails({
                 longitude: fulfillment.deliveryLongitude,
                 placeId: fulfillment.deliveryPlaceId,
               }}
-              showValidation={showAddressError}
+              showValidation={showAddressValidation}
               onChange={(location) =>
                 persistFulfillment({
                   ...fulfillment,
@@ -407,6 +466,30 @@ export function PublicMenuCheckoutDetails({
                 })
               }
             />
+
+            <label className={styles.addressField} htmlFor="checkout-delivery-details">
+              <span className={styles.fieldLabel}>
+                Detalles para encontrarte
+                <span className={styles.fieldOptional}> (opcional)</span>
+              </span>
+              <textarea
+                id="checkout-delivery-details"
+                className={styles.textArea}
+                rows={3}
+                maxLength={240}
+                value={fulfillment.deliveryAddressDetails}
+                onChange={(event) =>
+                  persistFulfillment({
+                    ...fulfillment,
+                    deliveryAddressDetails: event.target.value,
+                  })
+                }
+                placeholder="Ej. casa blanca, puerta de madera, entre calles…"
+              />
+              <p className={styles.fieldHint}>
+                Ayuda al repartidor a llegar más rápido a tu ubicación.
+              </p>
+            </label>
 
             {deliveryQuoteLoading ? (
               <p className={styles.deliveryStatus} role="status">
@@ -439,7 +522,15 @@ export function PublicMenuCheckoutDetails({
         ) : null}
 
         {showPaymentSection ? (
-        <section className={styles.section} aria-labelledby="checkout-payment-heading">
+        <section
+          ref={(node) => {
+            sectionRefs.current['checkout-payment-heading'] = node;
+          }}
+          className={`${styles.section} ${
+            showPaymentValidation ? styles.sectionNeedsAttention : ''
+          }`}
+          aria-labelledby="checkout-payment-heading"
+        >
           <h2 id="checkout-payment-heading" className={styles.sectionTitle}>
             ¿Cómo te gustaría pagar?
           </h2>
@@ -450,7 +541,13 @@ export function PublicMenuCheckoutDetails({
               restaurante.
             </p>
           ) : (
-            <ul className={styles.paymentList} role="radiogroup" aria-labelledby="checkout-payment-heading">
+            <ul
+              className={`${styles.paymentList} ${
+                showPaymentValidation ? styles.paymentListNeedsAttention : ''
+              }`}
+              role="radiogroup"
+              aria-labelledby="checkout-payment-heading"
+            >
               {paymentMethods.map((method) => {
                 const Icon = PAYMENT_ICONS[method];
                 const selected = fulfillment.paymentMethod === method;
@@ -481,16 +578,41 @@ export function PublicMenuCheckoutDetails({
               })}
             </ul>
           )}
+          {showPaymentValidation ? (
+            <p className={styles.fieldError} role="alert">
+              Elige cómo te gustaría pagar
+            </p>
+          ) : null}
         </section>
         ) : null}
       </form>
 
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
+          {showValidationBanner && validationBannerMessage ? (
+            <div
+              id="checkout-continue-validation"
+              className={styles.continueValidationBanner}
+              role="alert"
+              aria-live="assertive"
+            >
+              <InfoOutlinedIcon
+                className={styles.continueValidationIcon}
+                sx={{ fontSize: 20 }}
+                aria-hidden
+              />
+              <p className={styles.continueValidationText}>{validationBannerMessage}</p>
+            </div>
+          ) : null}
           <button
             type="submit"
-            className={styles.continueBtn}
-            disabled={!canContinue}
+            className={`${styles.continueBtn} ${
+              canContinue ? styles.continueBtnReady : styles.continueBtnActionable
+            } ${continueBtnAttention ? styles.continueBtnAttention : ''}`}
+            aria-disabled={!canContinue}
+            aria-describedby={
+              showValidationBanner ? 'checkout-continue-validation' : undefined
+            }
             onClick={handleSubmit}
           >
             <span>Revisar pedido</span>
