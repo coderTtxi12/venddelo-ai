@@ -1,6 +1,6 @@
 # Temas del Menú Digital
 
-Catálogo de **45 temas** para la vista previa del menú digital (incluye colección **Festividades MX**). Generados con la skill **ui-ux-pro-max** (`--design-system`), combinando tipografía, colores, superficies y tokens de layout.
+Catálogo de **46 temas** para la vista previa del menú digital (incluye colección **Festividades MX**). Generados con la skill **ui-ux-pro-max** (`--design-system`), combinando tipografía, colores, superficies y tokens de layout.
 
 **Almacenamiento:** solo frontend (`frontend/src/lib/digital-menu/themes/`). No se persisten en la base de datos.
 
