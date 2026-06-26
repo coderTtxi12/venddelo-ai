@@ -1,0 +1,236 @@
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.listPending {
+  padding: 0.15rem 0.1rem 0;
+}
+
+.listPendingPair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.listMessage {
+  margin-top: 0.5rem;
+}
+
+.listMessagePair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+  width: 100%;
+  margin-top: 0.45rem;
+}
+
+.listMessagePairCompact {
+  margin-top: 0;
+}
+
+.item {
+  position: relative;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.itemPair {
+  max-width: none;
+}
+
+.imageCard {
+  display: flex;
+  flex-direction: column;
+  width: 7.5rem;
+  border-radius: calc(var(--radius) + 2px);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.imageCardPair {
+  width: 100%;
+  position: relative;
+}
+
+.imagePreview {
+  width: 100%;
+  height: 5rem;
+  object-fit: cover;
+  display: block;
+}
+
+.imageCardPair .imagePreview {
+  height: 4.75rem;
+}
+
+.imageMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.35rem 0.45rem;
+  min-width: 0;
+}
+
+.imageCardPair .imageMeta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1.1rem 0.4rem 0.35rem;
+  background: linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.72) 100%);
+}
+
+.imageCardPair .fileName {
+  color: #fff;
+  font-size: 0.64rem;
+  font-weight: 600;
+}
+
+.imageCardPair .fileSize {
+  display: none;
+}
+
+.docCard {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: 14rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: calc(var(--radius) + 2px);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.docCardPair {
+  width: 100%;
+  max-width: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 4.75rem;
+  padding: 0.55rem 0.4rem;
+  text-align: center;
+}
+
+.docIcon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
+}
+
+.docCardPair .docIcon {
+  width: 1.85rem;
+  height: 1.85rem;
+}
+
+.docMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.docCardPair .fileName {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.25;
+}
+
+.docCardPair .fileSize {
+  font-size: 0.62rem;
+}
+
+.fileName {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fileSize {
+  font-size: 0.68rem;
+  color: var(--color-text-secondary);
+}
+
+.removeButton {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  z-index: 1;
+}
+
+.removeButton:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.listPendingPair .imageCard,
+.listPendingPair .docCard {
+  width: 100%;
+  max-width: none;
+}
+
+.listMessage .imageCard,
+.listMessage .docCard {
+  border-color: color-mix(in srgb, #fff 25%, var(--color-border));
+}
+
+.listMessage .fileName,
+.listMessage .fileSize {
+  color: inherit;
+}
+
+.listMessage .docIcon {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: inherit;
+}
+
+.listMessagePair .imageCard,
+.listMessagePair .docCard {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.listMessagePair .docIcon {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+}
+
+.listMessagePair .fileName,
+.listMessagePair .fileSize {
+  color: var(--color-text);
+}
+
+.listMessagePair .fileSize {
+  color: var(--color-text-secondary);
+}
