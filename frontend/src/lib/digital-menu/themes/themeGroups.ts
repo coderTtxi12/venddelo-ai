@@ -84,6 +84,7 @@ const DARK_THEME_IDS = new Set([
   'lampara-ramen',
   'abisal-mar',
   'forno-notte',
+  'subway-nocturno',
 ]);
 
 const SEASONAL_THEME_IDS = new Set([

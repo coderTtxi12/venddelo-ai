@@ -108,4 +108,6 @@ export const THEME_ADD_SUCCESS: Record<string, ThemeAddSuccessTokens> = {
   'lampara-ramen': { addSuccess: '#00FF66', addSuccessText: '#1A0500' },
   'abisal-mar': { addSuccess: '#00FFBB', addSuccessText: '#000000' },
   'forno-notte': { addSuccess: '#7FFF00', addSuccessText: '#1A0505' },
+  // Subway green on black — vivid neon flash vs brand green
+  'subway-nocturno': { addSuccess: '#39FF14', addSuccessText: '#000000' },
 };
