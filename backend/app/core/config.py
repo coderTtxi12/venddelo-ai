@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     rate_limit_window_seconds: int = 60
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+    llm_provider: str = "stub"
+    langsmith_tracing: bool = False
+    langsmith_api_key: str | None = None
+    langsmith_project: str = "venddelo-ai"
+    langsmith_endpoint: str = "https://api.smith.langchain.com"
     google_maps_api_key: str | None = None
     translation_cache_ttl_seconds: int = 3600
     cors_origins: str = "http://localhost:3000"
