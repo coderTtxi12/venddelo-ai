@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -46,6 +47,7 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [socketLive, setSocketLive] = useState(false);
   const alertNewOrder = useNewOrderSoundAlert();
+  const bootstrapTokenRef = useRef<string | null>(null);
 
   const loadOrders = useCallback(
     async (token: string, rid: string, options?: { silent?: boolean }) => {
@@ -74,9 +76,14 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
     async function bootstrap() {
       if (authLoading) return;
       if (!accessToken) {
+        bootstrapTokenRef.current = null;
         setLoading(false);
         setRestaurantId(null);
         setOrders([]);
+        return;
+      }
+
+      if (bootstrapTokenRef.current === accessToken) {
         return;
       }
 
@@ -95,6 +102,7 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
         }
 
         if (cancelled) return;
+        bootstrapTokenRef.current = accessToken;
         setRestaurantId(resolved.supplierId);
         await loadOrders(accessToken, resolved.supplierId);
       } catch (error) {
