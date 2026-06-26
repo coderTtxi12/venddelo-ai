@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { listRestaurants } from '@/lib/api/restaurants';
+import { resolveSupplierIdByEmail } from '@/services/db';
+import { legacyDb as db } from '@/services/legacyDb';
 import styles from './RestaurantGate.module.css';
 
 export function RestaurantGate({ children }: { children: React.ReactNode }) {
@@ -11,6 +12,7 @@ export function RestaurantGate({ children }: { children: React.ReactNode }) {
   const { user, accessToken, loading: authLoading } = useAuth();
   const [checking, setChecking] = useState(true);
   const [hasRestaurant, setHasRestaurant] = useState(false);
+  const checkedTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -18,7 +20,8 @@ export function RestaurantGate({ children }: { children: React.ReactNode }) {
     async function check() {
       if (authLoading) return;
 
-      if (!accessToken || !user) {
+      if (!accessToken || !user?.uid) {
+        checkedTokenRef.current = null;
         if (!cancelled) {
           setChecking(false);
           setHasRestaurant(false);
@@ -26,10 +29,20 @@ export function RestaurantGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      if (checkedTokenRef.current === accessToken) {
+        if (!cancelled) setChecking(false);
+        return;
+      }
+
       try {
-        const page = await listRestaurants(accessToken, 1);
-        const found = page.items.length > 0;
+        const resolved = await resolveSupplierIdByEmail(
+          db,
+          user.email ?? '',
+          accessToken,
+        );
+        const found = 'supplierId' in resolved;
         if (!cancelled) {
+          checkedTokenRef.current = accessToken;
           setHasRestaurant(found);
           if (!found) {
             router.replace('/onboarding');
@@ -50,7 +63,7 @@ export function RestaurantGate({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, authLoading, router, user]);
+  }, [accessToken, authLoading, user?.uid, user?.email]);
 
   if (authLoading || checking) {
     return (
