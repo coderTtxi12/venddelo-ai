@@ -3,14 +3,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
+import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import { useAssistantChat } from '@/contexts/AssistantChatContext';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import styles from './Sidebar.module.css';
 
@@ -45,11 +47,20 @@ function shouldSidebarStartCollapsed(width: number): boolean {
 export default function Sidebar() {
   const pathname = usePathname();
   const { pendingOrdersCount } = useRestaurantOrders();
+  const { isOpen: isChatOpen, openChat, closeChat } = useAssistantChat();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const wasChatOpenRef = useRef(false);
 
   useEffect(() => {
     setIsCollapsed(shouldSidebarStartCollapsed(window.innerWidth));
   }, []);
+
+  useEffect(() => {
+    if (isChatOpen && !wasChatOpenRef.current) {
+      setIsCollapsed(true);
+    }
+    wasChatOpenRef.current = isChatOpen;
+  }, [isChatOpen]);
 
   return (
     <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}>
@@ -94,7 +105,24 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <button className={styles.addButton}>+ Agregar</button>
+      <div className={styles.chatAction}>
+        <button
+          type="button"
+          className={`${styles.addButton} ${isCollapsed ? styles.addButtonCompact : ''} ${
+            isChatOpen ? styles.addButtonActive : ''
+          }`}
+          onClick={isChatOpen ? closeChat : openChat}
+          aria-label={isChatOpen ? 'Cerrar asistente' : 'Abrir asistente'}
+          title={isChatOpen ? 'Cerrar asistente' : 'Agregar con IA'}
+        >
+          <span className={styles.addButtonIcon} aria-hidden>
+            <BrainOutlinedIcon sx={{ fontSize: isCollapsed ? 22 : 18 }} />
+          </span>
+          <span className={styles.addButtonLabel}>
+            {isChatOpen ? 'Asistente' : '+ Agregar'}
+          </span>
+        </button>
+      </div>
     </aside>
   );
 }
