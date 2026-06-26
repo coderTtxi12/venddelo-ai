@@ -50,6 +50,10 @@ type UserChatMessage = {
 
 The backend controls **whether** a complement is shown and **what it contains**.
 
+> **Streaming chat API:** `POST /api/v1/restaurants/{restaurant_id}/assistant/chat`  
+> See `backend/docs/assistant-chat-streaming.md` for SSE event format.  
+> Today, complements are not yet emitted on `message.complete`; they will be added in a follow-up.
+
 ### Recommended response envelope
 
 For a non-streaming response:
