@@ -775,6 +775,16 @@ export const MENU_QR_PRESET_CATALOG: MenuQrPreset[] = [
     dotStyle: 'classy-rounded',
   }),
   qrPreset({
+    id: 'subway-nocturno',
+    label: 'Subway nocturno',
+    theme: 'Subway Nocturno sandwich dark',
+    dot: '#f8fafc',
+    corner: '#4ade80',
+    cornerDot: '#009639',
+    bg: '#000000',
+    dotStyle: 'rounded',
+  }),
+  qrPreset({
     id: 'speakeasy',
     label: 'Speakeasy',
     theme: 'Bar oculto art déco',
