@@ -9,6 +9,8 @@ from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.request_context import RequestIdMiddleware
+from app.infra.llm.factory import build_llm_provider
+from app.infra.llm.tracing import log_tracing_status
 from app.infra.realtime.order_hub import get_order_realtime_hub
 from app.middleware.rate_limit import RateLimitMiddleware
 
@@ -24,6 +26,8 @@ def _menu_cors_origin_regex(menu_public_domain: str) -> str:
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
+    log_tracing_status()
+    build_llm_provider(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
