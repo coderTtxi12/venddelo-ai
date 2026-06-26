@@ -8,6 +8,7 @@
   border-right: 1px solid var(--color-border);
   padding: 1.25rem 0.75rem;
   gap: 0.25rem;
+  transition: width 0.25s ease-out, min-width 0.25s ease-out, padding 0.25s ease-out;
 }
 
 .collapsed {
@@ -145,29 +146,74 @@
   color: #fff;
 }
 
+.chatAction {
+  flex-shrink: 0;
+  margin-top: 0.5rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--color-border);
+}
+
 .addButton {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  width: 100%;
   padding: 0.7rem 1rem;
-  border-radius: var(--radius);
+  border-radius: calc(var(--radius) + 2px);
   border: none;
   background: var(--color-primary);
   color: #fff;
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s;
-  margin-top: 0.5rem;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.32);
+  transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 
 .addButton:hover {
   background: var(--color-primary-hover);
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.38);
 }
 
-.collapsed .addButton {
+.addButton:active {
+  transform: translateY(1px);
+}
+
+.addButtonCompact {
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  margin-inline: auto;
+  border-radius: 999px;
+}
+
+.addButtonActive {
+  background: var(--color-primary-hover);
+  box-shadow:
+    0 0 0 3px rgba(79, 70, 229, 0.2),
+    0 4px 14px rgba(79, 70, 229, 0.32);
+}
+
+.addButtonIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.addButtonLabel {
+  white-space: nowrap;
+}
+
+.collapsed .addButtonLabel {
   display: none;
+}
+
+.collapsed .chatAction {
+  padding-top: 0.75rem;
+  display: flex;
+  justify-content: center;
 }
 
 .toggleButton {
