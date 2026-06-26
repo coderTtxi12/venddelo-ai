@@ -62,4 +62,8 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    from app.infra.llm.tracing import configure_langsmith_env
+
+    settings = Settings()
+    configure_langsmith_env(settings)
+    return settings
