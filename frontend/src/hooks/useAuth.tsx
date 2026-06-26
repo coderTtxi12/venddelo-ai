@@ -105,18 +105,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.refresh();
   };
 
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      firebaseUser: user,
+      loading,
+      loginRejectionMessage,
+      loginWithGoogle,
+      logout,
+      accessToken,
+    }),
+    [user, loading, loginRejectionMessage, accessToken],
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        firebaseUser: user,
-        loading,
-        loginRejectionMessage,
-        loginWithGoogle,
-        logout,
-        accessToken,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
