@@ -6,11 +6,13 @@ import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import ChatAttachmentList from '@/components/assistant/ChatAttachmentList';
 import ChatFormComplement from '@/components/assistant/ChatFormComplement';
 import { useAssistantChat } from '@/contexts/AssistantChatContext';
-import { useStreamingText } from '@/hooks/useStreamingText';
+import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
+import { useAuth } from '@/hooks/useAuth';
+import { useChatPanelResize } from '@/hooks/useChatPanelResize';
 import {
   createAttachmentsFromFileList,
   revokeAttachmentPreviews,
@@ -18,12 +20,19 @@ import {
 } from '@/lib/assistant/chatAttachments';
 import {
   formatFormSubmissionAsText,
-  MOCK_PRODUCT_FORM,
-  MOCK_PROMOTION_FORM,
   type ChatComplement,
   type ChatFormSubmission,
   isChatFormComplement,
 } from '@/lib/assistant/chatComplements';
+import {
+  streamAssistantChat,
+  type AssistantChatHistoryMessage,
+} from '@/lib/api/assistant';
+import {
+  MAX_CHAT_PANEL_WIDTH,
+  MIN_CHAT_PANEL_WIDTH,
+} from '@/lib/assistant/chatPanelWidth';
+import { ApiError } from '@/lib/api/types';
 import styles from './AssistantChatPanel.module.css';
 
 type ChatRole = 'user' | 'assistant';
@@ -36,17 +45,6 @@ type ChatMessage = {
   complement?: ChatComplement;
   complementSubmitted?: boolean;
   formSubmission?: ChatFormSubmission;
-};
-
-type PendingAssistantReply = {
-  messageId: string;
-  fullText: string;
-  complement?: ChatComplement;
-};
-
-type MockAssistantReply = {
-  text: string;
-  complement?: ChatComplement;
 };
 
 const WELCOME_MESSAGE: ChatMessage = {
@@ -62,93 +60,47 @@ const SUGGESTIONS = [
   'Actualizar mi menú digital',
 ];
 
-const MOCK_RESPONSES = [
-  'Perfecto. Para el nuevo producto necesito el nombre, precio y categoría. ¿Cómo se llamará?',
-  'Entendido. ¿Prefieres un descuento porcentual o un monto fijo para la promoción?',
-  'Puedo ayudarte a reorganizar categorías y destacar tus platillos más vendidos. ¿Por dónde empezamos?',
-  'Listo, revisé tu menú. Te sugiero agregar una foto y una descripción corta para mejorar las conversiones.',
-  'Claro. Cuando conectemos el backend, podré aplicar estos cambios directamente en tu restaurante.',
-];
-
 function createId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function pickMockResponse(userText: string, attachmentCount: number): MockAssistantReply {
-  if (attachmentCount > 0) {
-    if (attachmentCount === 1) {
-      return {
-        text: 'Recibí tu archivo. Lo revisaré y te indico los siguientes pasos para usarlo en tu restaurante.',
-      };
-    }
-    return {
-      text: `Recibí ${attachmentCount} archivos. Los revisaré y te digo qué podemos hacer con cada uno.`,
-    };
-  }
-
-  const lower = userText.toLowerCase();
-
-  if (lower.includes('producto')) {
-    return {
-      text: 'Perfecto. Para crear el producto, completa este formulario:',
-      complement: MOCK_PRODUCT_FORM,
-    };
-  }
-  if (lower.includes('promoci') || lower.includes('descuento')) {
-    return {
-      text: 'Entendido. Configura la promoción con estas opciones:',
-      complement: MOCK_PROMOTION_FORM,
-    };
-  }
-  if (lower.includes('menú') || lower.includes('menu') || lower.includes('categor')) {
-    return { text: MOCK_RESPONSES[2] };
-  }
-
-  const hash = lower.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return { text: MOCK_RESPONSES[hash % MOCK_RESPONSES.length] };
+function buildAssistantHistory(messages: ChatMessage[]): AssistantChatHistoryMessage[] {
+  return messages
+    .filter((message) => message.id !== 'welcome' && message.content.trim().length > 0)
+    .map((message) => ({
+      role: message.role,
+      content: message.content.trim(),
+    }));
 }
 
-function AssistantStreamingBubble({
-  fullText,
-  onComplete,
-}: {
-  fullText: string;
-  onComplete: (finalText: string) => void;
-}) {
-  const { text, isComplete } = useStreamingText(fullText, true);
-  const completedRef = useRef(false);
-
-  useEffect(() => {
-    if (isComplete && !completedRef.current) {
-      completedRef.current = true;
-      onComplete(fullText);
-    }
-  }, [isComplete, fullText, onComplete]);
-
-  return (
-    <div className={`${styles.bubble} ${styles.bubbleAssistant}`}>
-      {text}
-      {!isComplete ? <span className={styles.cursor} aria-hidden /> : null}
-    </div>
-  );
+function buildOutboundMessage(text: string, attachments: ChatAttachment[]): string {
+  if (attachments.length === 0) return text;
+  const names = attachments.map((item) => item.name).join(', ');
+  if (!text) return `[Adjuntos: ${names}]`;
+  return `${text}\n\n[Adjuntos: ${names}]`;
 }
 
 export default function AssistantChatPanel() {
   const { isOpen, closeChat } = useAssistantChat();
+  const { accessToken } = useAuth();
+  const { restaurantId } = useRestaurantOrders();
+  const { width: panelWidth, isResizing, onResizePointerDown, onResizeKeyDown } =
+    useChatPanelResize(isOpen);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [draft, setDraft] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
   const [isThinking, setIsThinking] = useState(false);
-  const [pendingReply, setPendingReply] = useState<PendingAssistantReply | null>(null);
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const thinkTimerRef = useRef<number | null>(null);
   const dragCounterRef = useRef(0);
   const pendingAttachmentsRef = useRef<ChatAttachment[]>([]);
+  const streamAbortRef = useRef<AbortController | null>(null);
+  const sendInFlightRef = useRef(false);
 
   pendingAttachmentsRef.current = pendingAttachments;
 
@@ -170,13 +122,11 @@ export default function AssistantChatPanel() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isThinking, pendingReply, pendingAttachments, scrollToBottom]);
+  }, [messages, isThinking, streamingMessageId, pendingAttachments, scrollToBottom]);
 
   useEffect(() => {
     return () => {
-      if (thinkTimerRef.current != null) {
-        window.clearTimeout(thinkTimerRef.current);
-      }
+      streamAbortRef.current?.abort();
       revokeAttachmentPreviews(pendingAttachmentsRef.current);
     };
   }, []);
@@ -206,24 +156,121 @@ export default function AssistantChatPanel() {
     });
   }, []);
 
-  const handleStreamingComplete = useCallback(
-    (messageId: string, finalText: string, complement?: ChatComplement) => {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId ? { ...msg, content: finalText, complement } : msg,
-        ),
-      );
-      setPendingReply(null);
-      setIsBusy(false);
+  const requestAssistantReply = useCallback(
+    async (outboundMessage: string, historyMessages: ChatMessage[]) => {
+      if (sendInFlightRef.current) return;
+
+      if (!accessToken || !restaurantId) {
+        const assistantMessage: ChatMessage = {
+          id: createId(),
+          role: 'assistant',
+          content:
+            'No pude conectar con el asistente. Inicia sesión y asegúrate de tener un restaurante configurado.',
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setIsBusy(false);
+        return;
+      }
+
+      const assistantMessageId = createId();
+      sendInFlightRef.current = true;
+      setIsBusy(true);
+      setIsThinking(true);
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantMessageId, role: 'assistant', content: '' },
+      ]);
+      setIsThinking(false);
+      setStreamingMessageId(assistantMessageId);
+
+      streamAbortRef.current?.abort();
+      const abortController = new AbortController();
+      streamAbortRef.current = abortController;
+
+      let streamedContent = '';
+      let streamFinished = false;
+
+      const finishStream = () => {
+        if (streamFinished) return;
+        streamFinished = true;
+        sendInFlightRef.current = false;
+        setStreamingMessageId(null);
+        setIsBusy(false);
+      };
+
+      try {
+        await streamAssistantChat(
+          accessToken,
+          restaurantId,
+          {
+            message: outboundMessage,
+            history: buildAssistantHistory(historyMessages),
+          },
+          {
+            onDelta: (delta) => {
+              streamedContent += delta;
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.id === assistantMessageId
+                    ? { ...message, content: streamedContent }
+                    : message,
+                ),
+              );
+            },
+            onComplete: (payload) => {
+              const finalContent = payload.content || streamedContent;
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.id === assistantMessageId
+                    ? { ...message, content: finalContent }
+                    : message,
+                ),
+              );
+              finishStream();
+            },
+            onError: (error) => {
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.id === assistantMessageId
+                    ? { ...message, content: `Error: ${error.message}` }
+                    : message,
+                ),
+              );
+              finishStream();
+            },
+          },
+          abortController.signal,
+        );
+        if (!streamFinished) {
+          finishStream();
+        }
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          finishStream();
+          return;
+        }
+        const message =
+          error instanceof ApiError
+            ? error.message
+            : 'No se pudo contactar al asistente. Intenta de nuevo.';
+        setMessages((prev) =>
+          prev.map((item) =>
+            item.id === assistantMessageId ? { ...item, content: message } : item,
+          ),
+        );
+        finishStream();
+      }
     },
-    [],
+    [accessToken, restaurantId],
   );
 
   const sendMessage = useCallback(
-    (rawText: string, attachments: ChatAttachment[] = []) => {
+    async (rawText: string, attachments: ChatAttachment[] = []) => {
       const text = rawText.trim();
-      if ((!text && attachments.length === 0) || isBusy) return;
+      if ((!text && attachments.length === 0) || isBusy || sendInFlightRef.current) return;
 
+      setIsBusy(true);
+      const outboundMessage = buildOutboundMessage(text, attachments);
       const userMessage: ChatMessage = {
         id: createId(),
         role: 'user',
@@ -231,66 +278,29 @@ export default function AssistantChatPanel() {
         attachments: attachments.length > 0 ? attachments : undefined,
       };
 
-      const assistantMessageId = createId();
-      const assistantReply = pickMockResponse(text, attachments.length);
-
+      const historyMessages = [...messages, userMessage];
       setMessages((prev) => [...prev, userMessage]);
       setDraft('');
       setPendingAttachments([]);
-      setIsBusy(true);
-      setIsThinking(true);
-      setPendingReply(null);
-
-      if (thinkTimerRef.current != null) {
-        window.clearTimeout(thinkTimerRef.current);
-      }
-
-      thinkTimerRef.current = window.setTimeout(() => {
-        setIsThinking(false);
-        setMessages((prev) => [
-          ...prev,
-          { id: assistantMessageId, role: 'assistant', content: '' },
-        ]);
-        setPendingReply({
-          messageId: assistantMessageId,
-          fullText: assistantReply.text,
-          complement: assistantReply.complement,
-        });
-      }, 700 + Math.random() * 500);
+      await requestAssistantReply(outboundMessage, historyMessages);
     },
-    [isBusy],
+    [isBusy, messages, requestAssistantReply],
   );
 
-  const dispatchAssistantReply = useCallback(
-    (reply: MockAssistantReply) => {
-      const assistantMessageId = createId();
+  const handleSubmit = () => {
+    if (isBusy || sendInFlightRef.current) return;
+    void sendMessage(draft, pendingAttachments);
+  };
 
-      setIsBusy(true);
-      setIsThinking(true);
-      setPendingReply(null);
-
-      if (thinkTimerRef.current != null) {
-        window.clearTimeout(thinkTimerRef.current);
-      }
-
-      thinkTimerRef.current = window.setTimeout(() => {
-        setIsThinking(false);
-        setMessages((prev) => [
-          ...prev,
-          { id: assistantMessageId, role: 'assistant', content: '' },
-        ]);
-        setPendingReply({
-          messageId: assistantMessageId,
-          fullText: reply.text,
-          complement: reply.complement,
-        });
-      }, 700 + Math.random() * 500);
-    },
-    [],
-  );
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleSubmit();
+    }
+  };
 
   const handleFormSubmit = useCallback(
-    (submission: ChatFormSubmission) => {
+    async (submission: ChatFormSubmission) => {
       if (isBusy) return;
 
       const sourceMessage = messages.find((msg) => msg.id === submission.messageId);
@@ -312,36 +322,21 @@ export default function AssistantChatPanel() {
         formSubmission: submission,
       };
 
+      const historyMessages = [...messages, userMessage];
       setMessages((prev) => [...prev, userMessage]);
-
-      dispatchAssistantReply({
-        text: 'Gracias. Recibí tus respuestas y continuaré con el siguiente paso pronto.',
-      });
+      await requestAssistantReply(summary, historyMessages);
     },
-    [dispatchAssistantReply, isBusy, messages],
+    [isBusy, messages, requestAssistantReply],
   );
 
-  const handleSubmit = () => {
-    sendMessage(draft, pendingAttachments);
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      handleSubmit();
-    }
-  };
-
   const handleNewConversation = () => {
-    if (thinkTimerRef.current != null) {
-      window.clearTimeout(thinkTimerRef.current);
-      thinkTimerRef.current = null;
-    }
+    streamAbortRef.current?.abort();
+    sendInFlightRef.current = false;
     clearPendingAttachments();
     setMessages([WELCOME_MESSAGE]);
     setDraft('');
     setIsThinking(false);
-    setPendingReply(null);
+    setStreamingMessageId(null);
     setIsBusy(false);
     setIsDragActive(false);
     dragCounterRef.current = 0;
@@ -386,7 +381,12 @@ export default function AssistantChatPanel() {
 
   return (
     <aside
-      className={`${styles.panel} ${isOpen ? styles.open : ''}`}
+      className={`${styles.panel} ${isOpen ? styles.open : ''} ${isResizing ? styles.resizing : ''}`}
+      style={
+        isOpen
+          ? ({ '--chat-panel-width': `${panelWidth}px` } as CSSProperties)
+          : undefined
+      }
       aria-hidden={!isOpen}
       aria-label="Asistente de Venddelo"
       onDragEnter={handleDragEnter}
@@ -394,6 +394,20 @@ export default function AssistantChatPanel() {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      {isOpen ? (
+        <button
+          type="button"
+          className={styles.resizeHandle}
+          aria-label="Ajustar ancho del chat"
+          aria-orientation="vertical"
+          aria-valuemin={MIN_CHAT_PANEL_WIDTH}
+          aria-valuemax={MAX_CHAT_PANEL_WIDTH}
+          aria-valuenow={panelWidth}
+          title="Arrastra para cambiar el ancho"
+          onPointerDown={onResizePointerDown}
+          onKeyDown={onResizeKeyDown}
+        />
+      ) : null}
       {isDragActive ? (
         <div className={styles.dropOverlay} aria-hidden>
           <div className={styles.dropOverlayCard}>
@@ -438,32 +452,14 @@ export default function AssistantChatPanel() {
       <div className={styles.messages} role="log" aria-live="polite" aria-relevant="additions">
         {messages.map((message) => {
           const isUser = message.role === 'user';
-          const isStreamingTarget = pendingReply?.messageId === message.id;
+          const isStreaming = streamingMessageId === message.id;
           const hasAttachments = (message.attachments?.length ?? 0) > 0;
           const hasComplement = Boolean(message.complement);
           const attachmentCount = message.attachments?.length ?? 0;
           const attachmentsOnly = hasAttachments && !message.content && !hasComplement;
           const isAttachmentPair = attachmentCount === 2;
 
-          if (!isUser && isStreamingTarget && pendingReply) {
-            return (
-              <div key={message.id} className={`${styles.messageRow} ${styles.messageRowAssistant}`}>
-                <div className={styles.messageAvatar} aria-hidden>
-                  <BrainOutlinedIcon fontSize="inherit" />
-                </div>
-                <div className={styles.assistantContent}>
-                  <AssistantStreamingBubble
-                    fullText={pendingReply.fullText}
-                    onComplete={(finalText) =>
-                      handleStreamingComplete(message.id, finalText, pendingReply.complement)
-                    }
-                  />
-                </div>
-              </div>
-            );
-          }
-
-          if (!isUser && !message.content && !hasAttachments && !hasComplement) {
+          if (!isUser && !message.content && !hasAttachments && !hasComplement && !isStreaming) {
             return null;
           }
 
@@ -480,13 +476,14 @@ export default function AssistantChatPanel() {
               <div
                 className={`${styles.messageContent} ${isUser ? styles.messageContentUser : styles.messageContentAssistant}`}
               >
-                {(message.content || hasAttachments) && (
+                {(message.content || hasAttachments || isStreaming) && (
                   <div
                     className={`${styles.bubble} ${isUser ? styles.bubbleUser : styles.bubbleAssistant} ${
                       attachmentsOnly ? styles.bubbleAttachmentsOnly : ''
                     } ${isAttachmentPair ? styles.bubbleAttachmentPair : ''}`}
                   >
                     {message.content ? <span>{message.content}</span> : null}
+                    {isStreaming ? <span className={styles.cursor} aria-hidden /> : null}
                     {hasAttachments ? (
                       <ChatAttachmentList
                         attachments={message.attachments ?? []}
