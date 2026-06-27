@@ -1,0 +1,48 @@
+.processing {
+  display: inline-flex;
+  align-items: center;
+}
+
+.dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+}
+
+.dot {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--color-primary);
+  opacity: 0.35;
+  animation: processingPulse 1.15s ease-in-out infinite;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes processingPulse {
+  0%,
+  70%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  35% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot {
+    animation: none;
+    opacity: 0.7;
+  }
+}

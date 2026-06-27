@@ -1,0 +1,132 @@
+.markdown {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown p {
+  margin: 0 0 0.65rem;
+}
+
+.markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown strong {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.markdown em {
+  font-style: italic;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3 {
+  margin: 0.85rem 0 0.45rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.markdown h1 {
+  font-size: 1.05rem;
+}
+
+.markdown h2 {
+  font-size: 0.975rem;
+}
+
+.markdown h3 {
+  font-size: 0.925rem;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 0 0 0.65rem;
+  padding-left: 1.25rem;
+}
+
+.markdown li {
+  margin: 0.2rem 0;
+}
+
+.markdown li > p {
+  margin: 0;
+}
+
+.markdown blockquote {
+  margin: 0 0 0.65rem;
+  padding: 0.35rem 0 0.35rem 0.75rem;
+  border-left: 3px solid color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  color: var(--color-text-secondary);
+}
+
+.markdown code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-bg));
+  color: var(--color-text);
+}
+
+.markdown pre {
+  margin: 0 0 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+
+.markdown pre code {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+
+.markdown a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown a:hover {
+  color: var(--color-primary-hover);
+}
+
+.markdown hr {
+  margin: 0.75rem 0;
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.markdown table {
+  width: 100%;
+  margin: 0 0 0.65rem;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.markdown th,
+.markdown td {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.markdown th {
+  font-weight: 600;
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-bg));
+}
