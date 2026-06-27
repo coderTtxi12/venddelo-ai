@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 
-from app.core.exceptions import ForbiddenError, NotFoundError
+from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
@@ -11,11 +12,21 @@ from app.modules.delivery_providers.schemas import (
     RestaurantDeliveryPartnershipDTO,
     RestaurantDeliveryPartnershipResponse,
 )
+from app.modules.restaurants.repository import RestaurantRepository
+from app.modules.restaurants.schemas import PaymentMethodCreate, PaymentMethodDTO
+
+_DELIVERY_PAYMENT_METHODS = ("cash", "transfer", "card_terminal")
 
 
 class DeliveryPartnershipService:
-    def __init__(self, repo: DeliveryProviderRepository) -> None:
+    def __init__(
+        self,
+        repo: DeliveryProviderRepository,
+        *,
+        restaurant_repo: RestaurantRepository | None = None,
+    ) -> None:
         self._repo = repo
+        self._restaurant_repo = restaurant_repo
 
     def ensure_mexy_request_for_restaurant(self, restaurant_id: uuid.UUID) -> bool:
         if self._repo.get_mexy_partnership_for_restaurant(restaurant_id) is not None:
@@ -71,6 +82,81 @@ class DeliveryPartnershipService:
             return None
         return self._repo.get_mexy_provider_id()
 
+    def validate_restaurant_payment_methods(
+        self,
+        restaurant_id: uuid.UUID,
+        methods: Sequence[PaymentMethodCreate],
+    ) -> None:
+        provider_id = self._active_partnership_provider_id(restaurant_id)
+        if provider_id is None:
+            return
+
+        provider_enabled = {
+            pm.method for pm in self.get_active_provider_payment_methods(restaurant_id) if pm.enabled
+        }
+        for method in methods:
+            if (
+                method.service_type == "delivery"
+                and method.enabled
+                and method.method not in provider_enabled
+            ):
+                raise ValidationError(
+                    "El método de pago no está disponible con tu proveedor de reparto"
+                )
+
+    def seed_restaurant_delivery_payment_methods(self, restaurant_id: uuid.UUID) -> None:
+        if self._restaurant_repo is None:
+            return
+        if self._active_partnership_provider_id(restaurant_id) is None:
+            return
+
+        provider_enabled = {
+            pm.method
+            for pm in self.get_active_provider_payment_methods(restaurant_id)
+            if pm.enabled
+        }
+        existing = list(self._restaurant_repo.list_payment_methods(restaurant_id))
+        takeout_methods = [pm for pm in existing if pm.service_type == "takeout"]
+
+        rows: list[PaymentMethodCreate] = []
+        if takeout_methods:
+            for pm in takeout_methods:
+                rows.append(
+                    PaymentMethodCreate(
+                        method=pm.method,
+                        service_type="takeout",
+                        enabled=pm.enabled,
+                    )
+                )
+        else:
+            for method in _DELIVERY_PAYMENT_METHODS:
+                rows.append(
+                    PaymentMethodCreate(method=method, service_type="takeout", enabled=True)
+                )
+
+        for method in _DELIVERY_PAYMENT_METHODS:
+            rows.append(
+                PaymentMethodCreate(
+                    method=method,
+                    service_type="delivery",
+                    enabled=method in provider_enabled,
+                )
+            )
+
+        self._restaurant_repo.set_payment_methods(restaurant_id, rows)
+
+    def ensure_restaurant_delivery_payment_methods(self, restaurant_id: uuid.UUID) -> None:
+        if self._restaurant_repo is None:
+            return
+        if self._active_partnership_provider_id(restaurant_id) is None:
+            return
+
+        existing = list(self._restaurant_repo.list_payment_methods(restaurant_id))
+        if any(pm.service_type == "delivery" for pm in existing):
+            return
+
+        self.seed_restaurant_delivery_payment_methods(restaurant_id)
+
     def list_pending_requests(self, user_id: uuid.UUID) -> list[DeliveryPartnershipRequestDTO]:
         self._require_delivery_provider_member(user_id)
 
@@ -101,7 +187,9 @@ class DeliveryPartnershipService:
         self, user_id: uuid.UUID, link_id: uuid.UUID
     ) -> DeliveryPartnershipRequestDTO:
         provider_id = self._require_delivery_provider_mexy_link(user_id, link_id)
-        return self._repo.accept_partnership_request(link_id, provider_id)
+        result = self._repo.accept_partnership_request(link_id, provider_id)
+        self.seed_restaurant_delivery_payment_methods(result.restaurant.id)
+        return result
 
     def reject_request(self, user_id: uuid.UUID, link_id: uuid.UUID) -> None:
         provider_id = self._require_delivery_provider_mexy_link(user_id, link_id)
