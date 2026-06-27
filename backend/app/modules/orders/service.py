@@ -130,8 +130,8 @@ def _snapshot_line_discounts(
         and catalog_promo is not None
         and catalog_per_unit > 0
     ):
-        catalog_cents = min(catalog_per_unit * quantity, priced.discount_cents)
-        bundle_cents = priced.discount_cents - catalog_cents
+        catalog_cents = catalog_per_unit * quantity
+        bundle_cents = priced.discount_cents
         snapshots: list[AppliedDiscountSnapshot] = []
 
         if catalog_cents > 0:
