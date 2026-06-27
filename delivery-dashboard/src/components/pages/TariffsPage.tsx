@@ -17,6 +17,7 @@ import type {
   DeliveryPricingQuote,
   DeliveryProviderPricingConfig,
   DeliveryWeatherMode,
+  InsideWeatherTariffs,
   OutsideTariffBracket,
 } from '@/lib/api/types';
 import {
@@ -37,6 +38,17 @@ const WEATHER_OPTIONS: { mode: DeliveryWeatherMode; label: string; danger?: bool
   { mode: 'heavy', label: 'Lluvia fuerte' },
   { mode: 'intense', label: 'Lluvia intensa (suspendido)', danger: true },
 ];
+
+const INSIDE_WEATHER_ROWS: {
+  key: keyof DeliveryProviderPricingConfig['inside_polygon'];
+  label: string;
+}[] = [
+  { key: 'none', label: 'Sin lluvia' },
+  { key: 'light', label: 'Lluvia ligera' },
+  { key: 'heavy', label: 'Lluvia fuerte' },
+];
+
+type InsideWeatherField = keyof InsideWeatherTariffs;
 
 type BracketField = keyof Pick<
   OutsideTariffBracket,
@@ -126,12 +138,19 @@ export default function TariffsPage() {
     }, 4000);
   };
 
-  const patchInside = (field: 'day_cents' | 'night_cents', pesos: string) => {
+  const patchInside = (
+    weatherKey: keyof DeliveryProviderPricingConfig['inside_polygon'],
+    field: InsideWeatherField,
+    pesos: string,
+  ) => {
     setConfig((prev) => ({
       ...prev,
       inside_polygon: {
         ...prev.inside_polygon,
-        [field]: pesosInputToCents(pesos),
+        [weatherKey]: {
+          ...prev.inside_polygon[weatherKey],
+          [field]: pesosInputToCents(pesos),
+        },
       },
     }));
     setSuccess(null);
@@ -355,8 +374,8 @@ export default function TariffsPage() {
               Clima operativo
             </h2>
             <p className={styles.panelHint}>
-              Activa lluvia ligera o fuerte para aplicar tarifas de lluvia fuera de cobertura. Lluvia
-              intensa suspende entregas.
+              Activa lluvia ligera o fuerte para aplicar tarifas de lluvia dentro y fuera de
+              cobertura. Lluvia intensa suspende entregas.
             </p>
             <div className={styles.weatherRow}>
               {WEATHER_OPTIONS.map((option) => (
@@ -394,32 +413,46 @@ export default function TariffsPage() {
               Dentro de cobertura (polígono)
             </h2>
             <p className={styles.panelHint}>
-              Tarifa fija para clientes dentro de tu zona. Mismo precio con cualquier clima. El
-              turno nocturno aplica solo aquí.
+              Tarifa fija para clientes dentro de tu zona según clima y turno. El turno nocturno
+              aplica solo aquí. Lluvia intensa suspende entregas.
             </p>
-            <div className={styles.grid2}>
-              <label className={styles.label}>
-                Día
-                <input
-                  className={styles.input}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={centsToPesosInput(config.inside_polygon.day_cents)}
-                  onChange={(e) => patchInside('day_cents', e.target.value)}
-                />
-              </label>
-              <label className={styles.label}>
-                Noche
-                <input
-                  className={styles.input}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={centsToPesosInput(config.inside_polygon.night_cents)}
-                  onChange={(e) => patchInside('night_cents', e.target.value)}
-                />
-              </label>
+            <div className={styles.insideTableWrap}>
+              <table className={styles.insideTable}>
+                <thead>
+                  <tr>
+                    <th>Clima</th>
+                    <th>Día</th>
+                    <th>Noche</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {INSIDE_WEATHER_ROWS.map((row) => (
+                    <tr key={row.key}>
+                      <td className={styles.insideWeatherLabel}>{row.label}</td>
+                      <td>
+                        <input
+                          className={styles.cellInput}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={centsToPesosInput(config.inside_polygon[row.key].day_cents)}
+                          onChange={(e) => patchInside(row.key, 'day_cents', e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className={styles.cellInput}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={centsToPesosInput(config.inside_polygon[row.key].night_cents)}
+                          onChange={(e) => patchInside(row.key, 'night_cents', e.target.value)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </section>
 
@@ -641,8 +674,14 @@ export default function TariffsPage() {
                     <div className={styles.quoteTotal}>{formatMoney(quote.total_cents)}</div>
                     <p className={styles.quoteMeta}>
                       {quote.inside_polygon
-                        ? `Dentro de cobertura · ${quote.is_night ? 'Noche' : 'Día'}`
-                        : `Fuera de cobertura · ${quote.distance_km?.toFixed(1)} km de ruta · solo horario diurno`}
+                        ? `Dentro de cobertura · ${quote.is_night ? 'Noche' : 'Día'} · ${
+                            WEATHER_OPTIONS.find((option) => option.mode === quote.weather_mode)
+                              ?.label ?? quote.weather_mode
+                          }`
+                        : `Fuera de cobertura · ${quote.distance_km?.toFixed(1)} km de ruta · solo horario diurno · ${
+                            WEATHER_OPTIONS.find((option) => option.mode === quote.weather_mode)
+                              ?.label ?? quote.weather_mode
+                          }`}
                     </p>
                     {!quote.inside_polygon ? (
                       <div className={styles.quoteBreakdown}>
