@@ -493,6 +493,21 @@ def test_provider_lists_accepts_and_rejects_partnership_requests(client, engine)
         assert link.is_default is True
         assert link.activated_at is not None
 
+    app.dependency_overrides[get_auth] = lambda: __import__(
+        "tests.api.test_api_v1", fromlist=["FakeAuth"]
+    ).FakeAuth(OWNER)
+    payments_resp = client.get(
+        f"/api/v1/restaurants/{restaurant_id}/payment-methods",
+        headers=AUTH,
+    )
+    assert payments_resp.status_code == 200
+    delivery_payments = {
+        entry["method"]: entry["enabled"]
+        for entry in payments_resp.json()
+        if entry["service_type"] == "delivery"
+    }
+    assert delivery_payments == {"cash": True, "transfer": True, "card_terminal": True}
+
     # Second restaurant for reject flow
     app.dependency_overrides[get_auth] = lambda: __import__(
         "tests.api.test_api_v1", fromlist=["FakeAuth"]
@@ -613,3 +628,196 @@ def test_restaurant_provider_data_empty_when_partnership_pending(client, engine)
     )
     assert payments_resp.status_code == 200
     assert payments_resp.json() == []
+
+
+@requires_db
+def test_restaurant_cannot_enable_delivery_payment_unavailable_from_provider(client, engine):
+    from app.api.deps import get_auth
+    from app.core.security import AuthenticatedUser, AuthPort
+    from app.main import app
+
+    _create_mexy_provider(client)
+
+    create_resp = client.post(
+        "/api/v1/restaurants",
+        json={
+            "name": "Payment Guard Bistro",
+            "subdomain": "payment-guard-bistro",
+            "delivery_enabled": True,
+        },
+        headers=AUTH,
+    )
+    restaurant_id = create_resp.json()["id"]
+
+    class MexyAuth(AuthPort):
+        def verify_token(self, token: str) -> AuthenticatedUser:
+            return AuthenticatedUser(id=MEXY_USER, email="mexy@example.com")
+
+    app.dependency_overrides[get_auth] = MexyAuth
+    listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
+    link_id = listed.json()[0]["id"]
+    client.post(
+        f"/api/v1/delivery-providers/me/partnership-requests/{link_id}/accept",
+        headers=AUTH,
+    )
+
+    client.put(
+        "/api/v1/delivery-providers/me/payment-methods",
+        json=[
+            {"method": "cash", "enabled": True},
+            {"method": "transfer", "enabled": False},
+            {"method": "card_terminal", "enabled": True},
+        ],
+        headers=AUTH,
+    )
+
+    app.dependency_overrides[get_auth] = lambda: __import__(
+        "tests.api.test_api_v1", fromlist=["FakeAuth"]
+    ).FakeAuth(OWNER)
+
+    rejected = client.put(
+        f"/api/v1/restaurants/{restaurant_id}/payment-methods",
+        json=[
+            {"method": "cash", "service_type": "takeout", "enabled": True},
+            {"method": "transfer", "service_type": "takeout", "enabled": True},
+            {"method": "card_terminal", "service_type": "takeout", "enabled": True},
+            {"method": "cash", "service_type": "delivery", "enabled": True},
+            {"method": "transfer", "service_type": "delivery", "enabled": True},
+            {"method": "card_terminal", "service_type": "delivery", "enabled": False},
+        ],
+        headers=AUTH,
+    )
+    assert rejected.status_code == 400
+
+    allowed = client.put(
+        f"/api/v1/restaurants/{restaurant_id}/payment-methods",
+        json=[
+            {"method": "cash", "service_type": "takeout", "enabled": True},
+            {"method": "transfer", "service_type": "takeout", "enabled": True},
+            {"method": "card_terminal", "service_type": "takeout", "enabled": True},
+            {"method": "cash", "service_type": "delivery", "enabled": True},
+            {"method": "transfer", "service_type": "delivery", "enabled": False},
+            {"method": "card_terminal", "service_type": "delivery", "enabled": False},
+        ],
+        headers=AUTH,
+    )
+    assert allowed.status_code == 204
+
+
+@requires_db
+def test_public_checkout_config_exposes_delivery_payments_after_partnership(client, engine):
+    from app.api.deps import get_auth
+    from app.core.security import AuthenticatedUser, AuthPort
+    from app.main import app
+
+    _create_mexy_provider(client)
+
+    create_resp = client.post(
+        "/api/v1/restaurants",
+        json={
+            "name": "Live Menu Bistro",
+            "subdomain": "live-menu-bistro",
+            "delivery_enabled": True,
+            "status": "published",
+            "latitude": 19.4326,
+            "longitude": -99.1332,
+        },
+        headers=AUTH,
+    )
+    restaurant_id = create_resp.json()["id"]
+
+    class MexyAuth(AuthPort):
+        def verify_token(self, token: str) -> AuthenticatedUser:
+            return AuthenticatedUser(id=MEXY_USER, email="mexy@example.com")
+
+    app.dependency_overrides[get_auth] = MexyAuth
+    listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
+    link_id = listed.json()[0]["id"]
+    client.post(
+        f"/api/v1/delivery-providers/me/partnership-requests/{link_id}/accept",
+        headers=AUTH,
+    )
+
+    app.dependency_overrides[get_auth] = lambda: __import__(
+        "tests.api.test_api_v1", fromlist=["FakeAuth"]
+    ).FakeAuth(OWNER)
+
+    wiped = client.put(
+        f"/api/v1/restaurants/{restaurant_id}/payment-methods",
+        json=[
+            {"method": "cash", "service_type": "takeout", "enabled": True},
+            {"method": "transfer", "service_type": "takeout", "enabled": True},
+            {"method": "card_terminal", "service_type": "takeout", "enabled": True},
+        ],
+        headers=AUTH,
+    )
+    assert wiped.status_code == 204
+
+    checkout_resp = client.get("/api/v1/public/restaurants/live-menu-bistro/checkout-config")
+    assert checkout_resp.status_code == 200
+    body = checkout_resp.json()
+    assert body["delivery_service"]["available"] is True
+    methods = {(entry["method"], entry["service_type"]) for entry in body["payment_methods"]}
+    assert ("cash", "delivery") in methods
+    assert ("transfer", "delivery") in methods
+    assert ("card_terminal", "delivery") in methods
+
+
+@requires_db
+def test_public_checkout_config_respects_restaurant_delivery_opt_out(client, engine):
+    from app.api.deps import get_auth
+    from app.core.security import AuthenticatedUser, AuthPort
+    from app.main import app
+
+    _create_mexy_provider(client)
+
+    create_resp = client.post(
+        "/api/v1/restaurants",
+        json={
+            "name": "Opt Out Bistro",
+            "subdomain": "opt-out-bistro",
+            "delivery_enabled": True,
+            "status": "published",
+            "latitude": 19.4326,
+            "longitude": -99.1332,
+        },
+        headers=AUTH,
+    )
+    restaurant_id = create_resp.json()["id"]
+
+    class MexyAuth(AuthPort):
+        def verify_token(self, token: str) -> AuthenticatedUser:
+            return AuthenticatedUser(id=MEXY_USER, email="mexy@example.com")
+
+    app.dependency_overrides[get_auth] = MexyAuth
+    listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
+    link_id = listed.json()[0]["id"]
+    client.post(
+        f"/api/v1/delivery-providers/me/partnership-requests/{link_id}/accept",
+        headers=AUTH,
+    )
+
+    app.dependency_overrides[get_auth] = lambda: __import__(
+        "tests.api.test_api_v1", fromlist=["FakeAuth"]
+    ).FakeAuth(OWNER)
+
+    saved = client.put(
+        f"/api/v1/restaurants/{restaurant_id}/payment-methods",
+        json=[
+            {"method": "cash", "service_type": "takeout", "enabled": True},
+            {"method": "transfer", "service_type": "takeout", "enabled": True},
+            {"method": "card_terminal", "service_type": "takeout", "enabled": True},
+            {"method": "cash", "service_type": "delivery", "enabled": True},
+            {"method": "transfer", "service_type": "delivery", "enabled": False},
+            {"method": "card_terminal", "service_type": "delivery", "enabled": False},
+        ],
+        headers=AUTH,
+    )
+    assert saved.status_code == 204
+
+    checkout_resp = client.get("/api/v1/public/restaurants/opt-out-bistro/checkout-config")
+    assert checkout_resp.status_code == 200
+    methods = {(entry["method"], entry["service_type"]) for entry in checkout_resp.json()["payment_methods"]}
+    assert ("cash", "delivery") in methods
+    assert ("transfer", "delivery") not in methods
+    assert ("card_terminal", "delivery") not in methods
