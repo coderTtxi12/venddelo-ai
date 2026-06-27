@@ -32,10 +32,12 @@ export function buildOrderCancelledWhatsAppMessage(order: Order, reason: string)
   ].join('\n');
 }
 
+import { isLegacyWhatsAppPendingPhone } from '@/lib/digital-menu/checkout/customerPhone';
+
 /** Opens WhatsApp in a new tab with a prefilled customer message. */
 export function openCustomerWhatsAppMessage(phone: string | null | undefined, message: string): void {
   const digits = phone?.replace(/\D/g, '') ?? '';
-  const hasCustomerPhone = digits.length >= 10 && phone !== 'whatsapp';
+  const hasCustomerPhone = digits.length >= 10 && !isLegacyWhatsAppPendingPhone(phone ?? '');
   const url = hasCustomerPhone
     ? `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
     : `https://wa.me/?text=${encodeURIComponent(message)}`;
