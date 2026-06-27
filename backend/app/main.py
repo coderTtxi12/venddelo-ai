@@ -10,7 +10,7 @@ from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.request_context import RequestIdMiddleware
 from app.infra.llm.factory import build_llm_provider
-from app.infra.llm.tracing import log_tracing_status
+from app.infra.llm.tracing import flush_langsmith_traces, log_tracing_status
 from app.infra.realtime.order_hub import get_order_realtime_hub
 from app.middleware.rate_limit import RateLimitMiddleware
 
@@ -36,6 +36,7 @@ def create_app() -> FastAPI:
         hub = get_order_realtime_hub()
         hub.bind_loop(asyncio.get_running_loop())
         yield
+        flush_langsmith_traces()
         await hub.shutdown()
 
     app = FastAPI(title="Vendelo AI API", version=settings.app_version, lifespan=lifespan)

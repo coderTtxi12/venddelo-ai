@@ -30,6 +30,19 @@ def is_langsmith_tracing_enabled() -> bool:
     return bool(tracing_is_enabled())
 
 
+def flush_langsmith_traces() -> None:
+    """Flush pending LangSmith runs before process shutdown (official SDK guidance)."""
+    if not is_langsmith_tracing_enabled():
+        return
+
+    try:
+        from langsmith import Client
+
+        Client().flush()
+    except Exception:
+        logger.exception("Failed to flush LangSmith traces")
+
+
 def log_tracing_status() -> None:
     if not is_langsmith_tracing_enabled():
         logger.info("LangSmith tracing disabled")

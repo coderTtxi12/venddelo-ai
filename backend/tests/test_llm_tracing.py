@@ -1,7 +1,7 @@
 import os
 
 from app.core.config import Settings
-from app.infra.llm.tracing import configure_langsmith_env, is_langsmith_tracing_enabled
+from app.infra.llm.tracing import configure_langsmith_env, flush_langsmith_traces, is_langsmith_tracing_enabled
 
 
 def test_configure_langsmith_env_exports_settings(monkeypatch):
@@ -48,3 +48,8 @@ def test_get_settings_loads_langsmith_from_env(monkeypatch):
     assert is_langsmith_tracing_enabled() is True
 
     get_settings.cache_clear()
+
+
+def test_flush_langsmith_traces_noop_when_disabled(monkeypatch):
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+    flush_langsmith_traces()
