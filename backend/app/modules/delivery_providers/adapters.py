@@ -44,6 +44,7 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderZoneDTO,
     GeoJsonPolygon,
     InsidePolygonTariffsDTO,
+    InsideWeatherTariffsDTO,
     OutsidePolygonTariffsDTO,
     OutsideTariffBracketDTO,
     RestaurantDeliveryPartnershipDTO,
@@ -506,8 +507,18 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         )
         return DeliveryProviderPricingConfigDTO(
             inside_polygon=InsidePolygonTariffsDTO(
-                day_cents=parsed.inside_polygon.day_cents,
-                night_cents=parsed.inside_polygon.night_cents,
+                none=InsideWeatherTariffsDTO(
+                    day_cents=parsed.inside_polygon.none.day_cents,
+                    night_cents=parsed.inside_polygon.none.night_cents,
+                ),
+                light=InsideWeatherTariffsDTO(
+                    day_cents=parsed.inside_polygon.light.day_cents,
+                    night_cents=parsed.inside_polygon.light.night_cents,
+                ),
+                heavy=InsideWeatherTariffsDTO(
+                    day_cents=parsed.inside_polygon.heavy.day_cents,
+                    night_cents=parsed.inside_polygon.heavy.night_cents,
+                ),
             ),
             outside_polygon=OutsidePolygonTariffsDTO(
                 max_distance_km=parsed.outside_polygon.max_distance_km,
