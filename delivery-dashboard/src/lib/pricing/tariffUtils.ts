@@ -1,5 +1,6 @@
 import type {
   DeliveryProviderPricingConfig,
+  InsideWeatherTariffs,
   OutsideTariffBracket,
 } from '@/lib/api/types';
 
@@ -24,11 +25,16 @@ export const DEFAULT_OUTSIDE_BRACKETS: OutsideTariffBracket[] = [
   { min_km: 19.1, max_km: 20, repa_cents: 21500, mexy_cents: 12500, restaurant_cents: 34000, rain_light_cents: 38000, rain_heavy_cents: 42000 },
 ];
 
+export const DEFAULT_INSIDE_NONE: InsideWeatherTariffs = { day_cents: 3500, night_cents: 5000 };
+export const DEFAULT_INSIDE_LIGHT: InsideWeatherTariffs = { day_cents: 5000, night_cents: 6500 };
+export const DEFAULT_INSIDE_HEAVY: InsideWeatherTariffs = { day_cents: 7000, night_cents: 10000 };
+
 export function createDefaultPricingConfig(): DeliveryProviderPricingConfig {
   return {
     inside_polygon: {
-      day_cents: 3500,
-      night_cents: 5000,
+      none: { ...DEFAULT_INSIDE_NONE },
+      light: { ...DEFAULT_INSIDE_LIGHT },
+      heavy: { ...DEFAULT_INSIDE_HEAVY },
     },
     outside_polygon: {
       max_distance_km: 20,
