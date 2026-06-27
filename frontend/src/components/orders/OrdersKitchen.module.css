@@ -470,6 +470,14 @@
   word-break: break-word;
 }
 
+.infoMeta {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
 .infoCardWide {
   grid-column: 1 / -1;
 }

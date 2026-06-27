@@ -51,6 +51,7 @@ import {
   openCustomerWhatsAppMessage,
   type KitchenCancelReason,
 } from '@/lib/orders/kitchenWhatsApp';
+import { formatOrderCustomerPhone } from '@/lib/digital-menu/checkout/customerPhone';
 import styles from './OrdersKitchen.module.css';
 
 function statusClassName(tone: OrderStatusMeta['tone']): string {
@@ -144,6 +145,7 @@ function OrderItemCard({
   const imageUrl = storagePublicUrl(item.product_image_path);
   const product = item.product_id ? productsById.get(item.product_id) : undefined;
   const itemDiscounts = resolveOrderItemDiscounts(item, { product, promotions });
+  const preDiscountCents = orderItemPreDiscountCents(item, itemDiscounts);
 
   return (
     <article className={styles.itemCard}>
@@ -160,7 +162,7 @@ function OrderItemCard({
             <h3 className={styles.itemName}>
               <span className={styles.itemQty}>{item.quantity}×</span> {item.product_name}
             </h3>
-            <span className={styles.itemTotal}>{formatCents(item.line_total_cents)}</span>
+            <span className={styles.itemTotal}>{formatCents(preDiscountCents)}</span>
           </div>
 
           {options.length > 0 ? (
@@ -192,7 +194,6 @@ function OrderItemCard({
 
           <div className={styles.itemMeta}>
             <span>Base {formatCents(item.unit_price_cents)} c/u</span>
-            <span>Subtotal línea {formatCents(item.line_subtotal_cents)}</span>
           </div>
         </div>
       </div>
@@ -262,10 +263,8 @@ function OrderDetailContent({
             <p className={styles.infoValue}>{order.customer_name}</p>
           </div>
           <div className={styles.infoCard}>
-            <p className={styles.infoLabel}>Teléfono</p>
-            <p className={styles.infoValue}>
-              {order.customer_phone === 'whatsapp' ? 'Vía WhatsApp' : order.customer_phone}
-            </p>
+            <p className={styles.infoLabel}>WhatsApp</p>
+            <p className={styles.infoValue}>{formatOrderCustomerPhone(order.customer_phone)}</p>
           </div>
           <div className={styles.infoCard}>
             <p className={styles.infoLabel}>Tipo</p>
@@ -274,6 +273,16 @@ function OrderDetailContent({
           <div className={styles.infoCard}>
             <p className={styles.infoLabel}>Pago</p>
             <p className={styles.infoValue}>{formatOrderPaymentLabel(order.payment_method)}</p>
+            {order.type === 'delivery' &&
+            order.payment_method === 'cash' &&
+            order.cash_denomination_cents != null ? (
+              <p className={styles.infoMeta}>
+                Pagará con {formatCents(order.cash_denomination_cents)}
+                {order.cash_denomination_cents > order.total_cents
+                  ? ` · Cambio ${formatCents(order.cash_denomination_cents - order.total_cents)}`
+                  : ''}
+              </p>
+            ) : null}
           </div>
           {orderRef ? (
             <div className={`${styles.infoCard} ${styles.infoCardWide}`}>
