@@ -1,6 +1,7 @@
 import type { PaymentMethodKey } from '@/lib/restaurantPaymentConfig';
 import type { RestaurantServiceType } from '@/lib/restaurantServices';
 import type { CheckoutFulfillment } from './fulfillment';
+import { DEFAULT_CHECKOUT_PHONE_COUNTRY_ISO } from './customerPhone';
 
 const STORAGE_PREFIX = 'venddelo:public-checkout:';
 
@@ -13,6 +14,9 @@ export type StoredCheckoutPreferences = {
   deliveryLongitude: number | null;
   deliveryPlaceId: string | null;
   customerName: string;
+  customerPhoneCountryIso: string;
+  customerPhoneLocal: string;
+  cashDenominationCents: number | null;
 };
 
 export function checkoutPreferencesStorageKey(subdomain: string): string {
@@ -55,6 +59,14 @@ function parseStoredCheckoutPreferences(raw: string): StoredCheckoutPreferences 
       deliveryPlaceId:
         typeof parsed.deliveryPlaceId === 'string' ? parsed.deliveryPlaceId : null,
       customerName: typeof parsed.customerName === 'string' ? parsed.customerName : '',
+      customerPhoneCountryIso:
+        typeof parsed.customerPhoneCountryIso === 'string'
+          ? parsed.customerPhoneCountryIso
+          : DEFAULT_CHECKOUT_PHONE_COUNTRY_ISO,
+      customerPhoneLocal:
+        typeof parsed.customerPhoneLocal === 'string' ? parsed.customerPhoneLocal : '',
+      cashDenominationCents:
+        typeof parsed.cashDenominationCents === 'number' ? parsed.cashDenominationCents : null,
     };
   } catch {
     return null;
@@ -83,6 +95,9 @@ export function toStoredCheckoutPreferences(
     deliveryLongitude: fulfillment.deliveryLongitude,
     deliveryPlaceId: fulfillment.deliveryPlaceId,
     customerName: fulfillment.customerName,
+    customerPhoneCountryIso: fulfillment.customerPhoneCountryIso,
+    customerPhoneLocal: fulfillment.customerPhoneLocal,
+    cashDenominationCents: fulfillment.cashDenominationCents,
   };
 }
 
