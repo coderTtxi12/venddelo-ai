@@ -114,9 +114,15 @@ class DeliveryProviderPaymentMethodCreate(BaseModel):
     enabled: bool
 
 
-class InsidePolygonTariffsDTO(BaseModel):
+class InsideWeatherTariffsDTO(BaseModel):
     day_cents: int = Field(ge=0)
     night_cents: int = Field(ge=0)
+
+
+class InsidePolygonTariffsDTO(BaseModel):
+    none: InsideWeatherTariffsDTO
+    light: InsideWeatherTariffsDTO
+    heavy: InsideWeatherTariffsDTO
 
 
 class OutsideTariffBracketDTO(BaseModel):
