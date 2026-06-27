@@ -510,6 +510,10 @@
   text-align: center;
 }
 
+.sendOrderHintBlocked {
+  color: #b45309;
+}
+
 .sendOrderDesktop .sendOrderHint {
   text-align: left;
 }
