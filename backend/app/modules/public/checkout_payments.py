@@ -23,8 +23,13 @@ def enabled_public_payment_methods(
 
     if restaurant.delivery_enabled and delivery_resolved_available:
         if provider_methods:
-            for pm in provider_methods:
-                if pm.enabled:
+            provider_enabled = {pm.method for pm in provider_methods if pm.enabled}
+            for pm in restaurant_methods:
+                if (
+                    pm.service_type == "delivery"
+                    and pm.enabled
+                    and pm.method in provider_enabled
+                ):
                     enabled.append((pm.method, "delivery"))
         else:
             for pm in restaurant_methods:
