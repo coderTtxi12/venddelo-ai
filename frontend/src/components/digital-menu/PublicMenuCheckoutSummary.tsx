@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import type { CartQuote } from '@/lib/api/public';
-import type { Product, Promotion } from '@/lib/api/types';
+import type { Product, Promotion, RestaurantSchedule } from '@/lib/api/types';
 import {
   buildCheckoutLineBreakdowns,
   promotionDisplayName,
@@ -26,6 +26,11 @@ import {
   isCashDenominationValid,
   needsCashDenomination,
 } from '@/lib/digital-menu/checkout/cashDenomination';
+import {
+  buildCheckoutClosedMessage,
+  isRestaurantOpenForCheckout,
+  resolveCheckoutRestaurantOpenStatus,
+} from '@/lib/digital-menu/checkout/checkoutRestaurantHours';
 import type { CheckoutFulfillment } from '@/lib/digital-menu/checkout/fulfillment';
 import { isCustomerContactComplete } from '@/lib/digital-menu/checkout/fulfillment';
 import { submitPublicOrderBackground } from '@/lib/digital-menu/checkout/submitPublicOrderBackground';
@@ -46,6 +51,7 @@ type PublicMenuCheckoutSummaryProps = {
   restaurantName: string;
   restaurantLocation: WhatsAppRestaurantLocation;
   whatsappPhone: string | null;
+  schedules: RestaurantSchedule[];
   lines: PublicMenuCartLine[];
   quote: CartQuote;
   products: Product[];
@@ -171,11 +177,13 @@ function PriceRow({
 function SendOrderButton({
   disabled,
   disabledReason,
+  sendErrorMessage,
   onSend,
   variant,
 }: {
   disabled: boolean;
   disabledReason: string | null;
+  sendErrorMessage: string | null;
   onSend: () => void;
   variant: 'mobile' | 'desktop';
 }) {
@@ -191,7 +199,11 @@ function SendOrderButton({
         <WhatsappIcon className={styles.sendOrderIcon} />
         <span>Enviar pedido</span>
       </button>
-      {disabled && disabledReason ? (
+      {sendErrorMessage ? (
+        <p className={`${styles.sendOrderHint} ${styles.sendOrderHintBlocked}`} role="alert">
+          {sendErrorMessage}
+        </p>
+      ) : disabled && disabledReason ? (
         <p className={styles.sendOrderHint} role="status">
           {disabledReason}
         </p>
@@ -454,6 +466,7 @@ export function PublicMenuCheckoutSummary({
   restaurantName,
   restaurantLocation,
   whatsappPhone,
+  schedules,
   lines,
   quote,
   products,
@@ -467,6 +480,11 @@ export function PublicMenuCheckoutSummary({
 }: PublicMenuCheckoutSummaryProps) {
   const [collapsedLineIds, setCollapsedLineIds] = useState<Set<string>>(() => new Set());
   const [sendAttempted, setSendAttempted] = useState(false);
+  const [closedSendMessage, setClosedSendMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setClosedSendMessage(null);
+  }, [fulfillment.serviceType]);
 
   const productsById = useMemo(
     () => new Map(products.map((product) => [product.id, product])),
@@ -565,6 +583,14 @@ export function PublicMenuCheckoutSummary({
     }
     if (!canSendOrder) return;
 
+    const openStatus = resolveCheckoutRestaurantOpenStatus(schedules, new Date());
+    if (!isRestaurantOpenForCheckout(openStatus, schedules)) {
+      setClosedSendMessage(buildCheckoutClosedMessage(openStatus));
+      return;
+    }
+
+    setClosedSendMessage(null);
+
     const { orderId, idempotencyKey } = createCheckoutOrderRef();
 
     const message = formatWhatsAppOrderMessage({
@@ -654,6 +680,7 @@ export function PublicMenuCheckoutSummary({
               variant="desktop"
               disabled={!whatsappConfigured || lines.length === 0}
               disabledReason={sendDisabledReason}
+              sendErrorMessage={closedSendMessage}
               onSend={handleSendOrder}
             />
           </div>
@@ -676,6 +703,7 @@ export function PublicMenuCheckoutSummary({
           variant="mobile"
           disabled={!whatsappConfigured || lines.length === 0}
           disabledReason={sendDisabledReason}
+          sendErrorMessage={closedSendMessage}
           onSend={handleSendOrder}
         />
       </footer>
