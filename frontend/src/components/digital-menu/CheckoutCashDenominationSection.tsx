@@ -65,7 +65,7 @@ export function CheckoutCashDenominationSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderTotalCents]);
 
-  const validationMessage = `Indica con qué billete pagarás (mínimo ${formatMoney(orderTotalCents / 100, currency)})`;
+  const validationMessage = `Indica con qué monto pagarás (mínimo ${formatMoney(orderTotalCents / 100, currency)})`;
 
   const blockClass =
     variant === 'sidebar'
