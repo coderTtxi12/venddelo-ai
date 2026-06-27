@@ -2,7 +2,7 @@ from app.core.llm.ports import ChatCompletionMessage
 from app.infra.llm.stub_provider import StubLLMProvider
 from app.modules.assistant.prompts import ASSISTANT_SYSTEM_PROMPT
 from app.modules.assistant.schemas import AssistantChatHistoryMessage, AssistantChatRequest
-from app.modules.assistant.service import AssistantService
+from app.modules.assistant.service import AssistantService, aggregate_assistant_stream_output
 
 
 def test_build_messages_puts_system_prompt_first():
@@ -41,3 +41,22 @@ def test_format_sse():
     )
     assert payload.startswith("event: content.delta\n")
     assert '"delta": "Hola"' in payload
+
+
+def test_aggregate_assistant_stream_output_joins_tokens():
+    result = aggregate_assistant_stream_output(["Hola", " ", "mundo"])
+    assert result == {"content": "Hola mundo", "content_length": 10}
+
+
+def test_stream_chat_handles_client_disconnect_without_error(monkeypatch):
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+
+    service = AssistantService(provider=StubLLMProvider())
+    stream = service.stream_chat(
+        AssistantChatRequest(message="Hola"),
+        message_id="msg-close-1",
+    )
+
+    first = next(stream)
+    assert first.event == "content.delta"
+    stream.close()
