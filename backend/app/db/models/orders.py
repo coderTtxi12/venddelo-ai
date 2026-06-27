@@ -56,6 +56,7 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("delivery_providers.id", ondelete="SET NULL"),
         nullable=True,
     )
+    cash_denomination_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order", cascade="all, delete-orphan"

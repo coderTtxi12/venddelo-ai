@@ -59,6 +59,7 @@ class OrderCreate(BaseModel):
     delivery_latitude: float | None = None
     delivery_longitude: float | None = None
     delivery_fee_cents: int = 0
+    cash_denomination_cents: int | None = None
     cancellation_reason: str | None = None
     status: str = "pending"
     idempotency_key: str | None = None
@@ -86,6 +87,7 @@ class OrderDTO(BaseModel):
     delivery_latitude: float | None = None
     delivery_longitude: float | None = None
     delivery_fee_cents: int = 0
+    cash_denomination_cents: int | None = None
     cancellation_reason: str | None = None
     idempotency_key: str | None = None
     note: str | None = None
@@ -109,6 +111,7 @@ class PublicOrderInput(BaseModel):
     delivery_latitude: float | None = None
     delivery_longitude: float | None = None
     delivery_fee_cents: int = 0
+    cash_denomination_cents: int | None = None
     note: str | None = None
     items: list[PublicOrderItemInput]
 
