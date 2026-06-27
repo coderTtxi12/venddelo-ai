@@ -121,10 +121,16 @@ export type OutsideTariffBracket = {
   rain_heavy_cents: number;
 };
 
+export type InsideWeatherTariffs = {
+  day_cents: number;
+  night_cents: number;
+};
+
 export type DeliveryProviderPricingConfig = {
   inside_polygon: {
-    day_cents: number;
-    night_cents: number;
+    none: InsideWeatherTariffs;
+    light: InsideWeatherTariffs;
+    heavy: InsideWeatherTariffs;
   };
   outside_polygon: {
     max_distance_km: number;
