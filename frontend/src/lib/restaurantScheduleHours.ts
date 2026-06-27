@@ -31,8 +31,8 @@ export type ServiceHoursBlock = {
 
 const TIME_RE = /^(\d{1,2}):(\d{2})/;
 
-export function getTodayDayIndex(): number {
-  const jsDay = new Date().getDay();
+export function getTodayDayIndex(now = new Date()): number {
+  const jsDay = now.getDay();
   return jsDay === 0 ? 6 : jsDay - 1;
 }
 
@@ -263,7 +263,7 @@ export function resolveRestaurantOpenStatus(
     return { state: 'unknown', label: 'Horario no configurado' };
   }
 
-  const todayIndex = getTodayDayIndex();
+  const todayIndex = getTodayDayIndex(now);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const todaySlots = relevant
     .filter((entry) => entry.day_of_week === todayIndex)
