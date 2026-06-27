@@ -202,8 +202,16 @@ export function PublicMenuCheckoutDetails({
         (!deliverySelectable ? deliveryServiceReason : null)
       : null;
 
+  const deliveryPaymentReady =
+    deliveryQuote?.available === true &&
+    fulfillment.deliveryFeeCents != null &&
+    !deliveryQuoteLoading &&
+    !deliveryBlockingReason;
+
   const showPaymentSection =
-    fulfillment.serviceType !== 'delivery' || deliverySelectable;
+    fulfillment.serviceType === 'takeout'
+      ? true
+      : deliverySelectable && deliveryPaymentReady;
 
   const validationIssues = useMemo(
     (): CheckoutValidationIssue[] =>
@@ -584,9 +592,9 @@ export function PublicMenuCheckoutDetails({
           </h2>
           {paymentMethods.length === 0 ? (
             <p className={styles.emptyPayment}>
-              No hay métodos de pago disponibles para{' '}
-              {RESTAURANT_SERVICE_LABELS[fulfillment.serviceType].toLowerCase()}. Contacta al
-              restaurante.
+              {fulfillment.serviceType === 'delivery'
+                ? 'Este restaurante no tiene métodos de pago disponibles para entrega a domicilio. Contacta al restaurante.'
+                : 'No hay métodos de pago disponibles para recoger en el local. Contacta al restaurante.'}
             </p>
           ) : (
             <ul
