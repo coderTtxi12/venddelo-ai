@@ -1,6 +1,11 @@
 import type { CheckoutFulfillment } from './fulfillment';
+import { isCustomerPhoneLocalValid } from './customerPhone';
 
-export type CheckoutValidationField = 'customerName' | 'deliveryAddress' | 'paymentMethod';
+export type CheckoutValidationField =
+  | 'customerName'
+  | 'customerPhone'
+  | 'deliveryAddress'
+  | 'paymentMethod';
 
 export type CheckoutValidationIssue = {
   field: CheckoutValidationField;
@@ -29,6 +34,14 @@ export function getCheckoutValidationIssues({
     issues.push({
       field: 'customerName',
       message: 'Ingresa tu nombre para continuar',
+      sectionId: 'checkout-contact-heading',
+    });
+  }
+
+  if (!isCustomerPhoneLocalValid(fulfillment.customerPhoneLocal)) {
+    issues.push({
+      field: 'customerPhone',
+      message: 'Ingresa tu número de WhatsApp para continuar',
       sectionId: 'checkout-contact-heading',
     });
   }
@@ -85,6 +98,8 @@ export function checkoutValidationBannerMessage(issues: CheckoutValidationIssue[
     switch (issue.field) {
       case 'customerName':
         return 'tu nombre';
+      case 'customerPhone':
+        return 'tu WhatsApp';
       case 'deliveryAddress':
         return 'tu dirección de entrega';
       case 'paymentMethod':
