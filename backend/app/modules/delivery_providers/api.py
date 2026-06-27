@@ -41,7 +41,10 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeliveryProviderSe
 def _partnership_service(
     uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> DeliveryPartnershipService:
-    return DeliveryPartnershipService(SqlAlchemyDeliveryProviderRepository(uow.session))
+    return DeliveryPartnershipService(
+        SqlAlchemyDeliveryProviderRepository(uow.session),
+        restaurant_repo=uow.restaurants,
+    )
 
 
 @router.get("/me", response_model=DeliveryProviderMeResponse)
