@@ -55,6 +55,26 @@ def _hash_public_order(data: PublicOrderInput) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
+def _resolve_cash_denomination_cents(
+    data: PublicOrderInput,
+    *,
+    order_total_cents: int,
+) -> int | None:
+    requires_denomination = data.type == "delivery" and data.payment_method == "cash"
+    if requires_denomination:
+        if data.cash_denomination_cents is None:
+            raise ValidationError("cash_denomination_cents is required for delivery cash orders")
+        if data.cash_denomination_cents <= 0:
+            raise ValidationError("cash_denomination_cents must be positive")
+        if data.cash_denomination_cents < order_total_cents:
+            raise ValidationError("cash_denomination_cents must be at least the order total")
+        return data.cash_denomination_cents
+
+    if data.cash_denomination_cents is not None:
+        raise ValidationError("cash_denomination_cents is only allowed for delivery cash orders")
+    return None
+
+
 def _promo_display_name(promo: PromotionDTO) -> str:
     if promo.name.startswith(CATALOG_DISCOUNT_PREFIX):
         return "Descuento de producto"
@@ -405,6 +425,10 @@ class OrderService:
             raise ValidationError("delivery_fee_cents is only allowed for delivery orders")
 
         order_total = lines_total + delivery_fee_cents
+        cash_denomination_cents = _resolve_cash_denomination_cents(
+            data,
+            order_total_cents=order_total,
+        )
 
         delivery_latitude = data.delivery_latitude if data.type == "delivery" else None
         delivery_longitude = data.delivery_longitude if data.type == "delivery" else None
@@ -430,6 +454,7 @@ class OrderService:
                 delivery_latitude=delivery_latitude,
                 delivery_longitude=delivery_longitude,
                 delivery_fee_cents=delivery_fee_cents,
+                cash_denomination_cents=cash_denomination_cents,
                 note=data.note,
                 idempotency_key=idempotency_key,
                 items=order_items,

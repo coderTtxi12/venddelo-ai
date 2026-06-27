@@ -91,8 +91,9 @@ def test_public_live_menu_order_persists_all_details(client, engine):
     order_body = {
         "type": "delivery",
         "customer_name": "Oliver",
-        "customer_phone": "whatsapp",
+        "customer_phone": "+525512345678",
         "payment_method": "cash",
+        "cash_denomination_cents": 100000,
         "delivery_address": delivery_address,
         "delivery_latitude": 19.686433560420415,
         "delivery_longitude": -99.12609887948815,
@@ -118,8 +119,9 @@ def test_public_live_menu_order_persists_all_details(client, engine):
     assert created["restaurant_id"] == str(restaurant_id)
     assert created["type"] == "delivery"
     assert created["customer_name"] == "Oliver"
-    assert created["customer_phone"] == "whatsapp"
+    assert created["customer_phone"] == "+525512345678"
     assert created["payment_method"] == "cash"
+    assert created["cash_denomination_cents"] == 100000
     assert created["delivery_address"] == delivery_address
     assert created["delivery_latitude"] == 19.686433560420415
     assert created["delivery_longitude"] == -99.12609887948815
@@ -145,6 +147,8 @@ def test_public_live_menu_order_persists_all_details(client, engine):
     )
     assert list_resp.status_code == 200
     listed = list_resp.json()["items"]
+    listed_order = next(row for row in listed if row["id"] == created["id"])
+    assert listed_order["customer_phone"] == "+525512345678"
     assert any(row["id"] == created["id"] for row in listed)
 
     get_resp = client.get(
@@ -153,6 +157,7 @@ def test_public_live_menu_order_persists_all_details(client, engine):
     )
     assert get_resp.status_code == 200
     fetched = get_resp.json()
+    assert fetched["customer_phone"] == "+525512345678"
     assert fetched["restaurant_id"] == str(restaurant_id)
     assert fetched["delivery_address"] == delivery_address
     assert fetched["items"][0]["selected_options"] == {str(group_id): [str(option_id)]}
@@ -212,7 +217,7 @@ def test_public_live_menu_order_allowed_for_draft_restaurant(client, engine):
         json={
             "type": "takeout",
             "customer_name": "Oliver",
-            "customer_phone": "whatsapp",
+            "customer_phone": "+525512345678",
             "payment_method": "cash",
             "items": [{"product_id": str(product_id), "quantity": 1}],
         },
@@ -263,7 +268,7 @@ def test_public_live_menu_order_rejected_when_restaurant_suspended(client, engin
         json={
             "type": "takeout",
             "customer_name": "Oliver",
-            "customer_phone": "whatsapp",
+            "customer_phone": "+525512345678",
             "payment_method": "cash",
             "items": [{"product_id": str(product_id), "quantity": 1}],
         },
@@ -336,8 +341,9 @@ def test_public_live_menu_order_persists_line_and_order_discount_snapshots(clien
     order_body = {
         "type": "delivery",
         "customer_name": "Oliver",
-        "customer_phone": "whatsapp",
+        "customer_phone": "+525512345678",
         "payment_method": "cash",
+        "cash_denomination_cents": 100000,
         "delivery_address": "Tultepec, State of Mexico, Mexico",
         "delivery_fee_cents": 3500,
         "items": [{"product_id": str(product_id), "quantity": 1}],
@@ -364,4 +370,73 @@ def test_public_live_menu_order_persists_line_and_order_discount_snapshots(clien
         created["total_cents"]
         == created["subtotal_cents"] - created["discount_cents"] + created["delivery_fee_cents"]
     )
+
+
+@requires_db
+def test_public_live_menu_delivery_cash_requires_denomination(client, engine):
+    me = client.get("/api/v1/users/me", headers=AUTH)
+    assert me.status_code == 200
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    subdomain = "wildrooster-cash-denom"
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restaurant = uow.restaurants.add(
+            RestaurantCreate(
+                name="Wild Rooster Cash",
+                subdomain=subdomain,
+                status="published",
+                takeout_enabled=True,
+                delivery_enabled=True,
+            ),
+            owner_id=OWNER,
+        )
+        uow.restaurants.set_payment_methods(
+            restaurant.id,
+            [PaymentMethodCreate(method="cash", service_type="delivery")],
+        )
+        cat = uow.menu.add_category(
+            CategoryCreate(restaurant_id=restaurant.id, name="Burgers"),
+        )
+        product = uow.menu.add_product(
+            ProductCreate(
+                restaurant_id=restaurant.id,
+                name="Burger",
+                price_cents=10000,
+                approval_status="approved",
+                is_published=True,
+                category_ids=[cat.id],
+            )
+        )
+        product_id = product.id
+        uow.commit()
+
+    missing = client.post(
+        f"/api/v1/public/menu/{subdomain}/orders",
+        json={
+            "type": "delivery",
+            "customer_name": "Oliver",
+            "customer_phone": "+525512345678",
+            "payment_method": "cash",
+            "delivery_address": "Tultepec, State of Mexico, Mexico",
+            "items": [{"product_id": str(product_id), "quantity": 1}],
+        },
+    )
+    assert missing.status_code == 400
+    assert "cash_denomination_cents" in missing.json()["error"]["message"]
+
+    too_low = client.post(
+        f"/api/v1/public/menu/{subdomain}/orders",
+        json={
+            "type": "delivery",
+            "customer_name": "Oliver",
+            "customer_phone": "+525512345678",
+            "payment_method": "cash",
+            "cash_denomination_cents": 5000,
+            "delivery_address": "Tultepec, State of Mexico, Mexico",
+            "items": [{"product_id": str(product_id), "quantity": 1}],
+        },
+    )
+    assert too_low.status_code == 400
+    assert "at least the order total" in too_low.json()["error"]["message"]
 
