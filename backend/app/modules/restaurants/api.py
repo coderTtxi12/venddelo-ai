@@ -37,7 +37,10 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> RestaurantService:
 
 
 def _partnership_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeliveryPartnershipService:
-    return DeliveryPartnershipService(SqlAlchemyDeliveryProviderRepository(uow.session))
+    return DeliveryPartnershipService(
+        SqlAlchemyDeliveryProviderRepository(uow.session),
+        restaurant_repo=uow.restaurants,
+    )
 
 
 def _maybe_request_mexy_delivery(
@@ -146,7 +149,9 @@ def set_payment_methods(
     methods: list[PaymentMethodCreate],
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: RestaurantService = Depends(_service),
+    partnership: DeliveryPartnershipService = Depends(_partnership_service),
 ) -> None:
+    partnership.validate_restaurant_payment_methods(restaurant.id, methods)
     service.set_payment_methods(restaurant.id, methods)
 
 
@@ -154,7 +159,9 @@ def set_payment_methods(
 def list_payment_methods(
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: RestaurantService = Depends(_service),
+    partnership: DeliveryPartnershipService = Depends(_partnership_service),
 ) -> list[PaymentMethodDTO]:
+    partnership.ensure_restaurant_delivery_payment_methods(restaurant.id)
     return service.list_payment_methods(restaurant.id)
 
 
