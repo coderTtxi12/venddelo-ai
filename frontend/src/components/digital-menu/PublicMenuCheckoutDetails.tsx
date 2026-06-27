@@ -40,6 +40,7 @@ import {
   type RestaurantServiceType,
 } from '@/lib/restaurantServices';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
+import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
 import { CheckoutDeliveryAddressPicker } from './CheckoutDeliveryAddressPicker';
 import styles from './PublicMenuCheckoutDetails.module.css';
 
@@ -84,6 +85,7 @@ export function PublicMenuCheckoutDetails({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [addressTouched, setAddressTouched] = useState(false);
   const [customerTouched, setCustomerTouched] = useState(false);
+  const [customerPhoneTouched, setCustomerPhoneTouched] = useState(false);
   const [validationAttempted, setValidationAttempted] = useState(false);
   const [continueBtnAttention, setContinueBtnAttention] = useState(false);
   const preferencesHydratedRef = useRef(false);
@@ -232,6 +234,10 @@ export function PublicMenuCheckoutDetails({
     (customerTouched || validationAttempted) &&
     checkoutFieldHasIssue(validationIssues, 'customerName');
 
+  const showCustomerPhoneError =
+    (customerPhoneTouched || validationAttempted) &&
+    checkoutFieldHasIssue(validationIssues, 'customerPhone');
+
   const showAddressValidation =
     (addressTouched || validationAttempted) &&
     checkoutFieldHasIssue(validationIssues, 'deliveryAddress');
@@ -252,6 +258,7 @@ export function PublicMenuCheckoutDetails({
 
     setValidationAttempted(true);
     setCustomerTouched(true);
+    setCustomerPhoneTouched(true);
     if (fulfillment.serviceType === 'delivery') {
       setAddressTouched(true);
     }
@@ -275,6 +282,7 @@ export function PublicMenuCheckoutDetails({
     const keepsPayment =
       fulfillment.paymentMethod != null &&
       nextPaymentMethods.includes(fulfillment.paymentMethod);
+    const nextPaymentMethod = keepsPayment ? fulfillment.paymentMethod : (nextPaymentMethods[0] ?? null);
     persistFulfillment({
       serviceType,
       ...(serviceType === 'delivery'
@@ -287,8 +295,14 @@ export function PublicMenuCheckoutDetails({
             deliveryFeeCents: fulfillment.deliveryFeeCents,
           }
         : EMPTY_DELIVERY_LOCATION),
-      paymentMethod: keepsPayment ? fulfillment.paymentMethod : (nextPaymentMethods[0] ?? null),
+      paymentMethod: nextPaymentMethod,
       customerName: fulfillment.customerName,
+      customerPhoneCountryIso: fulfillment.customerPhoneCountryIso,
+      customerPhoneLocal: fulfillment.customerPhoneLocal,
+      cashDenominationCents:
+        serviceType === 'delivery' && nextPaymentMethod === 'cash'
+          ? fulfillment.cashDenominationCents
+          : null,
     });
     setAddressTouched(false);
     setValidationAttempted(false);
