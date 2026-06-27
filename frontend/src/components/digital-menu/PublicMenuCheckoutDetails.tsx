@@ -360,43 +360,77 @@ export function PublicMenuCheckoutDetails({
             sectionRefs.current['checkout-contact-heading'] = node;
           }}
           className={`${styles.section} ${
-            showCustomerNameError ? styles.sectionNeedsAttention : ''
+            showCustomerNameError || showCustomerPhoneError ? styles.sectionNeedsAttention : ''
           }`}
           aria-labelledby="checkout-contact-heading"
         >
           <h2 id="checkout-contact-heading" className={styles.sectionTitle}>
-            ¿Cómo te llamas?
+            Tus datos de contacto
           </h2>
           <p className={styles.sectionHint}>
-            El restaurante requiere tu nombre para enviar el pedido por WhatsApp.
+            El restaurante necesita tu nombre y WhatsApp para confirmar y dar seguimiento a tu pedido.
           </p>
 
-          <label className={styles.addressField} htmlFor="checkout-customer-name">
-            <span className={styles.fieldLabel}>Nombre</span>
-            <input
-              id="checkout-customer-name"
-              type="text"
-              className={`${styles.textInput} ${
-                showCustomerNameError ? styles.fieldInputNeedsAttention : ''
-              }`}
-              autoComplete="name"
-              value={fulfillment.customerName}
-              onChange={(event) =>
-                persistFulfillment({
-                  ...fulfillment,
-                  customerName: event.target.value,
-                })
-              }
-              onBlur={() => setCustomerTouched(true)}
-              placeholder="Tu nombre"
-              aria-invalid={showCustomerNameError}
-            />
-            {showCustomerNameError ? (
-              <p className={styles.fieldError} role="alert">
-                Ingresa tu nombre para continuar
-              </p>
-            ) : null}
-          </label>
+          <div className={styles.contactFields}>
+            <label className={styles.addressField} htmlFor="checkout-customer-name">
+              <span className={styles.fieldLabel}>Nombre</span>
+              <input
+                id="checkout-customer-name"
+                type="text"
+                className={`${styles.textInput} ${
+                  showCustomerNameError ? styles.fieldInputNeedsAttention : ''
+                }`}
+                autoComplete="name"
+                value={fulfillment.customerName}
+                onChange={(event) =>
+                  persistFulfillment({
+                    ...fulfillment,
+                    customerName: event.target.value,
+                  })
+                }
+                onBlur={() => setCustomerTouched(true)}
+                placeholder="Tu nombre"
+                aria-invalid={showCustomerNameError}
+              />
+              {showCustomerNameError ? (
+                <p className={styles.fieldError} role="alert">
+                  Ingresa tu nombre para continuar
+                </p>
+              ) : null}
+            </label>
+
+            <div className={styles.addressField}>
+              <span id="checkout-customer-whatsapp-label" className={styles.fieldLabel}>
+                WhatsApp
+              </span>
+              <PhoneInputWithCountry
+                variant="digitalMenu"
+                hasError={showCustomerPhoneError}
+                countryIso={fulfillment.customerPhoneCountryIso}
+                localNumber={fulfillment.customerPhoneLocal}
+                placeholder="55 1234 5678"
+                hint="Incluye solo el número local, sin lada."
+                onCountryChange={(iso) =>
+                  persistFulfillment({
+                    ...fulfillment,
+                    customerPhoneCountryIso: iso,
+                  })
+                }
+                onLocalNumberChange={(value) =>
+                  persistFulfillment({
+                    ...fulfillment,
+                    customerPhoneLocal: value,
+                  })
+                }
+                onLocalNumberBlur={() => setCustomerPhoneTouched(true)}
+              />
+              {showCustomerPhoneError ? (
+                <p className={styles.fieldError} role="alert">
+                  Ingresa tu número de WhatsApp para continuar
+                </p>
+              ) : null}
+            </div>
+          </div>
         </section>
 
         <section className={styles.section} aria-labelledby="checkout-service-heading">
