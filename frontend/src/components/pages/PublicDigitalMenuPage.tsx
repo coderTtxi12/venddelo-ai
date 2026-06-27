@@ -803,6 +803,13 @@ export default function PublicDigitalMenuPage({
               <PublicMenuCart
                 subdomain={subdomain}
                 restaurantName={restaurant.name}
+                restaurantLocation={{
+                  name: restaurant.name,
+                  address: restaurant.address,
+                  latitude: restaurant.latitude,
+                  longitude: restaurant.longitude,
+                  place_id: restaurant.place_id,
+                }}
                 whatsappPhone={restaurant.whatsapp_phone}
                 lines={cart.lines}
                 validProductIds={validProductIds}
@@ -1043,6 +1050,13 @@ export default function PublicDigitalMenuPage({
             <PublicMenuCart
               subdomain={subdomain}
               restaurantName={restaurant.name}
+              restaurantLocation={{
+                name: restaurant.name,
+                address: restaurant.address,
+                latitude: restaurant.latitude,
+                longitude: restaurant.longitude,
+                place_id: restaurant.place_id,
+              }}
               whatsappPhone={restaurant.whatsapp_phone}
               lines={cart.lines}
               validProductIds={validProductIds}

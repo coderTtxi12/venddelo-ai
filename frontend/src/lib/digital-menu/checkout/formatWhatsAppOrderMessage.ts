@@ -12,13 +12,23 @@ import {
   PAYMENT_METHOD_LABELS,
 } from '@/lib/restaurantPaymentConfig';
 import { RESTAURANT_SERVICE_LABELS } from '@/lib/restaurantServices';
-import type { CheckoutFulfillment } from './fulfillment';
-import { buildGoogleMapsDeliveryUrl } from './buildGoogleMapsDeliveryUrl';
+import {
+  buildCheckoutCustomerPhoneE164,
+  formatOrderCustomerPhone,
+} from '@/lib/digital-menu/checkout/customerPhone';
+import type { Restaurant } from '@/lib/api/types';
+import { buildGoogleMapsLink } from '@/lib/googleMaps';
 import { formatCheckoutOrderIdLabel } from './createCheckoutOrderRef';
+
+export type WhatsAppRestaurantLocation = Pick<
+  Restaurant,
+  'name' | 'address' | 'latitude' | 'longitude' | 'place_id'
+>;
 
 export type WhatsAppOrderMessageInput = {
   orderId: string;
   restaurantName: string;
+  restaurantLocation?: WhatsAppRestaurantLocation | null;
   currency: string;
   lines: PublicMenuCartLine[];
   quote: CartQuote;
@@ -84,6 +94,7 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
   const {
     orderId,
     restaurantName,
+    restaurantLocation,
     currency,
     lines,
     quote,
@@ -123,6 +134,7 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
     `${bold('Pedido')} ${formatCheckoutOrderIdLabel(orderId)}`,
     '',
     `${bold('Cliente:')} ${fulfillment.customerName.trim()}`,
+    `${bold('WhatsApp:')} ${formatOrderCustomerPhone(buildCheckoutCustomerPhoneE164(fulfillment))}`,
     '',
     `${bold('Tipo de pedido:')} ${RESTAURANT_SERVICE_LABELS[fulfillment.serviceType]}`,
   ];
@@ -133,15 +145,37 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
     if (details) {
       parts.push(`${bold('Referencias:')} ${details}`);
     }
-    const mapsUrl = buildGoogleMapsDeliveryUrl(fulfillment);
-    if (mapsUrl) {
+    const deliveryMapsUrl = buildGoogleMapsDeliveryUrl(fulfillment);
+    if (deliveryMapsUrl) {
       parts.push(`${bold('Ubicación en mapa:')}`);
-      parts.push(mapsUrl);
+      parts.push(deliveryMapsUrl);
+    }
+
+    const restaurantMapsUrl = restaurantLocation
+      ? buildGoogleMapsLink(restaurantLocation)
+      : null;
+    if (restaurantMapsUrl) {
+      parts.push(`${bold('Ubicación del restaurante:')}`);
+      parts.push(restaurantMapsUrl);
     }
   }
 
   if (fulfillment.paymentMethod) {
     parts.push(`${bold('Método de pago:')} ${PAYMENT_METHOD_LABELS[fulfillment.paymentMethod]}`);
+  }
+
+  if (
+    fulfillment.serviceType === 'delivery' &&
+    fulfillment.paymentMethod === 'cash' &&
+    fulfillment.cashDenominationCents != null
+  ) {
+    parts.push(
+      `${bold('Pagará con:')} ${formatMoney(fulfillment.cashDenominationCents / 100, currency)}`,
+    );
+    const changeCents = fulfillment.cashDenominationCents - Math.round(grandTotal * 100);
+    if (changeCents > 0) {
+      parts.push(`${bold('Cambio:')} ${formatMoney(changeCents / 100, currency)}`);
+    }
   }
 
   parts.push('', '——————————————', bold('DETALLE DEL PEDIDO'), '');
