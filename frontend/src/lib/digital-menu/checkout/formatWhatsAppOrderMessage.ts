@@ -16,14 +16,15 @@ import {
   buildCheckoutCustomerPhoneE164,
   formatOrderCustomerPhone,
 } from '@/lib/digital-menu/checkout/customerPhone';
-import type { Restaurant } from '@/lib/api/types';
-import { buildGoogleMapsLink } from '@/lib/googleMaps';
+import {
+  buildGoogleMapsDeliveryUrl,
+  buildGoogleMapsRestaurantUrl,
+  type RestaurantMapLocation,
+} from './buildGoogleMapsDeliveryUrl';
+import type { CheckoutFulfillment } from './fulfillment';
 import { formatCheckoutOrderIdLabel } from './createCheckoutOrderRef';
 
-export type WhatsAppRestaurantLocation = Pick<
-  Restaurant,
-  'name' | 'address' | 'latitude' | 'longitude' | 'place_id'
->;
+export type WhatsAppRestaurantLocation = RestaurantMapLocation;
 
 export type WhatsAppOrderMessageInput = {
   orderId: string;
@@ -151,9 +152,7 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
       parts.push(deliveryMapsUrl);
     }
 
-    const restaurantMapsUrl = restaurantLocation
-      ? buildGoogleMapsLink(restaurantLocation)
-      : null;
+    const restaurantMapsUrl = buildGoogleMapsRestaurantUrl(restaurantLocation);
     if (restaurantMapsUrl) {
       parts.push(`${bold('Ubicación del restaurante:')}`);
       parts.push(restaurantMapsUrl);
