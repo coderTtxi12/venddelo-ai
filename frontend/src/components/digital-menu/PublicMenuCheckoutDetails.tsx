@@ -612,6 +612,8 @@ export function PublicMenuCheckoutDetails({
                         persistFulfillment({
                           ...fulfillment,
                           paymentMethod: method,
+                          cashDenominationCents:
+                            method === 'cash' ? fulfillment.cashDenominationCents : null,
                         })
                       }
                     >
