@@ -339,7 +339,9 @@ def test_delivery_provider_pricing_defaults_and_simulate(client):
     assert pricing.status_code == 200
     body = pricing.json()
     assert body["weather_mode"] == "none"
-    assert body["config"]["inside_polygon"]["day_cents"] == 3500
+    assert body["config"]["inside_polygon"]["none"]["day_cents"] == 3500
+    assert body["config"]["inside_polygon"]["light"]["day_cents"] == 5000
+    assert body["config"]["inside_polygon"]["heavy"]["night_cents"] == 10000
     assert len(body["config"]["outside_polygon"]["brackets"]) == 18
 
     simulate_inside = client.post(

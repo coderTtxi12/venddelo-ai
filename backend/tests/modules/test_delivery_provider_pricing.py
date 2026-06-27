@@ -36,10 +36,53 @@ def test_inside_polygon_night_quote():
         inside_polygon=True,
         distance_km=None,
         is_night=True,
-        weather_mode="heavy",
+        weather_mode="none",
     )
     assert quote.available is True
     assert quote.total_cents == 5000
+
+
+def test_inside_polygon_heavy_rain_night_quote():
+    config = default_pricing_config()
+    quote = quote_delivery_fee(
+        config,
+        inside_polygon=True,
+        distance_km=None,
+        is_night=True,
+        weather_mode="heavy",
+    )
+    assert quote.available is True
+    assert quote.total_cents == 10000
+
+
+def test_inside_polygon_light_rain_day_quote():
+    config = default_pricing_config()
+    quote = quote_delivery_fee(
+        config,
+        inside_polygon=True,
+        distance_km=None,
+        is_night=False,
+        weather_mode="light",
+    )
+    assert quote.available is True
+    assert quote.total_cents == 5000
+
+
+def test_inside_polygon_legacy_json_format():
+    from app.modules.delivery_providers.pricing import config_from_json
+
+    config = config_from_json(
+        {
+            "inside_polygon": {"day_cents": 3500, "night_cents": 5000},
+            "outside_polygon": {
+                "max_distance_km": 20,
+                "brackets": [],
+            },
+        }
+    )
+    assert config.inside_polygon.none.day_cents == 3500
+    assert config.inside_polygon.light.day_cents == 5000
+    assert config.inside_polygon.heavy.night_cents == 10000
 
 
 def test_outside_rain_light_quote():
@@ -100,6 +143,10 @@ def test_outside_bracket_uses_next_tier_after_3km():
 def test_validate_pricing_config_rejects_negative():
     config = default_pricing_config()
     broken = default_pricing_config()
-    object.__setattr__(broken.inside_polygon, "day_cents", -1)
+    object.__setattr__(
+        broken.inside_polygon,
+        "none",
+        type(broken.inside_polygon.none)(day_cents=-1, night_cents=5000),
+    )
     with pytest.raises(ValueError):
         validate_pricing_config(broken)
