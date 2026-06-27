@@ -1,7 +1,9 @@
 import type { PublicOrderInput } from '@/lib/api/public';
 import { selectionsToQuoteApi } from '@/lib/digital-menu/cart/cartQuotePayload';
 import type { PublicMenuCartLine } from '@/lib/digital-menu/cart/types';
-import { WHATSAPP_PENDING_CUSTOMER_PHONE, formatDeliveryAddressForOrder, type CheckoutFulfillment } from './fulfillment';
+import { buildCheckoutCustomerPhoneE164 } from '@/lib/digital-menu/checkout/customerPhone';
+import { needsCashDenomination } from '@/lib/digital-menu/checkout/cashDenomination';
+import { formatDeliveryAddressForOrder, type CheckoutFulfillment } from './fulfillment';
 import { formatCheckoutOrderIdLabel } from './createCheckoutOrderRef';
 
 export function buildPublicOrderInput(
@@ -35,7 +37,7 @@ export function buildPublicOrderInput(
   return {
     type: fulfillment.serviceType,
     customer_name: fulfillment.customerName.trim(),
-    customer_phone: WHATSAPP_PENDING_CUSTOMER_PHONE,
+    customer_phone: buildCheckoutCustomerPhoneE164(fulfillment),
     payment_method: fulfillment.paymentMethod!,
     delivery_address: deliveryAddress,
     delivery_latitude:
@@ -43,6 +45,10 @@ export function buildPublicOrderInput(
     delivery_longitude:
       fulfillment.serviceType === 'delivery' ? fulfillment.deliveryLongitude ?? undefined : undefined,
     delivery_fee_cents: deliveryFeeCents > 0 ? deliveryFeeCents : undefined,
+    cash_denomination_cents:
+      needsCashDenomination(fulfillment) && fulfillment.cashDenominationCents != null
+        ? fulfillment.cashDenominationCents
+        : undefined,
     note: noteParts.length > 0 ? noteParts.join(' | ') : undefined,
     items: lines.map((line) => ({
       product_id: line.productId,

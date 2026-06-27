@@ -119,6 +119,7 @@ export type PublicOrderInput = {
   delivery_latitude?: number;
   delivery_longitude?: number;
   delivery_fee_cents?: number;
+  cash_denomination_cents?: number;
   note?: string;
   items: PublicOrderItemInput[];
 };

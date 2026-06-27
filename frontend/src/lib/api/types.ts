@@ -244,6 +244,7 @@ export type Order = {
   delivery_latitude: number | null;
   delivery_longitude: number | null;
   delivery_fee_cents: number;
+  cash_denomination_cents: number | null;
   cancellation_reason: string | null;
   idempotency_key: string | null;
   note: string | null;
