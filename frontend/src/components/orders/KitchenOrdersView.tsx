@@ -27,6 +27,7 @@ import {
   formatOrderTypeLabel,
   resolveOrderItemOptions,
   resolveOrderItemDiscounts,
+  orderItemPreDiscountCents,
   buildOrderTotalsBreakdown,
   splitOrderNote,
 } from '@/lib/orders/orderDisplay';
