@@ -57,10 +57,9 @@ function allocateStackedDiscountCents(
     : null;
 
   if (bundlePromo && catalogPerUnit > 0) {
-    const catalogCents = Math.min(catalogPerUnit * item.quantity, actualTotalDiscount);
     return {
-      catalogCents,
-      bundleCents: actualTotalDiscount - catalogCents,
+      catalogCents: catalogPerUnit * item.quantity,
+      bundleCents: item.discount_cents,
       bundlePromo,
     };
   }
