@@ -809,6 +809,7 @@ export default function PublicDigitalMenuPage({
                   longitude: restaurant.longitude,
                 }}
                 whatsappPhone={restaurant.whatsapp_phone}
+                schedules={schedules}
                 lines={cart.lines}
                 validProductIds={validProductIds}
                 products={products}
@@ -1054,6 +1055,7 @@ export default function PublicDigitalMenuPage({
                 longitude: restaurant.longitude,
               }}
               whatsappPhone={restaurant.whatsapp_phone}
+              schedules={schedules}
               lines={cart.lines}
               validProductIds={validProductIds}
               products={products}
