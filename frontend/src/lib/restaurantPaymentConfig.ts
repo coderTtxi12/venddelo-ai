@@ -60,6 +60,18 @@ export function providerPaymentMethodsToDeliveryMatrix(
   return delivery;
 }
 
+/** Keep restaurant toggles only where the courier still offers the method. */
+export function clampDeliveryMatrixToProviderAvailable(
+  delivery: PaymentMethodMatrix['delivery'],
+  providerAvailable: PaymentMethodMatrix['delivery'],
+): PaymentMethodMatrix['delivery'] {
+  return {
+    cash: delivery.cash && providerAvailable.cash,
+    transfer: delivery.transfer && providerAvailable.transfer,
+    card_terminal: delivery.card_terminal && providerAvailable.card_terminal,
+  };
+}
+
 export function matrixToPaymentCreates(
   matrix: PaymentMethodMatrix,
   options?: { serviceTypes?: RestaurantServiceType[] },
