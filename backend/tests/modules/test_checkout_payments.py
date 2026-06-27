@@ -39,6 +39,18 @@ def test_delivery_uses_provider_payment_methods_when_partnership_active():
             service_type="takeout",
             enabled=True,
         ),
+        PaymentMethodDTO(
+            id=uuid.uuid4(),
+            method="cash",
+            service_type="delivery",
+            enabled=True,
+        ),
+        PaymentMethodDTO(
+            id=uuid.uuid4(),
+            method="transfer",
+            service_type="delivery",
+            enabled=False,
+        ),
     ]
     provider_methods = [
         DeliveryProviderPaymentMethodDTO(id=uuid.uuid4(), method="cash", enabled=True),
@@ -56,6 +68,30 @@ def test_delivery_uses_provider_payment_methods_when_partnership_active():
     assert ("cash", "delivery") in enabled
     assert ("transfer", "delivery") not in enabled
     assert is_public_payment_method_enabled(
+        restaurant,
+        restaurant_methods,
+        order_type="delivery",
+        payment_method="cash",
+        delivery_resolved_available=True,
+        provider_methods=provider_methods,
+    )
+
+
+def test_delivery_requires_restaurant_and_provider_when_partnership_active():
+    restaurant = _restaurant()
+    restaurant_methods = [
+        PaymentMethodDTO(
+            id=uuid.uuid4(),
+            method="cash",
+            service_type="delivery",
+            enabled=False,
+        ),
+    ]
+    provider_methods = [
+        DeliveryProviderPaymentMethodDTO(id=uuid.uuid4(), method="cash", enabled=True),
+    ]
+
+    assert not is_public_payment_method_enabled(
         restaurant,
         restaurant_methods,
         order_type="delivery",
