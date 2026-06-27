@@ -23,7 +23,7 @@ import {
   validateCartAgainstMenu,
 } from '@/lib/digital-menu/cart/freshMenuAvailability';
 import type { PublicMenuCartLine } from '@/lib/digital-menu/cart/types';
-import type { Product, Promotion } from '@/lib/api/types';
+import type { Product, Promotion, RestaurantSchedule } from '@/lib/api/types';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
 import { promoWarningLabel } from '@/lib/promotions/bundlePromoEligibility';
 import { formatMoney } from '@/lib/currency';
@@ -76,6 +76,7 @@ type PublicMenuCartProps = {
   restaurantName: string;
   restaurantLocation: WhatsAppRestaurantLocation;
   whatsappPhone: string | null;
+  schedules: RestaurantSchedule[];
   lines: PublicMenuCartLine[];
   validProductIds: ReadonlySet<string>;
   products: Product[];
@@ -209,6 +210,7 @@ export function PublicMenuCart({
   restaurantName,
   restaurantLocation,
   whatsappPhone,
+  schedules,
   lines,
   validProductIds,
   products,
@@ -370,6 +372,7 @@ export function PublicMenuCart({
         restaurantName={restaurantName}
         restaurantLocation={restaurantLocation}
         whatsappPhone={whatsappPhone}
+        schedules={schedules}
         lines={lines}
         quote={quote}
         products={products}
