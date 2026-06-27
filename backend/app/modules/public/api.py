@@ -64,7 +64,10 @@ def _promotion_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> Promotio
 
 
 def _partnership_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeliveryPartnershipService:
-    return DeliveryPartnershipService(SqlAlchemyDeliveryProviderRepository(uow.session))
+    return DeliveryPartnershipService(
+        SqlAlchemyDeliveryProviderRepository(uow.session),
+        restaurant_repo=uow.restaurants,
+    )
 
 
 def _public_delivery_quote_service(
@@ -188,6 +191,8 @@ def get_public_checkout_config(
             provider_name=resolved.provider_name,
         )
         if resolved.available:
+            partnership.ensure_restaurant_delivery_payment_methods(restaurant.id)
+            restaurant_methods = list(uow.restaurants.list_payment_methods(restaurant.id))
             provider_methods = partnership.get_active_provider_payment_methods(restaurant.id)
 
     payment_method_pairs = enabled_public_payment_methods(
