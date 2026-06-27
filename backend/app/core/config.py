@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     order_idempotency_ttl_seconds: int = 86400
     redis_url: str | None = None
     menu_cache_ttl_seconds: int = 300
+    assistant_conversation_cache_ttl_seconds: int = 300
+    assistant_llm_context_message_limit: int = 40
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
     openai_api_key: str | None = None
