@@ -130,11 +130,6 @@ export function resolveOrderItemDiscounts(
     promotions?: Promotion[];
   },
 ): AppliedOrderDiscount[] {
-  const applied = item.applied_discounts.filter(
-    (discount) => discount.applied && discount.discount_cents > 0,
-  );
-  if (applied.length > 1) return applied;
-
   if (context?.product && context.promotions && context.promotions.length > 0) {
     const rebuilt = buildDiscountSnapshots(
       item,
@@ -145,7 +140,10 @@ export function resolveOrderItemDiscounts(
     if (rebuilt.length > 0) return rebuilt;
   }
 
-  if (applied.length === 1) return applied;
+  const applied = item.applied_discounts.filter(
+    (discount) => discount.applied && discount.discount_cents > 0,
+  );
+  if (applied.length > 0) return applied;
 
   const implied = Math.max(0, item.line_subtotal_cents - item.line_total_cents);
   if (implied <= 0) return [];
