@@ -18,9 +18,16 @@ class OutsideTariffBracket:
 
 
 @dataclass(frozen=True)
-class InsidePolygonTariffs:
+class InsideWeatherTariffs:
     day_cents: int
     night_cents: int
+
+
+@dataclass(frozen=True)
+class InsidePolygonTariffs:
+    none: InsideWeatherTariffs
+    light: InsideWeatherTariffs
+    heavy: InsideWeatherTariffs
 
 
 @dataclass(frozen=True)
@@ -57,9 +64,22 @@ DEFAULT_OUTSIDE_BRACKETS: tuple[OutsideTariffBracket, ...] = (
 )
 
 
+DEFAULT_INSIDE_NONE = InsideWeatherTariffs(day_cents=3500, night_cents=5000)
+DEFAULT_INSIDE_LIGHT = InsideWeatherTariffs(day_cents=5000, night_cents=6500)
+DEFAULT_INSIDE_HEAVY = InsideWeatherTariffs(day_cents=7000, night_cents=10000)
+
+
+def default_inside_polygon_tariffs() -> InsidePolygonTariffs:
+    return InsidePolygonTariffs(
+        none=DEFAULT_INSIDE_NONE,
+        light=DEFAULT_INSIDE_LIGHT,
+        heavy=DEFAULT_INSIDE_HEAVY,
+    )
+
+
 def default_pricing_config() -> DeliveryPricingConfig:
     return DeliveryPricingConfig(
-        inside_polygon=InsidePolygonTariffs(day_cents=3500, night_cents=5000),
+        inside_polygon=default_inside_polygon_tariffs(),
         outside_polygon=OutsidePolygonTariffs(
             max_distance_km=20,
             brackets=DEFAULT_OUTSIDE_BRACKETS,
@@ -67,11 +87,61 @@ def default_pricing_config() -> DeliveryPricingConfig:
     )
 
 
+def _inside_weather_to_json(tariffs: InsideWeatherTariffs) -> dict[str, int]:
+    return {
+        "day_cents": tariffs.day_cents,
+        "night_cents": tariffs.night_cents,
+    }
+
+
+def _inside_weather_from_json(data: dict[str, object]) -> InsideWeatherTariffs:
+    return InsideWeatherTariffs(
+        day_cents=int(data["day_cents"]),
+        night_cents=int(data["night_cents"]),
+    )
+
+
+def _inside_polygon_from_json(data: dict[str, object]) -> InsidePolygonTariffs:
+    if "none" in data:
+        none = data["none"]
+        light = data["light"]
+        heavy = data["heavy"]
+        if not isinstance(none, dict) or not isinstance(light, dict) or not isinstance(heavy, dict):
+            raise ValueError("inside_polygon inválido")
+        return InsidePolygonTariffs(
+            none=_inside_weather_from_json(none),
+            light=_inside_weather_from_json(light),
+            heavy=_inside_weather_from_json(heavy),
+        )
+
+    # Formato legado: solo día/noche sin clima.
+    if "day_cents" in data and "night_cents" in data:
+        legacy = _inside_weather_from_json(data)
+        return InsidePolygonTariffs(
+            none=legacy,
+            light=DEFAULT_INSIDE_LIGHT,
+            heavy=DEFAULT_INSIDE_HEAVY,
+        )
+
+    raise ValueError("inside_polygon inválido")
+
+
+def _inside_weather_for_mode(
+    tariffs: InsidePolygonTariffs, weather_mode: DeliveryWeatherMode
+) -> InsideWeatherTariffs:
+    if weather_mode == "light":
+        return tariffs.light
+    if weather_mode == "heavy":
+        return tariffs.heavy
+    return tariffs.none
+
+
 def config_to_json(config: DeliveryPricingConfig) -> dict[str, object]:
     return {
         "inside_polygon": {
-            "day_cents": config.inside_polygon.day_cents,
-            "night_cents": config.inside_polygon.night_cents,
+            "none": _inside_weather_to_json(config.inside_polygon.none),
+            "light": _inside_weather_to_json(config.inside_polygon.light),
+            "heavy": _inside_weather_to_json(config.inside_polygon.heavy),
         },
         "outside_polygon": {
             "max_distance_km": config.outside_polygon.max_distance_km,
@@ -121,10 +191,7 @@ def config_from_json(data: dict[str, object]) -> DeliveryPricingConfig:
         )
 
     return DeliveryPricingConfig(
-        inside_polygon=InsidePolygonTariffs(
-            day_cents=int(inside["day_cents"]),
-            night_cents=int(inside["night_cents"]),
-        ),
+        inside_polygon=_inside_polygon_from_json(inside),
         outside_polygon=OutsidePolygonTariffs(
             max_distance_km=float(outside.get("max_distance_km", 20)),
             brackets=tuple(brackets),
@@ -201,7 +268,8 @@ def quote_delivery_fee(
         )
 
     if inside_polygon:
-        total = config.inside_polygon.night_cents if is_night else config.inside_polygon.day_cents
+        weather_tariffs = _inside_weather_for_mode(config.inside_polygon, weather_mode)
+        total = weather_tariffs.night_cents if is_night else weather_tariffs.day_cents
         return PricingQuote(
             available=True,
             reason=None,
@@ -272,8 +340,14 @@ def quote_delivery_fee(
 
 
 def validate_pricing_config(config: DeliveryPricingConfig) -> None:
-    if config.inside_polygon.day_cents < 0 or config.inside_polygon.night_cents < 0:
-        raise ValueError("Las tarifas dentro de cobertura no pueden ser negativas")
+    inside_tiers = (
+        ("Sin lluvia", config.inside_polygon.none),
+        ("Lluvia ligera", config.inside_polygon.light),
+        ("Lluvia fuerte", config.inside_polygon.heavy),
+    )
+    for label, tier in inside_tiers:
+        if tier.day_cents < 0 or tier.night_cents < 0:
+            raise ValueError(f"Las tarifas dentro de cobertura ({label}) no pueden ser negativas")
 
     if config.outside_polygon.max_distance_km <= 0:
         raise ValueError("La distancia máxima debe ser mayor a cero")
