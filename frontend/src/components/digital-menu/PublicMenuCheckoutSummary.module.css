@@ -335,6 +335,19 @@
   display: none;
 }
 
+.sidebarStack {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--dm-border, #e2e8f0);
+  border-radius: var(--dm-radius-card, 16px);
+  background: var(--dm-surface, #fff);
+  overflow: hidden;
+}
+
+.cashDenominationInline {
+  display: block;
+}
+
 .totalsCard {
   width: 100%;
 }
@@ -435,7 +448,13 @@
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
-  margin-top: 1rem;
+  margin-top: 0;
+  padding: 0 1.25rem 1.25rem;
+}
+
+.sidebarStack .sendOrderDesktop {
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--dm-border, #e2e8f0);
 }
 
 .sendOrderBtn {
@@ -534,7 +553,7 @@
 
   .body {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
     align-items: start;
     gap: 2rem;
     padding: 1.25rem 2.5rem 2rem;
@@ -578,11 +597,15 @@
     top: 1.25rem;
   }
 
+  .cashDenominationInline {
+    display: none;
+  }
+
   .totalsCardDesktop {
     padding: 1.25rem;
-    border: 1px solid var(--dm-border, #e2e8f0);
-    border-radius: var(--dm-radius-card, 16px);
-    background: var(--dm-surface, #fff);
+    border: none;
+    border-radius: 0;
+    background: transparent;
   }
 }
 
@@ -635,11 +658,15 @@
   top: 5.5rem;
 }
 
+.checkoutSummary.publicTablet .cashDenominationInline {
+  display: none;
+}
+
 .checkoutSummary.publicTablet .totalsCardDesktop {
   padding: 1.15rem;
-  border: 1px solid var(--dm-border, #e2e8f0);
-  border-radius: var(--dm-radius-card, 16px);
-  background: var(--dm-surface, #fff);
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {

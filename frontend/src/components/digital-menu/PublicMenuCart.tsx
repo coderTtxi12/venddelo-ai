@@ -30,12 +30,14 @@ import { formatMoney } from '@/lib/currency';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
+import type { WhatsAppRestaurantLocation } from '@/lib/digital-menu/checkout/formatWhatsAppOrderMessage';
 import { PublicMenuCheckoutDetails } from './PublicMenuCheckoutDetails';
 import { PublicMenuCheckoutSummary } from './PublicMenuCheckoutSummary';
 import {
   type CheckoutFulfillment,
   EMPTY_DELIVERY_LOCATION,
 } from '@/lib/digital-menu/checkout/fulfillment';
+import { DEFAULT_CHECKOUT_PHONE_COUNTRY_ISO } from '@/lib/digital-menu/checkout/customerPhone';
 import {
   readCheckoutPreferencesFromStorage,
   toStoredCheckoutPreferences,
@@ -52,6 +54,10 @@ function createFallbackFulfillment(subdomain: string): CheckoutFulfillment {
       ...saved,
       deliveryFeeCents: null,
       customerName: saved.customerName ?? '',
+      customerPhoneCountryIso:
+        saved.customerPhoneCountryIso ?? DEFAULT_CHECKOUT_PHONE_COUNTRY_ISO,
+      customerPhoneLocal: saved.customerPhoneLocal ?? '',
+      cashDenominationCents: saved.cashDenominationCents ?? null,
     };
   }
   return {
@@ -59,12 +65,16 @@ function createFallbackFulfillment(subdomain: string): CheckoutFulfillment {
     ...EMPTY_DELIVERY_LOCATION,
     paymentMethod: null,
     customerName: '',
+    customerPhoneCountryIso: DEFAULT_CHECKOUT_PHONE_COUNTRY_ISO,
+    customerPhoneLocal: '',
+    cashDenominationCents: null,
   };
 }
 
 type PublicMenuCartProps = {
   subdomain: string;
   restaurantName: string;
+  restaurantLocation: WhatsAppRestaurantLocation;
   whatsappPhone: string | null;
   lines: PublicMenuCartLine[];
   validProductIds: ReadonlySet<string>;
@@ -197,6 +207,7 @@ function CartOrderSummary({
 export function PublicMenuCart({
   subdomain,
   restaurantName,
+  restaurantLocation,
   whatsappPhone,
   lines,
   validProductIds,
@@ -357,6 +368,7 @@ export function PublicMenuCart({
       <PublicMenuCheckoutSummary
         subdomain={subdomain}
         restaurantName={restaurantName}
+        restaurantLocation={restaurantLocation}
         whatsappPhone={whatsappPhone}
         lines={lines}
         quote={quote}
@@ -364,6 +376,7 @@ export function PublicMenuCart({
         promotions={promotions}
         currency={currency}
         fulfillment={fulfillment}
+        onFulfillmentChange={handleFulfillmentChange}
         onBack={() => setCheckoutStep('fulfillment')}
         onOrderSent={onOrderSent}
         isTabletLayout={isTabletLayout}

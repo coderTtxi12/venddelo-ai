@@ -19,7 +19,13 @@ import {
   formatWhatsAppOrderMessage,
   openWhatsAppOrder,
   whatsappPhoneDigits,
+  type WhatsAppRestaurantLocation,
 } from '@/lib/digital-menu/checkout/formatWhatsAppOrderMessage';
+import { buildCheckoutCustomerPhoneE164, formatOrderCustomerPhone } from '@/lib/digital-menu/checkout/customerPhone';
+import {
+  isCashDenominationValid,
+  needsCashDenomination,
+} from '@/lib/digital-menu/checkout/cashDenomination';
 import type { CheckoutFulfillment } from '@/lib/digital-menu/checkout/fulfillment';
 import { isCustomerContactComplete } from '@/lib/digital-menu/checkout/fulfillment';
 import { submitPublicOrderBackground } from '@/lib/digital-menu/checkout/submitPublicOrderBackground';
@@ -31,12 +37,14 @@ import {
 import { RESTAURANT_SERVICE_LABELS } from '@/lib/restaurantServices';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
+import { CheckoutCashDenominationSection } from '@/components/digital-menu/CheckoutCashDenominationSection';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import styles from './PublicMenuCheckoutSummary.module.css';
 
 type PublicMenuCheckoutSummaryProps = {
   subdomain: string;
   restaurantName: string;
+  restaurantLocation: WhatsAppRestaurantLocation;
   whatsappPhone: string | null;
   lines: PublicMenuCartLine[];
   quote: CartQuote;
@@ -44,6 +52,7 @@ type PublicMenuCheckoutSummaryProps = {
   promotions: Promotion[];
   currency: string;
   fulfillment: CheckoutFulfillment;
+  onFulfillmentChange: (next: CheckoutFulfillment) => void;
   onBack: () => void;
   onOrderSent: () => void;
   isTabletLayout?: boolean;
@@ -77,6 +86,12 @@ function FulfillmentSummary({
         <div className={styles.fulfillmentRow}>
           <dt className={styles.fulfillmentLabel}>Cliente</dt>
           <dd className={styles.fulfillmentValue}>{fulfillment.customerName.trim()}</dd>
+        </div>
+        <div className={styles.fulfillmentRow}>
+          <dt className={styles.fulfillmentLabel}>WhatsApp</dt>
+          <dd className={styles.fulfillmentValue}>
+            {formatOrderCustomerPhone(buildCheckoutCustomerPhoneE164(fulfillment))}
+          </dd>
         </div>
         <div className={styles.fulfillmentRow}>
           <dt className={styles.fulfillmentLabel}>Tipo de pedido</dt>
@@ -437,6 +452,7 @@ function CheckoutLineCard({
 export function PublicMenuCheckoutSummary({
   subdomain,
   restaurantName,
+  restaurantLocation,
   whatsappPhone,
   lines,
   quote,
@@ -444,11 +460,13 @@ export function PublicMenuCheckoutSummary({
   promotions,
   currency,
   fulfillment,
+  onFulfillmentChange,
   onBack,
   onOrderSent,
   isTabletLayout = false,
 }: PublicMenuCheckoutSummaryProps) {
   const [collapsedLineIds, setCollapsedLineIds] = useState<Set<string>>(() => new Set());
+  const [sendAttempted, setSendAttempted] = useState(false);
 
   const productsById = useMemo(
     () => new Map(products.map((product) => [product.id, product])),
@@ -489,6 +507,11 @@ export function PublicMenuCheckoutSummary({
     fulfillment.serviceType === 'delivery' && fulfillment.deliveryFeeCents != null
       ? fulfillment.deliveryFeeCents / 100
       : 0;
+  const orderTotalCents = quote.total_cents + (fulfillment.deliveryFeeCents ?? 0);
+  const showCashDenomination = needsCashDenomination(fulfillment);
+  const cashDenominationValid =
+    !showCashDenomination ||
+    isCashDenominationValid(fulfillment.cashDenominationCents, orderTotalCents);
 
   const toggleLine = (lineId: string) => {
     setCollapsedLineIds((prev) => {
@@ -507,19 +530,47 @@ export function PublicMenuCheckoutSummary({
     whatsappConfigured &&
     isCustomerContactComplete(fulfillment) &&
     fulfillment.paymentMethod != null &&
+    cashDenominationValid &&
     lines.length > 0;
   const sendDisabledReason = !whatsappConfigured
     ? 'Este restaurante aún no tiene WhatsApp de pedidos configurado.'
-    : null;
+    : showCashDenomination && !cashDenominationValid
+      ? 'Indica con qué billete pagarás para enviar el pedido.'
+      : null;
+
+  const handleCashDenominationChange = (cashDenominationCents: number | null) => {
+    onFulfillmentChange({ ...fulfillment, cashDenominationCents });
+  };
+
+  const cashDenominationSectionProps = {
+    fulfillment,
+    orderTotalCents,
+    currency,
+    showValidation: sendAttempted,
+    onChange: handleCashDenominationChange,
+  };
 
   const handleSendOrder = () => {
-    if (!canSendOrder || !whatsappPhone || !fulfillment.paymentMethod) return;
+    if (!whatsappPhone || !fulfillment.paymentMethod) return;
+    if (!cashDenominationValid) {
+      setSendAttempted(true);
+      const sections = document.querySelectorAll('[data-cash-denomination-section]');
+      for (const section of sections) {
+        if (section instanceof HTMLElement && section.offsetParent !== null) {
+          section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          break;
+        }
+      }
+      return;
+    }
+    if (!canSendOrder) return;
 
     const { orderId, idempotencyKey } = createCheckoutOrderRef();
 
     const message = formatWhatsAppOrderMessage({
       orderId,
       restaurantName,
+      restaurantLocation,
       currency,
       lines,
       quote,
@@ -557,6 +608,16 @@ export function PublicMenuCheckoutSummary({
       <div className={styles.body}>
         <FulfillmentSummary fulfillment={fulfillment} currency={currency} />
 
+        {showCashDenomination ? (
+          <div className={styles.cashDenominationInline}>
+            <CheckoutCashDenominationSection
+              {...cashDenominationSectionProps}
+              variant="inline"
+              idSuffix="inline"
+            />
+          </div>
+        ) : null}
+
         <ul className={styles.lineList} aria-label="Desglose del pedido">
           {lineBreakdowns.map((breakdown) => (
             <CheckoutLineCard
@@ -570,23 +631,32 @@ export function PublicMenuCheckoutSummary({
         </ul>
 
         <aside className={styles.totalsAside} aria-label="Total del pedido">
-          <TotalsPanel
-            currency={currency}
-            itemCount={itemCount}
-            subtotalBefore={subtotalBefore}
-            lineDiscountTotal={lineDiscountTotal}
-            orderDiscount={orderDiscount}
-            orderPromoLabel={orderPromoLabel}
-            total={total}
-            deliveryFee={deliveryFee}
-            variant="desktop"
-          />
-          <SendOrderButton
-            variant="desktop"
-            disabled={!canSendOrder}
-            disabledReason={sendDisabledReason}
-            onSend={handleSendOrder}
-          />
+          <div className={styles.sidebarStack}>
+            <TotalsPanel
+              currency={currency}
+              itemCount={itemCount}
+              subtotalBefore={subtotalBefore}
+              lineDiscountTotal={lineDiscountTotal}
+              orderDiscount={orderDiscount}
+              orderPromoLabel={orderPromoLabel}
+              total={total}
+              deliveryFee={deliveryFee}
+              variant="desktop"
+            />
+            {showCashDenomination ? (
+              <CheckoutCashDenominationSection
+                {...cashDenominationSectionProps}
+                variant="sidebar"
+                idSuffix="sidebar"
+              />
+            ) : null}
+            <SendOrderButton
+              variant="desktop"
+              disabled={!whatsappConfigured || lines.length === 0}
+              disabledReason={sendDisabledReason}
+              onSend={handleSendOrder}
+            />
+          </div>
         </aside>
       </div>
 
@@ -604,7 +674,7 @@ export function PublicMenuCheckoutSummary({
         />
         <SendOrderButton
           variant="mobile"
-          disabled={!canSendOrder}
+          disabled={!whatsappConfigured || lines.length === 0}
           disabledReason={sendDisabledReason}
           onSend={handleSendOrder}
         />
