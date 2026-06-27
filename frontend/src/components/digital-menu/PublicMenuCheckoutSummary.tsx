@@ -535,7 +535,7 @@ export function PublicMenuCheckoutSummary({
   const sendDisabledReason = !whatsappConfigured
     ? 'Este restaurante aún no tiene WhatsApp de pedidos configurado.'
     : showCashDenomination && !cashDenominationValid
-      ? 'Indica con qué billete pagarás para enviar el pedido.'
+      ? 'Indica con qué monto pagarás para enviar el pedido.'
       : null;
 
   const handleCashDenominationChange = (cashDenominationCents: number | null) => {
