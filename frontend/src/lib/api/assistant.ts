@@ -1,18 +1,30 @@
+import { apiRequest } from './client';
+import { fetchAllPages } from './pagination';
 import { ApiError } from './types';
+import type { CursorPage } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api/v1';
 
-export type AssistantChatHistoryMessage = {
-  role: 'user' | 'assistant';
-  content: string;
+export type AssistantConversation = {
+  id: string;
+  restaurant_id: string;
+  title: string;
+  last_message_at: string;
+  created_at: string;
+  updated_at: string;
 };
 
-export type AssistantChatRequest = {
-  message: string;
-  history: AssistantChatHistoryMessage[];
+export type AssistantMessage = {
+  id: string;
+  conversation_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
 };
 
 export type AssistantStreamCompletePayload = {
+  conversation_id: string;
   message_id: string;
   content: string;
 };
@@ -27,6 +39,54 @@ export type AssistantStreamHandlers = {
   onComplete: (payload: AssistantStreamCompletePayload) => void;
   onError: (payload: AssistantStreamErrorPayload) => void;
 };
+
+export function listAssistantConversations(
+  token: string,
+  restaurantId: string,
+  limit = 30,
+  cursor?: string | null,
+) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set('cursor', cursor);
+  return apiRequest<CursorPage<AssistantConversation>>(
+    `/restaurants/${restaurantId}/assistant/conversations?${params}`,
+    { token },
+  );
+}
+
+export function createAssistantConversation(token: string, restaurantId: string, title?: string) {
+  return apiRequest<AssistantConversation>(`/restaurants/${restaurantId}/assistant/conversations`, {
+    method: 'POST',
+    token,
+    body: title ? { title } : {},
+  });
+}
+
+export function listAssistantMessages(
+  token: string,
+  restaurantId: string,
+  conversationId: string,
+  limit = 100,
+  cursor?: string | null,
+) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set('cursor', cursor);
+  return apiRequest<CursorPage<AssistantMessage>>(
+    `/restaurants/${restaurantId}/assistant/conversations/${conversationId}/messages?${params}`,
+    { token },
+  );
+}
+
+export async function loadAllAssistantMessages(
+  token: string,
+  restaurantId: string,
+  conversationId: string,
+) {
+  return fetchAllPages(
+    (cursor) => listAssistantMessages(token, restaurantId, conversationId, 100, cursor),
+    100,
+  );
+}
 
 function parseSseBlock(block: string): { event: string; data: string } | null {
   const lines = block.split('\n').filter(Boolean);
@@ -48,22 +108,26 @@ function parseSseBlock(block: string): { event: string; data: string } | null {
 export async function streamAssistantChat(
   token: string,
   restaurantId: string,
-  body: AssistantChatRequest,
+  conversationId: string,
+  message: string,
   handlers: AssistantStreamHandlers,
   signal?: AbortSignal,
 ): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/restaurants/${restaurantId}/assistant/chat`, {
-      method: 'POST',
-      headers: {
-        Accept: 'text/event-stream',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+    response = await fetch(
+      `${API_URL}/restaurants/${restaurantId}/assistant/conversations/${conversationId}/chat`,
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'text/event-stream',
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ message }),
+        signal,
       },
-      body: JSON.stringify(body),
-      signal,
-    });
+    );
   } catch {
     throw new ApiError(
       'network_error',
@@ -74,14 +138,14 @@ export async function streamAssistantChat(
 
   if (!response.ok) {
     const text = await response.text();
-    let message = response.statusText;
+    let errorMessage = response.statusText;
     try {
       const parsed = text ? JSON.parse(text) : null;
-      message = parsed?.error?.message ?? message;
+      errorMessage = parsed?.error?.message ?? errorMessage;
     } catch {
-      if (text) message = text;
+      if (text) errorMessage = text;
     }
-    throw new ApiError('assistant_chat_error', message, response.status);
+    throw new ApiError('assistant_chat_error', errorMessage, response.status);
   }
 
   if (!response.body) {
@@ -126,6 +190,7 @@ export async function streamAssistantChat(
 
       if (parsed.event === 'message.complete') {
         handlers.onComplete({
+          conversation_id: String(payload.conversation_id ?? conversationId),
           message_id: String(payload.message_id ?? ''),
           content: String(payload.content ?? ''),
         });
