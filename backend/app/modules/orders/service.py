@@ -273,6 +273,8 @@ class OrderService:
                 delivery_resolved_available = restaurant.delivery_enabled
 
             if delivery_resolved_available and self._partnership is not None:
+                self._partnership.ensure_restaurant_delivery_payment_methods(restaurant.id)
+                restaurant_methods = list(self._restaurants.list_payment_methods(restaurant.id))
                 provider_methods = self._partnership.get_active_provider_payment_methods(
                     restaurant.id
                 )
@@ -286,15 +288,6 @@ class OrderService:
             provider_methods=provider_methods,
         ):
             return
-
-        if order_type == "delivery":
-            for pm in restaurant_methods:
-                if (
-                    pm.method == payment_method
-                    and pm.service_type == "delivery"
-                    and pm.enabled
-                ):
-                    return
 
         raise ValidationError("Payment method not enabled for this order type")
 
