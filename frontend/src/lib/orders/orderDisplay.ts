@@ -136,6 +136,15 @@ export function resolveOrderItemDiscountCents(item: OrderItem): number {
   );
 }
 
+/** Precio de línea antes de descuentos (base + opciones × cantidad). */
+export function orderItemPreDiscountCents(
+  item: OrderItem,
+  discounts: AppliedOrderDiscount[],
+): number {
+  const discountTotal = discounts.reduce((sum, row) => sum + row.discount_cents, 0);
+  return item.line_total_cents + discountTotal;
+}
+
 export function sumOrderLineDiscountCents(order: Order): number {
   const fromItems = order.items.reduce(
     (sum, item) => sum + resolveOrderItemDiscountCents(item),
