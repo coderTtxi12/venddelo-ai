@@ -8,17 +8,23 @@ import {
   type CountryDialCode,
 } from '@/lib/phone/countryDialCodes';
 import styles from './PhoneInputWithCountry.module.css';
+import digitalMenuStyles from './PhoneInputWithCountry.digitalMenu.module.css';
+
+type PhoneInputVariant = 'dashboard' | 'digitalMenu';
 
 type PhoneInputWithCountryProps = {
   countryIso: string;
   localNumber: string;
   onCountryChange: (iso: string) => void;
   onLocalNumberChange: (value: string) => void;
+  onLocalNumberBlur?: () => void;
   placeholder?: string;
   hint?: string;
   autoFocus?: boolean;
   showSameAsOwner?: boolean;
   onUseSameAsOwner?: () => void;
+  variant?: PhoneInputVariant;
+  hasError?: boolean;
 };
 
 export function PhoneInputWithCountry({
@@ -26,16 +32,21 @@ export function PhoneInputWithCountry({
   localNumber,
   onCountryChange,
   onLocalNumberChange,
+  onLocalNumberBlur,
   placeholder = '55 1234 5678',
   hint,
   autoFocus = false,
   showSameAsOwner = false,
   onUseSameAsOwner,
+  variant = 'dashboard',
+  hasError = false,
 }: PhoneInputWithCountryProps) {
   const listId = useId();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const selected = findCountryByIso(countryIso);
+  const ui = variant === 'digitalMenu' ? digitalMenuStyles : styles;
+  const attentionClass = hasError ? ui.inputNeedsAttention : '';
 
   useEffect(() => {
     if (!open) return;
@@ -56,38 +67,38 @@ export function PhoneInputWithCountry({
   };
 
   return (
-    <div className={styles.wrap}>
-      <div className={styles.row} ref={wrapRef}>
-        <div className={styles.countrySelect}>
+    <div className={ui.wrap}>
+      <div className={ui.row} ref={wrapRef}>
+        <div className={ui.countrySelect}>
           <button
             type="button"
-            className={styles.countryButton}
+            className={`${ui.countryButton} ${attentionClass}`}
             aria-haspopup="listbox"
             aria-expanded={open}
             aria-controls={listId}
             onClick={() => setOpen((prev) => !prev)}
           >
-            <span className={styles.flag} aria-hidden>
+            <span className={ui.flag} aria-hidden>
               {selected.flag}
             </span>
-            <span className={styles.dialCode}>{selected.dialCode}</span>
-            <span className={styles.chevron} aria-hidden>
+            <span className={ui.dialCode}>{selected.dialCode}</span>
+            <span className={ui.chevron} aria-hidden>
               ▾
             </span>
           </button>
 
           {open ? (
-            <div id={listId} className={styles.dropdown} role="listbox" aria-label="País">
+            <div id={listId} className={ui.dropdown} role="listbox" aria-label="País">
               {COUNTRY_DIAL_CODES.map((country) => (
                 <button
                   key={country.iso}
                   type="button"
                   role="option"
                   aria-selected={country.iso === countryIso}
-                  className={styles.dropdownItem}
+                  className={ui.dropdownItem}
                   onClick={() => pickCountry(country)}
                 >
-                  <span className={styles.flag} aria-hidden>
+                  <span className={ui.flag} aria-hidden>
                     {country.flag}
                   </span>
                   <span>
@@ -103,19 +114,21 @@ export function PhoneInputWithCountry({
           type="tel"
           inputMode="numeric"
           autoComplete="tel-national"
-          className={styles.phoneInput}
+          className={`${ui.phoneInput} ${attentionClass}`}
           value={localNumber}
           placeholder={placeholder}
           autoFocus={autoFocus}
           aria-label="Número de teléfono"
+          aria-invalid={hasError || undefined}
           onChange={(event) => onLocalNumberChange(digitsOnly(event.target.value))}
+          onBlur={onLocalNumberBlur}
         />
       </div>
 
-      {hint ? <p className={styles.hint}>{hint}</p> : null}
+      {hint ? <p className={ui.hint}>{hint}</p> : null}
 
       {showSameAsOwner && onUseSameAsOwner ? (
-        <button type="button" className={styles.sameNumberBtn} onClick={onUseSameAsOwner}>
+        <button type="button" className={ui.sameNumberBtn} onClick={onUseSameAsOwner}>
           Usar el mismo número del responsable
         </button>
       ) : null}

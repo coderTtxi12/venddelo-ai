@@ -1,0 +1,184 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+  max-width: none;
+}
+
+.row {
+  display: flex;
+  gap: 0.55rem;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+.countrySelect {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.countryButton {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 100%;
+  min-height: 2.75rem;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--dm-border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--dm-surface, #fff);
+  color: var(--dm-text, #111827);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 180ms ease, background-color 180ms ease;
+  min-width: 6.75rem;
+}
+
+.countryButton:hover {
+  border-color: color-mix(in srgb, var(--dm-primary, #111827) 35%, var(--dm-border, #e2e8f0));
+}
+
+.countryButton:focus-visible {
+  outline: 2px solid var(--dm-primary, #111827);
+  outline-offset: 1px;
+  border-color: var(--dm-primary, #111827);
+}
+
+.flag {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.dialCode {
+  color: var(--dm-text-secondary, #64748b);
+  font-weight: 500;
+}
+
+.chevron {
+  margin-left: auto;
+  opacity: 0.45;
+  font-size: 0.7rem;
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 30;
+  width: min(18rem, 90vw);
+  max-height: 16rem;
+  overflow: auto;
+  border: 1px solid var(--dm-border, #e2e8f0);
+  border-radius: var(--dm-radius-card, 14px);
+  background: var(--dm-surface, #fff);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--dm-text, #111827) 12%, transparent);
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: none;
+  background: transparent;
+  color: var(--dm-text, #111827);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.dropdownItem:hover,
+.dropdownItem[aria-selected='true'] {
+  background: color-mix(in srgb, var(--dm-primary, #111827) 7%, var(--dm-surface, #fff));
+}
+
+.phoneInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--dm-border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--dm-surface, #fff);
+  color: var(--dm-text, #111827);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  font-size: 0.92rem;
+  line-height: 1.4;
+  transition: border-color 180ms ease;
+}
+
+.phoneInput::placeholder {
+  color: var(--dm-text-secondary, #64748b);
+}
+
+.phoneInput:focus-visible {
+  outline: 2px solid var(--dm-primary, #111827);
+  outline-offset: 1px;
+  border-color: var(--dm-primary, #111827);
+}
+
+.inputNeedsAttention {
+  border-color: color-mix(in srgb, var(--dm-primary, #111827) 45%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--dm-primary, #111827) 18%, transparent);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--dm-text-secondary, #64748b);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+}
+
+.sameNumberBtn {
+  align-self: flex-start;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid color-mix(in srgb, var(--dm-primary, #111827) 22%, var(--dm-border, #e2e8f0));
+  border-radius: 999px;
+  background: var(--dm-surface, #fff);
+  color: var(--dm-primary, #111827);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.sameNumberBtn:hover {
+  background: color-mix(in srgb, var(--dm-primary, #111827) 6%, var(--dm-surface, #fff));
+  border-color: color-mix(in srgb, var(--dm-primary, #111827) 35%, var(--dm-border, #e2e8f0));
+}
+
+.sameNumberBtn:focus-visible {
+  outline: 2px solid var(--dm-primary, #111827);
+  outline-offset: 2px;
+}
+
+@media (max-width: 399px) {
+  .row {
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .countrySelect,
+  .countryButton,
+  .phoneInput {
+    width: 100%;
+  }
+
+  .countryButton {
+    justify-content: flex-start;
+  }
+
+  .dropdown {
+    width: 100%;
+    max-width: none;
+  }
+}
