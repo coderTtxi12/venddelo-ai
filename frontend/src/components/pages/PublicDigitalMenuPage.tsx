@@ -804,11 +804,9 @@ export default function PublicDigitalMenuPage({
                 subdomain={subdomain}
                 restaurantName={restaurant.name}
                 restaurantLocation={{
-                  name: restaurant.name,
                   address: restaurant.address,
                   latitude: restaurant.latitude,
                   longitude: restaurant.longitude,
-                  place_id: restaurant.place_id,
                 }}
                 whatsappPhone={restaurant.whatsapp_phone}
                 lines={cart.lines}
@@ -1051,11 +1049,9 @@ export default function PublicDigitalMenuPage({
               subdomain={subdomain}
               restaurantName={restaurant.name}
               restaurantLocation={{
-                name: restaurant.name,
                 address: restaurant.address,
                 latitude: restaurant.latitude,
                 longitude: restaurant.longitude,
-                place_id: restaurant.place_id,
               }}
               whatsappPhone={restaurant.whatsapp_phone}
               lines={cart.lines}
