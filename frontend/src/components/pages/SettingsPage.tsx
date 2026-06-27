@@ -32,6 +32,7 @@ import {
   isActiveDeliveryPartnership,
 } from '@/lib/fetchActiveDeliveryProviderConfig';
 import {
+  clampDeliveryMatrixToProviderAvailable,
   createDefaultPaymentMatrix,
   matrixToPaymentCreates,
   PAYMENT_METHOD_LABELS,
@@ -157,6 +158,9 @@ export default function SettingsPage() {
   const [paymentMatrix, setPaymentMatrix] = useState<PaymentMethodMatrix>(
     createDefaultPaymentMatrix(),
   );
+  const [providerDeliveryAvailable, setProviderDeliveryAvailable] = useState<
+    PaymentMethodMatrix['delivery'] | null
+  >(null);
   const [schedules, setSchedules] = useState<RestaurantSchedule[]>([]);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [whatsappCountryIso, setWhatsappCountryIso] = useState(DEFAULT_COUNTRY_ISO);
@@ -223,6 +227,7 @@ export default function SettingsPage() {
         let nextPaymentMatrix =
           paymentRows.length > 0 ? paymentMethodsToMatrix(paymentRows) : createDefaultPaymentMatrix();
         let nextProviderSchedules: DeliveryProviderSchedule[] | null = null;
+        let nextProviderDeliveryAvailable: PaymentMethodMatrix['delivery'] | null = null;
 
         if (restaurantData.delivery_enabled) {
           setDeliveryPartnershipLoading(true);
@@ -242,9 +247,15 @@ export default function SettingsPage() {
               );
               if (providerConfig) {
                 nextProviderSchedules = providerConfig.schedules;
+                nextProviderDeliveryAvailable = providerPaymentMethodsToDeliveryMatrix(
+                  providerConfig.paymentMethods,
+                );
                 nextPaymentMatrix = {
                   ...nextPaymentMatrix,
-                  delivery: providerPaymentMethodsToDeliveryMatrix(providerConfig.paymentMethods),
+                  delivery: clampDeliveryMatrixToProviderAvailable(
+                    nextPaymentMatrix.delivery,
+                    nextProviderDeliveryAvailable,
+                  ),
                 };
               }
             }
@@ -266,6 +277,7 @@ export default function SettingsPage() {
         if (!cancelled) {
           setPaymentMatrix(nextPaymentMatrix);
           setDeliveryProviderSchedules(nextProviderSchedules);
+          setProviderDeliveryAvailable(nextProviderDeliveryAvailable);
         }
         setSchedules(scheduleRows);
       } catch (error) {
@@ -438,9 +450,7 @@ export default function SettingsPage() {
         await setRestaurantPaymentMethods(
           accessToken,
           restaurantId,
-          matrixToPaymentCreates(paymentMatrix, {
-            serviceTypes: deliveryPartnershipActive ? ['takeout'] : ['takeout', 'delivery'],
-          }),
+          matrixToPaymentCreates(paymentMatrix),
         );
       } catch (paymentError) {
         console.error(paymentError);
@@ -488,13 +498,18 @@ export default function SettingsPage() {
             );
             if (providerConfig) {
               setDeliveryProviderSchedules(providerConfig.schedules);
+              const available = providerPaymentMethodsToDeliveryMatrix(
+                providerConfig.paymentMethods,
+              );
+              setProviderDeliveryAvailable(available);
               setPaymentMatrix((prev) => ({
                 ...prev,
-                delivery: providerPaymentMethodsToDeliveryMatrix(providerConfig.paymentMethods),
+                delivery: clampDeliveryMatrixToProviderAvailable(prev.delivery, available),
               }));
             }
           } else {
             setDeliveryProviderSchedules(null);
+            setProviderDeliveryAvailable(null);
           }
           if (!partnership) {
             setDeliveryPartnershipError(
@@ -513,6 +528,7 @@ export default function SettingsPage() {
       } else {
         setDeliveryPartnership(null);
         setDeliveryProviderSchedules(null);
+        setProviderDeliveryAvailable(null);
         setDeliveryPartnershipError(null);
       }
     } catch (error) {
@@ -787,29 +803,44 @@ export default function SettingsPage() {
         <p className={styles.panelHint}>
           Habilita o deshabilita métodos de pago por tipo de entrega.
           {deliveryPartnershipActive
-            ? ' Los métodos de entrega a domicilio los define tu proveedor de reparto.'
+            ? ' Para entrega a domicilio solo puedes activar métodos que tu repartidor tenga disponibles.'
             : null}
         </p>
         <div className={styles.paymentGrid}>
           {(['takeout', 'delivery'] as const).map((serviceType) => {
             const serviceEnabled =
               serviceType === 'takeout' ? takeoutEnabled : deliveryEnabled;
-            const providerManaged = serviceType === 'delivery' && deliveryPartnershipActive;
             return (
               <div key={serviceType} className={styles.paymentBlock}>
                 <h3 className={styles.paymentBlockTitle}>{RESTAURANT_SERVICE_LABELS[serviceType]}</h3>
                 <div className={styles.paymentRows}>
-                  {PAYMENT_METHOD_ORDER.map((method) => (
-                    <div key={method} className={styles.paymentRow}>
-                      <span className={styles.paymentName}>{PAYMENT_METHOD_LABELS[method]}</span>
-                      <Switch
-                        checked={paymentMatrix[serviceType][method]}
-                        disabled={!serviceEnabled || providerManaged}
-                        ariaLabel={`${PAYMENT_METHOD_LABELS[method]} — ${RESTAURANT_SERVICE_LABELS[serviceType]}`}
-                        onChange={(next) => setPaymentEnabled(serviceType, method, next)}
-                      />
-                    </div>
-                  ))}
+                  {PAYMENT_METHOD_ORDER.map((method) => {
+                    const courierOffersMethod =
+                      serviceType !== 'delivery' ||
+                      !deliveryPartnershipActive ||
+                      (providerDeliveryAvailable?.[method] ?? false);
+                    const rowDisabled = !serviceEnabled || !courierOffersMethod;
+                    return (
+                      <div key={method} className={styles.paymentRow}>
+                        <div className={styles.paymentNameGroup}>
+                          <span className={styles.paymentName}>{PAYMENT_METHOD_LABELS[method]}</span>
+                          {serviceType === 'delivery' &&
+                          deliveryPartnershipActive &&
+                          !courierOffersMethod ? (
+                            <span className={styles.paymentUnavailableHint}>
+                              No disponible con tu repartidor
+                            </span>
+                          ) : null}
+                        </div>
+                        <Switch
+                          checked={paymentMatrix[serviceType][method]}
+                          disabled={rowDisabled}
+                          ariaLabel={`${PAYMENT_METHOD_LABELS[method]} — ${RESTAURANT_SERVICE_LABELS[serviceType]}`}
+                          onChange={(next) => setPaymentEnabled(serviceType, method, next)}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
