@@ -7,8 +7,11 @@ import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import AssistantConversationList from '@/components/assistant/AssistantConversationList';
 import ChatAttachmentList from '@/components/assistant/ChatAttachmentList';
 import ChatFormComplement from '@/components/assistant/ChatFormComplement';
+import ChatMarkdown from '@/components/assistant/ChatMarkdown';
+import ChatStreamProcessing from '@/components/assistant/ChatStreamProcessing';
 import { useAssistantChat } from '@/contexts/AssistantChatContext';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -25,8 +28,11 @@ import {
   isChatFormComplement,
 } from '@/lib/assistant/chatComplements';
 import {
+  createAssistantConversation,
+  listAssistantConversations,
+  loadAllAssistantMessages,
   streamAssistantChat,
-  type AssistantChatHistoryMessage,
+  type AssistantConversation,
 } from '@/lib/api/assistant';
 import {
   MAX_CHAT_PANEL_WIDTH,
@@ -64,13 +70,14 @@ function createId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function buildAssistantHistory(messages: ChatMessage[]): AssistantChatHistoryMessage[] {
-  return messages
-    .filter((message) => message.id !== 'welcome' && message.content.trim().length > 0)
-    .map((message) => ({
-      role: message.role,
-      content: message.content.trim(),
-    }));
+function mapApiMessagesToChat(
+  rows: Awaited<ReturnType<typeof loadAllAssistantMessages>>,
+): ChatMessage[] {
+  return rows.map((row) => ({
+    id: row.id,
+    role: row.role,
+    content: row.content,
+  }));
 }
 
 function buildOutboundMessage(text: string, attachments: ChatAttachment[]): string {
@@ -87,9 +94,12 @@ export default function AssistantChatPanel() {
   const { width: panelWidth, isResizing, onResizePointerDown, onResizeKeyDown } =
     useChatPanelResize(isOpen);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
+  const [conversations, setConversations] = useState<AssistantConversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [draft, setDraft] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
-  const [isThinking, setIsThinking] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
@@ -101,8 +111,100 @@ export default function AssistantChatPanel() {
   const pendingAttachmentsRef = useRef<ChatAttachment[]>([]);
   const streamAbortRef = useRef<AbortController | null>(null);
   const sendInFlightRef = useRef(false);
+  const activeConversationIdRef = useRef<string | null>(null);
 
   pendingAttachmentsRef.current = pendingAttachments;
+  activeConversationIdRef.current = activeConversationId;
+
+  const refreshConversations = useCallback(async () => {
+    if (!accessToken || !restaurantId) return;
+    const page = await listAssistantConversations(accessToken, restaurantId);
+    setConversations(page.items);
+  }, [accessToken, restaurantId]);
+
+  const loadConversationMessages = useCallback(
+    async (conversationId: string) => {
+      if (!accessToken || !restaurantId) return;
+      setMessagesLoading(true);
+      try {
+        const rows = await loadAllAssistantMessages(accessToken, restaurantId, conversationId);
+        const mapped = mapApiMessagesToChat(rows);
+        setMessages(mapped.length > 0 ? mapped : [WELCOME_MESSAGE]);
+      } catch (error) {
+        console.error(error);
+        setMessages([
+          {
+            id: createId(),
+            role: 'assistant',
+            content: 'No se pudo cargar esta conversación. Intenta de nuevo.',
+          },
+        ]);
+      } finally {
+        setMessagesLoading(false);
+      }
+    },
+    [accessToken, restaurantId],
+  );
+
+  const selectConversation = useCallback(
+    async (conversationId: string) => {
+      if (isBusy || sendInFlightRef.current) return;
+      setActiveConversationId(conversationId);
+      await loadConversationMessages(conversationId);
+    },
+    [isBusy, loadConversationMessages],
+  );
+
+  useEffect(() => {
+    const token = accessToken;
+    const rid = restaurantId;
+    if (!isOpen || !token || !rid) return;
+
+    let cancelled = false;
+
+    async function bootstrap(token: string, rid: string) {
+      setConversationsLoading(true);
+      try {
+        const page = await listAssistantConversations(token, rid);
+        if (cancelled) return;
+
+        if (page.items.length > 0) {
+          setConversations(page.items);
+          const initial = page.items[0]!;
+          setActiveConversationId(initial.id);
+          const rows = await loadAllAssistantMessages(token, rid, initial.id);
+          if (cancelled) return;
+          const mapped = mapApiMessagesToChat(rows);
+          setMessages(mapped.length > 0 ? mapped : [WELCOME_MESSAGE]);
+          return;
+        }
+
+        const created = await createAssistantConversation(token, rid);
+        if (cancelled) return;
+        setConversations([created]);
+        setActiveConversationId(created.id);
+        setMessages([WELCOME_MESSAGE]);
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setMessages([
+            {
+              id: createId(),
+              role: 'assistant',
+              content: 'No se pudo cargar el historial del asistente.',
+            },
+          ]);
+        }
+      } finally {
+        if (!cancelled) setConversationsLoading(false);
+      }
+    }
+
+    void bootstrap(token, rid);
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, accessToken, restaurantId]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -122,7 +224,7 @@ export default function AssistantChatPanel() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isThinking, streamingMessageId, pendingAttachments, scrollToBottom]);
+  }, [messages, streamingMessageId, pendingAttachments, scrollToBottom]);
 
   useEffect(() => {
     return () => {
@@ -157,10 +259,12 @@ export default function AssistantChatPanel() {
   }, []);
 
   const requestAssistantReply = useCallback(
-    async (outboundMessage: string, historyMessages: ChatMessage[]) => {
+    async (outboundMessage: string, userMessage: ChatMessage) => {
       if (sendInFlightRef.current) return;
 
-      if (!accessToken || !restaurantId) {
+      const conversationId = activeConversationIdRef.current;
+
+      if (!accessToken || !restaurantId || !conversationId) {
         const assistantMessage: ChatMessage = {
           id: createId(),
           role: 'assistant',
@@ -175,12 +279,15 @@ export default function AssistantChatPanel() {
       const assistantMessageId = createId();
       sendInFlightRef.current = true;
       setIsBusy(true);
-      setIsThinking(true);
-      setMessages((prev) => [
-        ...prev,
-        { id: assistantMessageId, role: 'assistant', content: '' },
-      ]);
-      setIsThinking(false);
+      setMessages((prev) => {
+        const withoutWelcome =
+          prev.length === 1 && prev[0]?.id === 'welcome' ? [] : prev.filter((m) => m.id !== 'welcome');
+        return [
+          ...withoutWelcome,
+          userMessage,
+          { id: assistantMessageId, role: 'assistant', content: '' },
+        ];
+      });
       setStreamingMessageId(assistantMessageId);
 
       streamAbortRef.current?.abort();
@@ -202,10 +309,8 @@ export default function AssistantChatPanel() {
         await streamAssistantChat(
           accessToken,
           restaurantId,
-          {
-            message: outboundMessage,
-            history: buildAssistantHistory(historyMessages),
-          },
+          conversationId,
+          outboundMessage,
           {
             onDelta: (delta) => {
               streamedContent += delta;
@@ -219,13 +324,20 @@ export default function AssistantChatPanel() {
             },
             onComplete: (payload) => {
               const finalContent = payload.content || streamedContent;
+              const resolvedAssistantId = payload.message_id || assistantMessageId;
+              const resolvedUserId = userMessage.id;
               setMessages((prev) =>
-                prev.map((message) =>
-                  message.id === assistantMessageId
-                    ? { ...message, content: finalContent }
-                    : message,
-                ),
+                prev.map((message) => {
+                  if (message.id === assistantMessageId) {
+                    return { ...message, id: resolvedAssistantId, content: finalContent };
+                  }
+                  if (message.id === userMessage.id) {
+                    return { ...message, id: resolvedUserId };
+                  }
+                  return message;
+                }),
               );
+              void refreshConversations();
               finishStream();
             },
             onError: (error) => {
@@ -261,7 +373,7 @@ export default function AssistantChatPanel() {
         finishStream();
       }
     },
-    [accessToken, restaurantId],
+    [accessToken, restaurantId, refreshConversations],
   );
 
   const sendMessage = useCallback(
@@ -278,13 +390,11 @@ export default function AssistantChatPanel() {
         attachments: attachments.length > 0 ? attachments : undefined,
       };
 
-      const historyMessages = [...messages, userMessage];
-      setMessages((prev) => [...prev, userMessage]);
       setDraft('');
       setPendingAttachments([]);
-      await requestAssistantReply(outboundMessage, historyMessages);
+      await requestAssistantReply(outboundMessage, userMessage);
     },
-    [isBusy, messages, requestAssistantReply],
+    [isBusy, requestAssistantReply],
   );
 
   const handleSubmit = () => {
@@ -322,24 +432,32 @@ export default function AssistantChatPanel() {
         formSubmission: submission,
       };
 
-      const historyMessages = [...messages, userMessage];
       setMessages((prev) => [...prev, userMessage]);
-      await requestAssistantReply(summary, historyMessages);
+      await requestAssistantReply(summary, userMessage);
     },
     [isBusy, messages, requestAssistantReply],
   );
 
-  const handleNewConversation = () => {
+  const handleNewConversation = async () => {
+    if (!accessToken || !restaurantId || isBusy) return;
+
     streamAbortRef.current?.abort();
     sendInFlightRef.current = false;
     clearPendingAttachments();
-    setMessages([WELCOME_MESSAGE]);
     setDraft('');
-    setIsThinking(false);
     setStreamingMessageId(null);
     setIsBusy(false);
     setIsDragActive(false);
     dragCounterRef.current = 0;
+
+    try {
+      const created = await createAssistantConversation(accessToken, restaurantId);
+      setConversations((prev) => [created, ...prev]);
+      setActiveConversationId(created.id);
+      setMessages([WELCOME_MESSAGE]);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const handleDragEnter = (event: React.DragEvent) => {
@@ -449,10 +567,24 @@ export default function AssistantChatPanel() {
         </div>
       </header>
 
+      <AssistantConversationList
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        loading={conversationsLoading}
+        disabled={isBusy}
+        onSelect={(conversationId) => {
+          void selectConversation(conversationId);
+        }}
+      />
+
       <div className={styles.messages} role="log" aria-live="polite" aria-relevant="additions">
+        {messagesLoading ? (
+          <p className={styles.messagesLoading}>Cargando mensajes…</p>
+        ) : null}
         {messages.map((message) => {
           const isUser = message.role === 'user';
           const isStreaming = streamingMessageId === message.id;
+          const isAwaitingFirstToken = isStreaming && message.content.trim().length === 0;
           const hasAttachments = (message.attachments?.length ?? 0) > 0;
           const hasComplement = Boolean(message.complement);
           const attachmentCount = message.attachments?.length ?? 0;
@@ -469,7 +601,10 @@ export default function AssistantChatPanel() {
               className={`${styles.messageRow} ${isUser ? styles.messageRowUser : styles.messageRowAssistant}`}
             >
               {!isUser ? (
-                <div className={styles.messageAvatar} aria-hidden>
+                <div
+                  className={`${styles.messageAvatar} ${isAwaitingFirstToken ? styles.messageAvatarAwaiting : ''}`}
+                  aria-hidden
+                >
                   <BrainOutlinedIcon fontSize="inherit" />
                 </div>
               ) : null}
@@ -478,12 +613,23 @@ export default function AssistantChatPanel() {
               >
                 {(message.content || hasAttachments || isStreaming) && (
                   <div
-                    className={`${styles.bubble} ${isUser ? styles.bubbleUser : styles.bubbleAssistant} ${
-                      attachmentsOnly ? styles.bubbleAttachmentsOnly : ''
-                    } ${isAttachmentPair ? styles.bubbleAttachmentPair : ''}`}
+                    className={`${styles.messageBody} ${isUser ? styles.messageBodyUser : styles.messageBodyAssistant} ${
+                      attachmentsOnly ? styles.messageBodyAttachmentsOnly : ''
+                    } ${isAttachmentPair ? styles.messageBodyAttachmentPair : ''}`}
                   >
-                    {message.content ? <span>{message.content}</span> : null}
-                    {isStreaming ? <span className={styles.cursor} aria-hidden /> : null}
+                    {isUser ? (
+                      message.content ? (
+                        <p className={styles.userText}>{message.content}</p>
+                      ) : null
+                    ) : (
+                      <div className={styles.assistantText}>
+                        {isAwaitingFirstToken ? <ChatStreamProcessing /> : null}
+                        {message.content ? <ChatMarkdown content={message.content} /> : null}
+                        {isStreaming && message.content ? (
+                          <span className={styles.cursor} aria-hidden />
+                        ) : null}
+                      </div>
+                    )}
                     {hasAttachments ? (
                       <ChatAttachmentList
                         attachments={message.attachments ?? []}
@@ -505,19 +651,6 @@ export default function AssistantChatPanel() {
             </div>
           );
         })}
-
-        {isThinking ? (
-          <div className={`${styles.messageRow} ${styles.messageRowAssistant}`}>
-            <div className={styles.messageAvatar} aria-hidden>
-              <BrainOutlinedIcon fontSize="inherit" />
-            </div>
-            <div className={styles.typing} aria-label="El asistente está escribiendo">
-              <span className={styles.typingDot} />
-              <span className={styles.typingDot} />
-              <span className={styles.typingDot} />
-            </div>
-          </div>
-        ) : null}
 
         <div ref={messagesEndRef} />
       </div>

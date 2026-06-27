@@ -155,10 +155,17 @@
   overscroll-behavior: contain;
 }
 
+.messagesLoading {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
 .messageRow {
   display: flex;
-  gap: 0.5rem;
-  align-items: flex-end;
+  gap: 0.65rem;
+  align-items: flex-start;
 }
 
 .messageRowUser {
@@ -172,22 +179,76 @@
 .messageContent {
   display: flex;
   flex-direction: column;
-  max-width: 85%;
   min-width: 0;
 }
 
 .messageContentUser {
   align-items: flex-end;
+  max-width: 88%;
 }
 
 .messageContentAssistant {
   align-items: flex-start;
+  flex: 1;
+  max-width: calc(100% - 2.3rem);
 }
 
-.assistantContent {
+.messageBody {
+  width: 100%;
+  min-width: 0;
+}
+
+.messageBodyUser {
   display: flex;
   flex-direction: column;
-  max-width: 85%;
+  align-items: flex-end;
+  gap: 0.45rem;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.6rem 0.85rem;
+  border-radius: 1rem;
+  border-bottom-right-radius: 0.35rem;
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.messageBodyAssistant {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.messageBodyAttachmentsOnly {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.messageBodyUser.messageBodyAttachmentsOnly {
+  padding: 0.45rem;
+}
+
+.messageBodyAttachmentPair {
+  max-width: min(100%, 16.75rem);
+}
+
+.messageBodyUser.messageBodyAttachmentPair {
+  max-width: min(100%, 16.75rem);
+}
+
+.userText {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: left;
+}
+
+.assistantText {
+  width: 100%;
   min-width: 0;
 }
 
@@ -207,40 +268,19 @@
   font-size: 0.95rem;
 }
 
-.bubble {
-  max-width: 100%;
-  padding: 0.65rem 0.85rem;
-  border-radius: 1rem;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
+.messageAvatarAwaiting {
+  animation: avatarGlow 1.6s ease-in-out infinite;
 }
 
-.bubbleUser {
-  background: var(--color-primary);
-  color: #fff;
-  border-bottom-right-radius: 0.35rem;
-}
+@keyframes avatarGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 0%, transparent);
+  }
 
-.bubbleAssistant {
-  background: var(--color-bg);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-bottom-left-radius: 0.35rem;
-}
-
-.bubbleAttachmentsOnly {
-  padding: 0.45rem;
-}
-
-.bubbleAttachmentPair {
-  width: fit-content;
-  max-width: min(85%, 16.75rem);
-}
-
-.bubbleAttachmentPair.bubbleAttachmentsOnly {
-  padding: 0.4rem;
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 14%, transparent);
+  }
 }
 
 .cursor {
@@ -260,46 +300,6 @@
   }
   50% {
     opacity: 0;
-  }
-}
-
-.typing {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.65rem 0.85rem;
-  border-radius: 1rem;
-  border-bottom-left-radius: 0.35rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-}
-
-.typingDot {
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 999px;
-  background: var(--color-text-secondary);
-  animation: typingBounce 1.2s ease-in-out infinite;
-}
-
-.typingDot:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.typingDot:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-@keyframes typingBounce {
-  0%,
-  60%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.45;
-  }
-  30% {
-    transform: translateY(-3px);
-    opacity: 1;
   }
 }
 
@@ -523,8 +523,11 @@
     transition: none;
   }
 
-  .cursor,
-  .typingDot {
+  .messageAvatarAwaiting {
+    animation: none;
+  }
+
+  .cursor {
     animation: none;
   }
 }
