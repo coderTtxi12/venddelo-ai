@@ -13,6 +13,7 @@ from app.infra.redis.factory import build_cache
 from app.infra.repositories.idempotency import SqlAlchemyIdempotencyRepository
 from app.modules.ai.adapters import SqlAlchemyAIArtifactRepository
 from app.modules.ai.job_adapters import SqlAlchemyAIJobRepository
+from app.modules.assistant.adapters import SqlAlchemyAssistantRepository
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
 from app.modules.menu.adapters import SqlAlchemyMenuRepository
 from app.modules.orders.adapters import SqlAlchemyOrderRepository
@@ -59,6 +60,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.translations = SqlAlchemyTranslationRepository(self.session)
         self.ai_artifacts = SqlAlchemyAIArtifactRepository(self.session)
         self.ai_jobs = SqlAlchemyAIJobRepository(self.session)
+        self.assistant = SqlAlchemyAssistantRepository(self.session)
         self.idempotency = CompositeIdempotencyRepository(
             cache,
             db_idempotency,
