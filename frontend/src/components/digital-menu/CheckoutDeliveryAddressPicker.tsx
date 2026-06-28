@@ -1,6 +1,7 @@
 'use client';
 
 import MyLocationOutlinedIcon from '@mui/icons-material/MyLocationOutlined';
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   fetchPlaceById,
@@ -11,6 +12,7 @@ import {
   reverseGeocodeCoordinates,
 } from '@/lib/loadGoogleMapsPlaces';
 import { dismissMobileKeyboard, scrollElementIntoViewAfterKeyboard } from '@/lib/mobileKeyboard';
+import { applyPlaceAutocompleteTheme } from '@/lib/digital-menu/checkout/applyPlaceAutocompleteTheme';
 import styles from './CheckoutDeliveryAddressPicker.module.css';
 
 export type DeliveryLocationValue = {
@@ -54,6 +56,7 @@ export function CheckoutDeliveryAddressPicker({
   const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
   const dragEndListenerRef = useRef<google.maps.MapsEventListener | null>(null);
   const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
+  const stopAutocompleteThemeRef = useRef<(() => void) | null>(null);
   const skipDragEmitRef = useRef(false);
   const onChangeRef = useRef(onChange);
   const valueRef = useRef(value);
@@ -159,6 +162,11 @@ export function CheckoutDeliveryAddressPicker({
           includedRegionCodes: ['mx'],
         });
         autocomplete.className = styles.autocompleteHost;
+        autocomplete.placeholder = 'Calle, número, colonia, ciudad…';
+        stopAutocompleteThemeRef.current = applyPlaceAutocompleteTheme(autocomplete, {
+          predictionIconClassName: styles.predictionSlotIcon,
+          clearIconClassName: styles.clearSlotIcon,
+        });
 
         autocomplete.addEventListener(
           'gmp-select',
@@ -200,6 +208,8 @@ export function CheckoutDeliveryAddressPicker({
 
     return () => {
       cancelled = true;
+      stopAutocompleteThemeRef.current?.();
+      stopAutocompleteThemeRef.current = null;
     };
   }, [apiKeyMissing, handlePlaceSelected]);
 
@@ -348,11 +358,14 @@ export function CheckoutDeliveryAddressPicker({
           {autocompleteError}
         </p>
       ) : null}
-      <div
-        ref={autocompleteHostRef}
-        id="checkout-delivery-address-search"
-        className={styles.host}
-      />
+      <div className={styles.searchShell}>
+        <SearchOutlinedIcon className={styles.searchLeadIcon} aria-hidden />
+        <div
+          ref={autocompleteHostRef}
+          id="checkout-delivery-address-search"
+          className={styles.host}
+        />
+      </div>
 
       {value.address.trim() ? (
         <p className={styles.selectedAddress} aria-live="polite">
