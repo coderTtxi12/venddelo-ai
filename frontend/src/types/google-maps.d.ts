@@ -3,7 +3,12 @@ export {};
 declare global {
   namespace google.maps.places {
     class PlaceAutocompleteElement extends HTMLElement {
-      constructor(options?: { includedRegionCodes?: string[] });
+      constructor(options?: { includedRegionCodes?: string[]; noInputIcon?: boolean });
+      className: string;
+      placeholder: string;
+      noInputIcon: boolean;
+      appendChild<T extends Node>(node: T): T;
+      querySelector(selectors: string): Element | null;
       addEventListener(
         type: 'gmp-select',
         listener: (event: PlacePredictionSelectEvent) => void,
@@ -95,6 +100,7 @@ declare global {
     function importLibrary(name: 'places'): Promise<{
       PlaceAutocompleteElement: new (options?: {
         includedRegionCodes?: string[];
+        noInputIcon?: boolean;
       }) => google.maps.places.PlaceAutocompleteElement;
       Place: new (options: { id: string }) => google.maps.places.Place;
     }>;
