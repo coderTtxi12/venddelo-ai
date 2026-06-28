@@ -1,3 +1,9 @@
+import { installPlaceAutocompleteShadowThemePatch } from '@/lib/digital-menu/checkout/placeAutocompleteIcons';
+
+if (typeof document !== 'undefined') {
+  installPlaceAutocompleteShadowThemePatch();
+}
+
 let loadPromise: Promise<void> | null = null;
 
 export function getGoogleMapsApiKey(): string | null {
