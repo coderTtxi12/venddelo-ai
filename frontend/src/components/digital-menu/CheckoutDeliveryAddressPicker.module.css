@@ -1,19 +1,189 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.65rem;
 }
 
 .label {
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--dm-text, #111827);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
 }
 
 .hint {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   line-height: 1.45;
+  color: var(--dm-text-secondary, #64748b);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+}
+
+.searchShell {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 48px;
+  padding: 0.15rem 0.55rem 0.15rem 0.65rem;
+  border: 1.5px solid var(--dm-border, #e2e8f0);
+  border-radius: var(--dm-radius-ui, 12px);
+  background: color-mix(in srgb, var(--dm-primary, #111827) 3%, var(--dm-surface, #fff));
+}
+
+.searchLeadIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--dm-text-secondary, #64748b);
+  pointer-events: none;
+}
+
+.searchShell:focus-within .searchLeadIcon {
+  color: var(--dm-primary, #111827);
+}
+
+.predictionSlotIcon,
+:global(.dm-place-prediction-icon) {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--dm-primary, #111827);
+}
+
+.clearSlotIcon,
+:global(.dm-place-clear-icon) {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--dm-text-secondary, #64748b);
+}
+
+.searchShell:focus-within :global(.dm-place-clear-icon),
+.searchShell:focus-within .clearSlotIcon {
+  color: var(--dm-primary, #111827);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .searchShell {
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      background-color 180ms ease;
+  }
+}
+
+.searchShell:focus-within {
+  border-color: var(--dm-primary, #111827);
+  background: color-mix(in srgb, var(--dm-primary, #111827) 5%, var(--dm-surface, #fff));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--dm-primary, #111827) 18%, transparent);
+}
+
+.host {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.autocompleteHost {
+  width: 100%;
+}
+
+.host :global(gmp-place-autocomplete) {
+  width: 100%;
+  display: block;
+  background-color: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  color-scheme: normal;
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  font-size: 0.92rem;
+  color: var(--dm-text, #111827);
+  --gmp-mat-color-primary: var(--dm-primary, #111827);
+  --gmp-mat-color-outline-decorative: var(--dm-border, #e2e8f0);
+  --gmp-mat-color-surface: var(--dm-surface, #fff);
+  --gmp-mat-color-on-surface: var(--dm-text, #111827);
+  --gmp-mat-color-on-surface-variant: var(--dm-text-secondary, #64748b);
+  --gmp-mat-color-info: var(--dm-primary, #111827);
+  --gmp-mat-color-neutral-container: color-mix(
+    in srgb,
+    var(--dm-primary, #111827) 12%,
+    var(--dm-surface, #fff)
+  );
+  --gmp-mat-color-on-neutral-container: var(--dm-primary, #111827);
+}
+
+.host :global(gmp-place-autocomplete:focus),
+.host :global(gmp-place-autocomplete:focus-visible),
+.host :global(gmp-place-autocomplete:focus-within) {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Google renders its own blue focus ring — hide it; .searchShell:focus-within handles focus. */
+.host :global(gmp-place-autocomplete::part(focus-ring)) {
+  display: none !important;
+  opacity: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.host :global(gmp-place-autocomplete::part(input)) {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.35rem 0.55rem 0;
+  border: none;
+  border-radius: calc(var(--dm-radius-ui, 12px) - 2px);
+  font-size: 0.92rem;
+  line-height: 1.35;
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  background: transparent;
+  color: var(--dm-text, #111827);
+  color-scheme: normal;
+}
+
+.host :global(gmp-place-autocomplete::part(input):focus),
+.host :global(gmp-place-autocomplete::part(input):focus-visible) {
+  outline: none;
+  box-shadow: none;
+  border: none;
+}
+
+.host :global(gmp-place-autocomplete::part(prediction-list)) {
+  margin-top: 0.35rem;
+  border: 1px solid var(--dm-border, #e2e8f0);
+  border-radius: var(--dm-radius-ui, 12px);
+  background: var(--dm-surface, #fff);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--dm-text, #0f172a) 14%, transparent);
+  overflow: hidden;
+}
+
+.host :global(gmp-place-autocomplete::part(prediction-item)) {
+  color: var(--dm-text, #111827);
+  background: var(--dm-surface, #fff);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+}
+
+.host :global(gmp-place-autocomplete::part(prediction-item-icon)) {
+  color: var(--dm-primary, #111827);
+}
+
+.host :global(gmp-place-autocomplete::part(prediction-item-selected)) {
+  background: color-mix(in srgb, var(--dm-primary, #111827) 8%, var(--dm-surface, #fff));
+}
+
+.host :global(gmp-place-autocomplete::part(prediction-item-match)) {
+  color: var(--dm-primary, #111827);
+}
+
+.host :global(gmp-place-autocomplete::part(prediction-item-main-text)) {
+  color: var(--dm-text, #111827);
+}
+
+.host :global(gmp-place-autocomplete::part(prediction-item-secondary-text)) {
   color: var(--dm-text-secondary, #64748b);
 }
 
@@ -23,7 +193,7 @@
   gap: 0.55rem;
   padding: 0.7rem 0.8rem;
   border: 1px solid color-mix(in srgb, var(--dm-primary, #111827) 28%, var(--dm-border, #e2e8f0));
-  border-radius: 12px;
+  border-radius: var(--dm-radius-ui, 12px);
   background: color-mix(in srgb, var(--dm-primary, #111827) 6%, var(--dm-surface, #fff));
 }
 
@@ -40,48 +210,25 @@
   font-size: 0.78rem;
   line-height: 1.45;
   color: var(--dm-text-secondary, #64748b);
-}
-
-.autocompleteHost {
-  min-height: 44px;
-}
-
-.host :global(gmp-place-autocomplete) {
-  width: 100%;
-  color-scheme: light dark;
-}
-
-.host :global(input) {
-  width: 100%;
-  min-height: 44px;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid var(--dm-border, #e2e8f0);
-  border-radius: 12px;
-  font-size: 0.9rem;
   font-family: var(--dm-font-body, system-ui, sans-serif);
-  background: var(--dm-surface, #fff);
-  color: var(--dm-text, #111827);
-}
-
-.host :global(input:focus) {
-  outline: none;
-  border-color: var(--dm-primary, #111827);
 }
 
 .selectedAddress {
   margin: 0;
   padding: 0.65rem 0.75rem;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--dm-border, #e2e8f0) 35%, transparent);
+  border-radius: var(--dm-radius-ui, 12px);
+  border: 1px solid color-mix(in srgb, var(--dm-primary, #111827) 22%, var(--dm-border, #e2e8f0));
+  background: color-mix(in srgb, var(--dm-primary, #111827) 5%, var(--dm-surface, #fff));
   font-size: 0.82rem;
   line-height: 1.4;
   color: var(--dm-text, #111827);
+  font-family: var(--dm-font-body, system-ui, sans-serif);
 }
 
 .mapShell {
   position: relative;
   border: 1px solid var(--dm-border, #e2e8f0);
-  border-radius: 12px;
+  border-radius: var(--dm-radius-ui, 12px);
   overflow: hidden;
   background: var(--dm-surface, #fff);
 }
@@ -105,6 +252,7 @@
   font-size: 0.82rem;
   text-align: center;
   pointer-events: none;
+  font-family: var(--dm-font-body, system-ui, sans-serif);
 }
 
 .mapOverlay {
@@ -133,13 +281,13 @@
 .fallbackTextArea {
   width: 100%;
   min-height: 96px;
-  border: 1px solid var(--dm-border, #e2e8f0);
-  border-radius: 12px;
+  border: 1.5px solid var(--dm-border, #e2e8f0);
+  border-radius: var(--dm-radius-ui, 12px);
   padding: 0.75rem 0.85rem;
   font-size: 0.92rem;
   line-height: 1.4;
   color: var(--dm-text, #111827);
-  background: var(--dm-surface, #fff);
+  background: color-mix(in srgb, var(--dm-primary, #111827) 3%, var(--dm-surface, #fff));
   font-family: var(--dm-font-body, system-ui, sans-serif);
   resize: vertical;
 }
@@ -148,11 +296,18 @@
   outline: 2px solid var(--dm-primary, #111827);
   outline-offset: 1px;
   border-color: var(--dm-primary, #111827);
+  background: color-mix(in srgb, var(--dm-primary, #111827) 5%, var(--dm-surface, #fff));
 }
 
 @media (min-width: 1024px) {
   .mapCanvas {
     height: 260px;
     min-height: 260px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .searchShell {
+    transition: none;
   }
 }
