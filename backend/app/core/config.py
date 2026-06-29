@@ -39,7 +39,14 @@ class Settings(BaseSettings):
     redis_url: str | None = None
     menu_cache_ttl_seconds: int = 300
     assistant_conversation_cache_ttl_seconds: int = 300
+    assistant_profile_cache_ttl_seconds: int = 3600
+    assistant_lane_lock_ttl_seconds: int = 600
     assistant_llm_context_message_limit: int = 40
+    assistant_context_compression_enabled: bool = True
+    assistant_context_max_tokens: int = 8000
+    assistant_context_compression_threshold_ratio: float = 0.70
+    assistant_context_recent_window_turns: int = 6
+    assistant_max_tool_iterations: int = 8
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
     openai_api_key: str | None = None
