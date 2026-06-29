@@ -70,6 +70,20 @@ def test_create_and_list_conversations(client, engine):
 def test_stream_persists_messages(client, engine):
     restaurant = _seed_restaurant(client, engine, "assistant-conv-stream")
 
+    profile = client.get(
+        f"/api/v1/restaurants/{restaurant.id}/assistant/profile",
+        headers=AUTH,
+    )
+    assert profile.status_code == 200
+    profile_body = profile.json()
+    profile_patch = client.patch(
+        f"/api/v1/restaurants/{restaurant.id}/assistant/profile",
+        headers=AUTH,
+        json={"display_name": "Luna", "expected_version": profile_body["version"]},
+    )
+    assert profile_patch.status_code == 200
+    profile_version = profile_patch.json()["version"]
+
     create = client.post(
         f"/api/v1/restaurants/{restaurant.id}/assistant/conversations",
         headers=AUTH,
@@ -81,11 +95,12 @@ def test_stream_persists_messages(client, engine):
         response = client.post(
             f"/api/v1/restaurants/{restaurant.id}/assistant/conversations/{conversation_id}/chat",
             headers={**AUTH, "Accept": "text/event-stream"},
-            json={"message": "Hola desde el panel"},
+            json={"message": "Hola desde el panel", "profile_version": profile_version},
         )
 
     assert response.status_code == 200
     events = _parse_sse(response.text)
+    assert "agent.phase" in [name for name, _ in events]
     assert events[-1][0] == "message.complete"
     assert events[-1][1]["conversation_id"] == conversation_id
     assert "Hola desde el panel" in events[-1][1]["content"]
