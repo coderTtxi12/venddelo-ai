@@ -40,7 +40,6 @@ export type AssistantSkillCatalogEntry = {
   granted: boolean;
   enabled: boolean;
   effective: boolean;
-  required_plan: string;
   lock_reason: string | null;
 };
 
@@ -70,9 +69,6 @@ export type AssistantProfileUpdate = {
 
 export type AssistantProfileSnapshot = {
   display_name: string;
-  identity_markdown: string;
-  behavior_markdown: string;
-  menu_markdown: string;
   enabled_skill_ids: string[];
 };
 
@@ -81,12 +77,28 @@ export type AssistantChatStreamOptions = {
   profileSnapshot?: AssistantProfileSnapshot;
 };
 
+export type AssistantToolStartPayload = {
+  tool: string;
+  skill_id?: string;
+  args_summary?: Record<string, unknown>;
+  effect?: string;
+};
+
+export type AssistantToolResultPayload = {
+  tool: string;
+  ok: boolean;
+  summary?: string;
+};
+
 export type AssistantStreamHandlers = {
   onDelta: (delta: string) => void;
   onComplete: (payload: AssistantStreamCompletePayload) => void;
   onError: (payload: AssistantStreamErrorPayload) => void;
   onAgentPhase?: (phase: string) => void;
   onAgentStatus?: (status: string) => void;
+  onToolStart?: (payload: AssistantToolStartPayload) => void;
+  onToolResult?: (payload: AssistantToolResultPayload) => void;
+  onToolError?: (payload: AssistantToolResultPayload) => void;
 };
 
 export function getAssistantProfile(token: string, restaurantId: string) {
@@ -270,6 +282,39 @@ export async function streamAssistantChat(
         const status = payload.status;
         if (typeof status === 'string') {
           handlers.onAgentStatus?.(status);
+        }
+        continue;
+      }
+
+      if (parsed.event === 'tool.start') {
+        const tool = payload.tool;
+        if (typeof tool === 'string') {
+          handlers.onToolStart?.({
+            tool,
+            skill_id: typeof payload.skill_id === 'string' ? payload.skill_id : undefined,
+            args_summary:
+              payload.args_summary && typeof payload.args_summary === 'object'
+                ? (payload.args_summary as Record<string, unknown>)
+                : undefined,
+            effect: typeof payload.effect === 'string' ? payload.effect : undefined,
+          });
+        }
+        continue;
+      }
+
+      if (parsed.event === 'tool.result' || parsed.event === 'tool.error') {
+        const tool = payload.tool;
+        if (typeof tool === 'string') {
+          const resultPayload: AssistantToolResultPayload = {
+            tool,
+            ok: parsed.event === 'tool.result' && payload.ok !== false,
+            summary: typeof payload.summary === 'string' ? payload.summary : undefined,
+          };
+          if (parsed.event === 'tool.error' || payload.ok === false) {
+            handlers.onToolError?.(resultPayload);
+          } else {
+            handlers.onToolResult?.(resultPayload);
+          }
         }
         continue;
       }
