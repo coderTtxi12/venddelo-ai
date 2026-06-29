@@ -12,6 +12,23 @@ from app.modules.assistant.skills.base import SkillPort, ToolDefinition, ToolRes
 from app.modules.assistant.skills.registry import SkillRegistry
 
 
+class ChunkedLLMProvider(LLMProviderPort):
+    def __init__(self, responses: list[list[str]]) -> None:
+        self._responses = list(responses)
+        self._index = 0
+
+    def stream_chat(self, request: ChatCompletionRequest) -> Iterator[ChatStreamEvent]:
+        if self._index >= len(self._responses):
+            raise AssertionError("No more stub LLM responses configured")
+        chunks = self._responses[self._index]
+        self._index += 1
+        parts: list[str] = []
+        for chunk in chunks:
+            parts.append(chunk)
+            yield ChatStreamEvent(event="content.delta", data={"delta": chunk})
+        yield ChatStreamEvent(event="message.complete", data={"content": "".join(parts)})
+
+
 class SequenceLLMProvider(LLMProviderPort):
     def __init__(self, responses: list[str]) -> None:
         self._responses = list(responses)
@@ -80,8 +97,10 @@ def test_orchestrator_executes_tool_selected_by_llm_json():
     answer = json.dumps(
         {
             "type": "answer",
+            "skill_id": "menu_read",
             "content": "Encontré **Taco al pastor**.",
             "language": "es",
+            "reason": "Product found in tool result.",
         }
     )
     provider = SequenceLLMProvider([tool_call, answer])
@@ -108,8 +127,103 @@ def test_orchestrator_executes_tool_selected_by_llm_json():
     assert complete.data["content"] == "Encontré **Taco al pastor**."
 
 
+def test_orchestrator_normalizes_malformed_tool_call_json():
+    tool_call = (
+        '{"type":"toolcall","skillid":"menuread","tool":"searchproducts",'
+        '"args":{"query":"pastor"},"reason":"Need live data."}'
+    )
+    answer = json.dumps(
+        {
+            "type": "answer",
+            "skill_id": "menu_read",
+            "content": "Encontré **Taco al pastor**.",
+            "language": "es",
+            "reason": "Product found in tool result.",
+        }
+    )
+    provider = SequenceLLMProvider([tool_call, answer])
+    orchestrator = AgentOrchestrator(provider=provider, registry=SkillRegistry([FakeReadSkill()]))
+    ctx = AgentContext(
+        restaurant_id=uuid.uuid4(),
+        conversation_id=uuid.uuid4(),
+        uow=None,  # type: ignore[arg-type]
+        effective_skill_ids=["menu_read"],
+    )
+
+    events = list(
+        orchestrator.stream_chat(
+            AssistantChatRequest(message="¿Tienes tacos al pastor?"),
+            profile=_profile(),
+            ctx=ctx,
+        )
+    )
+
+    assert "tool.start" in [event.event for event in events]
+    assert "tool.result" in [event.event for event in events]
+    assert not any(event.event == "error" for event in events)
+
+
+def test_orchestrator_accepts_plain_text_llm_answer():
+    provider = SequenceLLMProvider(["Me llamo **Mark**."])
+    orchestrator = AgentOrchestrator(provider=provider, registry=SkillRegistry([FakeReadSkill()]))
+    ctx = AgentContext(
+        restaurant_id=uuid.uuid4(),
+        conversation_id=uuid.uuid4(),
+        uow=None,  # type: ignore[arg-type]
+        effective_skill_ids=["menu_read"],
+    )
+
+    events = list(
+        orchestrator.stream_chat(
+            AssistantChatRequest(message="¿Cómo te llamas?"),
+            profile=_profile(),
+            ctx=ctx,
+        )
+    )
+
+    complete = next(event for event in events if event.event == "message.complete")
+    assert complete.data["content"] == "Me llamo **Mark**."
+    assert not any(event.event == "error" for event in events)
+
+
+def test_orchestrator_streams_answer_deltas_during_llm_generation():
+    chunks = [
+        '{"type":"answer","content":"Me ',
+        "llamo **Mark**.",
+        '","language":"es"}',
+    ]
+    provider = ChunkedLLMProvider([chunks])
+    orchestrator = AgentOrchestrator(provider=provider, registry=SkillRegistry([FakeReadSkill()]))
+    ctx = AgentContext(
+        restaurant_id=uuid.uuid4(),
+        conversation_id=uuid.uuid4(),
+        uow=None,  # type: ignore[arg-type]
+        effective_skill_ids=["menu_read"],
+    )
+
+    events = list(
+        orchestrator.stream_chat(
+            AssistantChatRequest(message="¿Cómo te llamas?"),
+            profile=_profile(),
+            ctx=ctx,
+        )
+    )
+
+    deltas = [event.data["delta"] for event in events if event.event == "content.delta"]
+    assert len(deltas) >= 2
+    assert "".join(deltas) == "Me llamo **Mark**."
+
+
 def test_orchestrator_passthrough_when_menu_read_not_enabled():
-    answer = json.dumps({"type": "answer", "content": "Hola, ¿en qué te ayudo?", "language": "es"})
+    answer = json.dumps(
+        {
+            "type": "answer",
+            "skill_id": None,
+            "content": "Hola, ¿en qué te ayudo?",
+            "language": "es",
+            "reason": "Greeting only.",
+        }
+    )
     provider = SequenceLLMProvider([answer])
     orchestrator = AgentOrchestrator(provider=provider, registry=SkillRegistry([FakeReadSkill()]))
     ctx = AgentContext(
