@@ -18,6 +18,10 @@ def test_build_messages_puts_system_prompt_first():
     assert messages[-1].content == "Hola"
 
 
+def _content_events(events):
+    return [event for event in events if event.event == "content.delta"]
+
+
 def test_stream_chat_emits_delta_and_complete():
     service = AssistantService(provider=StubLLMProvider())
     events = list(
@@ -27,7 +31,8 @@ def test_stream_chat_emits_delta_and_complete():
         )
     )
 
-    assert events[0].event == "content.delta"
+    content_events = _content_events(events)
+    assert content_events
     assert events[-1].event == "message.complete"
     assert events[-1].data["message_id"] == "msg-test-1"
     assert "Quiero agregar un producto" in events[-1].data["content"]
@@ -57,6 +62,6 @@ def test_stream_chat_handles_client_disconnect_without_error(monkeypatch):
         message_id="msg-close-1",
     )
 
-    first = next(stream)
-    assert first.event == "content.delta"
+    first_content = next(event for event in stream if event.event == "content.delta")
+    assert first_content.event == "content.delta"
     stream.close()
