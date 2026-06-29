@@ -2,12 +2,14 @@ import uuid
 
 import pytest
 
-from app.modules.assistant.entitlements.catalog import SKILL_CATALOG
+from app.modules.assistant.entitlements.adapters import SqlAlchemyRestaurantEntitlementsRepository
+from app.modules.assistant.entitlements.catalog import DEFAULT_GRANTED_SKILL_IDS, SKILL_CATALOG
 from app.modules.assistant.entitlements.resolver import resolve_entitlements, resolve_granted_skill_ids
-from app.modules.assistant.profile.service import AssistantProfileService
-from app.modules.assistant.profile.schemas import AssistantProfileSnapshot, AssistantProfileUpdate
+from app.modules.assistant.entitlements.schemas import RestaurantEntitlementsRecord
 from app.modules.assistant.profile.adapters import SqlAlchemyAssistantProfileRepository
-from app.modules.assistant.entitlements.adapters import SqlAlchemyEntitlementOverridesRepository
+from app.modules.assistant.profile.schemas import AssistantProfileSnapshot, AssistantProfileUpdate
+from app.modules.assistant.profile.service import AssistantProfileService
+from app.modules.assistant.schemas import AssistantConversationChatRequest
 from app.modules.restaurants.adapters import SqlAlchemyRestaurantRepository
 from app.modules.restaurants.schemas import RestaurantCreate
 from app.modules.users.adapters import SqlAlchemyUserRepository
@@ -15,25 +17,55 @@ from app.modules.users.schemas import UserCreate
 from tests.conftest import requires_db
 
 
-@requires_db
-def test_granted_skills_by_plan(session):
-    free = resolve_granted_skill_ids("free", None)
-    assert "menu_read" in free
-    assert "menu_import" not in free
+def test_chat_request_accepts_minimal_profile_snapshot():
+    request = AssistantConversationChatRequest(
+        message="Lista todos mis productos",
+        profile_version=2,
+        profile_snapshot=AssistantProfileSnapshot(
+            display_name="Luna",
+            enabled_skill_ids=["menu_read"],
+        ),
+    )
+    assert request.profile_snapshot is not None
+    assert request.profile_snapshot.display_name == "Luna"
+    assert request.profile_snapshot.enabled_skill_ids == ["menu_read"]
 
-    pro = resolve_granted_skill_ids("pro", None)
-    assert "menu_import" in pro
+
+def _entitlements_record(
+    restaurant_id: uuid.UUID,
+    *,
+    granted_skill_ids: list[str],
+) -> RestaurantEntitlementsRecord:
+    from datetime import UTC, datetime
+
+    return RestaurantEntitlementsRecord(
+        restaurant_id=restaurant_id,
+        granted_skill_ids=granted_skill_ids,
+        updated_at=datetime.now(UTC),
+    )
 
 
-@requires_db
-def test_effective_skills_intersection(session):
+def test_granted_skills_from_restaurant_entitlements():
+    default = resolve_granted_skill_ids(None)
+    assert default == set(DEFAULT_GRANTED_SKILL_IDS)
+
+    custom = resolve_granted_skill_ids(
+        _entitlements_record(uuid.uuid4(), granted_skill_ids=["menu_read", "menu_import"])
+    )
+    assert custom == {"menu_read", "menu_import"}
+
+
+def test_effective_skills_intersection():
+    restaurant_id = uuid.uuid4()
     resolved = resolve_entitlements(
-        owner_plan="pro",
         enabled_skill_ids=["menu_read", "menu_import", "promotions"],
-        overrides=None,
+        entitlements=_entitlements_record(
+            restaurant_id,
+            granted_skill_ids=["menu_read", "menu_import"],
+        ),
     )
     assert set(resolved.effective_skill_ids).issubset(set(resolved.granted_skill_ids))
-    assert "menu_read" in resolved.effective_skill_ids
+    assert resolved.effective_skill_ids == ["menu_import", "menu_read"]
 
 
 @requires_db
@@ -49,15 +81,15 @@ def test_profile_create_and_update(session):
 
     svc = AssistantProfileService(
         SqlAlchemyAssistantProfileRepository(session),
-        SqlAlchemyEntitlementOverridesRepository(session),
+        SqlAlchemyRestaurantEntitlementsRepository(session),
         rest_repo,
-        user_repo,
         cache=None,
     )
     profile = svc.get_profile_response(restaurant.id)
     assert profile.version == 1
     assert profile.chat_ready is False
     assert len(profile.skills_catalog) == len(SKILL_CATALOG)
+    assert profile.granted_skill_ids == list(DEFAULT_GRANTED_SKILL_IDS)
 
     updated = svc.update_profile(
         restaurant.id,
@@ -81,9 +113,8 @@ def test_cannot_enable_skill_not_granted(session):
 
     svc = AssistantProfileService(
         SqlAlchemyAssistantProfileRepository(session),
-        SqlAlchemyEntitlementOverridesRepository(session),
+        SqlAlchemyRestaurantEntitlementsRepository(session),
         rest_repo,
-        user_repo,
         cache=None,
     )
     profile = svc.get_profile_response(restaurant.id)
@@ -113,9 +144,8 @@ def test_chat_ignores_snapshot_when_profile_version_is_stale(session):
 
     svc = AssistantProfileService(
         SqlAlchemyAssistantProfileRepository(session),
-        SqlAlchemyEntitlementOverridesRepository(session),
+        SqlAlchemyRestaurantEntitlementsRepository(session),
         rest_repo,
-        user_repo,
         cache=None,
     )
     profile = svc.get_profile_response(restaurant.id)
