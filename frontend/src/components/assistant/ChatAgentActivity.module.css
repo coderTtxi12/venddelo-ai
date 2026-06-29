@@ -1,0 +1,117 @@
+.activity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: calc(var(--radius) + 2px);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 16%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+}
+
+.phaseRow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 1.25rem;
+}
+
+.phaseIcon {
+  flex-shrink: 0;
+  color: var(--color-primary);
+  opacity: 0.85;
+}
+
+.phaseLabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.35;
+}
+
+.phasePulse {
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-left: auto;
+  border-radius: 999px;
+  background: var(--color-primary);
+  animation: phasePulse 1.2s ease-in-out infinite;
+}
+
+.toolList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.toolItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.toolIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+  color: var(--color-text-secondary);
+}
+
+.toolItem_running .toolIcon {
+  color: var(--color-primary);
+}
+
+.toolItem_done .toolIcon {
+  color: #059669;
+}
+
+.toolItem_error .toolIcon {
+  color: #dc2626;
+}
+
+.toolText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.toolLabel {
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.35;
+}
+
+.toolSummary {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+}
+
+@keyframes phasePulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phasePulse {
+    animation: none;
+    opacity: 0.7;
+  }
+}
