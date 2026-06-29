@@ -34,11 +34,76 @@ export type AssistantStreamErrorPayload = {
   message: string;
 };
 
+export type AssistantSkillCatalogEntry = {
+  id: string;
+  label: string;
+  granted: boolean;
+  enabled: boolean;
+  effective: boolean;
+  required_plan: string;
+  lock_reason: string | null;
+};
+
+export type AssistantProfile = {
+  restaurant_id: string;
+  display_name: string;
+  identity_markdown: string;
+  behavior_markdown: string;
+  menu_markdown: string;
+  enabled_skill_ids: string[];
+  granted_skill_ids: string[];
+  effective_skill_ids: string[];
+  skills_catalog: AssistantSkillCatalogEntry[];
+  version: number;
+  chat_ready: boolean;
+  updated_at: string;
+};
+
+export type AssistantProfileUpdate = {
+  display_name?: string;
+  identity_markdown?: string;
+  behavior_markdown?: string;
+  menu_markdown?: string;
+  enabled_skill_ids?: string[];
+  expected_version: number;
+};
+
+export type AssistantProfileSnapshot = {
+  display_name: string;
+  identity_markdown: string;
+  behavior_markdown: string;
+  menu_markdown: string;
+  enabled_skill_ids: string[];
+};
+
+export type AssistantChatStreamOptions = {
+  profileVersion: number;
+  profileSnapshot?: AssistantProfileSnapshot;
+};
+
 export type AssistantStreamHandlers = {
   onDelta: (delta: string) => void;
   onComplete: (payload: AssistantStreamCompletePayload) => void;
   onError: (payload: AssistantStreamErrorPayload) => void;
+  onAgentPhase?: (phase: string) => void;
+  onAgentStatus?: (status: string) => void;
 };
+
+export function getAssistantProfile(token: string, restaurantId: string) {
+  return apiRequest<AssistantProfile>(`/restaurants/${restaurantId}/assistant/profile`, { token });
+}
+
+export function updateAssistantProfile(
+  token: string,
+  restaurantId: string,
+  body: AssistantProfileUpdate,
+) {
+  return apiRequest<AssistantProfile>(`/restaurants/${restaurantId}/assistant/profile`, {
+    method: 'PATCH',
+    token,
+    body,
+  });
+}
 
 export function listAssistantConversations(
   token: string,
@@ -112,6 +177,7 @@ export async function streamAssistantChat(
   message: string,
   handlers: AssistantStreamHandlers,
   signal?: AbortSignal,
+  options?: AssistantChatStreamOptions,
 ): Promise<void> {
   let response: Response;
   try {
@@ -124,7 +190,11 @@ export async function streamAssistantChat(
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({
+          message,
+          profile_version: options?.profileVersion ?? 1,
+          profile_snapshot: options?.profileSnapshot,
+        }),
         signal,
       },
     );
@@ -184,6 +254,22 @@ export async function streamAssistantChat(
         const delta = payload.delta;
         if (typeof delta === 'string' && delta) {
           handlers.onDelta(delta);
+        }
+        continue;
+      }
+
+      if (parsed.event === 'agent.phase') {
+        const phase = payload.phase;
+        if (typeof phase === 'string') {
+          handlers.onAgentPhase?.(phase);
+        }
+        continue;
+      }
+
+      if (parsed.event === 'agent.status') {
+        const status = payload.status;
+        if (typeof status === 'string') {
+          handlers.onAgentStatus?.(status);
         }
         continue;
       }
