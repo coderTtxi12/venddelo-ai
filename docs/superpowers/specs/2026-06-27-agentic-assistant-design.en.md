@@ -451,15 +451,14 @@ Skills exist in code (Lego), but **access is gated per tenant**. Two distinct la
 
 | Layer | Who controls | Meaning |
 |-------|--------------|---------|
-| **Granted** (`granted_skill_ids`) | Platform (plan, admin, promos) | What the restaurant **may** use |
+| **Granted** (`granted_skill_ids`) | Platform / admin (per restaurant) | What the restaurant **may** use |
 | **Enabled** (`enabled_skill_ids`) | Restaurant owner | What the owner **wants active** now |
 | **Effective** (`effective_skill_ids`) | Backend (computed) | `granted ∩ enabled` — what the agent actually loads |
 
 ```mermaid
 flowchart LR
-    Plan[Owner plan: free/pro/enterprise] --> Catalog[Skill Plan Catalog]
-    Overrides[Per-restaurant overrides] --> Resolver[Entitlement Resolver]
-    Catalog --> Resolver
+    Entitlements[restaurant_assistant_entitlements] --> Resolver[Entitlement Resolver]
+    Catalog[Skill catalog in code] --> Resolver
     Resolver --> Granted[granted_skill_ids]
     Enabled[enabled_skill_ids from profile] --> Effective[effective_skill_ids]
     Granted --> Effective
@@ -469,45 +468,46 @@ flowchart LR
 
 #### Sources of `granted_skill_ids`
 
-1. **Owner plan** — today `users.plan` ∈ `free` | `pro` | `enterprise` (existing schema).
-2. **Plan → skills catalog** — defined in code for v1 (`assistant_skill_catalog.py`); migratable to `assistant_plan_skills` when billing becomes dynamic.
-3. **Per-restaurant overrides** — optional `restaurant_assistant_entitlements` row for beta, custom enterprise, or revoking a specific skill.
+1. **Per-restaurant configuration** — row in `restaurant_assistant_entitlements` (0..1 per tenant). Each client can have a different skill set based on contract, beta, or support.
+2. **Skill catalog** — defined in code (`entitlements/catalog.py`); lists known IDs and labels. No plans or billing.
+3. **Default when no row** — if no entitlements row exists, the resolver uses `DEFAULT_GRANTED_SKILL_IDS` (v1: `["menu_read"]`) until admin configures the tenant.
 
-Proposed table `restaurant_assistant_entitlements` (0..1 per restaurant):
+Table `restaurant_assistant_entitlements` (0..1 per restaurant):
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `restaurant_id` | UUID PK/FK | Tenant |
-| `granted_extra` | JSONB | Skills added outside the plan (`["menu_import"]`) |
-| `revoked` | JSONB | Skills removed even if the plan includes them |
-| `expires_at` | TIMESTAMPTZ NULL | Temporary promos / beta |
-| `source` | VARCHAR(40) | `admin`, `promo`, `beta`, `support` |
+| `granted_skill_ids` | JSONB | Skills granted to this restaurant (`["menu_read","menu_import"]`) |
+| `expires_at` | TIMESTAMPTZ NULL | For temporary promos / beta |
+| `source` | VARCHAR(40) | `admin`, `promo`, `beta`, `support`, `default`, `migration` |
 | `updated_at` | TIMESTAMPTZ | Audit |
 
 **Formula:**
 
 ```
-granted = plan_skills(owner.plan) ∪ granted_extra − revoked
+granted = entitlements.granted_skill_ids   (or default if no active row)
 effective = granted ∩ enabled_skill_ids
+agent_skills = effective ∩ registered_skill_ids   (only skills with code in SkillRegistry)
 ```
 
-If `expires_at` has passed → ignore that row's `granted_extra` (job or lazy check).
+If `expires_at` has passed → treat the row as inactive and use the default.
 
 #### Initial catalog (example — adjustable)
 
-| Skill ID | Minimum plan | Notes |
-|----------|--------------|-------|
-| `menu_read` | `free` | Always available |
-| `menu_write` | `free` | Core product value |
-| `business` | `free` | Hours, name, logo |
-| `menu_import` | `pro` | PDF/image extraction |
-| `promotions` | `pro` | Future |
-| `analytics` | `enterprise` | Future |
+| Skill ID | Notes |
+|----------|-------|
+| `menu_read` | Menu read (implemented) |
+| `menu_write` | Menu edit (future) |
+| `business` | Hours, name, logo (future) |
+| `menu_import` | PDF/image extraction (future) |
+| `promotions` | Promotions (future) |
+
+Per-restaurant grants are configured in `granted_skill_ids`; they do not depend on `users.plan`.
 
 #### Enforcement (backend — never UI-only)
 
-1. **Prompt composer** — only includes SKILL.md sections for `effective_skill_ids`.
-2. **Runtime tool registry** — the LLM only receives tool definitions for effective skills.
+1. **Prompt composer** — only includes SKILL.md sections for effective skills **registered** at runtime.
+2. **Runtime tool registry** — the LLM only receives tool definitions for skills in `agent_skills`.
 3. **Tool executor** — rejects execution if `tool.skill_id ∉ effective` → `tool.error` code `skill_not_entitled`.
 4. **PATCH profile** — validate `enabled_skill_ids ⊆ granted`; if the owner tries to enable a non-granted skill → `422` with blocked skill list.
 5. **Chat request** — even if the client sends a snapshot with non-granted skills, the backend recalculates and uses only `effective`.
@@ -516,9 +516,9 @@ If `expires_at` has passed → ignore that row's `granted_extra` (job or lazy ch
 
 | Key | Value | TTL |
 |-----|-------|-----|
-| `assistant:entitlements:{restaurant_id}` | `{granted, plan, overrides_version}` | 1h (same strategy as profile) |
+| `assistant:entitlements:{restaurant_id}` | `{granted, source, updated_at}` | 1h (same strategy as profile) |
 
-Invalidate when owner plan changes, admin overrides change, or promo expires.
+Invalidate when admin changes `granted_skill_ids` or a promo expires.
 
 #### Enriched API response
 
@@ -535,30 +535,29 @@ Invalidate when owner plan changes, admin overrides change, or promo expires.
       "id": "menu_import",
       "label": "Import menu",
       "granted": false,
-      "required_plan": "pro",
-      "lock_reason": "upgrade_required"
+      "lock_reason": "not_granted"
     }
   ]
 }
 ```
 
-The frontend **does not decide** access; it only renders locks/upsell based on `granted` and `skills_catalog`.
+The frontend **does not decide** access; it only renders locks based on `granted` and `skills_catalog`.
 
 #### Agent behavior when a skill is missing
 
 If the user asks for something outside entitlements (*"upload this PDF"* without `menu_import`):
 
 - The agent **does not** run tools from that skill.
-- It explains the limit and, if applicable, an upgrade CTA (plan-configurable copy).
-- Non-granted tools are **not exposed** to the LLM (avoids confusion and bypass attempts).
+- It explains the limit and suggests contacting support or enabling the skill if granted but disabled.
+- Only tools for skills in `agent_skills` (effective **and** registered in code) are listed to the LLM.
 
 #### Alternatives considered
 
 | Approach | Pros | Cons | Verdict |
 |----------|------|------|---------|
-| **A — Plan catalog + per-restaurant overrides (recommended)** | Flexible, auditable, aligns with `users.plan` | Extra resolver | ✅ |
-| **B — Only `enabled_skill_ids` without a granted layer** | Simple | Owner enables Pro skills on free; not monetizable | ❌ |
-| **C — Global feature flags (LaunchDarkly)** | Fast ops | Does not model per-tenant plan; extra cost | ❌ v1 |
+| **A — Per-restaurant grants (recommended)** | Flexible per client, auditable, no billing coupling | Requires admin tooling | ✅ |
+| **B — Only `enabled_skill_ids` without a granted layer** | Simple | Owner enables non-contracted skills | ❌ |
+| **C — Plan catalog + overrides** | Aligns with SaaS billing | Not all clients fit tiers | ❌ v1 |
 
 ---
 
@@ -1499,7 +1498,7 @@ Chat request shape:
 | **5 — menu_import** | menu.md + themes DB + batch onboarding + images + literal extraction | Full appetizing menu |
 | **6 — promotions + bulk** | Additional skills | |
 
-Each phase is **independently deployable**; new skills are added to the catalog with `min_plan` without changing the orchestrator.
+Each phase is **independently deployable**; new skills are added to the catalog and granted per restaurant in `restaurant_assistant_entitlements` without changing the orchestrator.
 
 ---
 
@@ -1509,8 +1508,7 @@ Each phase is **independently deployable**; new skills are added to the catalog 
 2. **Single model or routing?** e.g. `gpt-4o-mini` for read, `gpt-4o` for write/import.
 3. **Do staff share the same assistant profile** as the owner? (Recommendation: yes, 1 profile per restaurant.)
 4. **Size limit** for identity/behavior? (Recommendation: 8 KB each.)
-5. **Plan on `users` or migrate to `restaurants`?** (Recommendation v1: resolve via owner.plan; evaluate `restaurants.plan` when one user owns multiple locations on different plans.)
-6. **Admin UI for overrides** in v1 or internal SQL/API only? (Recommendation: internal admin API; admin UI in phase 2.)
+5. **Admin API for per-restaurant `granted_skill_ids`?** (Recommendation v1: internal SQL or admin API; UI in phase 2. Billing plans are decoupled — grants are per tenant.)
 
 7. **Compression model?** (Recommendation: `gpt-4o-mini` or equivalent cheap model; configurable in settings.)
 8. **Recent window K = 6 turns?** (Adjustable for enterprise plan.)
