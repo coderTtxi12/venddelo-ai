@@ -14,6 +14,9 @@ ChatStreamEventName = Literal[
     "error",
     "agent.phase",
     "agent.status",
+    "agent.thought",
+    "agent.plan",
+    "agent.plan_update",
     "tool.start",
     "tool.result",
     "tool.error",
@@ -28,7 +31,8 @@ class ChatCompletionMessage(BaseModel):
 class ChatCompletionRequest(BaseModel):
     messages: list[ChatCompletionMessage]
     model: str | None = None
-    temperature: float = 0.7
+    # Omit by default — some models (e.g. gpt-5-nano) only accept the API default.
+    temperature: float | None = None
     max_tokens: int | None = None
     response_format: Literal["json_object"] | None = None
 
