@@ -3,7 +3,14 @@ import uuid
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.skills.menu_read.tools import MenuReadSkill
-from app.modules.menu.schemas import CategoryCreate, ProductCreate
+from app.modules.menu.schemas import (
+    CategoryCreate,
+    OptionGroupCreate,
+    OptionItemCreate,
+    ProductCreate,
+)
+from app.modules.promotions.pricing import CATALOG_DISCOUNT_PREFIX
+from app.modules.promotions.schemas import PromotionBundle, PromotionCreate
 from app.modules.restaurants.schemas import RestaurantCreate
 from tests.conftest import requires_db
 
@@ -40,6 +47,90 @@ def test_menu_read_lists_categories_and_searches_products(session):
     assert categories.data["categories"][0]["name"] == "Tacos"
     assert products.ok is True
     assert products.data["products"][0]["id"] == str(product.id)
+
+
+@requires_db
+def test_menu_read_search_tolerates_typos(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Fuzzy Menu", subdomain="menu-read-fuzzy")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="WINGS & FRIES",
+            price_cents=24400,
+            category_ids=[category.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+    skill = MenuReadSkill()
+
+    typo = skill.execute("search_products", {"query": "wins and fries"}, ctx)
+    other_language = skill.execute("search_products", {"query": "alitas"}, ctx)
+
+    assert typo.ok is True
+    assert [item["id"] for item in typo.data["products"]] == [str(product.id)]
+    assert "match_score" in typo.data["products"][0]
+
+    # Cross-language returns nothing here; the agent must fall back to list_products.
+    assert other_language.ok is True
+    assert other_language.data["products"] == []
+    assert other_language.data["suggestions"] == []
+
+
+@requires_db
+def test_menu_read_get_product_disambiguates_shared_token_names(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Shared Token", subdomain="menu-read-shared-token")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+    )
+    burger = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BURGER & BONELESS",
+            price_cents=25900,
+            category_ids=[category.id],
+        )
+    )
+    boneless_fries = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BONELESS & FRIES WITC SAUCE",
+            price_cents=22900,
+            category_ids=[category.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+    skill = MenuReadSkill()
+
+    target = skill.execute(
+        "get_product", {"name": "BONELESS & FRIES WITC SAUCE"}, ctx
+    )
+    other = skill.execute("get_product", {"name": "BURGER & BONELESS"}, ctx)
+
+    assert target.ok is True
+    assert target.data["product"]["id"] == str(boneless_fries.id)
+    assert other.ok is True
+    assert other.data["product"]["id"] == str(burger.id)
 
 
 @requires_db
@@ -173,6 +264,498 @@ def test_menu_read_list_products_filters_by_category(session):
 
     assert all_page.ok is True
     assert len(all_page.data["products"]) == 2
+
+
+@requires_db
+def test_menu_read_get_product_resolves_by_name(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="By Name", subdomain="menu-read-by-name")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BURGER & BONELESS",
+            price_cents=25900,
+            category_ids=[category.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+    skill = MenuReadSkill()
+
+    by_name = skill.execute("get_product", {"name": "burger boneless"}, ctx)
+    by_bad_uuid_with_name = skill.execute(
+        "get_product",
+        {"product_id": "not-a-uuid", "name": "BURGER & BONELESS"},
+        ctx,
+    )
+    missing = skill.execute("get_product", {"name": "sushi"}, ctx)
+
+    assert by_name.ok is True
+    assert by_name.data["product"]["id"] == str(product.id)
+
+    assert by_bad_uuid_with_name.ok is True
+    assert by_bad_uuid_with_name.data["product"]["id"] == str(product.id)
+
+    assert missing.ok is False
+    assert missing.data["suggestions"] == []
+
+
+@requires_db
+def test_menu_read_product_payload_exposes_option_context(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Options", subdomain="menu-read-options")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Burgers", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Classic Burger",
+            description="Beef patty",
+            price_cents=12000,
+            image_path="products/burger.png",
+            category_ids=[category.id],
+        )
+    )
+    # Second group has a lower sort_index, so it must come first in the payload.
+    extras = uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(
+            title="Extras",
+            required=False,
+            selection="multi",
+            min_selections=0,
+            max_selections=2,
+            sort_index=2,
+            items=[
+                OptionItemCreate(label="Bacon", price_delta_cents=1500, sort_index=2),
+                OptionItemCreate(label="Cheese", price_delta_cents=1000, sort_index=1),
+            ],
+        ),
+    )
+    size = uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(
+            title="Size",
+            required=True,
+            selection="single",
+            sort_index=1,
+            items=[OptionItemCreate(label="Large", price_delta_cents=2000)],
+        ),
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+
+    result = MenuReadSkill().execute("get_product", {"product_id": str(product.id)}, ctx)
+
+    assert result.ok is True
+    payload = result.data["product"]
+    assert payload["image_path"] == "products/burger.png"
+    assert payload["has_options"] is True
+    assert payload["category_sort_indices"][str(category.id)] == 0
+
+    groups = payload["option_groups"]
+    assert [g["id"] for g in groups] == [str(size.id), str(extras.id)]
+
+    size_group = groups[0]
+    assert size_group["selection_summary"] == "Elige 1 · Obligatorio"
+
+    extras_group = groups[1]
+    assert extras_group["max_selections"] == 2
+    assert extras_group["selection_summary"] == "Elige hasta 2 (opcional)"
+    # Items sorted by sort_index → Cheese (1) before Bacon (2).
+    assert [item["label"] for item in extras_group["items"]] == ["Cheese", "Bacon"]
+    assert extras_group["items"][0]["price_delta_cents"] == 1000
+
+
+@requires_db
+def test_menu_read_lists_and_filters_promotions(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Promos", subdomain="menu-read-promos")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Alitas", sort_index=1)
+    )
+    wings = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="WINGS & FRIES",
+            price_cents=24400,
+            category_ids=[category.id],
+        )
+    )
+    bundle = uow.promotions.add(
+        PromotionCreate(
+            restaurant_id=restaurant.id,
+            name="2x1 Alitas",
+            image_path="promos/2x1.png",
+            type="bundle",
+            scope="product",
+            bundle=PromotionBundle(get_quantity=2, pay_quantity=1, pairing_mode="same_product"),
+            product_ids=[wings.id],
+        )
+    )
+    # Auto catalog discount — should be hidden unless include_catalog is set.
+    uow.promotions.add(
+        PromotionCreate(
+            restaurant_id=restaurant.id,
+            name=f"{CATALOG_DISCOUNT_PREFIX}WINGS & FRIES",
+            type="percent",
+            scope="product",
+            percent=15,
+            product_ids=[wings.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+    skill = MenuReadSkill()
+
+    default_list = skill.execute("list_promotions", {}, ctx)
+    without_catalog = skill.execute("list_promotions", {"include_catalog": False}, ctx)
+
+    # Default now includes product discounts (percent/amount) alongside bundles.
+    assert default_list.ok is True
+    assert len(default_list.data["promotions"]) == 2
+    by_type = {p["type"]: p for p in default_list.data["promotions"]}
+    assert by_type["bundle"]["id"] == str(bundle.id)
+    assert by_type["bundle"]["label"] == "2×1"
+    assert by_type["bundle"]["bundle"]["pairing_mode"] == "same_product"
+    assert by_type["percent"]["is_catalog_discount"] is True
+
+    # Opt-out hides catalog discounts and leaves only the marketing bundle.
+    assert without_catalog.ok is True
+    ids = [promo["id"] for promo in without_catalog.data["promotions"]]
+    assert ids == [str(bundle.id)]
+
+
+@requires_db
+def test_menu_read_list_product_promotions_includes_discount_and_bundle(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Double Promo", subdomain="menu-read-double")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Burgers", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BURGER & BONELESS",
+            price_cents=25900,
+            category_ids=[category.id],
+        )
+    )
+    discount = uow.promotions.add(
+        PromotionCreate(
+            restaurant_id=restaurant.id,
+            name=f"{CATALOG_DISCOUNT_PREFIX}BURGER & BONELESS",
+            type="amount",
+            scope="product",
+            amount_cents=5900,
+            product_ids=[product.id],
+        )
+    )
+    bundle = uow.promotions.add(
+        PromotionCreate(
+            restaurant_id=restaurant.id,
+            name="Hamburguesas 2x1",
+            image_path="promos/burger.png",
+            type="bundle",
+            scope="product",
+            bundle=PromotionBundle(get_quantity=2, pay_quantity=1, pairing_mode="same_product"),
+            product_ids=[product.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+
+    result = MenuReadSkill().execute(
+        "list_product_promotions", {"name": "burger boneless"}, ctx
+    )
+
+    assert result.ok is True
+    assert result.data["product"]["id"] == str(product.id)
+    promos = {p["type"]: p for p in result.data["promotions"]}
+    assert set(promos) == {"amount", "bundle"}
+    assert promos["amount"]["id"] == str(discount.id)
+    assert promos["amount"]["amount_cents"] == 5900
+    assert promos["amount"]["is_catalog_discount"] is True
+    assert promos["amount"]["applies_via"] == "product"
+    assert promos["bundle"]["id"] == str(bundle.id)
+    assert promos["bundle"]["applies_via"] == "product"
+
+    # get_product also surfaces the same promotions inline.
+    detail = MenuReadSkill().execute("get_product", {"product_id": str(product.id)}, ctx)
+    assert detail.ok is True
+    assert detail.data["product"]["has_promotions"] is True
+    detail_types = {p["type"] for p in detail.data["product"]["promotions"]}
+    assert detail_types == {"amount", "bundle"}
+
+
+@requires_db
+def test_menu_read_bundle_reports_non_participating_complements(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bundle Opts", subdomain="menu-read-bundle-opts")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Wings", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="WINGS",
+            price_cents=20000,
+            category_ids=[category.id],
+        )
+    )
+    group = uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(title="Salsas", selection="multi", max_selections=2),
+    )
+    eligible = uow.menu.add_option_item(
+        group.id, OptionItemCreate(label="BBQ", price_delta_cents=0)
+    )
+    excluded = uow.menu.add_option_item(
+        group.id, OptionItemCreate(label="Trufa premium", price_delta_cents=3000)
+    )
+    bundle = uow.promotions.add(
+        PromotionCreate(
+            restaurant_id=restaurant.id,
+            name="Wings 2x1",
+            image_path="promos/wings.png",
+            type="bundle",
+            scope="product",
+            bundle=PromotionBundle(get_quantity=2, pay_quantity=1, pairing_mode="same_product"),
+            product_ids=[product.id],
+            option_item_ids=[eligible.id],  # only BBQ participates
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+
+    detail = MenuReadSkill().execute("get_product", {"product_id": str(product.id)}, ctx)
+
+    assert detail.ok is True
+    promos = detail.data["product"]["promotions"]
+    bundle_payload = next(p for p in promos if p["id"] == str(bundle.id))
+    participation = bundle_payload["option_participation"]
+    assert participation["semantics"] == "bundle_allow_list"
+    assert participation["mode"] == "restricted"
+    participating_labels = [it["label"] for it in participation["participating"]]
+    not_participating_labels = [it["label"] for it in participation["not_participating"]]
+    assert participating_labels == ["BBQ"]
+    assert not_participating_labels == ["Trufa premium"]
+    assert str(excluded.id) in {it["id"] for it in participation["not_participating"]}
+
+
+@requires_db
+def test_menu_read_bundle_without_allow_list_lets_all_complements_participate(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bundle All", subdomain="menu-read-bundle-all")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Wings", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="WINGS PLAIN",
+            price_cents=20000,
+            category_ids=[category.id],
+        )
+    )
+    group = uow.menu.add_option_group(
+        product.id, OptionGroupCreate(title="Salsas", selection="multi")
+    )
+    uow.menu.add_option_item(group.id, OptionItemCreate(label="BBQ"))
+    uow.promotions.add(
+        PromotionCreate(
+            restaurant_id=restaurant.id,
+            name="Wings Plain 2x1",
+            image_path="promos/wings-plain.png",
+            type="bundle",
+            scope="product",
+            bundle=PromotionBundle(get_quantity=2, pay_quantity=1),
+            product_ids=[product.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+
+    detail = MenuReadSkill().execute("get_product", {"product_id": str(product.id)}, ctx)
+
+    assert detail.ok is True
+    participation = detail.data["product"]["promotions"][0]["option_participation"]
+    assert participation["mode"] == "all_participate"
+
+
+@requires_db
+def test_menu_read_get_product_reports_no_promotions(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="No Promo", subdomain="menu-read-no-promo")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Tacos", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Taco simple",
+            price_cents=1200,
+            category_ids=[category.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+
+    detail = MenuReadSkill().execute("get_product", {"product_id": str(product.id)}, ctx)
+
+    assert detail.ok is True
+    assert detail.data["product"]["has_promotions"] is False
+    assert detail.data["product"]["promotions"] == []
+
+
+@requires_db
+def test_menu_read_get_promotion_by_id_and_name(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Promo Detail", subdomain="menu-read-promo-detail")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Boneless", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BONELESS & FRIES",
+            price_cents=22900,
+            category_ids=[category.id],
+        )
+    )
+    promo = uow.promotions.add(
+        PromotionCreate(
+            restaurant_id=restaurant.id,
+            name="Martes Boneless",
+            image_path="promos/martes.png",
+            type="percent",
+            scope="product",
+            percent=20,
+            product_ids=[product.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+    skill = MenuReadSkill()
+
+    by_id = skill.execute("get_promotion", {"promotion_id": str(promo.id)}, ctx)
+    by_name = skill.execute("get_promotion", {"name": "martes boneless"}, ctx)
+    missing = skill.execute("get_promotion", {"name": "viernes pizza"}, ctx)
+
+    assert by_id.ok is True
+    assert by_id.data["promotion"]["id"] == str(promo.id)
+    assert by_id.data["promotion"]["percent"] == 20
+    assert by_id.data["promotion"]["products"][0]["name"] == "BONELESS & FRIES"
+    assert by_id.data["promotion"]["effective_status"] is not None
+
+    assert by_name.ok is True
+    assert by_name.data["promotion"]["id"] == str(promo.id)
+
+    assert missing.ok is False
+    assert missing.data["suggestions"] == []
+
+
+@requires_db
+def test_menu_read_get_promotion_is_tenant_scoped(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    owned = uow.restaurants.add(RestaurantCreate(name="Owned P", subdomain="owned-promo"))
+    other = uow.restaurants.add(RestaurantCreate(name="Other P", subdomain="other-promo"))
+    other_category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=other.id, name="Other", sort_index=1)
+    )
+    other_product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=other.id,
+            name="Other combo",
+            price_cents=1000,
+            category_ids=[other_category.id],
+        )
+    )
+    other_promo = uow.promotions.add(
+        PromotionCreate(
+            restaurant_id=other.id,
+            name="Other 2x1",
+            image_path="promos/other.png",
+            type="bundle",
+            scope="product",
+            bundle=PromotionBundle(get_quantity=2, pay_quantity=1),
+            product_ids=[other_product.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=owned.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+
+    result = MenuReadSkill().execute(
+        "get_promotion", {"promotion_id": str(other_promo.id)}, ctx
+    )
+
+    assert result.ok is False
+    assert "not found" in result.summary.lower()
 
 
 @requires_db
