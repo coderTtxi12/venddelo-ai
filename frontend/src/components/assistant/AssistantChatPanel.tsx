@@ -18,8 +18,12 @@ import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useChatPanelResize } from '@/hooks/useChatPanelResize';
 import {
+  createThoughtId,
   createToolStepId,
+  hasVisibleAgentActivity,
   INITIAL_AGENT_ACTIVITY,
+  mapPlanStepsFromPayload,
+  STREAMING_AGENT_ACTIVITY,
   type AgentActivityState,
 } from '@/lib/assistant/agentActivity';
 import {
@@ -311,7 +315,7 @@ export default function AssistantChatPanel() {
       sendInFlightRef.current = true;
       setIsBusy(true);
       setAgentProcessing(true);
-      setAgentActivity(INITIAL_AGENT_ACTIVITY);
+      setAgentActivity(STREAMING_AGENT_ACTIVITY);
       setMessages((prev) => {
         const withoutWelcome =
           prev.length === 1 && prev[0]?.id === 'welcome' ? [] : prev.filter((m) => m.id !== 'welcome');
@@ -387,6 +391,37 @@ export default function AssistantChatPanel() {
               if (status === 'processing') {
                 setAgentProcessing(true);
               }
+            },
+            onAgentThought: (text) => {
+              setAgentProcessing(true);
+              setAgentActivity((prev) => ({
+                ...prev,
+                status: 'processing',
+                thoughts: [...prev.thoughts, { id: createThoughtId(), text }],
+              }));
+            },
+            onAgentPlan: (payload) => {
+              setAgentProcessing(true);
+              setAgentActivity((prev) => ({
+                ...prev,
+                phase: 'planning',
+                status: 'processing',
+                planSteps: mapPlanStepsFromPayload(payload.steps),
+                planReason: payload.reason ?? null,
+              }));
+            },
+            onAgentPlanUpdate: (payload) => {
+              setAgentProcessing(true);
+              setAgentActivity((prev) => ({
+                ...prev,
+                phase: payload.decision === 'finish' ? 'analyzing' : prev.phase ?? 'planning',
+                status: 'processing',
+                planSteps: mapPlanStepsFromPayload(payload.steps),
+                latestReflection: {
+                  decision: payload.decision,
+                  reason: payload.reason,
+                },
+              }));
             },
             onToolStart: (payload) => {
               setAgentProcessing(true);
@@ -720,11 +755,8 @@ export default function AssistantChatPanel() {
           const isStreaming = streamingMessageId === message.id;
           const isAwaitingFirstToken =
             isStreaming && message.content.trim().length === 0 && agentProcessing;
-          const showAgentActivity = isStreaming && (
-            agentActivity.phase !== null ||
-            agentActivity.tools.length > 0 ||
-            agentActivity.status === 'processing'
-          );
+          const showAgentActivity =
+            isStreaming && (hasVisibleAgentActivity(agentActivity) || agentProcessing);
           const hasAttachments = (message.attachments?.length ?? 0) > 0;
           const hasComplement = Boolean(message.complement);
           const attachmentCount = message.attachments?.length ?? 0;
