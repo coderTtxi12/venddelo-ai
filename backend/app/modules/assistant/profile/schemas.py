@@ -34,11 +34,14 @@ class AssistantProfileUpdate(BaseModel):
 
 
 class AssistantProfileSnapshot(BaseModel):
+    """Client prompt snapshot — only fields actively synced for chat turns."""
+
     display_name: str = ""
-    identity_markdown: str
-    behavior_markdown: str
-    menu_markdown: str = ""
     enabled_skill_ids: list[str] = Field(default_factory=list)
+    # Disabled markdown blocks — optional for backward compat with older clients.
+    identity_markdown: str = ""
+    behavior_markdown: str = ""
+    menu_markdown: str = ""
 
 
 class SkillCatalogEntryDTO(BaseModel):
@@ -47,7 +50,6 @@ class SkillCatalogEntryDTO(BaseModel):
     granted: bool
     enabled: bool
     effective: bool
-    required_plan: str
     lock_reason: str | None = None
 
 
