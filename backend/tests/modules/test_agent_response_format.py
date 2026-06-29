@@ -4,6 +4,9 @@ import pytest
 
 from app.modules.assistant.agent.response_format import (
     ASSISTANT_JSON_RESPONSE_MARKER,
+    AgentLLMResponse,
+    PlanStep,
+    apply_plan_update,
     build_tools_prompt_section,
     extract_partial_answer_content,
     format_tools_for_prompt,
@@ -148,3 +151,65 @@ def test_extract_partial_answer_content_returns_none_for_tool_call():
 def test_should_suppress_answer_stream_for_tool_call():
     assert should_suppress_answer_stream('{"type":"tool_call"') is True
     assert should_suppress_answer_stream('{"type":"answer","content":"Hola') is False
+
+
+def test_parse_plan_response():
+    payload = {
+        "type": "plan",
+        "skill_id": None,
+        "steps": [
+            {"id": 1, "goal": "List products", "tool_hint": "menu_read.list_products"},
+            {"id": 2, "goal": "List promos"},
+        ],
+        "reason": "Multi-step task.",
+    }
+    parsed = parse_agent_json_response(json.dumps(payload))
+    assert parsed.type == "plan"
+    assert parsed.steps is not None
+    assert [step.id for step in parsed.steps] == [1, 2]
+    assert parsed.steps[0].status == "pending"
+
+
+def test_parse_plan_update_normalizes_aliases():
+    raw = '{"type":"planupdate","completedSteps":[1],"decision":"continue","reason":"done"}'
+    parsed = parse_agent_json_response(raw)
+    assert parsed.type == "plan_update"
+    assert parsed.completed_step_ids == [1]
+    assert parsed.decision == "continue"
+
+
+def test_plan_requires_steps():
+    with pytest.raises(ValueError):
+        parse_agent_json_response('{"type":"plan","steps":[]}')
+
+
+def test_plan_update_requires_decision():
+    with pytest.raises(ValueError):
+        parse_agent_json_response('{"type":"plan_update","completed_step_ids":[1]}')
+
+
+def test_apply_plan_update_marks_completed():
+    steps = [PlanStep(id=1, goal="a"), PlanStep(id=2, goal="b")]
+    update = AgentLLMResponse(type="plan_update", decision="continue", completed_step_ids=[1])
+    result = apply_plan_update(steps, update)
+    assert result[0].status == "done"
+    assert result[1].status == "pending"
+
+
+def test_apply_plan_update_replaces_on_replan():
+    steps = [PlanStep(id=1, goal="a")]
+    update = AgentLLMResponse(
+        type="plan_update",
+        decision="replan",
+        steps=[PlanStep(id=1, goal="x"), PlanStep(id=2, goal="y")],
+    )
+    result = apply_plan_update(steps, update)
+    assert [step.goal for step in result] == ["x", "y"]
+
+
+def test_planning_prompt_block_present_only_when_enabled():
+    with_plan = build_tools_prompt_section([], planning_enabled=True, plan_max_steps=5)
+    without_plan = build_tools_prompt_section([])
+    assert '"type": "plan"' in with_plan
+    assert '"type": "plan_update"' in with_plan
+    assert '"type": "plan"' not in without_plan
