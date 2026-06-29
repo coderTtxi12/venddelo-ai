@@ -1,64 +1,10 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
+import { parseBlocks } from '@/components/assistant/chatMarkdownParser';
 import styles from './ChatMarkdown.module.css';
 
 type ChatMarkdownProps = {
   content: string;
 };
-
-type Block =
-  | { type: 'paragraph'; text: string }
-  | { type: 'ul'; items: string[] }
-  | { type: 'ol'; items: string[] };
-
-function parseBlocks(content: string): Block[] {
-  const lines = content.split('\n');
-  const blocks: Block[] = [];
-  let index = 0;
-
-  while (index < lines.length) {
-    const line = lines[index] ?? '';
-
-    if (!line.trim()) {
-      index += 1;
-      continue;
-    }
-
-    if (/^[-*]\s+/.test(line)) {
-      const items: string[] = [];
-      while (index < lines.length && /^[-*]\s+/.test(lines[index] ?? '')) {
-        items.push((lines[index] ?? '').replace(/^[-*]\s+/, ''));
-        index += 1;
-      }
-      blocks.push({ type: 'ul', items });
-      continue;
-    }
-
-    if (/^\d+\.\s+/.test(line)) {
-      const items: string[] = [];
-      while (index < lines.length && /^\d+\.\s+/.test(lines[index] ?? '')) {
-        items.push((lines[index] ?? '').replace(/^\d+\.\s+/, ''));
-        index += 1;
-      }
-      blocks.push({ type: 'ol', items });
-      continue;
-    }
-
-    const paragraphLines: string[] = [];
-    while (
-      index < lines.length &&
-      (lines[index] ?? '').trim() &&
-      !/^[-*]\s+/.test(lines[index] ?? '') &&
-      !/^\d+\.\s+/.test(lines[index] ?? '')
-    ) {
-      paragraphLines.push(lines[index] ?? '');
-      index += 1;
-    }
-
-    blocks.push({ type: 'paragraph', text: paragraphLines.join('\n') });
-  }
-
-  return blocks;
-}
 
 function parseInline(text: string, keyPrefix: string): ReactNode[] {
   const pattern =
@@ -125,13 +71,54 @@ function renderParagraph(text: string, key: string): ReactNode {
   );
 }
 
-export default function ChatMarkdown({ content }: ChatMarkdownProps) {
+function renderHeading(level: number, text: string, key: string): ReactNode {
+  const clampedLevel = Math.min(Math.max(level, 1), 6);
+  const children = parseInline(text, `${key}-inline`);
+
+  switch (clampedLevel) {
+    case 1:
+      return <h1 key={key}>{children}</h1>;
+    case 2:
+      return <h2 key={key}>{children}</h2>;
+    case 3:
+      return <h3 key={key}>{children}</h3>;
+    case 4:
+      return <h4 key={key}>{children}</h4>;
+    case 5:
+      return <h5 key={key}>{children}</h5>;
+    default:
+      return <h6 key={key}>{children}</h6>;
+  }
+}
+
+function renderBlockquote(lines: string[], key: string): ReactNode {
+  return (
+    <blockquote key={key}>
+      {lines.map((line, lineIndex) => (
+        <span key={`${key}-line-${lineIndex}`}>
+          {lineIndex > 0 ? <br /> : null}
+          {parseInline(line, `${key}-inline-${lineIndex}`)}
+        </span>
+      ))}
+    </blockquote>
+  );
+}
+
+function ChatMarkdown({ content }: ChatMarkdownProps) {
   const blocks = parseBlocks(content);
 
   return (
     <div className={styles.markdown}>
       {blocks.map((block, blockIndex) => {
         const key = `block-${blockIndex}`;
+
+        if (block.type === 'heading') {
+          return renderHeading(block.level, block.text, key);
+        }
+
+        if (block.type === 'blockquote') {
+          return renderBlockquote(block.lines, key);
+        }
 
         if (block.type === 'ul') {
           return (
@@ -162,3 +149,5 @@ export default function ChatMarkdown({ content }: ChatMarkdownProps) {
     </div>
   );
 }
+
+export default memo(ChatMarkdown);
