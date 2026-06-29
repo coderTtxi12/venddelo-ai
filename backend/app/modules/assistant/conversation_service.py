@@ -258,7 +258,13 @@ class AssistantConversationService:
                     yield event
                     continue
 
-                if event.event in ("agent.phase", "agent.status"):
+                if event.event in (
+                    "agent.phase",
+                    "agent.status",
+                    "agent.thought",
+                    "agent.plan",
+                    "agent.plan_update",
+                ):
                     yield event
                     continue
 
