@@ -11,9 +11,10 @@ from app.db.session import SessionLocal
 from app.infra.redis.composite_idempotency import CompositeIdempotencyRepository
 from app.infra.redis.factory import build_cache
 from app.infra.repositories.idempotency import SqlAlchemyIdempotencyRepository
-from app.modules.ai.adapters import SqlAlchemyAIArtifactRepository
-from app.modules.ai.job_adapters import SqlAlchemyAIJobRepository
 from app.modules.assistant.adapters import SqlAlchemyAssistantRepository
+from app.modules.assistant.entitlements.adapters import SqlAlchemyEntitlementOverridesRepository
+from app.modules.assistant.profile.adapters import SqlAlchemyAssistantProfileRepository
+from app.modules.assistant.usage.adapters import SqlAlchemyAssistantUsageRepository
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
 from app.modules.menu.adapters import SqlAlchemyMenuRepository
 from app.modules.orders.adapters import SqlAlchemyOrderRepository
@@ -58,9 +59,10 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.orders = SqlAlchemyOrderRepository(self.session)
         self.promotions = SqlAlchemyPromotionRepository(self.session)
         self.translations = SqlAlchemyTranslationRepository(self.session)
-        self.ai_artifacts = SqlAlchemyAIArtifactRepository(self.session)
-        self.ai_jobs = SqlAlchemyAIJobRepository(self.session)
         self.assistant = SqlAlchemyAssistantRepository(self.session)
+        self.assistant_profiles = SqlAlchemyAssistantProfileRepository(self.session)
+        self.assistant_entitlements = SqlAlchemyEntitlementOverridesRepository(self.session)
+        self.assistant_usage = SqlAlchemyAssistantUsageRepository(self.session)
         self.idempotency = CompositeIdempotencyRepository(
             cache,
             db_idempotency,
