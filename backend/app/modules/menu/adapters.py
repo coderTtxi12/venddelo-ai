@@ -240,6 +240,7 @@ class SqlAlchemyMenuRepository(MenuRepository):
         params: PaginationParams,
         *,
         published_only: bool = False,
+        category_id: uuid.UUID | None = None,
     ) -> CursorPage[ProductDTO]:
         stmt = (
             select(Product)
@@ -247,6 +248,11 @@ class SqlAlchemyMenuRepository(MenuRepository):
             .order_by(Product.created_at, Product.id)
             .limit(params.limit + 1)
         )
+        if category_id is not None:
+            stmt = stmt.join(
+                product_categories,
+                product_categories.c.product_id == Product.id,
+            ).where(product_categories.c.category_id == category_id)
         if published_only:
             stmt = stmt.where(
                 Product.is_published.is_(True),

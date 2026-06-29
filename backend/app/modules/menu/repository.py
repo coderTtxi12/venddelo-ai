@@ -61,6 +61,7 @@ class MenuRepository(ABC):
         params: PaginationParams,
         *,
         published_only: bool = False,
+        category_id: uuid.UUID | None = None,
     ) -> CursorPage[ProductDTO]: ...
 
     @abstractmethod
