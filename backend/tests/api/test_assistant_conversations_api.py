@@ -115,6 +115,50 @@ def test_stream_persists_messages(client, engine):
 
 
 @requires_db
+def test_stream_accepts_minimal_profile_snapshot(client, engine):
+    restaurant = _seed_restaurant(client, engine, "assistant-conv-snapshot")
+
+    profile = client.get(
+        f"/api/v1/restaurants/{restaurant.id}/assistant/profile",
+        headers=AUTH,
+    )
+    assert profile.status_code == 200
+    profile_body = profile.json()
+    profile_patch = client.patch(
+        f"/api/v1/restaurants/{restaurant.id}/assistant/profile",
+        headers=AUTH,
+        json={"display_name": "Luna", "expected_version": profile_body["version"]},
+    )
+    assert profile_patch.status_code == 200
+    profile_version = profile_patch.json()["version"]
+
+    create = client.post(
+        f"/api/v1/restaurants/{restaurant.id}/assistant/conversations",
+        headers=AUTH,
+        json={},
+    )
+    conversation_id = create.json()["id"]
+
+    with patch("app.modules.assistant.api.build_llm_provider", return_value=StubLLMProvider()):
+        response = client.post(
+            f"/api/v1/restaurants/{restaurant.id}/assistant/conversations/{conversation_id}/chat",
+            headers={**AUTH, "Accept": "text/event-stream"},
+            json={
+                "message": "Lista todos mis productos",
+                "profile_version": profile_version,
+                "profile_snapshot": {
+                    "display_name": "Luna",
+                    "enabled_skill_ids": ["menu_read"],
+                },
+            },
+        )
+
+    assert response.status_code == 200
+    events = _parse_sse(response.text)
+    assert events[-1][0] == "message.complete"
+
+
+@requires_db
 def test_conversation_requires_owned_restaurant(client, engine):
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     with SqlAlchemyUnitOfWork(factory) as uow:
