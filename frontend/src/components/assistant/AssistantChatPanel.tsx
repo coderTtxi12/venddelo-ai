@@ -8,6 +8,7 @@ import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import AssistantConversationList from '@/components/assistant/AssistantConversationList';
+import ChatAgentActivity from '@/components/assistant/ChatAgentActivity';
 import ChatAttachmentList from '@/components/assistant/ChatAttachmentList';
 import ChatFormComplement from '@/components/assistant/ChatFormComplement';
 import ChatMarkdown from '@/components/assistant/ChatMarkdown';
@@ -16,6 +17,11 @@ import { useAssistantChat } from '@/contexts/AssistantChatContext';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useChatPanelResize } from '@/hooks/useChatPanelResize';
+import {
+  createToolStepId,
+  INITIAL_AGENT_ACTIVITY,
+  type AgentActivityState,
+} from '@/lib/assistant/agentActivity';
 import {
   createAttachmentsFromFileList,
   revokeAttachmentPreviews,
@@ -110,6 +116,7 @@ export default function AssistantChatPanel() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [assistantNameDraft, setAssistantNameDraft] = useState('');
   const [agentProcessing, setAgentProcessing] = useState(false);
+  const [agentActivity, setAgentActivity] = useState<AgentActivityState>(INITIAL_AGENT_ACTIVITY);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -242,7 +249,7 @@ export default function AssistantChatPanel() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, streamingMessageId, pendingAttachments, scrollToBottom]);
+  }, [messages, streamingMessageId, pendingAttachments, agentActivity, scrollToBottom]);
 
   useEffect(() => {
     return () => {
@@ -304,6 +311,7 @@ export default function AssistantChatPanel() {
       sendInFlightRef.current = true;
       setIsBusy(true);
       setAgentProcessing(true);
+      setAgentActivity(INITIAL_AGENT_ACTIVITY);
       setMessages((prev) => {
         const withoutWelcome =
           prev.length === 1 && prev[0]?.id === 'welcome' ? [] : prev.filter((m) => m.id !== 'welcome');
@@ -329,13 +337,11 @@ export default function AssistantChatPanel() {
         setStreamingMessageId(null);
         setIsBusy(false);
         setAgentProcessing(false);
+        setAgentActivity(INITIAL_AGENT_ACTIVITY);
       };
 
       const profileSnapshot = {
         display_name: profile.display_name,
-        identity_markdown: profile.identity_markdown,
-        behavior_markdown: profile.behavior_markdown,
-        menu_markdown: profile.menu_markdown,
         enabled_skill_ids: profile.enabled_skill_ids,
       };
 
@@ -357,10 +363,59 @@ export default function AssistantChatPanel() {
                 ),
               );
             },
+            onAgentPhase: (phase) => {
+              setAgentActivity((prev) => ({ ...prev, phase }));
+            },
             onAgentStatus: (status) => {
+              setAgentActivity((prev) => ({ ...prev, status }));
               if (status === 'processing') {
                 setAgentProcessing(true);
               }
+            },
+            onToolStart: (payload) => {
+              setAgentProcessing(true);
+              setAgentActivity((prev) => ({
+                ...prev,
+                phase: prev.phase ?? 'explore',
+                status: 'processing',
+                tools: [
+                  ...prev.tools,
+                  {
+                    id: createToolStepId(payload.tool),
+                    tool: payload.tool,
+                    skillId: payload.skill_id,
+                    status: 'running',
+                  },
+                ],
+              }));
+            },
+            onToolResult: (payload) => {
+              setAgentActivity((prev) => ({
+                ...prev,
+                tools: prev.tools.map((step) =>
+                  step.tool === payload.tool && step.status === 'running'
+                    ? {
+                        ...step,
+                        status: 'done',
+                        summary: payload.summary,
+                      }
+                    : step,
+                ),
+              }));
+            },
+            onToolError: (payload) => {
+              setAgentActivity((prev) => ({
+                ...prev,
+                tools: prev.tools.map((step) =>
+                  step.tool === payload.tool && step.status === 'running'
+                    ? {
+                        ...step,
+                        status: 'error',
+                        summary: payload.summary,
+                      }
+                    : step,
+                ),
+              }));
             },
             onComplete: (payload) => {
               const finalContent = payload.content || streamedContent;
@@ -648,7 +703,12 @@ export default function AssistantChatPanel() {
           const isUser = message.role === 'user';
           const isStreaming = streamingMessageId === message.id;
           const isAwaitingFirstToken =
-            isStreaming && (message.content.trim().length === 0 || agentProcessing);
+            isStreaming && message.content.trim().length === 0 && agentProcessing;
+          const showAgentActivity = isStreaming && (
+            agentActivity.phase !== null ||
+            agentActivity.tools.length > 0 ||
+            agentActivity.status === 'processing'
+          );
           const hasAttachments = (message.attachments?.length ?? 0) > 0;
           const hasComplement = Boolean(message.complement);
           const attachmentCount = message.attachments?.length ?? 0;
@@ -687,7 +747,15 @@ export default function AssistantChatPanel() {
                       ) : null
                     ) : (
                       <div className={styles.assistantText}>
-                        {isAwaitingFirstToken ? <ChatStreamProcessing /> : null}
+                        {showAgentActivity ? (
+                          <ChatAgentActivity
+                            activity={agentActivity}
+                            showProcessingDots={isAwaitingFirstToken}
+                          />
+                        ) : null}
+                        {isAwaitingFirstToken && !showAgentActivity ? (
+                          <ChatStreamProcessing />
+                        ) : null}
                         {message.content ? <ChatMarkdown content={message.content} /> : null}
                         {isStreaming && message.content ? (
                           <span className={styles.cursor} aria-hidden />
