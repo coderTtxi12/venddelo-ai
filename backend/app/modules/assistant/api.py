@@ -9,7 +9,11 @@ from app.api.deps import pagination_params, require_owned_restaurant
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.infra.llm.factory import build_llm_provider
+from app.infra.redis.factory import build_cache
 from app.modules.assistant.conversation_service import AssistantConversationService
+from app.modules.assistant.profile.cache import AssistantProfileCache
+from app.modules.assistant.profile.schemas import AssistantProfileResponse, AssistantProfileUpdate
+from app.modules.assistant.profile.service import AssistantProfileService
 from app.modules.assistant.schemas import (
     AssistantConversationChatRequest,
     AssistantConversationCreate,
@@ -18,13 +22,79 @@ from app.modules.assistant.schemas import (
     AssistantMessageDTO,
 )
 from app.modules.assistant.service import AssistantService
+from app.modules.assistant.skills.menu_read.tools import MenuReadSkill
+from app.modules.assistant.skills.registry import SkillRegistry
+from app.modules.assistant.usage.schemas import LLMUsageSummary
 from app.modules.restaurants.schemas import RestaurantDTO
 
 router = APIRouter(tags=["assistant"])
 
 
-def _conversation_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> AssistantConversationService:
-    return AssistantConversationService(uow.assistant, provider=build_llm_provider())
+def _profile_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> AssistantProfileService:
+    return AssistantProfileService(
+        uow.assistant_profiles,
+        uow.assistant_entitlements,
+        uow.restaurants,
+        uow.users,
+        cache=AssistantProfileCache(build_cache()),
+    )
+
+
+def _assistant_skill_registry() -> SkillRegistry:
+    return SkillRegistry([MenuReadSkill()])
+
+
+def _conversation_service(
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> AssistantConversationService:
+    profile_service = AssistantProfileService(
+        uow.assistant_profiles,
+        uow.assistant_entitlements,
+        uow.restaurants,
+        uow.users,
+        cache=AssistantProfileCache(build_cache()),
+    )
+    return AssistantConversationService(
+        uow.assistant,
+        provider=build_llm_provider(),
+        uow=uow,
+        profile_service=profile_service,
+        registry=_assistant_skill_registry(),
+    )
+
+
+@router.get(
+    "/restaurants/{restaurant_id}/assistant/profile",
+    response_model=AssistantProfileResponse,
+)
+def get_assistant_profile(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: AssistantProfileService = Depends(_profile_service),
+) -> AssistantProfileResponse:
+    return service.get_profile_response(restaurant.id)
+
+
+@router.patch(
+    "/restaurants/{restaurant_id}/assistant/profile",
+    response_model=AssistantProfileResponse,
+)
+def update_assistant_profile(
+    body: AssistantProfileUpdate,
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: AssistantProfileService = Depends(_profile_service),
+) -> AssistantProfileResponse:
+    return service.update_profile(restaurant.id, body)
+
+
+@router.get(
+    "/restaurants/{restaurant_id}/assistant/usage",
+    response_model=LLMUsageSummary,
+)
+def get_assistant_usage(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> LLMUsageSummary:
+    return uow.assistant_usage.summarize(restaurant.id)
 
 
 @router.get(
@@ -111,14 +181,34 @@ def stream_conversation_chat(
     uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> StreamingResponse:
     restaurant_id = restaurant.id
-    outbound_message = body.message
-    service = AssistantConversationService(uow.assistant, provider=build_llm_provider())
+    profile_service = AssistantProfileService(
+        uow.assistant_profiles,
+        uow.assistant_entitlements,
+        uow.restaurants,
+        uow.users,
+        cache=AssistantProfileCache(build_cache()),
+    )
+    # Validate profile before opening SSE — Cloud Run runs the full agent turn in-process.
+    profile_service.resolve_profile_for_chat(
+        restaurant_id,
+        profile_version=body.profile_version,
+        profile_snapshot=body.profile_snapshot,
+    )
+    service = AssistantConversationService(
+        uow.assistant,
+        provider=build_llm_provider(),
+        uow=uow,
+        profile_service=profile_service,
+        registry=_assistant_skill_registry(),
+    )
 
     def event_generator():
         stream = service.stream_chat(
             restaurant_id,
             conversation_id,
-            message=outbound_message,
+            message=body.message,
+            profile_version=body.profile_version,
+            profile_snapshot=body.profile_snapshot,
         )
         try:
             for event in stream:
