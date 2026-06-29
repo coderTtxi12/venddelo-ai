@@ -6,13 +6,20 @@ from collections.abc import Iterator
 
 from langsmith import trace
 
-from app.core.llm.ports import ChatCompletionMessage, ChatCompletionRequest, ChatStreamEvent, LLMProviderPort
-from app.modules.assistant.prompts import ASSISTANT_SYSTEM_PROMPT
+from app.core.config import Settings, get_settings
+from app.core.llm.ports import (
+    ChatCompletionMessage,
+    ChatCompletionRequest,
+    ChatStreamEvent,
+    LLMProviderPort,
+)
+from app.modules.assistant.context.compressor import compress_history_for_llm
+from app.modules.assistant.prompts import ASSISTANT_CORE_POLICY
 from app.modules.assistant.schemas import AssistantChatHistoryMessage, AssistantChatRequest
 
 
 def aggregate_assistant_stream_output(content_parts: list[str]) -> dict[str, object]:
-    """Reduce streamed assistant tokens for LangSmith output (see trace-generator-functions docs)."""
+    """Reduce streamed assistant tokens for LangSmith output."""
     content = "".join(content_parts)
     return {
         "content": content,
@@ -21,17 +28,19 @@ def aggregate_assistant_stream_output(content_parts: list[str]) -> dict[str, obj
 
 
 class AssistantService:
-    def __init__(self, *, provider: LLMProviderPort) -> None:
+    def __init__(self, *, provider: LLMProviderPort, settings: Settings | None = None) -> None:
         self._provider = provider
+        self._settings = settings or get_settings()
 
     def build_messages(
         self,
         *,
         user_message: str,
         history: list[AssistantChatHistoryMessage],
+        system_prompt: str | None = None,
     ) -> list[ChatCompletionMessage]:
         messages: list[ChatCompletionMessage] = [
-            ChatCompletionMessage(role="system", content=ASSISTANT_SYSTEM_PROMPT),
+            ChatCompletionMessage(role="system", content=system_prompt or ASSISTANT_CORE_POLICY),
         ]
 
         for item in history:
@@ -49,6 +58,7 @@ class AssistantService:
         message_id: str | None = None,
         restaurant_id: str | None = None,
         conversation_id: str | None = None,
+        system_prompt: str | None = None,
     ) -> Iterator[ChatStreamEvent]:
         resolved_message_id = message_id or str(uuid.uuid4())
         trace_metadata: dict[str, str] = {"message_id": resolved_message_id}
@@ -57,17 +67,34 @@ class AssistantService:
         if conversation_id:
             trace_metadata["conversation_id"] = conversation_id
 
-        # Use trace() instead of @traceable on a generator: LangSmith records GeneratorExit
-        # as an error when SSE clients disconnect unless it is explicitly ignored.
         with trace(
             "assistant_chat",
             run_type="chain",
             metadata=trace_metadata,
             exceptions_to_handle=(GeneratorExit,),
         ) as run:
+            yield ChatStreamEvent(event="agent.phase", data={"phase": "analyzing"})
+            yield ChatStreamEvent(event="agent.status", data={"status": "processing"})
+
+            system = system_prompt or ASSISTANT_CORE_POLICY
+            compression = compress_history_for_llm(
+                request.history,
+                system_prompt=system,
+                user_message=request.message,
+                max_context_tokens=self._settings.assistant_context_max_tokens,
+                threshold_ratio=self._settings.assistant_context_compression_threshold_ratio,
+                recent_window_turns=self._settings.assistant_context_recent_window_turns,
+            )
+            history = (
+                compression.history
+                if self._settings.assistant_context_compression_enabled
+                else request.history
+            )
+
             messages = self.build_messages(
                 user_message=request.message,
-                history=request.history,
+                history=history,
+                system_prompt=system,
             )
 
             completion = ChatCompletionRequest(messages=messages)
@@ -98,6 +125,8 @@ class AssistantService:
                             data={
                                 "message_id": resolved_message_id,
                                 "content": final_content,
+                                "usage": event.data.get("usage"),
+                                "context_compression": compression.model_dump(mode="json"),
                             },
                         )
                         return
