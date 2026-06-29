@@ -3,7 +3,6 @@ from datetime import time
 from sqlalchemy import select
 
 from app.db.models import (
-    AIArtifact,
     Category,
     MenuTranslation,
     OptionGroup,
@@ -166,17 +165,6 @@ def seed() -> None:
         )
         session.add(order)
 
-        session.add(
-            AIArtifact(
-                restaurant_id=restaurant.id,
-                entity_type="product",
-                entity_id=pastor.id,
-                field="description",
-                original_value="taco pastor",
-                optimized_value="Marinated pork taco",
-                status="applied",
-            )
-        )
         session.add(
             MenuTranslation(
                 restaurant_id=restaurant.id,

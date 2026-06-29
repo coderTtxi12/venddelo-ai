@@ -12,7 +12,6 @@ from app.api.deps import get_auth
 from app.core.security import AuthenticatedUser, AuthPort
 from app.db import uow as uow_module
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
-from app.infra.ai.stub_gateway import StubAIGateway
 from app.infra.redis import factory as redis_factory
 from app.infra.redis.cache import RedisCacheAdapter
 from app.infra.redis.rate_limiter import RedisRateLimiterAdapter
@@ -48,14 +47,10 @@ def client(engine):
     def fake_build_rate_limiter(settings=None):
         return limiter
 
-    def fake_build_ai_gateway(settings=None):
-        return StubAIGateway()
-
     patches = [
         patch.object(uow_module, "build_cache", fake_build_cache),
         patch.object(cache_helpers, "build_cache", fake_build_cache),
         patch.object(public_api, "build_cache", fake_build_cache),
-        patch.object(public_api, "build_ai_gateway", fake_build_ai_gateway),
         patch.object(redis_factory, "build_cache", fake_build_cache),
         patch.object(redis_factory, "build_rate_limiter", fake_build_rate_limiter),
     ]

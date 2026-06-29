@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, Header, Query, status
 from app.core.exceptions import NotFoundError
 from app.core.pagination import PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
-from app.infra.ai.openai_gateway import build_ai_gateway
 from app.infra.cache.menu_cache import MenuCacheService
 from app.infra.cache.translated_menu import TranslatedMenuService
 from app.infra.redis.factory import build_cache
@@ -55,7 +54,7 @@ def _translated_menu(
         build_cache(),
         uow.restaurants,
         menu_cache,
-        TranslationService(uow.translations, build_ai_gateway()),
+        TranslationService(uow.translations),
     )
 
 

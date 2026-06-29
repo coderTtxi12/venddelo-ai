@@ -1,6 +1,5 @@
 from fastapi import APIRouter
 
-from app.modules.ai.api import router as ai_router
 from app.modules.assistant.api import router as assistant_router
 from app.modules.delivery_providers.api import router as delivery_providers_router
 from app.modules.health.api import router as health_router
@@ -21,6 +20,5 @@ api_v1_router.include_router(menu_router)
 api_v1_router.include_router(promotions_router)
 api_v1_router.include_router(orders_router)
 api_v1_router.include_router(orders_ws_router)
-api_v1_router.include_router(ai_router)
 api_v1_router.include_router(assistant_router)
 api_v1_router.include_router(public_router)
