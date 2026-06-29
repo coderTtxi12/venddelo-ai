@@ -18,23 +18,30 @@ POST /api/v1/restaurants/{restaurant_id}/assistant/chat
 ```json
 {
   "message": "Quiero agregar un producto nuevo",
-  "history": [
-    { "role": "user", "content": "Hola" },
-    { "role": "assistant", "content": "¡Hola! ¿En qué te ayudo?" }
-  ]
+  "profile_version": 2,
+  "profile_snapshot": {
+    "display_name": "Luna",
+    "identity_markdown": "# IDENTITY — Who am I?",
+    "behavior_markdown": "# BEHAVIOR — How I act",
+    "menu_markdown": "# MENU — Menu knowledge",
+    "enabled_skill_ids": ["menu_read", "menu_write"]
+  }
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `message` | `string` | Latest user turn (required) |
-| `history` | `array` | Prior turns (`user` \| `assistant`), max 40 |
+| `profile_version` | `integer` | Required profile version known by the client |
+| `profile_snapshot` | `object` | Optional prompt snapshot, used only when version matches the server profile |
 
 ### SSE events
 
 | Event | Payload | When |
 |-------|---------|------|
 | `content.delta` | `{ "delta": "..." }` | Token chunk |
+| `agent.phase` | `{ "phase": "analyzing" }` | Agent phase transition |
+| `agent.status` | `{ "status": "processing" }` | UI should show processing dots |
 | `message.complete` | `{ "message_id": "uuid", "content": "..." }` | Stream finished |
 | `error` | `{ "code": "...", "message": "..." }` | Provider failure |
 
@@ -55,8 +62,9 @@ data: {"message_id": "abc-123", "content": "Hola, ¿qué producto quieres agrega
 
 | Layer | Source | Role |
 |-------|--------|------|
-| System prompt | `app/modules/assistant/prompts.py` | Static Venddelo assistant instructions |
-| History | Request `history[]` | Prior conversation turns |
+| System prompt | `app/modules/assistant/prompts.py` | Static Venddelo assistant instructions, written in English |
+| Profile prompt layers | `restaurant_assistant_profiles` | Identity, behavior, and menu knowledge, default templates written in English |
+| History | `assistant_messages` | Prior conversation turns |
 | User prompt | Request `message` | Current user input |
 
 The service builds the LLM message list as:
@@ -65,9 +73,17 @@ The service builds the LLM message list as:
 [system] → [...history] → [user: message]
 ```
 
+System-authored prompt layers are English. Owners usually write user prompts in Spanish, and the assistant responds in Spanish by default unless the user asks for another language.
+
+`profile_snapshot` is trusted only for prompt composition and only when its `profile_version` matches the server-side profile version. Entitlements are always recalculated server-side.
+
+## Cloud Run Runtime
+
+The assistant runtime runs inside the same backend Cloud Run container and within the SSE request lifecycle. Do not add Celery, workers, Cloud Tasks, or external job queues for v1 assistant turns. Redis is used for cache and lane locks only.
+
 ## Provider abstraction
 
-Chat uses **`LLMProviderPort`** (`app/core/llm/ports.py`), separate from job-based `AIGatewayPort`.
+Chat uses **`LLMProviderPort`** (`app/core/llm/ports.py`). Legacy job-based `AIGatewayPort` was removed; future extraction, optimization, and translation run through the agentic assistant.
 
 ```
 build_llm_provider(settings) → LLMProviderPort
