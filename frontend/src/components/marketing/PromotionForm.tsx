@@ -164,7 +164,12 @@ export function PromotionForm({
   const [imageError, setImageError] = useState<string | null>(null);
 
   useEffect(() => {
-    setForm(initialValues ?? createEmptyPromotionDraft());
+    const base = initialValues ?? createEmptyPromotionDraft();
+    setForm({
+      ...base,
+      kind: 'bundle',
+      bundle: { ...base.bundle, pairingMode: 'same_product' },
+    });
     setProductSearch('');
     setImageError(null);
   }, [initialValues]);
@@ -194,13 +199,9 @@ export function PromotionForm({
     if (!form.name.trim()) return false;
     if (!form.imagePath?.trim()) return false;
 
-    if (form.kind === 'percent' && (form.percent < 1 || form.percent > 100)) return false;
-    if (form.kind === 'amount' && form.amount <= 0) return false;
-    if (form.kind === 'bundle') {
-      if (form.bundle.getQuantity < 2) return false;
-      if (form.bundle.payQuantity < 1) return false;
-      if (form.bundle.payQuantity >= form.bundle.getQuantity) return false;
-    }
+    if (form.bundle.getQuantity < 2) return false;
+    if (form.bundle.payQuantity < 1) return false;
+    if (form.bundle.payQuantity >= form.bundle.getQuantity) return false;
 
     if (form.scope === 'product' && form.productIds.length === 0) return false;
     if (form.scope === 'category' && !hasMenuSelection(form.categoryIds, form.productIds)) {
@@ -221,12 +222,7 @@ export function PromotionForm({
     return true;
   }, [form]);
 
-  const previewLabel = useMemo(() => {
-    if (form.kind === 'bundle') return formatBundleLabel(form.bundle);
-    if (form.kind === 'percent') return `${form.percent}%`;
-    if (form.kind === 'amount') return formatMoney(form.amount);
-    return '—';
-  }, [form]);
+  const previewLabel = useMemo(() => formatBundleLabel(form.bundle), [form.bundle]);
 
   const promoImageUrl = storagePublicUrl(form.imagePath);
 
@@ -250,8 +246,17 @@ export function PromotionForm({
         e.preventDefault();
         const payload =
           form.scope === 'category'
-            ? { ...form, ...normalizeCategorySelection(form.categoryIds, form.productIds, products) }
-            : form;
+            ? {
+                ...form,
+                kind: 'bundle' as const,
+                bundle: { ...form.bundle, pairingMode: 'same_product' as const },
+                ...normalizeCategorySelection(form.categoryIds, form.productIds, products),
+              }
+            : {
+                ...form,
+                kind: 'bundle' as const,
+                bundle: { ...form.bundle, pairingMode: 'same_product' as const },
+              };
         void onSubmit(payload);
       }}
     >
@@ -344,90 +349,18 @@ export function PromotionForm({
         ) : null}
       </div>
 
-      <fieldset className={styles.fieldset}>
-        <legend className={styles.legend}>Tipo de descuento</legend>
-        <div className={styles.segment} role="group" aria-label="Tipo de descuento">
-          {(
-            [
-              ['bundle', 'NxM (2×1, 3×1…)'],
-              ['percent', 'Porcentaje'],
-              ['amount', 'Monto fijo'],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              className={
-                form.kind === value ? `${styles.segmentBtn} ${styles.segmentBtnActive}` : styles.segmentBtn
-              }
-              onClick={() =>
-                setForm((prev) => ({
-                  ...prev,
-                  kind: value,
-                  ...(value === 'bundle' && prev.scope === 'order' ? { scope: 'category' } : {}),
-                }))
-              }
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </fieldset>
-
-      {form.kind === 'bundle' ? (
-        <div className={styles.field}>
-          <fieldset className={styles.fieldset}>
-            <legend className={styles.legend}>¿Cómo se combinan los productos?</legend>
-            <div className={styles.segment} role="radiogroup" aria-label="Modo de emparejamiento N×M">
-              {(
-                [
-                  ['cross_product', 'Cualquier producto'],
-                  ['same_product', 'Mismo producto'],
-                ] as const
-              ).map(([mode, label]) => (
-                <button
-                  key={mode}
-                  type="button"
-                  role="radio"
-                  aria-checked={form.bundle.pairingMode === mode}
-                  className={
-                    form.bundle.pairingMode === mode
-                      ? `${styles.segmentBtn} ${styles.segmentBtnActive}`
-                      : styles.segmentBtn
-                  }
-                  onClick={() =>
-                    setForm((prev) => ({
-                      ...prev,
-                      bundle: { ...prev.bundle, pairingMode: mode },
-                    }))
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <p className={styles.helpText}>
-              {form.bundle.pairingMode === 'same_product'
-                ? 'Ejemplo: 2 hamburguesas del mismo tipo. No mezcla productos distintos en la misma oferta.'
-                : 'Ejemplo: 1 hamburguesa + 1 alitas. Pueden ser de categorías distintas.'}
-            </p>
-          </fieldset>
+      <div className={styles.field}>
+        <p className={styles.label}>¿Cómo se combinan los productos?</p>
+          <p className={styles.helpText}>
+            Mismo producto: la oferta aplica solo entre unidades del mismo platillo (ej. 2
+            hamburguesas del mismo tipo). No mezcla productos distintos en la misma oferta.
+          </p>
           <div className={styles.bundleCallout} role="note">
             <p className={styles.bundleCalloutSlogan}>Se cobra el de mayor precio</p>
             <p className={styles.bundleCalloutDetail}>
-              {form.bundle.pairingMode === 'same_product' ? (
-                <>
-                  La oferta aplica solo entre unidades del mismo producto. El carrito compara el precio
-                  con descuento de catálogo (si el producto ya lo tiene) y cobra el más caro; el de
-                  menor precio sale gratis. Los complementos con costo extra se suman siempre.
-                </>
-              ) : (
-                <>
-                  Puedes elegir productos distintos, incluso de diferentes categorías. El carrito
-                  compara el precio con descuento de catálogo y cobra el más caro; el de menor precio
-                  sale gratis. Los complementos con costo extra se suman siempre, en ambos productos.
-                </>
-              )}
+              La oferta aplica solo entre unidades del mismo producto. El carrito compara el precio
+              con descuento de catálogo (si el producto ya lo tiene) y cobra el más caro; el de menor
+              precio sale gratis. Los complementos con costo extra se suman siempre.
             </p>
           </div>
           <span className={styles.label}>Oferta N×M</span>
@@ -506,67 +439,15 @@ export function PromotionForm({
             </div>
           </div>
         </div>
-      ) : null}
-
-      {form.kind === 'percent' ? (
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="promo-percent">
-            Porcentaje (%)
-          </label>
-          <input
-            id="promo-percent"
-            className={styles.input}
-            type="number"
-            min={1}
-            max={100}
-            step={1}
-            value={form.percent}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                percent: clampNumber(Math.round(Number(e.target.value)), 1, 100),
-              }))
-            }
-          />
-        </div>
-      ) : null}
-
-      {form.kind === 'amount' ? (
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="promo-amount">
-            Monto de descuento (MXN)
-          </label>
-          <input
-            id="promo-amount"
-            className={styles.input}
-            type="number"
-            min={0.01}
-            step={0.01}
-            value={form.amount}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                amount: clampNumber(Number(e.target.value), 0, 1_000_000),
-              }))
-            }
-          />
-        </div>
-      ) : null}
 
       <fieldset className={styles.fieldset}>
         <legend className={styles.legend}>Aplica a</legend>
         <div className={styles.segment} role="group" aria-label="Alcance de la promoción">
           {(
-            form.kind === 'bundle'
-              ? ([
-                  ['product', 'Productos'],
-                  ['category', 'Categorías'],
-                ] as const)
-              : ([
-                  ['product', 'Productos'],
-                  ['category', 'Categorías'],
-                  ['order', 'Pedido'],
-                ] as const)
+            [
+              ['product', 'Productos'],
+              ['category', 'Categorías'],
+            ] as const
           ).map(([value, label]) => (
             <button
               key={value}
@@ -580,7 +461,7 @@ export function PromotionForm({
                   scope: value,
                   productIds: value === 'product' ? prev.productIds : [],
                   categoryIds: value === 'category' ? prev.categoryIds : [],
-                  complementOptionItemIds: value === 'order' ? [] : prev.complementOptionItemIds,
+                  complementOptionItemIds: prev.complementOptionItemIds,
                 }))
               }
             >
@@ -589,29 +470,6 @@ export function PromotionForm({
           ))}
         </div>
       </fieldset>
-
-      {form.scope === 'order' ? (
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="promo-min-order">
-            Pedido mínimo (MXN, opcional)
-          </label>
-          <input
-            id="promo-min-order"
-            className={styles.input}
-            type="number"
-            min={0}
-            step={0.01}
-            value={form.minOrderAmount}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                minOrderAmount: clampNumber(Number(e.target.value), 0, 1_000_000),
-              }))
-            }
-          />
-          <p className={styles.helpText}>Déjalo en 0 si no hay monto mínimo.</p>
-        </div>
-      ) : null}
 
       {form.scope === 'product' ? (
         <div className={styles.field}>
@@ -684,11 +542,7 @@ export function PromotionForm({
           products={products}
           categoryIds={form.categoryIds}
           productIds={form.productIds}
-          helpText={
-            form.kind === 'bundle'
-              ? 'Selecciona categorías completas o productos sueltos de distintas categorías. En el carrito se agrupan todos para aplicar el N×M.'
-              : 'Selecciona categorías completas o expande una para elegir productos específicos.'
-          }
+          helpText="Selecciona categorías completas o expande una para elegir productos específicos."
           onSelectionChange={(categoryIds, productIds) =>
             setForm((prev) => {
               const next = { ...prev, categoryIds, productIds };
@@ -701,7 +555,7 @@ export function PromotionForm({
         />
       ) : null}
 
-      {form.scope !== 'order' && complementProducts.length > 0 ? (
+      {complementProducts.length > 0 ? (
         <fieldset className={styles.fieldset}>
           <legend className={styles.legend}>
             Complementos que participan
