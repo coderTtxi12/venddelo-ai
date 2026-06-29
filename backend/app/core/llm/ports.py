@@ -8,6 +8,17 @@ from pydantic import BaseModel, Field
 
 ChatRole = Literal["system", "user", "assistant"]
 
+ChatStreamEventName = Literal[
+    "content.delta",
+    "message.complete",
+    "error",
+    "agent.phase",
+    "agent.status",
+    "tool.start",
+    "tool.result",
+    "tool.error",
+]
+
 
 class ChatCompletionMessage(BaseModel):
     role: ChatRole
@@ -22,8 +33,16 @@ class ChatCompletionRequest(BaseModel):
 
 
 class ChatStreamEvent(BaseModel):
-    event: Literal["content.delta", "message.complete", "error"]
+    event: ChatStreamEventName
     data: dict[str, Any] = Field(default_factory=dict)
+
+
+class LLMUsageRecord(BaseModel):
+    provider: str
+    model: str
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    total_tokens: int = Field(ge=0)
 
 
 class LLMProviderPort(ABC):
