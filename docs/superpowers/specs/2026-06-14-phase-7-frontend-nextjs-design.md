@@ -111,8 +111,8 @@ Single question per screen, progress bar, back/next. Steps:
 3. **Schedule** → takeout days/hours; toggle "same for delivery" → `PUT /restaurants/{id}/schedules`.
 4. **Payment methods** → checkboxes (all on by default) per takeout/delivery → `PUT /restaurants/{id}/payment-methods`.
 5. **Logo upload** → upload to Supabase Storage via **signed URL or direct client upload** (TBD: if backend lacks upload URL endpoint, MVP uploads via Supabase client with service bucket policy for authenticated user path `restaurants/{rid}/logo.*`); store `logo_path` on restaurant.
-6. **Menu upload** → `POST /restaurants/{rid}/ai/jobs/extract-menu` (multipart).
-7. **Redirect to processing** → poll `GET .../ai/jobs/{job_id}` every 2s until `completed|failed`; on success chain `optimize-menu` + `pick-palette` jobs (fire-and-forget + optional progress UI).
+6. **Menu onboarding** → agentic assistant (`menu_import` skill) in dashboard chat — upload photos/PDF, guided discovery, batch extraction via `LLMProviderPort` (replaces legacy `POST ai/jobs/extract-menu`).
+7. **Processing UX** → SSE agent progress (`agent.phase`, `tool.start/result`); preview + confirm before apply (no `ai/jobs` polling).
 8. **Review CTA** → navigate to dashboard menu editor.
 
 Draft state persisted in `localStorage` + server (restaurant record) so refresh is safe.
