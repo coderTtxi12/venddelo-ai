@@ -34,6 +34,8 @@ class OpenAILLMProvider(LLMProviderPort):
         }
         if request.max_tokens is not None:
             create_kwargs["max_tokens"] = request.max_tokens
+        if request.response_format == "json_object":
+            create_kwargs["response_format"] = {"type": "json_object"}
 
         try:
             stream = self._client.chat.completions.create(**create_kwargs)
