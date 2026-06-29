@@ -90,12 +90,26 @@ export type AssistantToolResultPayload = {
   summary?: string;
 };
 
+export type AssistantPlanPayload = {
+  steps: unknown;
+  reason?: string;
+};
+
+export type AssistantPlanUpdatePayload = {
+  steps: unknown;
+  decision: 'continue' | 'replan' | 'finish';
+  reason?: string;
+};
+
 export type AssistantStreamHandlers = {
   onDelta: (delta: string) => void;
   onComplete: (payload: AssistantStreamCompletePayload) => void;
   onError: (payload: AssistantStreamErrorPayload) => void;
   onAgentPhase?: (phase: string) => void;
   onAgentStatus?: (status: string) => void;
+  onAgentThought?: (text: string) => void;
+  onAgentPlan?: (payload: AssistantPlanPayload) => void;
+  onAgentPlanUpdate?: (payload: AssistantPlanUpdatePayload) => void;
   onToolStart?: (payload: AssistantToolStartPayload) => void;
   onToolResult?: (payload: AssistantToolResultPayload) => void;
   onToolError?: (payload: AssistantToolResultPayload) => void;
@@ -282,6 +296,34 @@ export async function streamAssistantChat(
         const status = payload.status;
         if (typeof status === 'string') {
           handlers.onAgentStatus?.(status);
+        }
+        continue;
+      }
+
+      if (parsed.event === 'agent.thought') {
+        const text = payload.text;
+        if (typeof text === 'string' && text.trim()) {
+          handlers.onAgentThought?.(text);
+        }
+        continue;
+      }
+
+      if (parsed.event === 'agent.plan') {
+        handlers.onAgentPlan?.({
+          steps: payload.steps,
+          reason: typeof payload.reason === 'string' ? payload.reason : undefined,
+        });
+        continue;
+      }
+
+      if (parsed.event === 'agent.plan_update') {
+        const decision = payload.decision;
+        if (decision === 'continue' || decision === 'replan' || decision === 'finish') {
+          handlers.onAgentPlanUpdate?.({
+            steps: payload.steps,
+            decision,
+            reason: typeof payload.reason === 'string' ? payload.reason : undefined,
+          });
         }
         continue;
       }
