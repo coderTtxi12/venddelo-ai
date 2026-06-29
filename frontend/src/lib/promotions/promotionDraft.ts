@@ -81,7 +81,7 @@ export function createEmptyPromotionDraft(): Omit<
     scope: 'product',
     percent: 10,
     amount: 0,
-    bundle: { getQuantity: 2, payQuantity: 1, pairingMode: 'cross_product' },
+    bundle: { getQuantity: 2, payQuantity: 1, pairingMode: 'same_product' },
     minOrderAmount: 0,
     productIds: [],
     categoryIds: [],
