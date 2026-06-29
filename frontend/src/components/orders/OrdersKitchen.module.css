@@ -155,17 +155,32 @@
   min-width: 1.35rem;
   padding: 0.1rem 0.4rem;
   border-radius: 999px;
-  background: var(--order-pending);
-  color: #fff;
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1;
 }
 
-.filterChipNewActive .filterChipCount {
+.filterChipCountNew {
+  background: var(--order-pending);
+  color: #fff;
+}
+
+.filterChipNewActive .filterChipCountNew {
   background: #fff;
   color: var(--order-pending);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--order-pending) 35%, transparent);
+}
+
+.filterChipCountNeutral {
+  background: color-mix(in srgb, var(--color-text-secondary) 14%, var(--color-border));
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+
+.filterChipActive .filterChipCountNeutral {
+  background: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));
+  color: var(--color-text);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 25%, transparent);
 }
 
 .board {

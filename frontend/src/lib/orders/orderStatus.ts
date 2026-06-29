@@ -86,6 +86,20 @@ export function matchesOrderStatusFilter(status: OrderStatus, filter: OrderStatu
   return status === filter;
 }
 
+export function buildOrderStatusFilterCounts(
+  orders: readonly { status: OrderStatus }[],
+): Record<OrderStatusFilter, number> {
+  return ORDER_STATUS_FILTER_OPTIONS.reduce(
+    (counts, option) => {
+      counts[option.value] = orders.filter((order) =>
+        matchesOrderStatusFilter(order.status, option.value),
+      ).length;
+      return counts;
+    },
+    {} as Record<OrderStatusFilter, number>,
+  );
+}
+
 export function canCancelOrder(status: OrderStatus): boolean {
   return status !== 'delivered' && status !== 'cancelled';
 }

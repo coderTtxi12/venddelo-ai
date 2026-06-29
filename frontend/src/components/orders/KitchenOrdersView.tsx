@@ -33,9 +33,9 @@ import {
 } from '@/lib/orders/orderDisplay';
 import { collectOrderDiscountRows } from '@/lib/orders/orderItemDiscounts';
 import {
-  ACTIVE_ORDER_STATUSES,
   canCancelOrder,
   DEFAULT_KITCHEN_STATUS_FILTER,
+  buildOrderStatusFilterCounts,
   matchesOrderStatusFilter,
   ORDER_STATUS_FILTER_OPTIONS,
   ORDER_STATUS_META,
@@ -549,10 +549,9 @@ export function KitchenOrdersView() {
     [orders, selectedOrderId],
   );
 
-  const activeCount = useMemo(
-    () => orders.filter((order) => ACTIVE_ORDER_STATUSES.includes(order.status)).length,
-    [orders],
-  );
+  const filterCounts = useMemo(() => buildOrderStatusFilterCounts(orders), [orders]);
+
+  const activeCount = filterCounts.active;
 
   const headerSubtitle = useMemo(() => {
     const liveSuffix = socketLive ? ' · en vivo' : '';
@@ -688,13 +687,14 @@ export function KitchenOrdersView() {
         {ORDER_STATUS_FILTER_OPTIONS.map((option) => {
           const isActive = statusFilter === option.value;
           const isNewTab = option.value === 'new';
-          const newCount = isNewTab ? pendingOrdersCount : 0;
+          const count = filterCounts[option.value];
           return (
             <button
               key={option.value}
               type="button"
               role="tab"
               aria-selected={isActive}
+              aria-label={`${option.label} (${count})`}
               className={`${styles.filterChip} ${isNewTab ? styles.filterChipNew : ''} ${
                 isActive
                   ? `${styles.filterChipActive} ${isNewTab ? styles.filterChipNewActive : ''}`
@@ -703,9 +703,13 @@ export function KitchenOrdersView() {
               onClick={() => setStatusFilter(option.value)}
             >
               {option.label}
-              {isNewTab && newCount > 0 ? (
-                <span className={styles.filterChipCount}>{newCount}</span>
-              ) : null}
+              <span
+                className={`${styles.filterChipCount} ${
+                  isNewTab ? styles.filterChipCountNew : styles.filterChipCountNeutral
+                }`}
+              >
+                {count}
+              </span>
             </button>
           );
         })}
