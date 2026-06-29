@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from app.modules.assistant.profile.schemas import AssistantProfileSnapshot
+
 ChatHistoryRole = Literal["user", "assistant"]
 
 
@@ -47,6 +49,10 @@ class AssistantConversationUpdate(BaseModel):
 
 class AssistantConversationChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
+    profile_version: int = Field(ge=1)
+    profile_snapshot: AssistantProfileSnapshot | None = None
+    confirmation_token: str | None = None
+    form_submission: dict[str, Any] | None = None
 
 
 class AssistantChatRequest(BaseModel):
