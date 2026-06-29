@@ -30,6 +30,7 @@ class ChatCompletionRequest(BaseModel):
     model: str | None = None
     temperature: float = 0.7
     max_tokens: int | None = None
+    response_format: Literal["json_object"] | None = None
 
 
 class ChatStreamEvent(BaseModel):
