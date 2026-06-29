@@ -35,8 +35,7 @@ class RestaurantAssistantEntitlement(Base):
         ForeignKey("restaurants.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    granted_extra: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default="[]")
-    revoked: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default="[]")
+    granted_skill_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default="[]")
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     source: Mapped[str | None] = mapped_column(String(40), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
