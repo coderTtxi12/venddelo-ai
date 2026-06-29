@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import uuid
 
-from app.core.ai_gateway import AIGatewayPort
 from app.core.palettes import normalize_locale
-from app.modules.ai.service import compute_source_hash
 from app.modules.menu.schemas import CategoryDTO, FullMenuDTO, ProductDTO
 from app.modules.restaurants.schemas import RestaurantDTO
+from app.modules.translations.hash import compute_source_hash
 from app.modules.translations.repository import TranslationRepository
 from app.modules.translations.schemas import TranslationUpsert
 
@@ -14,13 +13,14 @@ TRANSLATABLE_FIELDS = ("name", "description")
 
 
 class TranslationService:
-    def __init__(
-        self,
-        repo: TranslationRepository,
-        gateway: AIGatewayPort,
-    ) -> None:
+    """Serves cached menu translations from DB.
+
+    Live AI translation via the legacy AIGatewayPort was removed.
+    New translations will be handled by the agentic assistant (future).
+    """
+
+    def __init__(self, repo: TranslationRepository) -> None:
         self._repo = repo
-        self._gateway = gateway
 
     def translate_menu(
         self,
@@ -97,22 +97,4 @@ class TranslationService:
         existing = self._repo.get(restaurant_id, target_locale, entity_type, entity_id, field)
         if existing and existing.source_hash == digest:
             return existing.translated_text
-        translated_map = self._gateway.translate_texts(
-            {field: source_text},
-            source_locale=source_locale,
-            target_locale=target_locale,
-        )
-        translated = translated_map.get(field, source_text)
-        self._repo.upsert(
-            TranslationUpsert(
-                restaurant_id=restaurant_id,
-                locale=target_locale,
-                entity_type=entity_type,
-                entity_id=entity_id,
-                field=field,
-                translated_text=translated,
-                source_hash=digest,
-            )
-        )
-        self._repo.delete_stale(restaurant_id, entity_type, entity_id, field, digest)
-        return translated
+        return source_text
