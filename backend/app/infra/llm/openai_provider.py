@@ -10,6 +10,15 @@ def _estimate_tokens(text: str) -> int:
     return max(0, len(text.split()))
 
 
+# OpenAI models that reject non-default temperature (must omit the param).
+_FIXED_TEMPERATURE_PREFIXES = ("gpt-5-nano", "o1", "o3", "o4")
+
+
+def model_supports_custom_temperature(model: str) -> bool:
+    name = model.lower().strip()
+    return not any(name.startswith(prefix) for prefix in _FIXED_TEMPERATURE_PREFIXES)
+
+
 class OpenAILLMProvider(LLMProviderPort):
     def __init__(self, settings: Settings) -> None:
         from langsmith.wrappers import wrap_openai
@@ -28,10 +37,11 @@ class OpenAILLMProvider(LLMProviderPort):
         create_kwargs: dict[str, object] = {
             "model": model,
             "messages": messages,
-            "temperature": request.temperature,
             "stream": True,
             "stream_options": {"include_usage": True},
         }
+        if request.temperature is not None and model_supports_custom_temperature(model):
+            create_kwargs["temperature"] = request.temperature
         if request.max_tokens is not None:
             create_kwargs["max_tokens"] = request.max_tokens
         if request.response_format == "json_object":
