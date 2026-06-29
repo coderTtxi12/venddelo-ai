@@ -1,5 +1,9 @@
 # Phase 6 — AI Services (extraction, optimization, translation) — Design
 
+> **Status: superseded / removed from codebase (2026-06-27).**  
+> `AIGatewayPort`, `AIService`, and `POST ai/jobs/*` were deleted. See `2026-06-27-agentic-assistant-design.*.md` §10 for the agentic replacement via `LLMProviderPort`.  
+> Historical reference only — do not implement from this document.
+
 > Status: approved (continuing). Implements Phase 6 of `docs/PROJECT_PLANNING.en.md`.
 
 ## 1. Goal
