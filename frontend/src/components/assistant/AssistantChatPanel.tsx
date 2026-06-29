@@ -231,8 +231,8 @@ export default function AssistantChatPanel() {
     };
   }, [isOpen, accessToken, restaurantId]);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
   }, []);
 
   const clearPendingAttachments = useCallback(() => {
@@ -248,7 +248,7 @@ export default function AssistantChatPanel() {
   }, [isOpen, scrollToBottom]);
 
   useEffect(() => {
-    scrollToBottom();
+    scrollToBottom(streamingMessageId ? 'auto' : 'smooth');
   }, [messages, streamingMessageId, pendingAttachments, agentActivity, scrollToBottom]);
 
   useEffect(() => {
@@ -329,10 +329,30 @@ export default function AssistantChatPanel() {
 
       let streamedContent = '';
       let streamFinished = false;
+      let pendingFrame: number | null = null;
+
+      const flushStreamedContent = () => {
+        pendingFrame = null;
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === assistantMessageId
+              ? { ...message, content: streamedContent }
+              : message,
+          ),
+        );
+      };
+
+      const cancelPendingFrame = () => {
+        if (pendingFrame !== null) {
+          cancelAnimationFrame(pendingFrame);
+          pendingFrame = null;
+        }
+      };
 
       const finishStream = () => {
         if (streamFinished) return;
         streamFinished = true;
+        cancelPendingFrame();
         sendInFlightRef.current = false;
         setStreamingMessageId(null);
         setIsBusy(false);
@@ -355,13 +375,9 @@ export default function AssistantChatPanel() {
             onDelta: (delta) => {
               setAgentProcessing(false);
               streamedContent += delta;
-              setMessages((prev) =>
-                prev.map((message) =>
-                  message.id === assistantMessageId
-                    ? { ...message, content: streamedContent }
-                    : message,
-                ),
-              );
+              if (pendingFrame === null) {
+                pendingFrame = requestAnimationFrame(flushStreamedContent);
+              }
             },
             onAgentPhase: (phase) => {
               setAgentActivity((prev) => ({ ...prev, phase }));
@@ -756,7 +772,13 @@ export default function AssistantChatPanel() {
                         {isAwaitingFirstToken && !showAgentActivity ? (
                           <ChatStreamProcessing />
                         ) : null}
-                        {message.content ? <ChatMarkdown content={message.content} /> : null}
+                        {message.content ? (
+                          isStreaming ? (
+                            <p className={styles.streamingText}>{message.content}</p>
+                          ) : (
+                            <ChatMarkdown content={message.content} />
+                          )
+                        ) : null}
                         {isStreaming && message.content ? (
                           <span className={styles.cursor} aria-hidden />
                         ) : null}
