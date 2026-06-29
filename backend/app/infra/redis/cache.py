@@ -19,6 +19,9 @@ class NullCacheAdapter(CachePort):
     def set(self, key: str, value: str, ttl_seconds: int) -> None:
         pass
 
+    def set_nx(self, key: str, value: str, ttl_seconds: int) -> bool:
+        return True
+
     def delete(self, key: str) -> None:
         pass
 
@@ -54,6 +57,15 @@ class RedisCacheAdapter(CachePort):
             logger.warning("redis cache set failed key=%s", key, exc_info=True)
             return
         logger.debug("redis cache set key=%s ttl_seconds=%s", key, ttl_seconds)
+
+    def set_nx(self, key: str, value: str, ttl_seconds: int) -> bool:
+        try:
+            acquired = bool(self._client.set(key, value, nx=True, ex=ttl_seconds))
+        except Exception:
+            logger.warning("redis cache set_nx failed key=%s", key, exc_info=True)
+            return True
+        logger.debug("redis cache set_nx key=%s acquired=%s", key, acquired)
+        return acquired
 
     def delete(self, key: str) -> None:
         try:

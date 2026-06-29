@@ -9,6 +9,9 @@ class CachePort(ABC):
     def set(self, key: str, value: str, ttl_seconds: int) -> None: ...
 
     @abstractmethod
+    def set_nx(self, key: str, value: str, ttl_seconds: int) -> bool: ...
+
+    @abstractmethod
     def delete(self, key: str) -> None: ...
 
     @abstractmethod
