@@ -1,23 +1,27 @@
 from app.db.base import Base
-from app.db.models.ai import AIArtifact, AIJob, MenuTranslation
-from app.db.models.assistant import AssistantConversation, AssistantMessage
-from app.db.models.menu import (
-    Category,
-    OptionGroup,
-    OptionItem,
-    Product,
-    product_categories,
+from app.db.models.ai import MenuTranslation
+from app.db.models.assistant import AssistantConversation, AssistantLLMUsage, AssistantMessage
+from app.db.models.assistant_profile import (
+    RestaurantAssistantEntitlement,
+    RestaurantAssistantProfile,
 )
 from app.db.models.delivery import (
     DeliveryAssignment,
     DeliveryProvider,
     DeliveryProviderMember,
     DeliveryProviderPaymentMethod,
-    DeliveryProviderSchedule,
     DeliveryProviderPricingConfig,
+    DeliveryProviderSchedule,
     DeliveryProviderTariff,
     DeliveryProviderZone,
     RestaurantDeliveryProvider,
+)
+from app.db.models.menu import (
+    Category,
+    OptionGroup,
+    OptionItem,
+    Product,
+    product_categories,
 )
 from app.db.models.orders import Order, OrderItem
 from app.db.models.promotions import (
@@ -57,10 +61,11 @@ __all__ = [
     "DeliveryProviderTariff",
     "RestaurantDeliveryProvider",
     "DeliveryAssignment",
-    "AIArtifact",
-    "AIJob",
     "AssistantConversation",
     "AssistantMessage",
+    "AssistantLLMUsage",
+    "RestaurantAssistantProfile",
+    "RestaurantAssistantEntitlement",
     "MenuTranslation",
     "IdempotencyKey",
     "AuditLog",
