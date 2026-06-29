@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import uuid
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from app.core.exceptions import NotFoundError
@@ -9,6 +11,26 @@ from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
 from app.modules.menu.schemas import ProductDTO
 from app.modules.menu.service import MenuService
+
+DEFAULT_LIST_PRODUCTS_LIMIT = 20
+MAX_LIST_PRODUCTS_LIMIT = 50
+
+
+def _list_products_limit(args: dict[str, Any]) -> int:
+    raw = args.get("limit", DEFAULT_LIST_PRODUCTS_LIMIT)
+    try:
+        limit = int(raw)
+    except (TypeError, ValueError):
+        limit = DEFAULT_LIST_PRODUCTS_LIMIT
+    return max(1, min(limit, MAX_LIST_PRODUCTS_LIMIT))
+
+
+_SKILL_MD = Path(__file__).resolve().parent / "SKILL.md"
+
+
+@lru_cache
+def menu_read_skill_prompt_section() -> str:
+    return _SKILL_MD.read_text(encoding="utf-8")
 
 
 def _product_payload(product: ProductDTO) -> dict[str, Any]:
@@ -55,6 +77,34 @@ class MenuReadSkill:
                 input_schema={"type": "object", "properties": {}},
             ),
             ToolDefinition(
+                name="list_products",
+                description=(
+                    "List active products with cursor pagination. "
+                    "Omit category_id for all categories; set category_id to filter one category."
+                ),
+                effect="read",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "category_id": {
+                            "type": "string",
+                            "description": "Optional category UUID. Omit to list all categories.",
+                        },
+                        "cursor": {
+                            "type": "string",
+                            "description": "Cursor from a previous list_products call.",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": (
+                                f"Page size (default {DEFAULT_LIST_PRODUCTS_LIMIT}, "
+                                f"max {MAX_LIST_PRODUCTS_LIMIT})."
+                            ),
+                        },
+                    },
+                },
+            ),
+            ToolDefinition(
                 name="search_products",
                 description="Search products by name or description in the current restaurant.",
                 effect="read",
@@ -97,6 +147,49 @@ class MenuReadSkill:
                 data={"categories": categories},
             )
 
+        if tool_name == "list_products":
+            limit = _list_products_limit(args)
+            cursor_raw = args.get("cursor")
+            cursor = str(cursor_raw).strip() if cursor_raw is not None else None
+            if cursor == "":
+                cursor = None
+
+            category_id: uuid.UUID | None = None
+            category_id_raw = args.get("category_id")
+            if category_id_raw:
+                try:
+                    category_id = uuid.UUID(str(category_id_raw))
+                except ValueError:
+                    return ToolResult(ok=False, summary="Invalid category_id")
+
+            try:
+                page = service.list_products_page(
+                    ctx.restaurant_id,
+                    PaginationParams(limit=limit, cursor=cursor),
+                    category_id=category_id,
+                )
+            except NotFoundError:
+                return ToolResult(ok=False, summary="Category not found")
+
+            products = [_product_payload(product) for product in page.items if product.is_active]
+            data: dict[str, Any] = {
+                "products": products,
+                "next_cursor": page.next_cursor,
+                "has_more": page.has_more,
+                "limit": limit,
+            }
+            if category_id is not None:
+                data["category_id"] = str(category_id)
+            scope = f"category {category_id}" if category_id else "all categories"
+            return ToolResult(
+                ok=True,
+                summary=(
+                    f"Listed {len(products)} active products ({scope}, "
+                    f"has_more={page.has_more})"
+                ),
+                data=data,
+            )
+
         if tool_name == "search_products":
             query = str(args.get("query", "")).strip().casefold()
             page = service.list_products(ctx.restaurant_id, PaginationParams(limit=100))
@@ -126,7 +219,4 @@ class MenuReadSkill:
         return ToolResult(ok=False, summary=f"Unknown tool: {tool_name}")
 
     def system_prompt_section(self) -> str:
-        return (
-            "Menu Read Skill: use read-only tools to answer questions about categories, "
-            "products, prices, availability, and add-ons. Never mutate data."
-        )
+        return menu_read_skill_prompt_section()
