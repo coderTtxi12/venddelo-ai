@@ -20,6 +20,8 @@ from app.modules.assistant.agent.llm_turn import (
 from app.modules.assistant.agent.prompt_composer import compose_system_prompt
 from app.modules.assistant.agent.response_format import (
     AgentLLMResponse,
+    PlanStep,
+    apply_plan_update,
     build_tools_prompt_section,
 )
 from app.modules.assistant.context.compressor import compress_history_for_llm
@@ -89,12 +91,34 @@ class AgentOrchestrator:
         )
         tool_iterations = 0
         max_tool_iterations = self._settings.assistant_max_tool_iterations
+        planning_enabled = self._settings.assistant_planning_enabled
+        reflection_enabled = self._settings.assistant_reflection_enabled
+        reflection_every = self._settings.assistant_reflection_every
+        max_replans = self._settings.assistant_max_replans
+        # Bound *all* LLM turns (plan + reflections + tools + final answer) to cap cost.
+        max_total_turns = max_tool_iterations + max_replans + 4
         parse_context = AgentLLMParseContext(
             known_skill_ids=set(agent_skill_ids),
             known_tool_names={tool.name for _, tool in entitled_tools},
         )
 
+        plan: list[PlanStep] | None = None
+        replans = 0
+        tools_since_reflection = 0
+        total_turns = 0
+
         while True:
+            if total_turns >= max_total_turns:
+                yield ChatStreamEvent(
+                    event="error",
+                    data={
+                        "code": "turn_limit",
+                        "message": "Se alcanzó el límite de pasos para este turno.",
+                    },
+                )
+                return
+            total_turns += 1
+
             turn = AgentLLMTurnResult()
             completion_request = ChatCompletionRequest(
                 messages=messages,
@@ -138,6 +162,69 @@ class AgentOrchestrator:
             if parsed.type == "answer":
                 return
 
+            if parsed.type == "plan":
+                plan = parsed.steps or []
+                yield ChatStreamEvent(event="agent.phase", data={"phase": "planning"})
+                yield ChatStreamEvent(
+                    event="agent.plan",
+                    data={
+                        "steps": [step.model_dump() for step in plan],
+                        "reason": parsed.reason,
+                    },
+                )
+                messages.append(
+                    ChatCompletionMessage(role="assistant", content=raw_response)
+                )
+                messages.append(
+                    ChatCompletionMessage(
+                        role="user",
+                        content=(
+                            "Plan recorded. Execute it step by step: emit a tool_call when you "
+                            'need live data, or answer with type "answer" when done. '
+                            "Do not invent data."
+                        ),
+                    )
+                )
+                continue
+
+            if parsed.type == "plan_update":
+                if parsed.decision == "replan" and replans < max_replans:
+                    replans += 1
+                    plan = apply_plan_update(plan, parsed)
+                else:
+                    # Cap replans: keep progress (completed steps) but ignore new steps.
+                    plan = apply_plan_update(
+                        plan,
+                        AgentLLMResponse(
+                            type="plan_update",
+                            decision="continue",
+                            completed_step_ids=parsed.completed_step_ids,
+                        ),
+                    )
+                yield ChatStreamEvent(
+                    event="agent.plan_update",
+                    data={
+                        "steps": [step.model_dump() for step in (plan or [])],
+                        "decision": parsed.decision,
+                        "reason": parsed.reason,
+                    },
+                )
+                tools_since_reflection = 0
+                messages.append(
+                    ChatCompletionMessage(role="assistant", content=raw_response)
+                )
+                follow_up = (
+                    'You have enough information. Respond now with type "answer". '
+                    "Do not invent data."
+                    if parsed.decision == "finish"
+                    else (
+                        "Continue with the next step: emit a tool_call if more live data is "
+                        'needed, or answer with type "answer" if you are done.'
+                    )
+                )
+                messages.append(ChatCompletionMessage(role="user", content=follow_up))
+                continue
+
             if tool_iterations >= max_tool_iterations:
                 yield ChatStreamEvent(
                     event="error",
@@ -160,6 +247,11 @@ class AgentOrchestrator:
 
             tool_iterations += 1
             yield ChatStreamEvent(event="agent.phase", data={"phase": "explore"})
+            if parsed.reason:
+                yield ChatStreamEvent(
+                    event="agent.thought",
+                    data={"text": parsed.reason},
+                )
             yield ChatStreamEvent(
                 event="tool.start",
                 data={
@@ -190,18 +282,60 @@ class AgentOrchestrator:
                     content=raw_response,
                 )
             )
+
+            tools_since_reflection += 1
+            should_reflect = planning_enabled and reflection_enabled and (
+                not result.ok
+                or (reflection_every > 0 and tools_since_reflection >= reflection_every)
+            )
+            if should_reflect:
+                tools_since_reflection = 0
+
             messages.append(
                 ChatCompletionMessage(
                     role="user",
-                    content=(
-                        "Tool execution finished. Use the result below and respond with JSON "
-                        'type "answer". Do not invent data.\n\n'
-                        f"Original owner message: {request.message}\n\n"
-                        "Tool result JSON: "
-                        f"{json.dumps(result.model_dump(mode='json'), ensure_ascii=False)}"
+                    content=self._post_tool_message(
+                        owner_message=request.message,
+                        result=result,
+                        planning_enabled=planning_enabled,
+                        reflect=should_reflect,
                     ),
                 )
             )
+
+    @staticmethod
+    def _post_tool_message(
+        *,
+        owner_message: str,
+        result: ToolResult,
+        planning_enabled: bool,
+        reflect: bool,
+    ) -> str:
+        result_json = json.dumps(result.model_dump(mode="json"), ensure_ascii=False)
+        if not planning_enabled:
+            return (
+                "Tool execution finished. Use the result below and respond with JSON "
+                'type "answer". Do not invent data.\n\n'
+                f"Original owner message: {owner_message}\n\n"
+                f"Tool result JSON: {result_json}"
+            )
+        if reflect:
+            instruction = (
+                "Re-evaluate before continuing: emit a plan_update with completed_step_ids "
+                "and a decision (continue / replan / finish). Include a new steps list only "
+                "when you replan."
+            )
+        else:
+            instruction = (
+                "If the task is complete, respond with type \"answer\" (no invented data). "
+                "If more steps remain, continue with another tool_call, or emit a plan_update "
+                "to revise the plan."
+            )
+        return (
+            f"Tool execution finished. {instruction}\n\n"
+            f"Original owner message: {owner_message}\n\n"
+            f"Tool result JSON: {result_json}"
+        )
 
     def _compose_agent_system_prompt(
         self,
@@ -214,7 +348,11 @@ class AgentOrchestrator:
         sections = self._registry.system_prompt_sections(effective_skill_ids)
         if sections:
             system_prompt = system_prompt + "\n\n---\n\n" + "\n\n".join(sections)
-        system_prompt = system_prompt + "\n\n---\n\n" + build_tools_prompt_section(entitled_tools)
+        system_prompt = system_prompt + "\n\n---\n\n" + build_tools_prompt_section(
+            entitled_tools,
+            planning_enabled=self._settings.assistant_planning_enabled,
+            plan_max_steps=self._settings.assistant_plan_max_steps,
+        )
         return system_prompt
 
     def _build_messages(
