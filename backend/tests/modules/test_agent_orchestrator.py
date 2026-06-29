@@ -3,6 +3,7 @@ import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
 
+from app.core.config import get_settings
 from app.core.llm.ports import ChatCompletionRequest, ChatStreamEvent, LLMProviderPort
 from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.agent.orchestrator import AgentOrchestrator
@@ -92,6 +93,7 @@ def test_orchestrator_executes_tool_selected_by_llm_json():
             "skill_id": "menu_read",
             "tool": "search_products",
             "args": {"query": "pastor"},
+            "reason": "Voy a buscar el producto en tu catálogo activo.",
         }
     )
     answer = json.dumps(
@@ -123,6 +125,8 @@ def test_orchestrator_executes_tool_selected_by_llm_json():
     names = [event.event for event in events]
     assert "tool.start" in names
     assert "tool.result" in names
+    thought = next(event for event in events if event.event == "agent.thought")
+    assert thought.data["text"] == "Voy a buscar el producto en tu catálogo activo."
     complete = next(event for event in events if event.event == "message.complete")
     assert complete.data["content"] == "Encontré **Taco al pastor**."
 
@@ -212,6 +216,123 @@ def test_orchestrator_streams_answer_deltas_during_llm_generation():
     deltas = [event.data["delta"] for event in events if event.event == "content.delta"]
     assert len(deltas) >= 2
     assert "".join(deltas) == "Me llamo **Mark**."
+
+
+def test_orchestrator_runs_plan_then_executes_then_answers():
+    plan = json.dumps(
+        {
+            "type": "plan",
+            "skill_id": None,
+            "steps": [
+                {"id": 1, "goal": "Buscar pastor", "tool_hint": "menu_read.search_products"},
+                {"id": 2, "goal": "Responder"},
+            ],
+            "reason": "Multi-step.",
+        }
+    )
+    tool_call = json.dumps(
+        {
+            "type": "tool_call",
+            "skill_id": "menu_read",
+            "tool": "search_products",
+            "args": {"query": "pastor"},
+            "reason": "Need live data.",
+        }
+    )
+    answer = json.dumps(
+        {
+            "type": "answer",
+            "skill_id": "menu_read",
+            "content": "Encontré **Taco al pastor**.",
+            "language": "es",
+            "reason": "Done.",
+        }
+    )
+    provider = SequenceLLMProvider([plan, tool_call, answer])
+    orchestrator = AgentOrchestrator(provider=provider, registry=SkillRegistry([FakeReadSkill()]))
+    ctx = AgentContext(
+        restaurant_id=uuid.uuid4(),
+        conversation_id=uuid.uuid4(),
+        uow=None,  # type: ignore[arg-type]
+        effective_skill_ids=["menu_read"],
+    )
+
+    events = list(
+        orchestrator.stream_chat(
+            AssistantChatRequest(message="¿Tienes tacos al pastor?"),
+            profile=_profile(),
+            ctx=ctx,
+        )
+    )
+
+    names = [event.event for event in events]
+    assert "agent.plan" in names
+    assert "tool.start" in names
+    plan_event = next(event for event in events if event.event == "agent.plan")
+    assert [step["id"] for step in plan_event.data["steps"]] == [1, 2]
+    complete = next(event for event in events if event.event == "message.complete")
+    assert complete.data["content"] == "Encontré **Taco al pastor**."
+    assert not any(event.event == "error" for event in events)
+
+
+def test_orchestrator_emits_plan_update_on_reflection():
+    tool_call = json.dumps(
+        {
+            "type": "tool_call",
+            "skill_id": "menu_read",
+            "tool": "search_products",
+            "args": {"query": "pastor"},
+            "reason": "Need live data.",
+        }
+    )
+    plan_update = json.dumps(
+        {
+            "type": "plan_update",
+            "completed_step_ids": [1],
+            "decision": "finish",
+            "reason": "Tengo lo necesario.",
+        }
+    )
+    answer = json.dumps(
+        {
+            "type": "answer",
+            "skill_id": "menu_read",
+            "content": "Listo.",
+            "language": "es",
+            "reason": "Done.",
+        }
+    )
+    provider = SequenceLLMProvider([tool_call, plan_update, answer])
+    # Reflect after every tool to force the plan_update path.
+    settings = get_settings().model_copy(update={"assistant_reflection_every": 1})
+    orchestrator = AgentOrchestrator(
+        provider=provider,
+        registry=SkillRegistry([FakeReadSkill()]),
+        settings=settings,
+    )
+    ctx = AgentContext(
+        restaurant_id=uuid.uuid4(),
+        conversation_id=uuid.uuid4(),
+        uow=None,  # type: ignore[arg-type]
+        effective_skill_ids=["menu_read"],
+    )
+
+    events = list(
+        orchestrator.stream_chat(
+            AssistantChatRequest(message="Busca pastor"),
+            profile=_profile(),
+            ctx=ctx,
+        )
+    )
+
+    names = [event.event for event in events]
+    assert "tool.result" in names
+    assert "agent.plan_update" in names
+    update_event = next(event for event in events if event.event == "agent.plan_update")
+    assert update_event.data["decision"] == "finish"
+    complete = next(event for event in events if event.event == "message.complete")
+    assert complete.data["content"] == "Listo."
+    assert not any(event.event == "error" for event in events)
 
 
 def test_orchestrator_passthrough_when_menu_read_not_enabled():
