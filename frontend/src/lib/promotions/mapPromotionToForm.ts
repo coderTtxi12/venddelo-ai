@@ -42,7 +42,7 @@ export function mapPromotionToForm(promotion: Promotion): PromotionFormSubmitPay
       payQuantity: promotion.bundle?.pay_quantity ?? empty.bundle.payQuantity,
       pairingMode:
         (promotion.bundle?.pairing_mode as 'cross_product' | 'same_product' | undefined) ??
-        'cross_product',
+        'same_product',
     },
     minOrderAmount: (promotion.min_order_cents ?? 0) / 100,
     productIds: [...(promotion.product_ids ?? [])],
