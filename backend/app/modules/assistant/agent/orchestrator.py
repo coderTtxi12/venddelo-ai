@@ -12,11 +12,15 @@ from app.core.llm.ports import (
     LLMProviderPort,
 )
 from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.agent.llm_turn import (
+    AgentLLMParseContext,
+    AgentLLMTurnResult,
+    iter_agent_llm_turn,
+)
 from app.modules.assistant.agent.prompt_composer import compose_system_prompt
 from app.modules.assistant.agent.response_format import (
     AgentLLMResponse,
     build_tools_prompt_section,
-    parse_agent_json_response,
 )
 from app.modules.assistant.context.compressor import compress_history_for_llm
 from app.modules.assistant.profile.schemas import AssistantProfileRecord
@@ -25,6 +29,8 @@ from app.modules.assistant.skills.base import ToolDefinition, ToolResult
 
 
 class AgentSkillRegistry(Protocol):
+    def registered_skill_ids(self) -> list[str]: ...
+
     def entitled_tools(
         self, effective_skill_ids: list[str]
     ) -> list[tuple[str, ToolDefinition]]: ...
@@ -38,31 +44,6 @@ class AgentSkillRegistry(Protocol):
         args: dict[str, Any],
         ctx: AgentContext,
     ) -> ToolResult: ...
-
-
-def _collect_completion(provider: LLMProviderPort, request: ChatCompletionRequest) -> str:
-    content_parts: list[str] = []
-    for event in provider.stream_chat(request):
-        if event.event == "content.delta":
-            delta = event.data.get("delta")
-            if isinstance(delta, str) and delta:
-                content_parts.append(delta)
-            continue
-        if event.event == "error":
-            message = event.data.get("message")
-            raise RuntimeError(message if isinstance(message, str) else "LLM provider error")
-        if event.event == "message.complete":
-            provider_content = event.data.get("content")
-            if isinstance(provider_content, str) and provider_content:
-                return provider_content
-            return "".join(content_parts)
-    return "".join(content_parts)
-
-
-def _stream_answer_content(content: str) -> Iterator[ChatStreamEvent]:
-    for token in content.split(" "):
-        yield ChatStreamEvent(event="content.delta", data={"delta": f"{token} "})
-    yield ChatStreamEvent(event="message.complete", data={"content": content})
 
 
 class AgentOrchestrator:
@@ -86,10 +67,15 @@ class AgentOrchestrator:
         message_id: str | None = None,
     ) -> Iterator[ChatStreamEvent]:
         _ = message_id
-        entitled_tools = self._registry.entitled_tools(ctx.effective_skill_ids)
+        agent_skill_ids = [
+            skill_id
+            for skill_id in ctx.effective_skill_ids
+            if skill_id in self._registry.registered_skill_ids()
+        ]
+        entitled_tools = self._registry.entitled_tools(agent_skill_ids)
         system_prompt = self._compose_agent_system_prompt(
             profile,
-            effective_skill_ids=ctx.effective_skill_ids,
+            effective_skill_ids=agent_skill_ids,
             entitled_tools=entitled_tools,
         )
 
@@ -103,15 +89,40 @@ class AgentOrchestrator:
         )
         tool_iterations = 0
         max_tool_iterations = self._settings.assistant_max_tool_iterations
+        parse_context = AgentLLMParseContext(
+            known_skill_ids=set(agent_skill_ids),
+            known_tool_names={tool.name for _, tool in entitled_tools},
+        )
 
         while True:
-            raw_response = _collect_completion(
-                self._provider,
-                ChatCompletionRequest(messages=messages),
+            turn = AgentLLMTurnResult()
+            completion_request = ChatCompletionRequest(
+                messages=messages,
+                response_format="json_object",
             )
-            try:
-                parsed = parse_agent_json_response(raw_response)
-            except ValueError:
+            yield from iter_agent_llm_turn(
+                self._provider,
+                completion_request,
+                turn,
+                parse_context=parse_context,
+            )
+
+            if turn.error == "invalid_llm_json":
+                yield ChatStreamEvent(
+                    event="error",
+                    data={
+                        "code": "invalid_llm_json",
+                        "message": "El asistente devolvió un formato JSON inválido.",
+                    },
+                )
+                return
+            if turn.error:
+                yield ChatStreamEvent(
+                    event="error",
+                    data={"code": "llm_provider_error", "message": turn.error},
+                )
+                return
+            if turn.parsed is None:
                 yield ChatStreamEvent(
                     event="error",
                     data={
@@ -121,8 +132,10 @@ class AgentOrchestrator:
                 )
                 return
 
+            parsed = turn.parsed
+            raw_response = turn.raw_response
+
             if parsed.type == "answer":
-                yield from _stream_answer_content(parsed.content or "")
                 return
 
             if tool_iterations >= max_tool_iterations:
