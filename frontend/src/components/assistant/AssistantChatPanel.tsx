@@ -29,10 +29,13 @@ import {
 } from '@/lib/assistant/chatComplements';
 import {
   createAssistantConversation,
+  getAssistantProfile,
   listAssistantConversations,
   loadAllAssistantMessages,
   streamAssistantChat,
+  updateAssistantProfile,
   type AssistantConversation,
+  type AssistantProfile,
 } from '@/lib/api/assistant';
 import {
   MAX_CHAT_PANEL_WIDTH,
@@ -103,6 +106,10 @@ export default function AssistantChatPanel() {
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
+  const [assistantProfile, setAssistantProfile] = useState<AssistantProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [assistantNameDraft, setAssistantNameDraft] = useState('');
+  const [agentProcessing, setAgentProcessing] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -112,9 +119,11 @@ export default function AssistantChatPanel() {
   const streamAbortRef = useRef<AbortController | null>(null);
   const sendInFlightRef = useRef(false);
   const activeConversationIdRef = useRef<string | null>(null);
+  const assistantProfileRef = useRef<AssistantProfile | null>(null);
 
   pendingAttachmentsRef.current = pendingAttachments;
   activeConversationIdRef.current = activeConversationId;
+  assistantProfileRef.current = assistantProfile;
 
   const refreshConversations = useCallback(async () => {
     if (!accessToken || !restaurantId) return;
@@ -164,7 +173,13 @@ export default function AssistantChatPanel() {
 
     async function bootstrap(token: string, rid: string) {
       setConversationsLoading(true);
+      setProfileLoading(true);
       try {
+        const profile = await getAssistantProfile(token, rid);
+        if (cancelled) return;
+        setAssistantProfile(profile);
+        setAssistantNameDraft(profile.display_name);
+
         const page = await listAssistantConversations(token, rid);
         if (cancelled) return;
 
@@ -196,7 +211,10 @@ export default function AssistantChatPanel() {
           ]);
         }
       } finally {
-        if (!cancelled) setConversationsLoading(false);
+        if (!cancelled) {
+          setConversationsLoading(false);
+          setProfileLoading(false);
+        }
       }
     }
 
@@ -263,6 +281,7 @@ export default function AssistantChatPanel() {
       if (sendInFlightRef.current) return;
 
       const conversationId = activeConversationIdRef.current;
+      const profile = assistantProfileRef.current;
 
       if (!accessToken || !restaurantId || !conversationId) {
         const assistantMessage: ChatMessage = {
@@ -276,9 +295,15 @@ export default function AssistantChatPanel() {
         return;
       }
 
+      if (!profile?.chat_ready) {
+        setIsBusy(false);
+        return;
+      }
+
       const assistantMessageId = createId();
       sendInFlightRef.current = true;
       setIsBusy(true);
+      setAgentProcessing(true);
       setMessages((prev) => {
         const withoutWelcome =
           prev.length === 1 && prev[0]?.id === 'welcome' ? [] : prev.filter((m) => m.id !== 'welcome');
@@ -303,6 +328,15 @@ export default function AssistantChatPanel() {
         sendInFlightRef.current = false;
         setStreamingMessageId(null);
         setIsBusy(false);
+        setAgentProcessing(false);
+      };
+
+      const profileSnapshot = {
+        display_name: profile.display_name,
+        identity_markdown: profile.identity_markdown,
+        behavior_markdown: profile.behavior_markdown,
+        menu_markdown: profile.menu_markdown,
+        enabled_skill_ids: profile.enabled_skill_ids,
       };
 
       try {
@@ -313,6 +347,7 @@ export default function AssistantChatPanel() {
           outboundMessage,
           {
             onDelta: (delta) => {
+              setAgentProcessing(false);
               streamedContent += delta;
               setMessages((prev) =>
                 prev.map((message) =>
@@ -321,6 +356,11 @@ export default function AssistantChatPanel() {
                     : message,
                 ),
               );
+            },
+            onAgentStatus: (status) => {
+              if (status === 'processing') {
+                setAgentProcessing(true);
+              }
             },
             onComplete: (payload) => {
               const finalContent = payload.content || streamedContent;
@@ -352,6 +392,10 @@ export default function AssistantChatPanel() {
             },
           },
           abortController.signal,
+          {
+            profileVersion: profile.version,
+            profileSnapshot,
+          },
         );
         if (!streamFinished) {
           finishStream();
@@ -375,6 +419,22 @@ export default function AssistantChatPanel() {
     },
     [accessToken, restaurantId, refreshConversations],
   );
+
+  const saveAssistantName = useCallback(async () => {
+    const name = assistantNameDraft.trim();
+    if (!accessToken || !restaurantId || !assistantProfile || !name) return;
+
+    try {
+      const updated = await updateAssistantProfile(accessToken, restaurantId, {
+        display_name: name,
+        expected_version: assistantProfile.version,
+      });
+      setAssistantProfile(updated);
+      setAssistantNameDraft(updated.display_name);
+    } catch (error) {
+      console.error(error);
+    }
+  }, [accessToken, assistantNameDraft, assistantProfile, restaurantId]);
 
   const sendMessage = useCallback(
     async (rawText: string, attachments: ChatAttachment[] = []) => {
@@ -495,7 +555,10 @@ export default function AssistantChatPanel() {
     }
   };
 
-  const canSend = !isBusy && (draft.trim().length > 0 || pendingAttachments.length > 0);
+  const canSend =
+    !isBusy &&
+    assistantProfile?.chat_ready &&
+    (draft.trim().length > 0 || pendingAttachments.length > 0);
 
   return (
     <aside
@@ -584,7 +647,8 @@ export default function AssistantChatPanel() {
         {messages.map((message) => {
           const isUser = message.role === 'user';
           const isStreaming = streamingMessageId === message.id;
-          const isAwaitingFirstToken = isStreaming && message.content.trim().length === 0;
+          const isAwaitingFirstToken =
+            isStreaming && (message.content.trim().length === 0 || agentProcessing);
           const hasAttachments = (message.attachments?.length ?? 0) > 0;
           const hasComplement = Boolean(message.complement);
           const attachmentCount = message.attachments?.length ?? 0;
@@ -656,13 +720,47 @@ export default function AssistantChatPanel() {
       </div>
 
       <div className={styles.composer}>
+        {!profileLoading && assistantProfile && !assistantProfile.chat_ready ? (
+          <div className={styles.profileOnboarding}>
+            <p className={styles.profileOnboardingText}>
+              Antes de chatear, elige un nombre para tu asistente.
+            </p>
+            <div className={styles.profileOnboardingRow}>
+              <input
+                type="text"
+                className={styles.profileNameInput}
+                value={assistantNameDraft}
+                maxLength={80}
+                placeholder="Ej. Luna, Marco…"
+                onChange={(event) => setAssistantNameDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    void saveAssistantName();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className={styles.profileSaveButton}
+                disabled={!assistantNameDraft.trim() || isBusy}
+                onClick={() => {
+                  void saveAssistantName();
+                }}
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className={styles.suggestions}>
           {SUGGESTIONS.map((suggestion) => (
             <button
               key={suggestion}
               type="button"
               className={styles.suggestionChip}
-              disabled={isBusy}
+              disabled={isBusy || !assistantProfile?.chat_ready}
               onClick={() => sendMessage(suggestion)}
             >
               {suggestion}
@@ -707,7 +805,7 @@ export default function AssistantChatPanel() {
             rows={1}
             placeholder="Describe qué quieres agregar..."
             value={draft}
-            disabled={isBusy}
+            disabled={isBusy || !assistantProfile?.chat_ready}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleKeyDown}
           />
