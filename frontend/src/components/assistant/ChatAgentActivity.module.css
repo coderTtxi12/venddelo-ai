@@ -1,12 +1,13 @@
 .activity {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.55rem;
   margin-bottom: 0.35rem;
-  padding: 0.55rem 0.65rem;
+  padding: 0.65rem 0.75rem;
   border-radius: calc(var(--radius) + 2px);
   border: 1px solid color-mix(in srgb, var(--color-primary) 16%, var(--color-border));
   background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 4%, transparent);
 }
 
 .phaseRow {
@@ -36,6 +37,137 @@
   border-radius: 999px;
   background: var(--color-primary);
   animation: phasePulse 1.2s ease-in-out infinite;
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.thoughtSection,
+.planSection,
+.toolsSection,
+.reflectionSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.15rem;
+}
+
+.thoughtList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.thoughtItem {
+  position: relative;
+  padding: 0.05rem 0 0.05rem 0.7rem;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  border-left: 2px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
+  animation: thoughtIn 220ms ease;
+}
+
+.thoughtItem_active {
+  color: var(--color-text);
+  border-left-color: var(--color-primary);
+}
+
+@keyframes thoughtIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.planReason,
+.reflectionReason {
+  margin: 0;
+  font-size: 0.73rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.planList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.planItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: var(--radius);
+  transition: background-color 180ms ease;
+}
+
+.planItem_current {
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.planIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+  color: var(--color-text-secondary);
+}
+
+.planItem_done .planIcon {
+  color: #059669;
+}
+
+.planItem_skipped .planIcon {
+  color: #dc2626;
+}
+
+.planItem_pending .planIcon,
+.planItem_current .planIcon {
+  color: var(--color-primary);
+}
+
+.planText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.planGoal {
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.35;
+}
+
+.planHint {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  line-height: 1.35;
 }
 
 .toolList {
@@ -96,6 +228,11 @@
   line-height: 1.35;
 }
 
+.reflectionSection {
+  padding-top: 0.25rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+}
+
 @keyframes phasePulse {
   0%,
   100% {
@@ -113,5 +250,13 @@
   .phasePulse {
     animation: none;
     opacity: 0.7;
+  }
+
+  .planItem {
+    transition: none;
+  }
+
+  .thoughtItem {
+    animation: none;
   }
 }
