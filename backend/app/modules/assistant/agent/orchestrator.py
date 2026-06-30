@@ -1,8 +1,21 @@
+"""Single-loop agent orchestrator using native function/tool calling.
+
+The model receives the entitled skills' tools as native function schemas plus a
+generic ``load_skill`` tool for progressive disclosure of skill guides. Each turn
+the model either calls tools (which we execute and feed back as ``tool`` messages)
+or replies with a normal assistant message (the final answer, streamed live).
+
+There is no custom JSON envelope, no forced router/plan/activate phases, and no
+JSON repair: the provider parses tool calls natively.
+"""
+
 from __future__ import annotations
 
 import json
 from collections.abc import Iterator
 from typing import Any, Protocol
+
+from langsmith import trace
 
 from app.core.config import Settings, get_settings
 from app.core.llm.ports import (
@@ -12,22 +25,24 @@ from app.core.llm.ports import (
     LLMProviderPort,
 )
 from app.modules.assistant.agent.context import AgentContext
-from app.modules.assistant.agent.llm_turn import (
-    AgentLLMParseContext,
-    AgentLLMTurnResult,
-    iter_agent_llm_turn,
-)
 from app.modules.assistant.agent.prompt_composer import compose_system_prompt
 from app.modules.assistant.agent.response_format import (
-    AgentLLMResponse,
-    PlanStep,
-    apply_plan_update,
-    build_tools_prompt_section,
+    LOAD_SKILL_TOOL_NAME,
+    build_agent_runtime_section,
+    build_load_skill_schema,
+    build_openai_tool_schemas,
+    parse_function_name,
 )
 from app.modules.assistant.context.compressor import compress_history_for_llm
+from app.modules.assistant.entitlements.catalog import SKILL_CATALOG
 from app.modules.assistant.profile.schemas import AssistantProfileRecord
 from app.modules.assistant.schemas import AssistantChatRequest
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
+
+
+def _skill_label(skill_id: str) -> str:
+    definition = SKILL_CATALOG.get(skill_id)
+    return definition.label if definition else skill_id
 
 
 class AgentSkillRegistry(Protocol):
@@ -68,292 +83,254 @@ class AgentOrchestrator:
         ctx: AgentContext,
         message_id: str | None = None,
     ) -> Iterator[ChatStreamEvent]:
-        _ = message_id
-        agent_skill_ids = [
-            skill_id
-            for skill_id in ctx.effective_skill_ids
-            if skill_id in self._registry.registered_skill_ids()
-        ]
-        entitled_tools = self._registry.entitled_tools(agent_skill_ids)
-        system_prompt = self._compose_agent_system_prompt(
-            profile,
-            effective_skill_ids=agent_skill_ids,
-            entitled_tools=entitled_tools,
-        )
+        catalog_skill_ids = list(ctx.effective_skill_ids)
+        registered = set(self._registry.registered_skill_ids())
+        entitled_skill_ids = [s for s in catalog_skill_ids if s in registered]
+        entitled_tools = self._registry.entitled_tools(entitled_skill_ids)
+        tool_index: dict[tuple[str, str], ToolDefinition] = {
+            (skill_id, tool.name): tool for skill_id, tool in entitled_tools
+        }
 
-        yield ChatStreamEvent(event="agent.phase", data={"phase": "analyzing"})
-        yield ChatStreamEvent(event="agent.status", data={"status": "processing"})
+        system_prompt = (
+            compose_system_prompt(profile, effective_skill_ids=catalog_skill_ids)
+            + "\n\n---\n\n"
+            + build_agent_runtime_section()
+        )
+        tool_schemas = build_openai_tool_schemas(entitled_tools)
+        if entitled_skill_ids:
+            tool_schemas.append(build_load_skill_schema(entitled_skill_ids))
 
         messages = self._build_messages(
             request=request,
             system_prompt=system_prompt,
             user_message=request.message,
         )
-        tool_iterations = 0
+
         max_tool_iterations = self._settings.assistant_max_tool_iterations
-        planning_enabled = self._settings.assistant_planning_enabled
-        reflection_enabled = self._settings.assistant_reflection_enabled
-        reflection_every = self._settings.assistant_reflection_every
-        max_replans = self._settings.assistant_max_replans
-        # Bound *all* LLM turns (plan + reflections + tools + final answer) to cap cost.
-        max_total_turns = max_tool_iterations + max_replans + 4
-        parse_context = AgentLLMParseContext(
-            known_skill_ids=set(agent_skill_ids),
-            known_tool_names={tool.name for _, tool in entitled_tools},
-        )
-
-        plan: list[PlanStep] | None = None
-        replans = 0
-        tools_since_reflection = 0
+        max_total_turns = max_tool_iterations + 5
+        tool_iterations = 0
         total_turns = 0
+        content_parts: list[str] = []
+        loaded_skill_ids: list[str] = []
 
-        while True:
-            if total_turns >= max_total_turns:
-                yield ChatStreamEvent(
-                    event="error",
-                    data={
-                        "code": "turn_limit",
-                        "message": "Se alcanzó el límite de pasos para este turno.",
-                    },
-                )
-                return
-            total_turns += 1
+        trace_metadata = {
+            "message_id": message_id,
+            "restaurant_id": str(ctx.restaurant_id),
+            "conversation_id": str(ctx.conversation_id),
+            "entitled_skill_ids": entitled_skill_ids,
+        }
 
-            turn = AgentLLMTurnResult()
-            completion_request = ChatCompletionRequest(
-                messages=messages,
-                response_format="json_object",
-            )
-            yield from iter_agent_llm_turn(
-                self._provider,
-                completion_request,
-                turn,
-                parse_context=parse_context,
-            )
+        with trace(
+            "agent_chat",
+            run_type="chain",
+            metadata=trace_metadata,
+            inputs={"message": request.message},
+            exceptions_to_handle=(GeneratorExit,),
+        ) as agent_run:
+            try:
+                yield ChatStreamEvent(event="agent.phase", data={"phase": "analyzing"})
+                yield ChatStreamEvent(event="agent.status", data={"status": "processing"})
 
-            if turn.error == "invalid_llm_json":
-                yield ChatStreamEvent(
-                    event="error",
-                    data={
-                        "code": "invalid_llm_json",
-                        "message": "El asistente devolvió un formato JSON inválido.",
-                    },
-                )
-                return
-            if turn.error:
-                yield ChatStreamEvent(
-                    event="error",
-                    data={"code": "llm_provider_error", "message": turn.error},
-                )
-                return
-            if turn.parsed is None:
-                yield ChatStreamEvent(
-                    event="error",
-                    data={
-                        "code": "invalid_llm_json",
-                        "message": "El asistente devolvió un formato JSON inválido.",
-                    },
-                )
-                return
+                while True:
+                    if total_turns >= max_total_turns:
+                        yield ChatStreamEvent(
+                            event="error",
+                            data={
+                                "code": "turn_limit",
+                                "message": "Se alcanzó el límite de pasos para este turno.",
+                            },
+                        )
+                        return
+                    total_turns += 1
 
-            parsed = turn.parsed
-            raw_response = turn.raw_response
-
-            if parsed.type == "answer":
-                return
-
-            if parsed.type == "plan":
-                plan = parsed.steps or []
-                yield ChatStreamEvent(event="agent.phase", data={"phase": "planning"})
-                yield ChatStreamEvent(
-                    event="agent.plan",
-                    data={
-                        "steps": [step.model_dump() for step in plan],
-                        "reason": parsed.reason,
-                    },
-                )
-                messages.append(
-                    ChatCompletionMessage(role="assistant", content=raw_response)
-                )
-                messages.append(
-                    ChatCompletionMessage(
-                        role="user",
-                        content=(
-                            "Plan recorded. Execute it step by step: emit a tool_call when you "
-                            'need live data, or answer with type "answer" when done. '
-                            "Do not invent data."
-                        ),
+                    completion_request = ChatCompletionRequest(
+                        messages=messages,
+                        tools=tool_schemas or None,
                     )
-                )
-                continue
 
-            if parsed.type == "plan_update":
-                if parsed.decision == "replan" and replans < max_replans:
-                    replans += 1
-                    plan = apply_plan_update(plan, parsed)
-                else:
-                    # Cap replans: keep progress (completed steps) but ignore new steps.
-                    plan = apply_plan_update(
-                        plan,
-                        AgentLLMResponse(
-                            type="plan_update",
-                            decision="continue",
-                            completed_step_ids=parsed.completed_step_ids,
-                        ),
+                    turn_content: list[str] = []
+                    tool_calls: list[dict[str, Any]] | None = None
+                    final_content = ""
+                    usage_payload: Any = None
+
+                    stream_failed = False
+                    for event in self._provider.stream_chat(completion_request):
+                        if event.event == "content.delta":
+                            delta = event.data.get("delta")
+                            if isinstance(delta, str) and delta:
+                                turn_content.append(delta)
+                                content_parts.append(delta)
+                                yield event
+                            continue
+                        if event.event == "error":
+                            yield event
+                            stream_failed = True
+                            break
+                        if event.event == "message.complete":
+                            tool_calls = event.data.get("tool_calls") or None
+                            provider_content = event.data.get("content")
+                            final_content = (
+                                provider_content
+                                if isinstance(provider_content, str) and provider_content
+                                else "".join(turn_content)
+                            )
+                            usage_payload = event.data.get("usage")
+                    if stream_failed:
+                        return
+
+                    if not tool_calls:
+                        yield ChatStreamEvent(
+                            event="message.complete",
+                            data={"content": final_content, "usage": usage_payload},
+                        )
+                        return
+
+                    # Echo the assistant turn (content + tool calls) back into history.
+                    messages.append(
+                        ChatCompletionMessage(
+                            role="assistant",
+                            content=final_content or None,
+                            tool_calls=tool_calls,
+                        )
                     )
-                yield ChatStreamEvent(
-                    event="agent.plan_update",
-                    data={
-                        "steps": [step.model_dump() for step in (plan or [])],
-                        "decision": parsed.decision,
-                        "reason": parsed.reason,
-                    },
-                )
-                tools_since_reflection = 0
-                messages.append(
-                    ChatCompletionMessage(role="assistant", content=raw_response)
-                )
-                follow_up = (
-                    'You have enough information. Respond now with type "answer". '
-                    "Do not invent data."
-                    if parsed.decision == "finish"
-                    else (
-                        "Continue with the next step: emit a tool_call if more live data is "
-                        'needed, or answer with type "answer" if you are done.'
-                    )
-                )
-                messages.append(ChatCompletionMessage(role="user", content=follow_up))
-                continue
 
-            if tool_iterations >= max_tool_iterations:
-                yield ChatStreamEvent(
-                    event="error",
-                    data={
-                        "code": "tool_iteration_limit",
-                        "message": "Se alcanzó el límite de herramientas para este turno.",
-                    },
-                )
-                return
+                    for call in tool_calls:
+                        call_id = call.get("id") or ""
+                        function = call.get("function") or {}
+                        fn_name = function.get("name") or ""
+                        raw_args = function.get("arguments") or "{}"
+                        try:
+                            args = json.loads(raw_args) if raw_args else {}
+                        except (json.JSONDecodeError, TypeError):
+                            args = {}
+                        if not isinstance(args, dict):
+                            args = {}
 
-            if not self._is_entitled_tool(parsed, entitled_tools):
-                yield ChatStreamEvent(
-                    event="error",
-                    data={
-                        "code": "tool_not_entitled",
-                        "message": "El asistente intentó usar una herramienta no permitida.",
-                    },
-                )
-                return
+                        if fn_name == LOAD_SKILL_TOOL_NAME:
+                            result, skill_id = self._load_skill(args, entitled_skill_ids)
+                            if skill_id and skill_id not in loaded_skill_ids:
+                                loaded_skill_ids.append(skill_id)
+                            yield ChatStreamEvent(
+                                event="agent.skills",
+                                data={
+                                    "skills": (
+                                        [{"id": skill_id, "label": _skill_label(skill_id)}]
+                                        if skill_id
+                                        else []
+                                    ),
+                                    "active": list(loaded_skill_ids),
+                                },
+                            )
+                            messages.append(
+                                ChatCompletionMessage(
+                                    role="tool",
+                                    tool_call_id=call_id,
+                                    content=result,
+                                )
+                            )
+                            continue
 
-            tool_iterations += 1
-            yield ChatStreamEvent(event="agent.phase", data={"phase": "explore"})
-            if parsed.reason:
-                yield ChatStreamEvent(
-                    event="agent.thought",
-                    data={"text": parsed.reason},
-                )
-            yield ChatStreamEvent(
-                event="tool.start",
-                data={
-                    "tool": parsed.tool,
-                    "skill_id": parsed.skill_id,
-                    "args_summary": parsed.args,
-                    "effect": self._tool_effect(parsed, entitled_tools),
-                },
-            )
-            result = self._registry.execute(
-                parsed.skill_id or "",
-                parsed.tool or "",
-                parsed.args,
-                ctx,
-            )
-            event_name = "tool.result" if result.ok else "tool.error"
-            yield ChatStreamEvent(
-                event=event_name,
-                data={
-                    "tool": parsed.tool,
-                    "ok": result.ok,
-                    "summary": result.summary,
-                },
-            )
-            messages.append(
-                ChatCompletionMessage(
-                    role="assistant",
-                    content=raw_response,
-                )
-            )
+                        skill_id, tool_name = parse_function_name(fn_name)
+                        tool_def = (
+                            tool_index.get((skill_id, tool_name)) if skill_id else None
+                        )
+                        if tool_def is None:
+                            messages.append(
+                                ChatCompletionMessage(
+                                    role="tool",
+                                    tool_call_id=call_id,
+                                    content=json.dumps(
+                                        {
+                                            "ok": False,
+                                            "summary": (
+                                                "Tool is not available. Use only the "
+                                                "provided tools."
+                                            ),
+                                        }
+                                    ),
+                                )
+                            )
+                            yield ChatStreamEvent(
+                                event="tool.error",
+                                data={"tool": fn_name, "ok": False, "summary": "not_available"},
+                            )
+                            continue
 
-            tools_since_reflection += 1
-            should_reflect = planning_enabled and reflection_enabled and (
-                not result.ok
-                or (reflection_every > 0 and tools_since_reflection >= reflection_every)
-            )
-            if should_reflect:
-                tools_since_reflection = 0
+                        if tool_iterations >= max_tool_iterations:
+                            yield ChatStreamEvent(
+                                event="error",
+                                data={
+                                    "code": "tool_iteration_limit",
+                                    "message": (
+                                        "Se alcanzó el límite de herramientas para este turno."
+                                    ),
+                                },
+                            )
+                            return
+                        tool_iterations += 1
 
-            messages.append(
-                ChatCompletionMessage(
-                    role="user",
-                    content=self._post_tool_message(
-                        owner_message=request.message,
-                        result=result,
-                        planning_enabled=planning_enabled,
-                        reflect=should_reflect,
-                    ),
+                        yield ChatStreamEvent(event="agent.phase", data={"phase": "explore"})
+                        yield ChatStreamEvent(
+                            event="tool.start",
+                            data={
+                                "tool": tool_name,
+                                "skill_id": skill_id,
+                                "args_summary": args,
+                                "effect": tool_def.effect,
+                            },
+                        )
+                        result = self._registry.execute(
+                            skill_id or "", tool_name, args, ctx
+                        )
+                        yield ChatStreamEvent(
+                            event="tool.result" if result.ok else "tool.error",
+                            data={
+                                "tool": tool_name,
+                                "ok": result.ok,
+                                "summary": result.summary,
+                            },
+                        )
+                        messages.append(
+                            ChatCompletionMessage(
+                                role="tool",
+                                tool_call_id=call_id,
+                                content=json.dumps(
+                                    result.model_dump(mode="json"), ensure_ascii=False
+                                ),
+                            )
+                        )
+            finally:
+                agent_run.end(
+                    outputs={
+                        "content": "".join(content_parts),
+                        "tool_calls": tool_iterations,
+                        "llm_turns": total_turns,
+                        "loaded_skills": loaded_skill_ids,
+                    }
                 )
-            )
 
-    @staticmethod
-    def _post_tool_message(
-        *,
-        owner_message: str,
-        result: ToolResult,
-        planning_enabled: bool,
-        reflect: bool,
-    ) -> str:
-        result_json = json.dumps(result.model_dump(mode="json"), ensure_ascii=False)
-        if not planning_enabled:
+    def _load_skill(
+        self, args: dict[str, Any], entitled_skill_ids: list[str]
+    ) -> tuple[str, str | None]:
+        """Return ``(tool_result_json, skill_id)`` for a ``load_skill`` call."""
+        skill_id = args.get("skill_id")
+        if not isinstance(skill_id, str) or skill_id not in entitled_skill_ids:
+            available = ", ".join(entitled_skill_ids) or "none"
             return (
-                "Tool execution finished. Use the result below and respond with JSON "
-                'type "answer". Do not invent data.\n\n'
-                f"Original owner message: {owner_message}\n\n"
-                f"Tool result JSON: {result_json}"
+                json.dumps(
+                    {
+                        "ok": False,
+                        "summary": f"Unknown skill. Available skills: {available}.",
+                    }
+                ),
+                None,
             )
-        if reflect:
-            instruction = (
-                "Re-evaluate before continuing: emit a plan_update with completed_step_ids "
-                "and a decision (continue / replan / finish). Include a new steps list only "
-                "when you replan."
-            )
-        else:
-            instruction = (
-                "If the task is complete, respond with type \"answer\" (no invented data). "
-                "If more steps remain, continue with another tool_call, or emit a plan_update "
-                "to revise the plan."
-            )
+        sections = self._registry.system_prompt_sections([skill_id])
+        guide = "\n\n".join(sections).strip() or f"No additional guide for {skill_id}."
         return (
-            f"Tool execution finished. {instruction}\n\n"
-            f"Original owner message: {owner_message}\n\n"
-            f"Tool result JSON: {result_json}"
+            json.dumps({"ok": True, "summary": "Skill guide loaded.", "guide": guide}),
+            skill_id,
         )
-
-    def _compose_agent_system_prompt(
-        self,
-        profile: AssistantProfileRecord,
-        *,
-        effective_skill_ids: list[str],
-        entitled_tools: list[tuple[str, ToolDefinition]],
-    ) -> str:
-        system_prompt = compose_system_prompt(profile, effective_skill_ids=effective_skill_ids)
-        sections = self._registry.system_prompt_sections(effective_skill_ids)
-        if sections:
-            system_prompt = system_prompt + "\n\n---\n\n" + "\n\n".join(sections)
-        system_prompt = system_prompt + "\n\n---\n\n" + build_tools_prompt_section(
-            entitled_tools,
-            planning_enabled=self._settings.assistant_planning_enabled,
-            plan_max_steps=self._settings.assistant_plan_max_steps,
-        )
-        return system_prompt
 
     def _build_messages(
         self,
@@ -382,25 +359,3 @@ class AgentOrchestrator:
             messages.append(ChatCompletionMessage(role=item.role, content=item.content))
         messages.append(ChatCompletionMessage(role="user", content=user_message))
         return messages
-
-    @staticmethod
-    def _is_entitled_tool(
-        parsed: AgentLLMResponse,
-        entitled_tools: list[tuple[str, ToolDefinition]],
-    ) -> bool:
-        if parsed.type != "tool_call":
-            return False
-        return any(
-            skill_id == parsed.skill_id and tool.name == parsed.tool
-            for skill_id, tool in entitled_tools
-        )
-
-    @staticmethod
-    def _tool_effect(
-        parsed: AgentLLMResponse,
-        entitled_tools: list[tuple[str, ToolDefinition]],
-    ) -> str:
-        for skill_id, tool in entitled_tools:
-            if skill_id == parsed.skill_id and tool.name == parsed.tool:
-                return tool.effect
-        return "read"
