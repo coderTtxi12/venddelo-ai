@@ -23,8 +23,11 @@ export type AgentPlanStep = {
 
 export type AgentToolStep = {
   id: string;
+  callId?: string;
   tool: string;
   skillId?: string;
+  effect?: string;
+  argsSummary?: Record<string, unknown>;
   status: AgentToolStepStatus;
   summary?: string;
 };
@@ -39,6 +42,11 @@ export type AgentThought = {
   text: string;
 };
 
+export type AgentLoadedSkill = {
+  id: string;
+  label: string;
+};
+
 export type AgentActivityState = {
   phase: AgentActivityPhase | null;
   status: string | null;
@@ -46,6 +54,7 @@ export type AgentActivityState = {
   planReason: string | null;
   planSteps: AgentPlanStep[];
   latestReflection: AgentReflection | null;
+  loadedSkills: AgentLoadedSkill[];
   tools: AgentToolStep[];
 };
 
@@ -56,6 +65,7 @@ export const INITIAL_AGENT_ACTIVITY: AgentActivityState = {
   planReason: null,
   planSteps: [],
   latestReflection: null,
+  loadedSkills: [],
   tools: [],
 };
 
@@ -67,13 +77,14 @@ export const STREAMING_AGENT_ACTIVITY: AgentActivityState = {
   planReason: null,
   planSteps: [],
   latestReflection: null,
+  loadedSkills: [],
   tools: [],
 };
 
 const PHASE_LABELS: Record<string, string> = {
   analyzing: 'Analizando tu mensaje',
   explore: 'Consultando tu menú',
-  planning: 'Planificando pasos',
+  planning: 'Cargando guías y contexto',
   plan: 'Planificando pasos',
   preview: 'Preparando vista previa',
   confirm: 'Esperando confirmación',
@@ -83,10 +94,11 @@ const PHASE_LABELS: Record<string, string> = {
 const DECISION_LABELS: Record<AgentPlanDecision, string> = {
   continue: 'Continuando con el plan',
   replan: 'Ajustando el plan',
-  finish: 'Listo para responder',
+  finish: 'Plan completado',
 };
 
 const TOOL_LABELS: Record<string, string> = {
+  load_skill: 'Cargando guía de skill',
   list_categories: 'Listando categorías',
   list_products: 'Listando productos',
   search_products: 'Buscando productos',
@@ -94,6 +106,23 @@ const TOOL_LABELS: Record<string, string> = {
   list_promotions: 'Listando promociones',
   get_promotion: 'Obteniendo promoción',
   list_product_promotions: 'Revisando promociones del producto',
+  update_product: 'Actualizando producto',
+  create_product: 'Creando producto',
+  bulk_update_product_names: 'Renombrando productos',
+  bulk_update_product_descriptions: 'Actualizando descripciones',
+  bulk_update_product_prices: 'Actualizando precios',
+  update_category: 'Actualizando categoría',
+  create_category: 'Creando categoría',
+  set_category_product_order: 'Reordenando productos',
+  add_option_group: 'Agregando grupo de opciones',
+  update_option_group: 'Actualizando grupo de opciones',
+  add_option_item: 'Agregando opción',
+  update_option_item: 'Actualizando opción',
+};
+
+const EFFECT_LABELS: Record<string, string> = {
+  read: 'Consulta',
+  mutate: 'Cambio',
 };
 
 export function labelForAgentPhase(phase: string | null): string | null {
@@ -103,6 +132,11 @@ export function labelForAgentPhase(phase: string | null): string | null {
 
 export function labelForPlanDecision(decision: AgentPlanDecision): string {
   return DECISION_LABELS[decision];
+}
+
+export function labelForToolEffect(effect: string | undefined): string | null {
+  if (!effect) return null;
+  return EFFECT_LABELS[effect] ?? effect;
 }
 
 export function labelForTool(tool: string, status: AgentToolStepStatus): string {
@@ -120,9 +154,7 @@ export function createThoughtId(): string {
   return `thought-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export function mapPlanStepsFromPayload(
-  steps: unknown,
-): AgentPlanStep[] {
+export function mapPlanStepsFromPayload(steps: unknown): AgentPlanStep[] {
   if (!Array.isArray(steps)) return [];
   const mapped: AgentPlanStep[] = [];
   for (const item of steps) {
@@ -152,6 +184,62 @@ export function hasVisibleAgentActivity(activity: AgentActivityState): boolean {
     activity.thoughts.length > 0 ||
     activity.planSteps.length > 0 ||
     activity.tools.length > 0 ||
+    activity.loadedSkills.length > 0 ||
     activity.latestReflection !== null
   );
+}
+
+export function summarizeAgentActivity(activity: AgentActivityState): string {
+  const parts: string[] = [];
+  if (activity.tools.length > 0) {
+    parts.push(
+      `${activity.tools.length} acción${activity.tools.length === 1 ? '' : 'es'}`,
+    );
+  }
+  if (activity.loadedSkills.length > 0) {
+    parts.push(
+      `${activity.loadedSkills.length} guía${activity.loadedSkills.length === 1 ? '' : 's'}`,
+    );
+  }
+  if (activity.planSteps.length > 0) {
+    parts.push(`${activity.planSteps.length} pasos`);
+  }
+  if (activity.thoughts.length > 0 && parts.length === 0) {
+    parts.push(`${activity.thoughts.length} paso${activity.thoughts.length === 1 ? '' : 's'}`);
+  }
+  return parts.join(' · ') || 'Actividad del asistente';
+}
+
+export function updateToolStepResult(
+  tools: AgentToolStep[],
+  payload: { call_id?: string; tool: string; ok: boolean; summary?: string },
+): AgentToolStep[] {
+  const status: AgentToolStepStatus = payload.ok ? 'done' : 'error';
+  let matched = false;
+  return tools.map((step) => {
+    if (matched) return step;
+    const callMatch = payload.call_id && step.callId === payload.call_id;
+    const fallbackMatch = !payload.call_id && step.tool === payload.tool && step.status === 'running';
+    if (!callMatch && !fallbackMatch) return step;
+    matched = true;
+    return {
+      ...step,
+      status,
+      summary: payload.summary ?? step.summary,
+    };
+  });
+}
+
+export function mergeLoadedSkills(
+  current: AgentLoadedSkill[],
+  incoming: AgentLoadedSkill[],
+  activeIds: string[],
+): AgentLoadedSkill[] {
+  const byId = new Map(current.map((skill) => [skill.id, skill]));
+  for (const skill of incoming) {
+    byId.set(skill.id, skill);
+  }
+  return activeIds
+    .map((id) => byId.get(id))
+    .filter((skill): skill is AgentLoadedSkill => Boolean(skill));
 }
