@@ -52,20 +52,19 @@ def test_granted_skills_from_restaurant_entitlements():
     custom = resolve_granted_skill_ids(
         _entitlements_record(uuid.uuid4(), granted_skill_ids=["menu_read", "menu_import"])
     )
-    assert custom == {"menu_read", "menu_import"}
+    assert custom == set(DEFAULT_GRANTED_SKILL_IDS)
 
 
-def test_effective_skills_intersection():
+def test_effective_skills_all_granted_for_now():
     restaurant_id = uuid.uuid4()
     resolved = resolve_entitlements(
-        enabled_skill_ids=["menu_read", "menu_import", "promotions"],
+        enabled_skill_ids=["menu_read"],
         entitlements=_entitlements_record(
             restaurant_id,
             granted_skill_ids=["menu_read", "menu_import"],
         ),
     )
-    assert set(resolved.effective_skill_ids).issubset(set(resolved.granted_skill_ids))
-    assert resolved.effective_skill_ids == ["menu_import", "menu_read"]
+    assert resolved.effective_skill_ids == sorted(DEFAULT_GRANTED_SKILL_IDS)
 
 
 @requires_db
@@ -89,7 +88,7 @@ def test_profile_create_and_update(session):
     assert profile.version == 1
     assert profile.chat_ready is False
     assert len(profile.skills_catalog) == len(SKILL_CATALOG)
-    assert profile.granted_skill_ids == list(DEFAULT_GRANTED_SKILL_IDS)
+    assert profile.granted_skill_ids == sorted(DEFAULT_GRANTED_SKILL_IDS)
 
     updated = svc.update_profile(
         restaurant.id,
@@ -101,7 +100,7 @@ def test_profile_create_and_update(session):
 
 
 @requires_db
-def test_cannot_enable_skill_not_granted(session):
+def test_can_enable_any_catalog_skill(session):
     user_repo = SqlAlchemyUserRepository(session)
     owner = user_repo.add(UserCreate(id=uuid.uuid4(), email="free@test.com", plan="free"))
 
@@ -119,16 +118,14 @@ def test_cannot_enable_skill_not_granted(session):
     )
     profile = svc.get_profile_response(restaurant.id)
 
-    from app.core.exceptions import ValidationError
-
-    with pytest.raises(ValidationError):
-        svc.update_profile(
-            restaurant.id,
-            AssistantProfileUpdate(
-                enabled_skill_ids=["menu_import"],
-                expected_version=profile.version,
-            ),
-        )
+    updated = svc.update_profile(
+        restaurant.id,
+        AssistantProfileUpdate(
+            enabled_skill_ids=["menu_import"],
+            expected_version=profile.version,
+        ),
+    )
+    assert "menu_import" in updated.enabled_skill_ids
 
 
 @requires_db
@@ -168,4 +165,4 @@ def test_chat_ignores_snapshot_when_profile_version_is_stale(session):
 
     assert updated.version > profile.version
     assert record.display_name == "Luna"
-    assert "menu_import" not in effective
+    assert "menu_import" in effective
