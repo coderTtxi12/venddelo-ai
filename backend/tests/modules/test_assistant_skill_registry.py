@@ -1,6 +1,7 @@
 
 from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.skills.base import SkillPort, ToolDefinition, ToolResult
+from app.modules.assistant.skills.menu_read.tools import MenuReadSkill
 from app.modules.assistant.skills.registry import SkillRegistry
 
 
@@ -23,9 +24,6 @@ class FakeReadSkill(SkillPort):
             summary="read ok",
             data={"restaurant_id": str(ctx.restaurant_id)},
         )
-
-    def system_prompt_section(self) -> str:
-        return "Use fake read tools only for read-only tasks."
 
 
 def test_registry_filters_tools_by_effective_skill_ids():
@@ -57,3 +55,11 @@ def test_registry_rejects_delete_tools():
         assert "delete" in str(exc)
     else:
         raise AssertionError("delete tool was accepted")
+
+
+def test_registry_loads_skill_guide_from_skill_md():
+    registry = SkillRegistry([MenuReadSkill()])
+    sections = registry.system_prompt_sections(["menu_read"])
+    assert len(sections) == 1
+    assert "list_categories" in sections[0]
+    assert sections[0].startswith("# menu_read")
