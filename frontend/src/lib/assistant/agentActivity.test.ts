@@ -7,6 +7,7 @@ import {
   labelForPlanDecision,
   mapPlanStepsFromPayload,
   STREAMING_AGENT_ACTIVITY,
+  updateToolStepResult,
 } from './agentActivity';
 
 test('mapPlanStepsFromPayload maps valid plan steps', () => {
@@ -55,4 +56,30 @@ test('hasVisibleAgentActivity detects plan, reflection and thoughts', () => {
 
 test('labelForPlanDecision returns Spanish labels', () => {
   assert.equal(labelForPlanDecision('replan'), 'Ajustando el plan');
+});
+
+test('updateToolStepResult matches by call_id', () => {
+  const tools = [
+    {
+      id: 'a',
+      callId: 'call-1',
+      tool: 'search_products',
+      status: 'running' as const,
+    },
+    {
+      id: 'b',
+      callId: 'call-2',
+      tool: 'search_products',
+      status: 'running' as const,
+    },
+  ];
+  const updated = updateToolStepResult(tools, {
+    call_id: 'call-2',
+    tool: 'search_products',
+    ok: true,
+    summary: 'Found 3 products',
+  });
+  assert.equal(updated[0]?.status, 'running');
+  assert.equal(updated[1]?.status, 'done');
+  assert.equal(updated[1]?.summary, 'Found 3 products');
 });
