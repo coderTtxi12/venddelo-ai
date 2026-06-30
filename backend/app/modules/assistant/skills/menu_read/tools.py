@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from functools import lru_cache
-from pathlib import Path
 from typing import Any
 
 from app.core.exceptions import NotFoundError
@@ -19,6 +17,13 @@ from app.modules.assistant.skills.menu_read.search import (
     STRONG_MATCH_THRESHOLD,
     SUGGESTION_THRESHOLD,
     match_score,
+)
+from app.modules.assistant.skills.product_resolve import (
+    ProductResolveResult,
+    iter_active_products,
+    normalize_product_query,
+    resolve_product,
+    resolve_product_in_catalog,
 )
 from app.modules.menu.schemas import OptionGroupDTO, OptionItemDTO, ProductDTO
 from app.modules.menu.service import MenuService
@@ -43,14 +48,6 @@ def _list_products_limit(args: dict[str, Any]) -> int:
     except (TypeError, ValueError):
         limit = DEFAULT_LIST_PRODUCTS_LIMIT
     return max(1, min(limit, MAX_LIST_PRODUCTS_LIMIT))
-
-
-_SKILL_MD = Path(__file__).resolve().parent / "SKILL.md"
-
-
-@lru_cache
-def menu_read_skill_prompt_section() -> str:
-    return _SKILL_MD.read_text(encoding="utf-8")
 
 
 def _list_promotions_limit(args: dict[str, Any]) -> int:
@@ -205,15 +202,61 @@ def _score_promotions(
 
 def _score_catalog(query: str, products: list[ProductDTO]) -> list[tuple[float, ProductDTO]]:
     """Rank active products by fuzzy similarity to ``query`` (best first)."""
+    cleaned = normalize_product_query(query)
+    if not cleaned:
+        return []
+    resolved = resolve_product_in_catalog(cleaned, products)
+    if resolved.status == "found" and resolved.product is not None:
+        return [(1.0, resolved.product)]
+    if resolved.status == "ambiguous":
+        return list(resolved.matches)
+    if resolved.suggestions:
+        return list(resolved.suggestions)
     scored: list[tuple[float, ProductDTO]] = []
     for product in products:
         if not product.is_active:
             continue
-        score = match_score(query, product.name, product.description or "")
+        score = match_score(cleaned, product.name, product.description or "")
         if score >= SUGGESTION_THRESHOLD:
             scored.append((score, product))
     scored.sort(key=lambda pair: pair[0], reverse=True)
     return scored
+
+
+def _resolve_result_payload(
+    resolved: ProductResolveResult,
+) -> tuple[bool, str, dict[str, Any]]:
+    if resolved.status == "found" and resolved.product is not None:
+        return True, resolved.product.name, {}
+
+    if resolved.status == "ambiguous":
+        candidates = [
+            _scored_payload(score, product) for score, product in resolved.matches[:5]
+        ]
+        labels = ", ".join(product.name for _, product in resolved.matches[:5])
+        return (
+            False,
+            f"Ambiguous match for {resolved.query!r}; choose one: {labels}",
+            {"candidates": candidates, "query": resolved.query, "ambiguous": True},
+        )
+
+    suggestions = [
+        _scored_payload(score, product) for score, product in resolved.suggestions[:5]
+    ]
+    if suggestions:
+        return (
+            False,
+            f"No confident match for {resolved.query!r}; see suggestions",
+            {"suggestions": suggestions, "query": resolved.query},
+        )
+    return (
+        False,
+        (
+            f"No product matched {resolved.query!r}. "
+            "Fall back to list_products and match by translating the name."
+        ),
+        {"suggestions": [], "query": resolved.query},
+    )
 
 
 def _scored_payload(score: float, product: ProductDTO) -> dict[str, Any]:
@@ -513,12 +556,12 @@ class MenuReadSkill:
 
         if tool_name == "search_products":
             query = str(args.get("query", "")).strip()
-            page = service.list_products(ctx.restaurant_id, PaginationParams(limit=100))
+            catalog = iter_active_products(service, ctx.restaurant_id)
 
             if not query:
-                scored = [(1.0, product) for product in page.items if product.is_active]
+                scored = [(1.0, product) for product in catalog if product.is_active]
             else:
-                scored = _score_catalog(query, list(page.items))
+                scored = _score_catalog(query, catalog)
 
             strong = [
                 _scored_payload(score, product)
@@ -592,31 +635,14 @@ class MenuReadSkill:
 
             if name_raw:
                 query = str(name_raw).strip()
-                page = service.list_products(ctx.restaurant_id, PaginationParams(limit=100))
-                scored = _score_catalog(query, list(page.items))
-                strong = [pair for pair in scored if pair[0] >= STRONG_MATCH_THRESHOLD]
-                if strong:
-                    best_score, best_product = strong[0]
-                    return _product_detail(
-                        _scored_payload(best_score, best_product), best_product
-                    )
-                suggestions = [
-                    _scored_payload(score, product)
-                    for score, product in scored[:MAX_SEARCH_SUGGESTIONS]
-                ]
-                if suggestions:
-                    return ToolResult(
-                        ok=False,
-                        summary=f"No confident match for '{query}'; see suggestions",
-                        data={"suggestions": suggestions, "query": query},
-                    )
-                return ToolResult(
-                    ok=False,
-                    summary=(
-                        f"No product matched '{query}'. "
-                        "Fall back to list_products and match by translating the name."
-                    ),
-                    data={"suggestions": [], "query": query},
+                resolved = resolve_product(service, ctx.restaurant_id, query)
+                ok, message, extra = _resolve_result_payload(resolved)
+                if not ok:
+                    return ToolResult(ok=False, summary=message, data=extra)
+                assert resolved.product is not None
+                return _product_detail(
+                    _scored_payload(1.0, resolved.product),
+                    resolved.product,
                 )
 
             return ToolResult(ok=False, summary="Provide product_id or name")
@@ -813,6 +839,3 @@ class MenuReadSkill:
             return ToolResult(ok=False, summary="Provide promotion_id or name")
 
         return ToolResult(ok=False, summary=f"Unknown tool: {tool_name}")
-
-    def system_prompt_section(self) -> str:
-        return menu_read_skill_prompt_section()
