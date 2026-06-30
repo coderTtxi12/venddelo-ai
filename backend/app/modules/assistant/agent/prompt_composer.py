@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.modules.assistant.entitlements.catalog import SKILL_CATALOG
 from app.modules.assistant.profile.schemas import AssistantProfileRecord
 from app.modules.assistant.prompts import ASSISTANT_CORE_POLICY
+from app.modules.assistant.skills.markdown import load_skill_metadata
 
 
 def compose_system_prompt(
@@ -12,7 +13,6 @@ def compose_system_prompt(
 ) -> str:
     sections: list[str] = [
         ASSISTANT_CORE_POLICY,
-        # ASSISTANT_BEHAVIOR_POLICY,  # disabled — see behavior_policy.py
     ]
 
     display_name = profile.display_name.strip()
@@ -33,9 +33,13 @@ def compose_system_prompt(
     if effective_skill_ids:
         skill_lines = []
         for skill_id in effective_skill_ids:
-            skill = SKILL_CATALOG.get(skill_id)
-            label = skill.label if skill else skill_id
-            skill_lines.append(f"- {skill_id}: {label}")
+            meta = load_skill_metadata(skill_id)
+            catalog = SKILL_CATALOG.get(skill_id)
+            summary = (
+                meta.get("description")
+                or (catalog.label if catalog else skill_id)
+            )
+            skill_lines.append(f"- **{skill_id}**: {summary}")
         sections.append("## Active skills\n\n" + "\n".join(skill_lines))
 
     # Temporarily disabled — per-restaurant MENU markdown (see profile/menu_markdown.py)
