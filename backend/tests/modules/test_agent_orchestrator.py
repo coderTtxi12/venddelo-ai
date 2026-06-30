@@ -44,7 +44,7 @@ class ScriptedProvider(LLMProviderPort):
                 parts.append(chunk)
                 yield ChatStreamEvent(event="content.delta", data={"delta": chunk})
             content = "".join(parts)
-        elif content and not tool_calls:
+        elif content:
             yield ChatStreamEvent(event="content.delta", data={"delta": content})
 
         yield ChatStreamEvent(
@@ -167,6 +167,46 @@ def test_orchestrator_load_skill_then_answers():
     assert skills_event.data["active"] == ["menu_read"]
     complete = next(e for e in events if e.event == "message.complete")
     assert complete.data["content"] == "Listo, ya revisé la guía."
+    assert not any(e.event == "error" for e in events)
+
+
+def test_orchestrator_emits_llm_reasoning_before_tools():
+    search = openai_function_name("menu_read", "search_products")
+    reasoning = "Voy a buscar productos al pastor en tu menú."
+    provider = ScriptedProvider(
+        [
+            {
+                "content": reasoning,
+                "tool_calls": [_tool_call(search, {"query": "pastor"})],
+            },
+            {"content": "Encontré **Taco al pastor**."},
+        ]
+    )
+    events = _run(provider, "¿Tienes tacos al pastor?", ["menu_read"])
+
+    thoughts = [e for e in events if e.event == "agent.thought"]
+    assert thoughts
+    assert any(reasoning in e.data["text"] for e in thoughts)
+    assert not any("Buscar productos" in e.data["text"] for e in thoughts)
+
+
+def test_orchestrator_emits_plan_for_multiple_tool_calls():
+    provider = ScriptedProvider(
+        [
+            {
+                "tool_calls": [
+                    _tool_call("load_skill", {"skill_id": "menu_best_practices"}),
+                    _tool_call("menu_read__list_products", {"limit": 50}),
+                ]
+            },
+            {"content": "Aquí van mis recomendaciones."},
+        ]
+    )
+    events = _run(provider, "Revisa todo mi menú y hazme recomendaciones", ["menu_read"])
+
+    assert any(e.event == "agent.plan" for e in events)
+    assert any(e.event == "agent.plan_update" for e in events)
+    assert any(e.event == "message.complete" for e in events)
     assert not any(e.event == "error" for e in events)
 
 
