@@ -4,7 +4,6 @@ import json
 from collections.abc import Iterator
 
 from app.core.llm.ports import ChatCompletionRequest, ChatStreamEvent, LLMProviderPort
-from app.modules.assistant.agent.response_format import ASSISTANT_JSON_RESPONSE_MARKER
 
 
 def _estimate_tokens(text: str) -> int:
@@ -12,31 +11,50 @@ def _estimate_tokens(text: str) -> int:
 
 
 class StubLLMProvider(LLMProviderPort):
-    """Deterministic provider for local dev and tests."""
+    """Deterministic provider for local dev and tests (native tool calling)."""
 
     def stream_chat(self, request: ChatCompletionRequest) -> Iterator[ChatStreamEvent]:
-        system_messages = [
-            message.content for message in request.messages if message.role == "system"
+        user_messages = [
+            m.content or "" for m in request.messages if m.role == "user"
         ]
-        user_messages = [message.content for message in request.messages if message.role == "user"]
-        system_prompt = system_messages[-1] if system_messages else ""
         latest_user = user_messages[-1] if user_messages else ""
+        last_role = request.messages[-1].role if request.messages else "user"
 
-        if ASSISTANT_JSON_RESPONSE_MARKER in system_prompt:
-            full_text = self._agent_json_response(system_prompt, latest_user)
-        else:
-            full_text = f"Recibí tu mensaje: {latest_user}"
+        tool_calls = None
+        content = f"Recibí tu mensaje: {latest_user}"
 
-        input_tokens = sum(_estimate_tokens(message.content) for message in request.messages)
-        output_tokens = _estimate_tokens(full_text)
+        if request.tools and last_role != "tool":
+            search_fn = self._find_search_tool(request.tools)
+            if search_fn and self._should_search(latest_user):
+                tool_calls = [
+                    {
+                        "id": "call_stub_1",
+                        "type": "function",
+                        "function": {
+                            "name": search_fn,
+                            "arguments": json.dumps(
+                                {"query": latest_user.strip() or "pastor"},
+                                ensure_ascii=False,
+                            ),
+                        },
+                    }
+                ]
+                content = ""
+        elif last_role == "tool":
+            content = "Encontré productos relacionados con tu búsqueda."
 
-        for token in full_text.split(" "):
-            yield ChatStreamEvent(event="content.delta", data={"delta": f"{token} "})
+        input_tokens = sum(_estimate_tokens(m.content or "") for m in request.messages)
+        output_tokens = _estimate_tokens(content)
+
+        if content and tool_calls is None:
+            for token in content.split(" "):
+                yield ChatStreamEvent(event="content.delta", data={"delta": f"{token} "})
 
         yield ChatStreamEvent(
             event="message.complete",
             data={
-                "content": full_text,
+                "content": content,
+                "tool_calls": tool_calls,
                 "usage": {
                     "provider": "stub",
                     "model": request.model or "stub",
@@ -48,42 +66,15 @@ class StubLLMProvider(LLMProviderPort):
         )
 
     @staticmethod
-    def _agent_json_response(system_prompt: str, latest_user: str) -> str:
-        if "Tool execution finished." in latest_user or "Tool result JSON:" in latest_user:
-            return json.dumps(
-                {
-                    "type": "answer",
-                    "content": "Encontré productos relacionados con tu búsqueda.",
-                    "language": "es",
-                },
-                ensure_ascii=False,
-            )
-
-        if (
-            "menu_read.search_products" in system_prompt
-            and StubLLMProvider._should_use_menu_read_tool(latest_user)
-        ):
-            return json.dumps(
-                {
-                    "type": "tool_call",
-                    "skill_id": "menu_read",
-                    "tool": "search_products",
-                    "args": {"query": latest_user.strip() or "pastor"},
-                },
-                ensure_ascii=False,
-            )
-
-        return json.dumps(
-            {
-                "type": "answer",
-                "content": f"Recibí tu mensaje: {latest_user}",
-                "language": "es",
-            },
-            ensure_ascii=False,
-        )
+    def _find_search_tool(tools: list[dict]) -> str | None:
+        for tool in tools:
+            name = (tool.get("function") or {}).get("name") or ""
+            if name.endswith("search_products"):
+                return name
+        return None
 
     @staticmethod
-    def _should_use_menu_read_tool(message: str) -> bool:
+    def _should_search(message: str) -> bool:
         normalized = message.strip().casefold()
         return any(
             token in normalized
