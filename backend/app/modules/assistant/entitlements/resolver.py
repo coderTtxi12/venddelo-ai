@@ -27,15 +27,19 @@ def _normalize_skill_ids(skill_ids: list[str]) -> list[str]:
 def resolve_granted_skill_ids(
     entitlements: RestaurantEntitlementsRecord | None,
 ) -> set[str]:
-    """Return skills granted to this restaurant (configured per tenant, not by billing plan)."""
-    if entitlements is None or not entitlements.is_active:
-        return set(DEFAULT_GRANTED_SKILL_IDS)
-    return set(_normalize_skill_ids(entitlements.granted_skill_ids))
+    """Return skills granted to this restaurant.
+
+    Por ahora: todas las skills del catálogo para todos los tenants (ignora la fila
+    almacenada hasta tener billing/planes).
+    """
+    _ = entitlements
+    return known_skill_ids()
 
 
 def resolve_effective_skill_ids(granted: set[str], enabled: list[str]) -> list[str]:
-    enabled_set = set(_normalize_skill_ids(enabled))
-    return sorted(granted & enabled_set)
+    """Por ahora: todas las granted están activas en runtime (ignora toggles del perfil)."""
+    _ = enabled
+    return sorted(granted)
 
 
 def build_skills_catalog(
