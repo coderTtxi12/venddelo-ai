@@ -15,9 +15,9 @@ SKILL_CATALOG: dict[str, SkillDefinition] = {
         id="menu_best_practices",
         label="Menu best practices",
     ),
-    "business": SkillDefinition(id="business", label="Business settings"),
-    "menu_import": SkillDefinition(id="menu_import", label="Import menu"),
-    "promotions": SkillDefinition(id="promotions", label="Promotions"),
+    # "business": SkillDefinition(id="business", label="Business settings"),
+    # "menu_import": SkillDefinition(id="menu_import", label="Import menu"),
+    # "promotions": SkillDefinition(id="promotions", label="Promotions"),
 }
 
 # Por ahora: acceso completo al catálogo para tenants nuevos sin fila de entitlements.
