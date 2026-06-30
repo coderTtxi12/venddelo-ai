@@ -78,6 +78,7 @@ export type AssistantChatStreamOptions = {
 };
 
 export type AssistantToolStartPayload = {
+  call_id?: string;
   tool: string;
   skill_id?: string;
   args_summary?: Record<string, unknown>;
@@ -85,9 +86,15 @@ export type AssistantToolStartPayload = {
 };
 
 export type AssistantToolResultPayload = {
+  call_id?: string;
   tool: string;
   ok: boolean;
   summary?: string;
+};
+
+export type AssistantSkillsPayload = {
+  skills: Array<{ id: string; label: string }>;
+  active: string[];
 };
 
 export type AssistantPlanPayload = {
@@ -107,9 +114,10 @@ export type AssistantStreamHandlers = {
   onError: (payload: AssistantStreamErrorPayload) => void;
   onAgentPhase?: (phase: string) => void;
   onAgentStatus?: (status: string) => void;
-  onAgentThought?: (text: string) => void;
+  onAgentThought?: (text: string, options?: { replace?: boolean }) => void;
   onAgentPlan?: (payload: AssistantPlanPayload) => void;
   onAgentPlanUpdate?: (payload: AssistantPlanUpdatePayload) => void;
+  onAgentSkills?: (payload: AssistantSkillsPayload) => void;
   onToolStart?: (payload: AssistantToolStartPayload) => void;
   onToolResult?: (payload: AssistantToolResultPayload) => void;
   onToolError?: (payload: AssistantToolResultPayload) => void;
@@ -303,7 +311,9 @@ export async function streamAssistantChat(
       if (parsed.event === 'agent.thought') {
         const text = payload.text;
         if (typeof text === 'string' && text.trim()) {
-          handlers.onAgentThought?.(text);
+          handlers.onAgentThought?.(text, {
+            replace: payload.replace === true,
+          });
         }
         continue;
       }
@@ -328,10 +338,32 @@ export async function streamAssistantChat(
         continue;
       }
 
+      if (parsed.event === 'agent.skills') {
+        const skillsRaw = payload.skills;
+        const activeRaw = payload.active;
+        const skills = Array.isArray(skillsRaw)
+          ? skillsRaw
+              .filter(
+                (item): item is { id: string; label: string } =>
+                  Boolean(item) &&
+                  typeof item === 'object' &&
+                  typeof (item as Record<string, unknown>).id === 'string' &&
+                  typeof (item as Record<string, unknown>).label === 'string',
+              )
+              .map((item) => ({ id: item.id, label: item.label }))
+          : [];
+        const active = Array.isArray(activeRaw)
+          ? activeRaw.filter((item): item is string => typeof item === 'string')
+          : [];
+        handlers.onAgentSkills?.({ skills, active });
+        continue;
+      }
+
       if (parsed.event === 'tool.start') {
         const tool = payload.tool;
         if (typeof tool === 'string') {
           handlers.onToolStart?.({
+            call_id: typeof payload.call_id === 'string' ? payload.call_id : undefined,
             tool,
             skill_id: typeof payload.skill_id === 'string' ? payload.skill_id : undefined,
             args_summary:
@@ -348,6 +380,7 @@ export async function streamAssistantChat(
         const tool = payload.tool;
         if (typeof tool === 'string') {
           const resultPayload: AssistantToolResultPayload = {
+            call_id: typeof payload.call_id === 'string' ? payload.call_id : undefined,
             tool,
             ok: parsed.event === 'tool.result' && payload.ok !== false,
             summary: typeof payload.summary === 'string' ? payload.summary : undefined,
