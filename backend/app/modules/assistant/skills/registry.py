@@ -1,8 +1,8 @@
 """Skill registry for the agent runtime.
 
-Collects ``SkillPort`` implementations (e.g. ``menu_read``), indexes them by
-``skill.id``, and exposes entitled tools and prompt sections filtered by
-``effective_skill_ids`` from profile + entitlements resolution.
+Collects tool executors discovered under ``skills/<id>/tools.py``. Behavioral guides
+live in each skill's ``SKILL.md`` and are loaded on demand via ``load_skill`` (see
+``skills/markdown.py``), not injected into the initial system prompt.
 
 Delete-effect tools are rejected at construction time. ``execute`` re-checks
 entitlements against ``AgentContext`` before delegating to the skill.
@@ -15,6 +15,7 @@ from typing import Any
 
 from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.skills.base import SkillPort, ToolDefinition, ToolResult
+from app.modules.assistant.skills.markdown import load_skill_guide
 
 
 class SkillRegistry:
@@ -47,13 +48,15 @@ class SkillRegistry:
         return entitled
 
     def system_prompt_sections(self, effective_skill_ids: list[str]) -> list[str]:
-        """Skill-specific markdown blocks appended to the system prompt when entitled."""
-        effective = set(effective_skill_ids)
-        return [
-            skill.system_prompt_section()
-            for skill_id, skill in self._skills.items()
-            if skill_id in effective
-        ]
+        """Full ``SKILL.md`` bodies for on-demand loading (``load_skill`` tool)."""
+        sections: list[str] = []
+        for skill_id in effective_skill_ids:
+            if skill_id not in self._skills:
+                continue
+            guide = load_skill_guide(skill_id)
+            if guide:
+                sections.append(guide)
+        return sections
 
     def execute(
         self,
