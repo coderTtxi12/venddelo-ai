@@ -18,7 +18,7 @@ def compose_system_prompt(
     display_name = profile.display_name.strip()
     if display_name:
         sections.append(
-            f'Your assistant display name is "{display_name}". '
+            f'Your name is "{display_name}". '
             "Use that name naturally when introducing yourself. Respond in Spanish."
         )
 
