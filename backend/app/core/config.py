@@ -47,13 +47,6 @@ class Settings(BaseSettings):
     assistant_context_compression_threshold_ratio: float = 0.70
     assistant_context_recent_window_turns: int = 6
     assistant_max_tool_iterations: int = 8
-    # Plan-and-execute + reflexion (all in-process, no extra workers/jobs).
-    assistant_planning_enabled: bool = True
-    assistant_plan_max_steps: int = 6
-    assistant_reflection_enabled: bool = True
-    # Reflect every N executed tools (0 = only reflect after a failed tool).
-    assistant_reflection_every: int = 3
-    assistant_max_replans: int = 2
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
     openai_api_key: str | None = None
