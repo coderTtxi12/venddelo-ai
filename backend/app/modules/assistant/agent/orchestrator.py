@@ -24,6 +24,12 @@ from app.core.llm.ports import (
     ChatStreamEvent,
     LLMProviderPort,
 )
+from app.modules.assistant.agent.activity_emit import (
+    mark_plan_step_done,
+    normalize_llm_reasoning,
+    phase_for_effect,
+    plan_steps_for_calls,
+)
 from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.agent.prompt_composer import compose_system_prompt
 from app.modules.assistant.agent.response_format import (
@@ -99,6 +105,7 @@ class AgentOrchestrator:
         tool_schemas = build_openai_tool_schemas(entitled_tools)
         if entitled_skill_ids:
             tool_schemas.append(build_load_skill_schema(entitled_skill_ids))
+        tools_enabled = bool(tool_schemas)
 
         messages = self._build_messages(
             request=request,
@@ -149,6 +156,8 @@ class AgentOrchestrator:
                     )
 
                     turn_content: list[str] = []
+                    turn_reasoning: list[str] = []
+                    thought_started_this_turn = False
                     tool_calls: list[dict[str, Any]] | None = None
                     final_content = ""
                     usage_payload: Any = None
@@ -158,9 +167,24 @@ class AgentOrchestrator:
                         if event.event == "content.delta":
                             delta = event.data.get("delta")
                             if isinstance(delta, str) and delta:
-                                turn_content.append(delta)
-                                content_parts.append(delta)
-                                yield event
+                                if tools_enabled:
+                                    turn_reasoning.append(delta)
+                                    reasoning = normalize_llm_reasoning(
+                                        "".join(turn_reasoning)
+                                    )
+                                    if reasoning:
+                                        yield ChatStreamEvent(
+                                            event="agent.thought",
+                                            data={
+                                                "text": reasoning,
+                                                "replace": thought_started_this_turn,
+                                            },
+                                        )
+                                        thought_started_this_turn = True
+                                else:
+                                    turn_content.append(delta)
+                                    content_parts.append(delta)
+                                    yield event
                             continue
                         if event.event == "error":
                             yield event
@@ -172,7 +196,7 @@ class AgentOrchestrator:
                             final_content = (
                                 provider_content
                                 if isinstance(provider_content, str) and provider_content
-                                else "".join(turn_content)
+                                else "".join(turn_content or turn_reasoning)
                             )
                             usage_payload = event.data.get("usage")
                     if stream_failed:
@@ -185,6 +209,16 @@ class AgentOrchestrator:
                         )
                         return
 
+                    turn_reasoning_text = normalize_llm_reasoning(final_content)
+                    if turn_reasoning_text:
+                        yield ChatStreamEvent(
+                            event="agent.thought",
+                            data={
+                                "text": turn_reasoning_text,
+                                "replace": thought_started_this_turn,
+                            },
+                        )
+
                     # Echo the assistant turn (content + tool calls) back into history.
                     messages.append(
                         ChatCompletionMessage(
@@ -194,7 +228,21 @@ class AgentOrchestrator:
                         )
                     )
 
-                    for call in tool_calls:
+                    plan_steps: list[dict[str, Any]] = []
+                    if len(tool_calls) > 1:
+                        plan_steps = plan_steps_for_calls(tool_calls)
+                        yield ChatStreamEvent(
+                            event="agent.plan",
+                            data={
+                                "reason": (
+                                    turn_reasoning_text
+                                    or "Pasos para completar tu solicitud"
+                                ),
+                                "steps": plan_steps,
+                            },
+                        )
+
+                    for step_index, call in enumerate(tool_calls, start=1):
                         call_id = call.get("id") or ""
                         function = call.get("function") or {}
                         fn_name = function.get("name") or ""
@@ -207,6 +255,19 @@ class AgentOrchestrator:
                             args = {}
 
                         if fn_name == LOAD_SKILL_TOOL_NAME:
+                            yield ChatStreamEvent(
+                                event="agent.phase",
+                                data={"phase": "planning"},
+                            )
+                            yield ChatStreamEvent(
+                                event="tool.start",
+                                data={
+                                    "call_id": call_id,
+                                    "tool": LOAD_SKILL_TOOL_NAME,
+                                    "args_summary": args,
+                                    "effect": "read",
+                                },
+                            )
                             result, skill_id = self._load_skill(args, entitled_skill_ids)
                             if skill_id and skill_id not in loaded_skill_ids:
                                 loaded_skill_ids.append(skill_id)
@@ -221,6 +282,28 @@ class AgentOrchestrator:
                                     "active": list(loaded_skill_ids),
                                 },
                             )
+                            yield ChatStreamEvent(
+                                event="tool.result" if skill_id else "tool.error",
+                                data={
+                                    "call_id": call_id,
+                                    "tool": LOAD_SKILL_TOOL_NAME,
+                                    "ok": bool(skill_id),
+                                    "summary": (
+                                        f"Guía cargada: {_skill_label(skill_id)}"
+                                        if skill_id
+                                        else "Skill no disponible"
+                                    ),
+                                },
+                            )
+                            if plan_steps:
+                                plan_steps = mark_plan_step_done(plan_steps, step_index)
+                                yield ChatStreamEvent(
+                                    event="agent.plan_update",
+                                    data={
+                                        "decision": "continue",
+                                        "steps": plan_steps,
+                                    },
+                                )
                             messages.append(
                                 ChatCompletionMessage(
                                     role="tool",
@@ -252,8 +335,22 @@ class AgentOrchestrator:
                             )
                             yield ChatStreamEvent(
                                 event="tool.error",
-                                data={"tool": fn_name, "ok": False, "summary": "not_available"},
+                                data={
+                                    "call_id": call_id,
+                                    "tool": fn_name,
+                                    "ok": False,
+                                    "summary": "not_available",
+                                },
                             )
+                            if plan_steps:
+                                plan_steps = mark_plan_step_done(plan_steps, step_index)
+                                yield ChatStreamEvent(
+                                    event="agent.plan_update",
+                                    data={
+                                        "decision": "continue",
+                                        "steps": plan_steps,
+                                    },
+                                )
                             continue
 
                         if tool_iterations >= max_tool_iterations:
@@ -269,10 +366,12 @@ class AgentOrchestrator:
                             return
                         tool_iterations += 1
 
-                        yield ChatStreamEvent(event="agent.phase", data={"phase": "explore"})
+                        phase = phase_for_effect(tool_def.effect)
+                        yield ChatStreamEvent(event="agent.phase", data={"phase": phase})
                         yield ChatStreamEvent(
                             event="tool.start",
                             data={
+                                "call_id": call_id,
                                 "tool": tool_name,
                                 "skill_id": skill_id,
                                 "args_summary": args,
@@ -285,11 +384,26 @@ class AgentOrchestrator:
                         yield ChatStreamEvent(
                             event="tool.result" if result.ok else "tool.error",
                             data={
+                                "call_id": call_id,
                                 "tool": tool_name,
                                 "ok": result.ok,
                                 "summary": result.summary,
                             },
                         )
+                        if plan_steps:
+                            plan_steps = mark_plan_step_done(plan_steps, step_index)
+                            decision = (
+                                "finish"
+                                if step_index == len(tool_calls)
+                                else "continue"
+                            )
+                            yield ChatStreamEvent(
+                                event="agent.plan_update",
+                                data={
+                                    "decision": decision,
+                                    "steps": plan_steps,
+                                },
+                            )
                         messages.append(
                             ChatCompletionMessage(
                                 role="tool",
