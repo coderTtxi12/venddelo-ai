@@ -23,7 +23,9 @@ import {
   hasVisibleAgentActivity,
   INITIAL_AGENT_ACTIVITY,
   mapPlanStepsFromPayload,
+  mergeLoadedSkills,
   STREAMING_AGENT_ACTIVITY,
+  updateToolStepResult,
   type AgentActivityState,
 } from '@/lib/assistant/agentActivity';
 import {
@@ -64,6 +66,7 @@ type ChatMessage = {
   complement?: ChatComplement;
   complementSubmitted?: boolean;
   formSubmission?: ChatFormSubmission;
+  agentActivity?: AgentActivityState;
 };
 
 const WELCOME_MESSAGE: ChatMessage = {
@@ -121,6 +124,7 @@ export default function AssistantChatPanel() {
   const [assistantNameDraft, setAssistantNameDraft] = useState('');
   const [agentProcessing, setAgentProcessing] = useState(false);
   const [agentActivity, setAgentActivity] = useState<AgentActivityState>(INITIAL_AGENT_ACTIVITY);
+  const [collapsedActivityIds, setCollapsedActivityIds] = useState<Record<string, boolean>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -377,7 +381,6 @@ export default function AssistantChatPanel() {
           outboundMessage,
           {
             onDelta: (delta) => {
-              setAgentProcessing(false);
               streamedContent += delta;
               if (pendingFrame === null) {
                 pendingFrame = requestAnimationFrame(flushStreamedContent);
@@ -392,13 +395,27 @@ export default function AssistantChatPanel() {
                 setAgentProcessing(true);
               }
             },
-            onAgentThought: (text) => {
+            onAgentThought: (text, options) => {
               setAgentProcessing(true);
-              setAgentActivity((prev) => ({
-                ...prev,
-                status: 'processing',
-                thoughts: [...prev.thoughts, { id: createThoughtId(), text }],
-              }));
+              setAgentActivity((prev) => {
+                if (options?.replace && prev.thoughts.length > 0) {
+                  const updated = [...prev.thoughts];
+                  updated[updated.length - 1] = {
+                    ...updated[updated.length - 1],
+                    text,
+                  };
+                  return {
+                    ...prev,
+                    status: 'processing',
+                    thoughts: updated,
+                  };
+                }
+                return {
+                  ...prev,
+                  status: 'processing',
+                  thoughts: [...prev.thoughts, { id: createThoughtId(), text }],
+                };
+              });
             },
             onAgentPlan: (payload) => {
               setAgentProcessing(true);
@@ -423,18 +440,34 @@ export default function AssistantChatPanel() {
                 },
               }));
             },
+            onAgentSkills: (payload) => {
+              setAgentProcessing(true);
+              setAgentActivity((prev) => ({
+                ...prev,
+                status: 'processing',
+                loadedSkills: mergeLoadedSkills(prev.loadedSkills, payload.skills, payload.active),
+              }));
+            },
             onToolStart: (payload) => {
               setAgentProcessing(true);
               setAgentActivity((prev) => ({
                 ...prev,
-                phase: prev.phase ?? 'explore',
+                phase:
+                  payload.effect === 'mutate'
+                    ? 'execute'
+                    : payload.tool === 'load_skill'
+                      ? 'planning'
+                      : prev.phase ?? 'explore',
                 status: 'processing',
                 tools: [
                   ...prev.tools,
                   {
                     id: createToolStepId(payload.tool),
+                    callId: payload.call_id,
                     tool: payload.tool,
                     skillId: payload.skill_id,
+                    effect: payload.effect,
+                    argsSummary: payload.args_summary,
                     status: 'running',
                   },
                 ],
@@ -443,46 +476,47 @@ export default function AssistantChatPanel() {
             onToolResult: (payload) => {
               setAgentActivity((prev) => ({
                 ...prev,
-                tools: prev.tools.map((step) =>
-                  step.tool === payload.tool && step.status === 'running'
-                    ? {
-                        ...step,
-                        status: 'done',
-                        summary: payload.summary,
-                      }
-                    : step,
-                ),
+                tools: updateToolStepResult(prev.tools, payload),
               }));
             },
             onToolError: (payload) => {
               setAgentActivity((prev) => ({
                 ...prev,
-                tools: prev.tools.map((step) =>
-                  step.tool === payload.tool && step.status === 'running'
-                    ? {
-                        ...step,
-                        status: 'error',
-                        summary: payload.summary,
-                      }
-                    : step,
-                ),
+                tools: updateToolStepResult(prev.tools, { ...payload, ok: false }),
               }));
             },
             onComplete: (payload) => {
               const finalContent = payload.content || streamedContent;
               const resolvedAssistantId = payload.message_id || assistantMessageId;
               const resolvedUserId = userMessage.id;
-              setMessages((prev) =>
-                prev.map((message) => {
-                  if (message.id === assistantMessageId) {
-                    return { ...message, id: resolvedAssistantId, content: finalContent };
-                  }
-                  if (message.id === userMessage.id) {
-                    return { ...message, id: resolvedUserId };
-                  }
-                  return message;
-                }),
-              );
+              setAgentActivity((currentActivity) => {
+                const activitySnapshot = hasVisibleAgentActivity(currentActivity)
+                  ? currentActivity
+                  : undefined;
+                setMessages((prev) =>
+                  prev.map((message) => {
+                    if (message.id === assistantMessageId) {
+                      return {
+                        ...message,
+                        id: resolvedAssistantId,
+                        content: finalContent,
+                        agentActivity: activitySnapshot,
+                      };
+                    }
+                    if (message.id === userMessage.id) {
+                      return { ...message, id: resolvedUserId };
+                    }
+                    return message;
+                  }),
+                );
+                if (activitySnapshot) {
+                  setCollapsedActivityIds((prev) => ({
+                    ...prev,
+                    [assistantMessageId]: true,
+                  }));
+                }
+                return INITIAL_AGENT_ACTIVITY;
+              });
               void refreshConversations();
               finishStream();
             },
@@ -514,7 +548,9 @@ export default function AssistantChatPanel() {
         const message =
           error instanceof ApiError
             ? error.message
-            : 'No se pudo contactar al asistente. Intenta de nuevo.';
+            : error instanceof Error && error.message
+              ? error.message
+              : 'No se pudo contactar al asistente. Intenta de nuevo.';
         setMessages((prev) =>
           prev.map((item) =>
             item.id === assistantMessageId ? { ...item, content: message } : item,
@@ -755,8 +791,14 @@ export default function AssistantChatPanel() {
           const isStreaming = streamingMessageId === message.id;
           const isAwaitingFirstToken =
             isStreaming && message.content.trim().length === 0 && agentProcessing;
+          const liveActivity = isStreaming ? agentActivity : message.agentActivity;
           const showAgentActivity =
-            isStreaming && (hasVisibleAgentActivity(agentActivity) || agentProcessing);
+            Boolean(liveActivity) &&
+            (isStreaming
+              ? hasVisibleAgentActivity(agentActivity) || agentProcessing
+              : hasVisibleAgentActivity(message.agentActivity!));
+          const activityCollapsed =
+            !isStreaming && Boolean(collapsedActivityIds[message.id]);
           const hasAttachments = (message.attachments?.length ?? 0) > 0;
           const hasComplement = Boolean(message.complement);
           const attachmentCount = message.attachments?.length ?? 0;
@@ -795,10 +837,20 @@ export default function AssistantChatPanel() {
                       ) : null
                     ) : (
                       <div className={styles.assistantText}>
-                        {showAgentActivity ? (
+                        {showAgentActivity && liveActivity ? (
                           <ChatAgentActivity
-                            activity={agentActivity}
+                            activity={liveActivity}
                             showProcessingDots={isAwaitingFirstToken}
+                            collapsed={activityCollapsed}
+                            onToggleCollapsed={
+                              !isStreaming
+                                ? () =>
+                                    setCollapsedActivityIds((prev) => ({
+                                      ...prev,
+                                      [message.id]: !prev[message.id],
+                                    }))
+                                : undefined
+                            }
                           />
                         ) : null}
                         {isAwaitingFirstToken && !showAgentActivity ? (
