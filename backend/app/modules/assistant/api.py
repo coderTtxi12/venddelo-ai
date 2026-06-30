@@ -26,7 +26,7 @@ Usage
 Runtime wiring
 --------------
 - ``build_llm_provider()`` — OpenAI in prod, stub in dev/tests.
-- ``SkillRegistry([MenuReadSkill()])`` — read-only menu tools for entitled skills.
+- ``build_skill_registry()`` — auto-discovers ``skills/*/`` (``SKILL.md`` + ``tools.py``).
 - Profile is validated **before** opening the SSE stream so HTTP errors return as JSON.
 """
 
@@ -54,8 +54,7 @@ from app.modules.assistant.schemas import (
     AssistantMessageDTO,
 )
 from app.modules.assistant.service import AssistantService
-from app.modules.assistant.skills.menu_read.tools import MenuReadSkill
-from app.modules.assistant.skills.registry import SkillRegistry
+from app.modules.assistant.skills import build_skill_registry
 from app.modules.assistant.usage.schemas import LLMUsageSummary
 from app.modules.restaurants.schemas import RestaurantDTO
 
@@ -72,9 +71,9 @@ def _profile_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> AssistantP
     )
 
 
-def _assistant_skill_registry() -> SkillRegistry:
-    """Return the in-process skill registry wired for the agent orchestrator."""
-    return SkillRegistry([MenuReadSkill()])
+def _assistant_skill_registry():
+    """Return the in-process skill registry (discovered from ``skills/*/``)."""
+    return build_skill_registry()
 
 
 def _conversation_service(
