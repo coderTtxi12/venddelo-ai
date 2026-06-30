@@ -262,8 +262,7 @@ class AssistantConversationService:
                     "agent.phase",
                     "agent.status",
                     "agent.thought",
-                    "agent.plan",
-                    "agent.plan_update",
+                    "agent.skills",
                 ):
                     yield event
                     continue
