@@ -22,5 +22,6 @@ def test_compose_system_prompt_includes_display_name():
     assert "Respond in Spanish" in prompt
     assert "# Identity" not in prompt
     assert "# Behavior" not in prompt
-    assert "menu_read" in prompt
+    assert "**menu_read**" in prompt
+    assert "Read-only access" in prompt
     assert "# Menu rules" not in prompt
