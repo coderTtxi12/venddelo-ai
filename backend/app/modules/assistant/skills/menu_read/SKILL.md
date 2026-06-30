@@ -1,6 +1,15 @@
+---
+name: menu_read
+description: Read-only access to menu categories, products, prices, options, and promotions.
+---
+
 # menu_read
 
 Read-only access to the current restaurant menu: categories, products, prices, option groups, availability, **and promotions** (2×1/NxM, percent, amount, combo). All data is tenant-scoped; never mutate menu or promotion records from this skill.
+
+**How this skill is wired:** when entitled, its tools are available as native function calls
+(`menu_read__list_products`, etc.). Call `load_skill(menu_read)` only if you need this full
+guide on disk; you do not need a separate "activation" step.
 
 ---
 
@@ -35,10 +44,9 @@ promotions (type, scope)            → list_promotions / get_promotion
 
 ## When to Use This Skill
 
-Activate `menu_read` when the owner asks about **live catalog data** that is not already in:
+Use **`menu_read` tools** when the owner asks about **live catalog data** that is not already in:
 
 - Conversation history or prior tool results in this turn
-- The `## MENU knowledge` block in the system prompt
 
 Typical intents:
 
@@ -49,7 +57,8 @@ Typical intents:
 - List or navigate promotions (active now, by type or scope)
 - Get full detail for one promotion (targets, schedule, how it discounts)
 
-**Do not use** when a direct `type: "answer"` is enough (greetings, identity, general advice, data already in context).
+**Answer directly without tools** for greetings, identity, general advice, or when prior tool
+results in this turn already contain accurate data.
 
 ---
 
@@ -74,7 +83,7 @@ Follow this workflow on every menu question:
 
 ### Step 2: Prefer the Smallest Read
 
-1. **Default:** answer from context/MENU knowledge if accurate.
+1. **Default:** answer from conversation history and prior tool results if accurate.
 2. **Text lookup:** `search_products` when the owner names or describes items.
 3. **Full catalog / counts:** `list_products` with pagination — never guess totals.
 4. **Single record:** `get_product` when you already have a UUID.
@@ -104,7 +113,8 @@ When `list_products` returns `has_more: true`:
 
 ### Step 4: Respond in Spanish
 
-Tool `reason` fields stay in English (JSON contract). Owner-facing `content` is Spanish markdown with prices formatted for humans (e.g. `$120.00 MXN` from `price_cents`).
+Reply to the owner in **Spanish markdown**. Format prices for humans (e.g. `$120.00 MXN`
+from `price_cents`). Never dump raw tool JSON keys or snake_case field names in the reply.
 
 ---
 
@@ -478,7 +488,7 @@ Never invent values missing from tool results.
 | Paginate with `list_products` for large menus | Assume `search_products` returns the full catalog |
 | Scope every call to the current restaurant tenant | Reference other restaurants |
 | Say when data is partial (page 1 of N) | Claim you edited or disabled products |
-| Use `get_product` for one known UUID | Call tools "just in case" when MENU knowledge suffices |
+| Use `get_product` for one known UUID | Call tools "just in case" when prior results already suffice |
 | Explain promos with `label` + `pricing_note` | Compute or assert a final cart total (checkout owns that) |
 | Use `effective_only` for "active now" questions | Treat `combo` as a real discount |
 | Read promos from `get_product` / `list_product_promotions` / `list_promotions` | Claim `has_promotions` per product from `list_products` (it has none) |
@@ -488,14 +498,14 @@ Never invent values missing from tool results.
 
 ## Pre-Response Checklist
 
-Before sending `type: "answer"` after tool calls:
+Before your final reply to the owner (after any tool calls):
 
-- [ ] Numbers (counts, prices) come from tool JSON, not guesses
+- [ ] Numbers (counts, prices) come from tool results, not guesses
 - [ ] Pagination state explained if `has_more` was true
 - [ ] Inactive/unpublished products noted when relevant
 - [ ] Promotion claims come from `get_product` / `list_product_promotions` /
       `list_promotions` — NOT inferred from `list_products` (which has no promo data)
 - [ ] Aggregate "X products have/don't have promos" was actually computed by
       cross-referencing `list_promotions` ids, not assumed
-- [ ] Spanish markdown in `content`; English only in `reason`
+- [ ] Reply is Spanish markdown for the restaurant owner — no raw JSON keys in the message
 - [ ] No delete/mutate actions — this skill is read-only
