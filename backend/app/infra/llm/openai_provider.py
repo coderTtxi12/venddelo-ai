@@ -3,7 +3,12 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from app.core.config import Settings
-from app.core.llm.ports import ChatCompletionRequest, ChatStreamEvent, LLMProviderPort
+from app.core.llm.ports import (
+    ChatCompletionMessage,
+    ChatCompletionRequest,
+    ChatStreamEvent,
+    LLMProviderPort,
+)
 
 
 def _estimate_tokens(text: str) -> int:
@@ -19,6 +24,47 @@ def model_supports_custom_temperature(model: str) -> bool:
     return not any(name.startswith(prefix) for prefix in _FIXED_TEMPERATURE_PREFIXES)
 
 
+def _to_openai_message(message: ChatCompletionMessage) -> dict[str, object]:
+    """Map a domain message to the OpenAI chat schema (incl. tool calls/results)."""
+    payload: dict[str, object] = {"role": message.role}
+    if message.role == "tool":
+        payload["content"] = message.content or ""
+        payload["tool_call_id"] = message.tool_call_id or ""
+        return payload
+    payload["content"] = message.content or ""
+    if message.tool_calls:
+        payload["tool_calls"] = message.tool_calls
+    return payload
+
+
+def _accumulate_tool_call_deltas(deltas: object, acc: dict[int, dict]) -> None:
+    """Fold streamed ``tool_calls`` delta fragments into ``acc`` keyed by index."""
+    if not deltas:
+        return
+    for delta in deltas:
+        index = int(getattr(delta, "index", 0) or 0)
+        slot = acc.setdefault(
+            index,
+            {"id": "", "type": "function", "function": {"name": "", "arguments": ""}},
+        )
+        call_id = getattr(delta, "id", None)
+        if call_id:
+            slot["id"] = call_id
+        function = getattr(delta, "function", None)
+        if function is not None:
+            name = getattr(function, "name", None)
+            if name:
+                slot["function"]["name"] = name
+            arguments = getattr(function, "arguments", None)
+            if arguments:
+                slot["function"]["arguments"] += arguments
+
+
+def _finalize_tool_calls(acc: dict[int, dict]) -> list[dict]:
+    """Return accumulated tool calls in stable index order, dropping empty ones."""
+    return [acc[index] for index in sorted(acc) if acc[index]["function"]["name"]]
+
+
 class OpenAILLMProvider(LLMProviderPort):
     def __init__(self, settings: Settings) -> None:
         from langsmith.wrappers import wrap_openai
@@ -32,7 +78,7 @@ class OpenAILLMProvider(LLMProviderPort):
 
     def stream_chat(self, request: ChatCompletionRequest) -> Iterator[ChatStreamEvent]:
         model = request.model or self._default_model
-        messages = [{"role": m.role, "content": m.content} for m in request.messages]
+        messages = [_to_openai_message(m) for m in request.messages]
 
         create_kwargs: dict[str, object] = {
             "model": model,
@@ -46,6 +92,9 @@ class OpenAILLMProvider(LLMProviderPort):
             create_kwargs["max_tokens"] = request.max_tokens
         if request.response_format == "json_object":
             create_kwargs["response_format"] = {"type": "json_object"}
+        if request.tools:
+            create_kwargs["tools"] = request.tools
+            create_kwargs["tool_choice"] = request.tool_choice or "auto"
 
         try:
             stream = self._client.chat.completions.create(**create_kwargs)
@@ -57,6 +106,7 @@ class OpenAILLMProvider(LLMProviderPort):
             return
 
         parts: list[str] = []
+        tool_calls_acc: dict[int, dict] = {}
         usage_payload: dict[str, int | str] | None = None
         for chunk in stream:
             usage = getattr(chunk, "usage", None)
@@ -75,15 +125,21 @@ class OpenAILLMProvider(LLMProviderPort):
                 }
                 continue
             choice = chunk.choices[0] if chunk.choices else None
-            delta = choice.delta.content if choice and choice.delta.content else None
-            if not delta:
+            if choice is None:
                 continue
-            parts.append(delta)
-            yield ChatStreamEvent(event="content.delta", data={"delta": delta})
+            delta = choice.delta
+            _accumulate_tool_call_deltas(getattr(delta, "tool_calls", None), tool_calls_acc)
+            text = getattr(delta, "content", None)
+            if not text:
+                continue
+            parts.append(text)
+            yield ChatStreamEvent(event="content.delta", data={"delta": text})
 
         if usage_payload is None:
             output = "".join(parts)
-            input_tokens = sum(_estimate_tokens(message.content) for message in request.messages)
+            input_tokens = sum(
+                _estimate_tokens(message.content or "") for message in request.messages
+            )
             output_tokens = _estimate_tokens(output)
             usage_payload = {
                 "provider": "openai",
@@ -93,7 +149,12 @@ class OpenAILLMProvider(LLMProviderPort):
                 "total_tokens": input_tokens + output_tokens,
             }
 
+        tool_calls = _finalize_tool_calls(tool_calls_acc)
         yield ChatStreamEvent(
             event="message.complete",
-            data={"content": "".join(parts), "usage": usage_payload},
+            data={
+                "content": "".join(parts),
+                "tool_calls": tool_calls or None,
+                "usage": usage_payload,
+            },
         )
