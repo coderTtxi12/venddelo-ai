@@ -10,6 +10,57 @@
   box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 4%, transparent);
 }
 
+.activity_collapsed {
+  gap: 0.25rem;
+  padding-bottom: 0.5rem;
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.headerMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.summaryLine {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+}
+
+.toggleButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.toggleButton:hover {
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-text);
+}
+
+.toggleButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .phaseRow {
   display: flex;
   align-items: center;
@@ -52,12 +103,41 @@
 
 .thoughtSection,
 .planSection,
+.skillsSection,
 .toolsSection,
 .reflectionSection {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   padding-top: 0.15rem;
+}
+
+.skillList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.skillItem {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+  color: var(--color-text);
+}
+
+.skillItem svg {
+  color: #059669;
+  flex-shrink: 0;
+}
+
+.skillId {
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--color-text-secondary);
 }
 
 .thoughtList {
@@ -219,6 +299,37 @@
   font-size: 0.76rem;
   font-weight: 500;
   color: var(--color-text);
+  line-height: 1.35;
+}
+
+.toolLabelRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.effectBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.effectBadge_mutate {
+  color: #b45309;
+  background: color-mix(in srgb, #f59e0b 18%, transparent);
+}
+
+.toolArgs {
+  font-size: 0.71rem;
+  color: var(--color-text-secondary);
   line-height: 1.35;
 }
 
