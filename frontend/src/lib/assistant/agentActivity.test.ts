@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  extractReasoningFieldText,
   hasVisibleAgentActivity,
   INITIAL_AGENT_ACTIVITY,
   labelForPlanDecision,
@@ -9,6 +10,17 @@ import {
   STREAMING_AGENT_ACTIVITY,
   updateToolStepResult,
 } from './agentActivity';
+
+test('extractReasoningFieldText keeps only envelope reasoning', () => {
+  assert.equal(
+    extractReasoningFieldText(
+      '{"reasoning":"Revisé el menú.","content":"Hola **Mark**."}',
+    ),
+    'Revisé el menú.',
+  );
+  assert.equal(extractReasoningFieldText('Voy a buscar productos.'), 'Voy a buscar productos.');
+  assert.equal(extractReasoningFieldText('{"content":"solo content"}'), '');
+});
 
 test('mapPlanStepsFromPayload maps valid plan steps', () => {
   const steps = mapPlanStepsFromPayload([
