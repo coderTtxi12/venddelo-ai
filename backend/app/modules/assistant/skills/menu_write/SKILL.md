@@ -1,6 +1,6 @@
 ---
 name: menu_write
-description: Create and update menu categories, products, options, and availability (mutations require confirmation).
+description: Create and update menu categories, products, options, and availability.
 ---
 
 # menu_write
@@ -31,12 +31,10 @@ criteria, then read the live menu before previewing or mutating.
 ## Safety rules
 
 1. **Read before write** — inspect the current record with `menu_read` when IDs or names are unclear.
-2. **Preview** — describe exactly what will change (before/after) before calling a mutate tool.
-3. **Confirm** — wait for explicit owner approval on bulk or high-impact edits.
-4. **Never delete** — use `is_active=false` only (no delete tools exist).
-5. **Bulk edits** — for many products (descriptions, prices, names), use the matching
-   `bulk_update_product_*` tool after owner confirmation; do not loop `update_product`.
-6. **Resolve by exact name** — when the owner confirms a product (e.g. "este HAMBURGUESA"),
+2. **Never delete** — use `is_active=false` only (no delete tools exist).
+3. **Bulk edits** — for many products (descriptions, prices, names), use the matching
+   `bulk_update_product_*`; do not loop `update_product`.
+4. **Resolve by exact name** — when the owner confirms a product (e.g. "este HAMBURGUESA"),
    pass that name to `update_product` or bulk tools; never reuse a `product_id` from an
    earlier ambiguous candidate list.
 
@@ -47,7 +45,7 @@ criteria, then read the live menu before previewing or mutating.
 | Tool | Purpose |
 |------|---------|
 | `create_category` | New category (`name`, optional `description`, `sort_index`) |
-| `update_category` | Rename, reorder, or disable a category (`category_id` + fields) |
+| `update_category` | Rename, reorder, set `display_layout` (`vertical` \| `horizontal` \| `grid`), enable/disable regular categories (`category_id` UUID), or rename/enable/disable special aisles (`__dm_promotions__`, `__dm_limited_time__`) |
 | `create_product` | New product (`name`, `price_cents`, `category_ids`, optional `description`, `is_published`) |
 | `update_product` | Change one product by `product_id` **or** `name`/`product_name`; use `new_name` to rename; `price_cents` in cents (100 MXN = 10000) |
 | `bulk_update_product_names` | Rename up to 50 products (`items[]` with `new_name` + `product_id` or lookup name) |
@@ -70,8 +68,6 @@ Owner request (change or improve menu)
   → load_skill(menu_best_practices)   ← required for improve/optimize/recommend/audit
   → load_skill(menu_write)            ← optional; only if you need this mutate guide
   → menu_read tools to fetch current state
-  → Plain-language preview for the owner
-  → Owner confirms
   → menu_write mutate tool(s)
   → Answer summarizing what changed (owner-facing Markdown, no raw JSON keys)
 ```
