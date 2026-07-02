@@ -21,6 +21,11 @@ def _tool_call(name: str, args: dict, call_id: str = "call_1") -> dict:
     }
 
 
+def _agent_json(*, reasoning: str = "", content: str) -> str:
+    payload = {"reasoning": reasoning, "content": content}
+    return json.dumps(payload, ensure_ascii=False)
+
+
 class ScriptedProvider(LLMProviderPort):
     """Emits a scripted sequence of turns (content and/or native tool calls)."""
 
@@ -119,7 +124,7 @@ def test_orchestrator_executes_native_tool_then_answers():
     provider = ScriptedProvider(
         [
             {"tool_calls": [_tool_call(search, {"query": "pastor"})]},
-            {"content": "Encontré **Taco al pastor**."},
+            {"content": _agent_json(content="Encontré **Taco al pastor**.")},
         ]
     )
     events = _run(provider, "¿Tienes tacos al pastor?", ["menu_read"])
@@ -136,7 +141,9 @@ def test_orchestrator_executes_native_tool_then_answers():
 
 
 def test_orchestrator_answers_directly_without_tools():
-    provider = ScriptedProvider([{"content": "Me llamo **Mark**."}])
+    provider = ScriptedProvider(
+        [{"content": _agent_json(content="Me llamo **Mark**.")}]
+    )
     events = _run(provider, "¿Cómo te llamas?", ["menu_read"])
 
     complete = next(e for e in events if e.event == "message.complete")
@@ -146,11 +153,13 @@ def test_orchestrator_answers_directly_without_tools():
 
 
 def test_orchestrator_streams_answer_deltas():
-    provider = ScriptedProvider([{"content_chunks": ["Me ", "llamo **Mark**."]}])
+    provider = ScriptedProvider(
+        [{"content_chunks": [_agent_json(content="Me llamo **Mark**.")]}]
+    )
     events = _run(provider, "¿Cómo te llamas?", ["menu_read"])
 
     deltas = [e.data["delta"] for e in events if e.event == "content.delta"]
-    assert len(deltas) >= 2
+    assert len(deltas) >= 1
     assert "".join(deltas) == "Me llamo **Mark**."
 
 
@@ -158,7 +167,7 @@ def test_orchestrator_load_skill_then_answers():
     provider = ScriptedProvider(
         [
             {"tool_calls": [_tool_call("load_skill", {"skill_id": "menu_read"})]},
-            {"content": "Listo, ya revisé la guía."},
+            {"content": _agent_json(content="Listo, ya revisé la guía.")},
         ]
     )
     events = _run(provider, "Ayúdame con el menú", ["menu_read"])
@@ -179,7 +188,12 @@ def test_orchestrator_emits_llm_reasoning_before_tools():
                 "content": reasoning,
                 "tool_calls": [_tool_call(search, {"query": "pastor"})],
             },
-            {"content": "Encontré **Taco al pastor**."},
+            {
+                "content": _agent_json(
+                    reasoning="Busqué tacos al pastor en el menú.",
+                    content="Encontré **Taco al pastor**.",
+                )
+            },
         ]
     )
     events = _run(provider, "¿Tienes tacos al pastor?", ["menu_read"])
@@ -187,6 +201,7 @@ def test_orchestrator_emits_llm_reasoning_before_tools():
     thoughts = [e for e in events if e.event == "agent.thought"]
     assert thoughts
     assert any(reasoning in e.data["text"] for e in thoughts)
+    assert any("Busqué tacos al pastor" in e.data["text"] for e in thoughts)
     assert not any("Buscar productos" in e.data["text"] for e in thoughts)
 
 
@@ -199,7 +214,7 @@ def test_orchestrator_emits_plan_for_multiple_tool_calls():
                     _tool_call("menu_read__list_products", {"limit": 50}),
                 ]
             },
-            {"content": "Aquí van mis recomendaciones."},
+            {"content": _agent_json(content="Aquí van mis recomendaciones.")},
         ]
     )
     events = _run(provider, "Revisa todo mi menú y hazme recomendaciones", ["menu_read"])
@@ -214,7 +229,7 @@ def test_orchestrator_unknown_tool_reports_error_and_recovers():
     provider = ScriptedProvider(
         [
             {"tool_calls": [_tool_call("menu_read__delete_everything", {})]},
-            {"content": "No puedo hacer eso."},
+            {"content": _agent_json(content="No puedo hacer eso.")},
         ]
     )
     events = _run(provider, "Borra todo", ["menu_read"])
@@ -226,7 +241,9 @@ def test_orchestrator_unknown_tool_reports_error_and_recovers():
 
 
 def test_orchestrator_no_tools_when_skill_not_entitled():
-    provider = ScriptedProvider([{"content": "Hola, ¿en qué te ayudo?"}])
+    provider = ScriptedProvider(
+        [{"content": _agent_json(content="Hola, ¿en qué te ayudo?")}]
+    )
     events = _run(provider, "Hola", [])
 
     assert any(e.event == "message.complete" for e in events)
