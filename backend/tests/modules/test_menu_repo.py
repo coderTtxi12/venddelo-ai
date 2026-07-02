@@ -205,6 +205,39 @@ def test_category_sort_indices_batch_matches_single(session):
 
 
 @requires_db
+def test_set_category_product_order_active_only_when_inactive_linked(session):
+    r = _restaurant(session, "menu-order-active-only")
+    repo = SqlAlchemyMenuRepository(session)
+    cat = repo.add_category(CategoryCreate(restaurant_id=r.id, name="Burgers"))
+    active = repo.add_product(
+        ProductCreate(
+            restaurant_id=r.id,
+            name="Active",
+            price_cents=1000,
+            category_ids=[cat.id],
+        )
+    )
+    inactive = repo.add_product(
+        ProductCreate(
+            restaurant_id=r.id,
+            name="Inactive",
+            price_cents=1000,
+            category_ids=[cat.id],
+        )
+    )
+    repo.update_product(inactive.id, ProductUpdate(is_active=False))
+
+    repo.set_category_product_order(cat.id, [active.id])
+
+    loaded_active = repo.get_product_by_id(active.id)
+    loaded_inactive = repo.get_product_by_id(inactive.id)
+    assert loaded_active is not None
+    assert loaded_inactive is not None
+    assert loaded_active.category_sort_indices[str(cat.id)] == 0
+    assert loaded_inactive.category_sort_indices[str(cat.id)] == 1
+
+
+@requires_db
 def test_get_full_menu_bounded_query_count(session, engine):
     from sqlalchemy import event
 
