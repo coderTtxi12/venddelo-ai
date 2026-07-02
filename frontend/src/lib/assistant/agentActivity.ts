@@ -189,6 +189,34 @@ export function hasVisibleAgentActivity(activity: AgentActivityState): boolean {
   );
 }
 
+/** Keep only the assistant envelope ``reasoning`` field for the activity panel. */
+export function extractReasoningFieldText(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed) as { reasoning?: unknown };
+      if (typeof parsed.reasoning === 'string') {
+        return parsed.reasoning.trim();
+      }
+    } catch {
+      const match = trimmed.match(/"reasoning"\s*:\s*"((?:\\.|[^"\\])*)"/);
+      if (match?.[1]) {
+        try {
+          return JSON.parse(`"${match[1]}"`).trim();
+        } catch {
+          return match[1].trim();
+        }
+      }
+      return '';
+    }
+    return '';
+  }
+
+  return trimmed;
+}
+
 export function summarizeAgentActivity(activity: AgentActivityState): string {
   const parts: string[] = [];
   if (activity.tools.length > 0) {
