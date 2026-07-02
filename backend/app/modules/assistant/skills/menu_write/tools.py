@@ -8,6 +8,7 @@ from typing import Any
 
 from app.api.cache_helpers import invalidate_restaurant_menu_cache
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
+from app.core.pagination import PaginationParams
 from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
 from app.modules.assistant.skills.menu_write.bulk import (
@@ -15,6 +16,14 @@ from app.modules.assistant.skills.menu_write.bulk import (
     bulk_update_product_descriptions,
     bulk_update_product_names,
     bulk_update_product_prices,
+)
+from app.modules.assistant.skills.menu_write.category_bulk import (
+    bulk_category_tool_description,
+    bulk_update_category_descriptions,
+    bulk_update_category_display_layout,
+    bulk_update_category_names,
+    bulk_update_category_sort_indices,
+    bulk_update_category_visibility,
 )
 from app.modules.assistant.skills.menu_read.tools import (
     DEFAULT_DIGITAL_MENU_LIMITED_TIME_CATEGORY_NAME,
@@ -508,19 +517,175 @@ class MenuWriteSkill:
                 },
             ),
             ToolDefinition(
+                name="bulk_update_category_names",
+                description=bulk_category_tool_description(
+                    action="Rename MANY categories in one call."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "category_id": {"type": "string"},
+                                    "category_name": {"type": "string"},
+                                    "current_name": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "new_name": {"type": "string"},
+                                },
+                                "required": ["new_name"],
+                            },
+                        }
+                    },
+                    "required": ["items"],
+                },
+            ),
+            ToolDefinition(
+                name="bulk_update_category_descriptions",
+                description=bulk_category_tool_description(
+                    action="Update descriptions for MANY categories in one call."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "category_id": {"type": "string"},
+                                    "category_name": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "description": {"type": "string"},
+                                    "text": {"type": "string"},
+                                },
+                            },
+                        }
+                    },
+                    "required": ["items"],
+                },
+            ),
+            ToolDefinition(
+                name="bulk_update_category_sort_indices",
+                description=bulk_category_tool_description(
+                    action="Set sort_index for MANY categories in one call."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "category_id": {"type": "string"},
+                                    "category_name": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "sort_index": {"type": "integer"},
+                                },
+                                "required": ["sort_index"],
+                            },
+                        }
+                    },
+                    "required": ["items"],
+                },
+            ),
+            ToolDefinition(
+                name="bulk_update_category_visibility",
+                description=bulk_category_tool_description(
+                    action=(
+                        "Show or hide MANY categories in one call (is_active=false hides; "
+                        "never delete). Works for regular UUID categories and special aisles "
+                        f"{DIGITAL_MENU_PROMOTIONS_CATEGORY_ID!r} / "
+                        f"{DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID!r}."
+                    )
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "category_id": {"type": "string"},
+                                    "category_name": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "is_active": {"type": "boolean"},
+                                    "visible": {"type": "boolean"},
+                                },
+                            },
+                        }
+                    },
+                    "required": ["items"],
+                },
+            ),
+            ToolDefinition(
+                name="bulk_update_category_display_layout",
+                description=bulk_category_tool_description(
+                    action=(
+                        "Set digital-menu display_layout (vertical | horizontal | grid) for "
+                        "MANY regular categories in one call. Does not apply to special aisles."
+                    )
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "category_id": {"type": "string"},
+                                    "category_name": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "display_layout": {
+                                        "type": "string",
+                                        "enum": ["vertical", "horizontal", "grid"],
+                                    },
+                                },
+                                "required": ["display_layout"],
+                            },
+                        }
+                    },
+                    "required": ["items"],
+                },
+            ),
+            ToolDefinition(
                 name="set_category_product_order",
-                description="Reorder products within one category (full ordered id list).",
+                description=(
+                    "Reorder products within one regular category (UUID from list_categories). "
+                    "Pass the full ordered product_ids list. You may pass only the active "
+                    "products in the desired order (as returned by menu_read list_products); "
+                    "any inactive products still linked to the category are kept at the end "
+                    "automatically. Do not use for special aisles (__dm_promotions__, "
+                    "__dm_limited_time__)."
+                ),
                 effect="mutate",
                 input_schema={
                     "type": "object",
                     "properties": {
                         "category_id": {"type": "string"},
+                        "category_name": {
+                            "type": "string",
+                            "description": "Resolve category when category_id is omitted.",
+                        },
                         "product_ids": {
                             "type": "array",
                             "items": {"type": "string"},
+                            "description": (
+                                "All active products in desired order, or every linked product id."
+                            ),
                         },
                     },
-                    "required": ["category_id", "product_ids"],
+                    "required": ["product_ids"],
                 },
             ),
             ToolDefinition(
@@ -756,13 +921,80 @@ class MenuWriteSkill:
             return bulk_update_product_prices(
                 service, ctx, args, invalidate=_invalidate_menu_cache
             )
+        if tool_name == "bulk_update_category_names":
+            return bulk_update_category_names(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
+        if tool_name == "bulk_update_category_descriptions":
+            return bulk_update_category_descriptions(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
+        if tool_name == "bulk_update_category_sort_indices":
+            return bulk_update_category_sort_indices(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
+        if tool_name == "bulk_update_category_visibility":
+            return bulk_update_category_visibility(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
+        if tool_name == "bulk_update_category_display_layout":
+            return bulk_update_category_display_layout(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
 
         if tool_name == "set_category_product_order":
             try:
-                category_id = _parse_uuid(args.get("category_id"), "category_id")
                 product_ids = _parse_uuid_list(args.get("product_ids"), "product_ids")
             except ValidationError as exc:
                 return ToolResult(ok=False, summary=str(exc))
+
+            category_id: uuid.UUID | None = None
+            category_id_raw = args.get("category_id")
+            if category_id_raw:
+                category_id_str = str(category_id_raw).strip()
+                if _is_special_category_id(category_id_str):
+                    return ToolResult(
+                        ok=False,
+                        summary="Special categories cannot be reordered with this tool",
+                    )
+                try:
+                    category_id = _parse_uuid(category_id_str, "category_id")
+                except ValidationError as exc:
+                    return ToolResult(ok=False, summary=str(exc))
+            else:
+                category_name = _optional_str(args.get("category_name"))
+                if not category_name:
+                    return ToolResult(
+                        ok=False,
+                        summary="Provide category_id or category_name",
+                    )
+                page = service.list_all_categories(
+                    restaurant_id,
+                    PaginationParams(limit=200, cursor=None),
+                )
+                needle = category_name.casefold()
+                matches = [
+                    category
+                    for category in page.items
+                    if category.name.casefold() == needle
+                ]
+                if len(matches) != 1:
+                    if len(matches) > 1:
+                        labels = ", ".join(category.name for category in matches[:5])
+                        return ToolResult(
+                            ok=False,
+                            summary=(
+                                f"Ambiguous category name {category_name!r}; "
+                                f"candidates: {labels}"
+                            ),
+                        )
+                    return ToolResult(
+                        ok=False,
+                        summary=f"Category not found for name {category_name!r}",
+                    )
+                category_id = matches[0].id
+
+            assert category_id is not None
 
             def action() -> None:
                 service.set_category_product_order(
