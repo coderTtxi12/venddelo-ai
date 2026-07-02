@@ -22,6 +22,11 @@ _TOOL_GOALS: dict[str, str] = {
     "bulk_update_product_names": "Renombrar productos en lote",
     "bulk_update_product_descriptions": "Actualizar descripciones en lote",
     "bulk_update_product_prices": "Actualizar precios en lote",
+    "bulk_update_category_names": "Renombrar categorías en lote",
+    "bulk_update_category_descriptions": "Actualizar descripciones de categorías en lote",
+    "bulk_update_category_sort_indices": "Reordenar categorías en lote",
+    "bulk_update_category_visibility": "Cambiar visibilidad de categorías en lote",
+    "bulk_update_category_display_layout": "Cambiar layout de categorías en lote",
     "update_category": "Actualizar categoría",
     "create_category": "Crear categoría",
 }
@@ -74,6 +79,11 @@ def goal_for_call(fn_name: str, args: dict[str, Any]) -> str:
         count = len(items) if isinstance(items, list) else 0
         if count:
             return f"{base} ({count} producto{'s' if count != 1 else ''})"
+    if tool_name.startswith("bulk_update_category"):
+        items = args.get("items") or args.get("categories")
+        count = len(items) if isinstance(items, list) else 0
+        if count:
+            return f"{base} ({count} categoría{'s' if count != 1 else ''})"
 
     return base
 
