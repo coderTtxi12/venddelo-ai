@@ -72,6 +72,9 @@ class FakeMenuRepo(MenuRepository):
     def list_categories(self, restaurant_id, params):
         return CursorPage(items=[])
 
+    def list_all_categories(self, restaurant_id, params):
+        return CursorPage(items=[])
+
     def update_category(self, id, data):
         return self.categories.get(id)
 
