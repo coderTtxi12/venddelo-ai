@@ -39,6 +39,11 @@ class MenuRepository(ABC):
     ) -> CursorPage[CategoryDTO]: ...
 
     @abstractmethod
+    def list_all_categories(
+        self, restaurant_id: uuid.UUID, params: PaginationParams
+    ) -> CursorPage[CategoryDTO]: ...
+
+    @abstractmethod
     def update_category(self, id: uuid.UUID, data: CategoryUpdate) -> CategoryDTO | None: ...
 
     @abstractmethod

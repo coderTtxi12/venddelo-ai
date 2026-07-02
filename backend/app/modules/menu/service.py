@@ -61,6 +61,11 @@ class MenuService:
     ) -> CursorPage[CategoryDTO]:
         return self._repo.list_categories(restaurant_id, params)
 
+    def list_all_categories(
+        self, restaurant_id: uuid.UUID, params: PaginationParams
+    ) -> CursorPage[CategoryDTO]:
+        return self._repo.list_all_categories(restaurant_id, params)
+
     def update_category(
         self, restaurant_id: uuid.UUID, category_id: uuid.UUID, data: CategoryUpdate
     ) -> CategoryDTO:

@@ -152,6 +152,28 @@ class SqlAlchemyMenuRepository(MenuRepository):
             has_more=has_more,
         )
 
+    def list_all_categories(
+        self, restaurant_id: uuid.UUID, params: PaginationParams
+    ) -> CursorPage[CategoryDTO]:
+        stmt = (
+            select(Category)
+            .where(Category.restaurant_id == restaurant_id)
+            .order_by(Category.sort_index, Category.created_at, Category.id)
+            .limit(params.limit + 1)
+        )
+        if params.cursor:
+            created_at, last_id = decode_keyset_cursor(params.cursor)
+            stmt = stmt.where(tuple_(Category.created_at, Category.id) > (created_at, last_id))
+        rows = list(self._session.scalars(stmt))
+        has_more = len(rows) > params.limit
+        rows = rows[: params.limit]
+        next_cursor = encode_keyset_cursor(rows[-1].created_at, rows[-1].id) if has_more else None
+        return CursorPage(
+            items=[CategoryDTO.model_validate(r) for r in rows],
+            next_cursor=next_cursor,
+            has_more=has_more,
+        )
+
     def update_category(self, id: uuid.UUID, data: CategoryUpdate) -> CategoryDTO | None:
         obj = self._session.get(Category, id)
         if obj is None:
