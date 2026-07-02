@@ -33,7 +33,9 @@ criteria, then read the live menu before previewing or mutating.
 1. **Read before write** — inspect the current record with `menu_read` when IDs or names are unclear.
 2. **Never delete** — use `is_active=false` only (no delete tools exist).
 3. **Bulk edits** — for many products (descriptions, prices, names), use the matching
-   `bulk_update_product_*`; do not loop `update_product`.
+   `bulk_update_product_*`; for many categories (names, descriptions, sort order,
+   visibility, display layout), use the matching `bulk_update_category_*`; do not loop
+   `update_product` / `update_category`.
 4. **Resolve by exact name** — when the owner confirms a product (e.g. "este HAMBURGUESA"),
    pass that name to `update_product` or bulk tools; never reuse a `product_id` from an
    earlier ambiguous candidate list.
@@ -51,7 +53,12 @@ criteria, then read the live menu before previewing or mutating.
 | `bulk_update_product_names` | Rename up to 50 products (`items[]` with `new_name` + `product_id` or lookup name) |
 | `bulk_update_product_descriptions` | Rewrite up to 50 descriptions in one call (`items[]` with `description` + `product_id` or `name`) |
 | `bulk_update_product_prices` | Change up to 50 prices in one call (`items[]` with `price_cents` + `product_id` or `name`) |
-| `set_category_product_order` | Reorder products in one category (`category_id`, full `product_ids` list) |
+| `bulk_update_category_names` | Rename up to 50 categories (`items[]` with `new_name` + `category_id` or name) |
+| `bulk_update_category_descriptions` | Update up to 50 category descriptions in one call |
+| `bulk_update_category_sort_indices` | Set `sort_index` for up to 50 categories in one call |
+| `bulk_update_category_visibility` | Show/hide up to 50 categories (`is_active`; special aisles supported) |
+| `bulk_update_category_display_layout` | Set `display_layout` (`vertical` \| `horizontal` \| `grid`) for up to 50 regular categories |
+| `set_category_product_order` | Reorder products in one category (`category_id` or `category_name`, ordered `product_ids`; active-only list OK — inactive stay at end) |
 | `add_option_group` | Add size/extras group to a product |
 | `update_option_group` | Change group rules or disable with `is_active=false` |
 | `add_option_item` | Add one add-on choice to a group |
