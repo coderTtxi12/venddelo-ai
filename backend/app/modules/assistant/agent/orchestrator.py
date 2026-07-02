@@ -37,6 +37,7 @@ from app.modules.assistant.agent.response_format import (
     build_agent_runtime_section,
     build_load_skill_schema,
     build_openai_tool_schemas,
+    parse_agent_response,
     parse_function_name,
 )
 from app.modules.assistant.context.compressor import compress_history_for_llm
@@ -49,6 +50,35 @@ from app.modules.assistant.skills.base import ToolDefinition, ToolResult
 def _skill_label(skill_id: str) -> str:
     definition = SKILL_CATALOG.get(skill_id)
     return definition.label if definition else skill_id
+
+
+def _yield_parsed_final_message(
+    raw_content: str,
+    *,
+    usage_payload: Any,
+    content_parts: list[str],
+) -> Iterator[ChatStreamEvent]:
+    """Parse the JSON envelope and emit owner-facing stream events."""
+    parsed = parse_agent_response(raw_content)
+    reasoning = parsed["reasoning"]
+    content = parsed["content"]
+    if content:
+        content_parts.append(content)
+    if reasoning:
+        yield ChatStreamEvent(
+            event="agent.thought",
+            data={"text": reasoning, "replace": False},
+        )
+    if content:
+        yield ChatStreamEvent(event="content.delta", data={"delta": content})
+    yield ChatStreamEvent(
+        event="message.complete",
+        data={
+            "content": content,
+            "reasoning": reasoning,
+            "usage": usage_payload,
+        },
+    )
 
 
 class AgentSkillRegistry(Protocol):
@@ -183,8 +213,6 @@ class AgentOrchestrator:
                                         thought_started_this_turn = True
                                 else:
                                     turn_content.append(delta)
-                                    content_parts.append(delta)
-                                    yield event
                             continue
                         if event.event == "error":
                             yield event
@@ -203,9 +231,10 @@ class AgentOrchestrator:
                         return
 
                     if not tool_calls:
-                        yield ChatStreamEvent(
-                            event="message.complete",
-                            data={"content": final_content, "usage": usage_payload},
+                        yield from _yield_parsed_final_message(
+                            final_content,
+                            usage_payload=usage_payload,
+                            content_parts=content_parts,
                         )
                         return
 
