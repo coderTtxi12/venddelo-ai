@@ -20,6 +20,7 @@ import { useChatPanelResize } from '@/hooks/useChatPanelResize';
 import {
   createThoughtId,
   createToolStepId,
+  extractReasoningFieldText,
   hasVisibleAgentActivity,
   INITIAL_AGENT_ACTIVITY,
   mapPlanStepsFromPayload,
@@ -396,13 +397,15 @@ export default function AssistantChatPanel() {
               }
             },
             onAgentThought: (text, options) => {
+              const reasoningText = extractReasoningFieldText(text);
+              if (!reasoningText) return;
               setAgentProcessing(true);
               setAgentActivity((prev) => {
                 if (options?.replace && prev.thoughts.length > 0) {
                   const updated = [...prev.thoughts];
                   updated[updated.length - 1] = {
                     ...updated[updated.length - 1],
-                    text,
+                    text: reasoningText,
                   };
                   return {
                     ...prev,
@@ -413,7 +416,7 @@ export default function AssistantChatPanel() {
                 return {
                   ...prev,
                   status: 'processing',
-                  thoughts: [...prev.thoughts, { id: createThoughtId(), text }],
+                  thoughts: [...prev.thoughts, { id: createThoughtId(), text: reasoningText }],
                 };
               });
             },
@@ -489,10 +492,28 @@ export default function AssistantChatPanel() {
               const finalContent = payload.content || streamedContent;
               const resolvedAssistantId = payload.message_id || assistantMessageId;
               const resolvedUserId = userMessage.id;
+              const finalReasoning = payload.reasoning?.trim() ?? '';
               setAgentActivity((currentActivity) => {
-                const activitySnapshot = hasVisibleAgentActivity(currentActivity)
+                let activitySnapshot = hasVisibleAgentActivity(currentActivity)
                   ? currentActivity
                   : undefined;
+                if (finalReasoning) {
+                  activitySnapshot = {
+                    ...(activitySnapshot ?? currentActivity),
+                    thoughts: [{ id: createThoughtId(), text: finalReasoning }],
+                  };
+                } else if (activitySnapshot) {
+                  const cleanedThoughts = activitySnapshot.thoughts
+                    .map((thought) => ({
+                      ...thought,
+                      text: extractReasoningFieldText(thought.text),
+                    }))
+                    .filter((thought) => thought.text.length > 0);
+                  activitySnapshot = {
+                    ...activitySnapshot,
+                    thoughts: cleanedThoughts,
+                  };
+                }
                 setMessages((prev) =>
                   prev.map((message) => {
                     if (message.id === assistantMessageId) {
@@ -509,7 +530,7 @@ export default function AssistantChatPanel() {
                     return message;
                   }),
                 );
-                if (activitySnapshot) {
+                if (activitySnapshot && hasVisibleAgentActivity(activitySnapshot)) {
                   setCollapsedActivityIds((prev) => ({
                     ...prev,
                     [assistantMessageId]: true,
