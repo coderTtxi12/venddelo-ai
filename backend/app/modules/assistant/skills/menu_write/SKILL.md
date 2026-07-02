@@ -22,6 +22,10 @@ Use `menu_write` when the owner asks to **change** the menu:
 
 Use `menu_read` first when you need live data before proposing a change.
 
+For **improve / optimize / recommend / audit** requests (not just a single confirmed write),
+call **`load_skill(menu_best_practices)`** before `menu_read` so proposals follow quality
+criteria, then read the live menu before previewing or mutating.
+
 ---
 
 ## Safety rules
@@ -62,8 +66,9 @@ Prices are always in **cents** (e.g. $24.40 → `2440`).
 ## Typical flow
 
 ```
-Owner request
-  → load_skill(menu_write) if you need this guide
+Owner request (change or improve menu)
+  → load_skill(menu_best_practices)   ← required for improve/optimize/recommend/audit
+  → load_skill(menu_write)            ← optional; only if you need this mutate guide
   → menu_read tools to fetch current state
   → Plain-language preview for the owner
   → Owner confirms
