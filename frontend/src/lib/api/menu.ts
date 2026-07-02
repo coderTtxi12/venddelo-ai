@@ -7,9 +7,11 @@ export function listCategories(
   restaurantId: string,
   limit: number,
   cursor?: string | null,
+  options?: { includeInactive?: boolean },
 ) {
   const params = new URLSearchParams({ limit: String(limit) });
   if (cursor) params.set('cursor', cursor);
+  if (options?.includeInactive) params.set('include_inactive', 'true');
   return apiRequest<CursorPage<Category>>(
     `/restaurants/${restaurantId}/categories?${params}`,
     { token },
