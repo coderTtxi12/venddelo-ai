@@ -14,6 +14,7 @@ from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.agent.lane_queue import ConversationLaneQueue
 from app.modules.assistant.agent.orchestrator import AgentOrchestrator
 from app.modules.assistant.agent.prompt_composer import compose_system_prompt
+from app.modules.assistant.agent.response_format import parse_agent_response
 from app.modules.assistant.conversation_cache import AssistantConversationCache
 from app.modules.assistant.profile.schemas import AssistantProfileSnapshot
 from app.modules.assistant.profile.service import AssistantProfileService
@@ -279,11 +280,16 @@ class AssistantConversationService:
 
                 if event.event == "message.complete":
                     provider_content = event.data.get("content")
-                    final_content = (
+                    raw_content = (
                         provider_content
                         if isinstance(provider_content, str) and provider_content
                         else "".join(content_parts)
                     )
+                    parsed = parse_agent_response(raw_content)
+                    final_content = parsed["content"] or raw_content
+                    final_reasoning = parsed["reasoning"]
+                    if isinstance(event.data.get("reasoning"), str) and event.data["reasoning"]:
+                        final_reasoning = str(event.data["reasoning"])
 
                     usage_payload = event.data.get("usage")
                     compression_payload = event.data.get("context_compression")
@@ -291,6 +297,8 @@ class AssistantConversationService:
                         "effective_skill_ids": effective_skills,
                         "context_compression": compression_payload,
                     }
+                    if final_reasoning:
+                        assistant_metadata["reasoning"] = final_reasoning
                     self._repo.add_message(
                         conversation_id=conversation_id,
                         role="assistant",
@@ -329,6 +337,7 @@ class AssistantConversationService:
                             "conversation_id": str(conversation_id),
                             "message_id": str(assistant_message_id),
                             "content": final_content,
+                            "reasoning": final_reasoning,
                         },
                     )
                     return
