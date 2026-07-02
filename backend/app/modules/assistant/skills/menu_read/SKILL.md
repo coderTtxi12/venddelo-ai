@@ -56,6 +56,9 @@ Typical intents:
 - Get full detail for one product (price, add-ons, status)
 - List or navigate promotions (active now, by type or scope)
 - Get full detail for one promotion (targets, schedule, how it discounts)
+- **Improve / optimize / audit / recommend** the menu — always pair with
+  `load_skill(menu_best_practices)` first, then read the relevant categories/products/promos
+  here before proposing copy or structural changes
 
 **Answer directly without tools** for greetings, identity, general advice, or when prior tool
 results in this turn already contain accurate data.
