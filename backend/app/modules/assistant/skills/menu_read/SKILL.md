@@ -33,10 +33,10 @@ promotions (type, scope)            → list_promotions / get_promotion
 - A product ↔ promotion link lives in the **promotion**, not the product. A promo reaches a
   product by `product_ids` (scope=product), by `category_ids` (scope=category), or applies to
   the whole order (scope=order).
-- **`list_products` / `search_products` carry NO promotion data.** Only `get_product`
-  (field `promotions` / `has_promotions`) and `list_product_promotions` resolve a product's
-  promos. To reason about promotions across many products, also call `list_promotions` and
-  cross-reference its `product_ids` / `category_ids` against the catalog.
+- **`list_products` and `get_product` both include `promotions[]` / `has_promotions` per product**
+  (with `option_participation` when bundle/percent/amount applies). `search_products` does not.
+  Use `list_product_promotions` only when you already have the product elsewhere and want promos
+  without the full catalog row; use `list_promotions` for a restaurant-wide promo overview.
 - Options are children of a product (`option_groups → option_items`); add-on price lives in
   `option_items.price_delta_cents`.
 
@@ -79,7 +79,7 @@ Follow this workflow on every menu question:
 | "Busca tacos al pastor" / "¿tienes X?" | `search_products` + `query` |
 | "Detalle del producto {id}" / after search by id | `get_product` + `product_id` |
 | "¿Qué opciones/tamaños/extras tiene X?" / "¿es obligatorio elegir?" | `get_product` (read `option_groups` + `selection_summary`) |
-| "¿Cuántos productos (no) tienen promo?" | `list_products` + `list_promotions`, then cross-reference (see workflow) |
+| "¿Cuántos productos (no) tienen promo?" | `list_products` (paginate; read `has_promotions` on each row) |
 | "¿Qué promociones tengo?" / "promos activas" | `list_promotions` (incl. product discounts by default; paginate with `cursor`) |
 | "¿Qué promociones tiene el producto X?" | `list_product_promotions` + `product_id` or `name` |
 | "Detalle de la promo 2×1" / "¿cómo funciona la promo X?" | `get_promotion` + `promotion_id` or `name` |
@@ -128,8 +128,8 @@ from `price_cents`). Never dump raw tool JSON keys or snake_case field names in 
 | | |
 |---|---|
 | **Args** | `{}` (none) |
-| **Returns** | Active categories: `id`, `name`, `description`, `sort_index` (menu order, lower = first), `is_active` |
-| **Use when** | Owner needs category names/ids before filtering products |
+| **Returns** | Special virtual aisles (promotions, limited-time) first, then regular categories (active + inactive). Fields: `id`, `name`, `description`, `image_path`, `sort_index`, `display_layout`, `is_active`, `category_type`, `config_enabled`, `visible_in_digital_menu`, `auto_activates`, `menu_order`, `stored_in`. Special names come from `restaurants.digital_menu_*`; they auto-show when enabled and content exists. |
+| **Use when** | Owner needs category names/ids, menu order, special aisles, or inactive categories |
 
 ### `list_products`
 
@@ -139,9 +139,9 @@ from `price_cents`). Never dump raw tool JSON keys or snake_case field names in 
 | `cursor` | no | From previous `list_products` response |
 | `limit` | no | Page size (default 20, max 50) |
 
-**Returns:** `products[]`, `next_cursor`, `has_more`, `limit`, optional `category_id`
+**Returns:** `products[]` (each with `id`, `name`, `description`, `image_path`, `price_cents`, `currency`, `is_active`, `is_published`, `approval_status`, `category_ids`, `category_sort_indices`, `has_options`, `option_groups[]` with full complement/add-on detail, **`promotions[]` / `has_promotions`** including `option_participation` when relevant), `next_cursor`, `has_more`, `limit`, optional `category_id`
 
-**Use when:** Full browse, "how many products", or all items in one category.
+**Use when:** Full browse, "how many products", complements/photos audit, or all items in one category. Paginate until `has_more=false`.
 
 ### `search_products`
 
@@ -318,8 +318,8 @@ Each product includes (see `docs/live-menu-product-reference.en.md`):
 | `category_sort_indices` | `{ category_id → sort_index }`; display order **within** each category (lower = first) |
 | `has_options` | `true` when the product has at least one option group |
 | `option_groups` | Modifier groups (size, extras…), already **sorted by `sort_index`** |
-| `has_promotions` | *(`get_product` only)* `true` when the product has ≥1 promotion |
-| `promotions` | *(`get_product` only)* Promotions affecting it, each with `applies_via` + `pricing_note` |
+| `has_promotions` | `true` when the product has ≥1 promotion (`list_products`, `get_product`) |
+| `promotions` | Promotions affecting the product, each with `applies_via` + `option_participation` when relevant |
 
 ### `price_cents` is the base price — not the promo price
 
@@ -401,7 +401,7 @@ Never invent values missing from tool results.
    `get_product`.
 2. If multiple matches, clarify or list options.
 3. Format `price_cents` in Spanish for the owner.
-4. **Always mention promotions:** `get_product` returns `promotions` / `has_promotions`.
+4. **Always mention promotions:** `list_products` / `get_product` return `promotions` / `has_promotions`.
    If the product has any (a discount, a 2×1, etc.), state them with their
    `label`/`pricing_note` — e.g. "BURGER & BONELESS: $259.00, con descuento −$59.00 y
    además 2×1". If `has_promotions` is false, say it has no active promos.
@@ -455,25 +455,19 @@ Never invent values missing from tool results.
 
 ### "¿Qué complementos no entran en el 2×1 de WINGS?"
 
-1. `get_product` `{ "name": "WINGS" }` (or `list_product_promotions`).
+1. `get_product` or `list_products` (find the product), or `list_product_promotions`.
 2. Find the bundle promo and read `option_participation`:
    - `mode = "all_participate"` → "Todos los complementos participan en el 2×1".
    - `mode = "restricted"` → list `not_participating[]` by `label` and warn that choosing
      one of those saca esa unidad del 2×1 (paga precio completo).
 3. Add-ons are charged anyway in a bundle; the allow-list only controls **eligibility**.
 
-### "¿Cuántos productos (no) tienen promociones?" (aggregate — be careful)
+### "¿Cuántos productos (no) tienen promociones?" (aggregate)
 
-`list_products` does **not** tell you which products have promos. To answer correctly:
-
-1. `list_products` (paginate until `has_more=false`) → the full set of product `id`/name.
-2. `list_promotions` (default includes product discounts) → for each promo collect its
-   `product_ids`; for `scope=category` promos, expand via the products in those
-   `category_ids`; treat `scope=order` as affecting all products.
-3. A product "has a promotion" if it appears in any of those sets. Count the complement.
-4. If unsure (e.g. many promos/products), say what you counted and how. **Never** claim a
-   per-product `has_promotions` value that you did not actually fetch — that field only
-   exists in `get_product` / `list_product_promotions`, not in `list_products`.
+1. `list_products` (paginate until `has_more=false`) → each row has `has_promotions`.
+2. Count products where `has_promotions=true` vs `false`. For category-scoped promos,
+   read `promotions[].applies_via` and `scope` on each product if you need detail.
+3. Optionally cross-check with `list_promotions` for a restaurant-wide overview.
 
 ### "¿En qué productos aplica mi descuento del 15%?"
 
@@ -494,8 +488,7 @@ Never invent values missing from tool results.
 | Use `get_product` for one known UUID | Call tools "just in case" when prior results already suffice |
 | Explain promos with `label` + `pricing_note` | Compute or assert a final cart total (checkout owns that) |
 | Use `effective_only` for "active now" questions | Treat `combo` as a real discount |
-| Read promos from `get_product` / `list_product_promotions` / `list_promotions` | Claim `has_promotions` per product from `list_products` (it has none) |
-| Cross-reference `list_promotions` ids for "how many products have promos" | Invent per-product promo coverage you never fetched |
+| Read promos from `list_products`, `get_product`, `list_product_promotions`, or `list_promotions` | Invent per-product promo coverage you never fetched |
 
 ---
 
@@ -506,9 +499,9 @@ Before your final reply to the owner (after any tool calls):
 - [ ] Numbers (counts, prices) come from tool results, not guesses
 - [ ] Pagination state explained if `has_more` was true
 - [ ] Inactive/unpublished products noted when relevant
-- [ ] Promotion claims come from `get_product` / `list_product_promotions` /
-      `list_promotions` — NOT inferred from `list_products` (which has no promo data)
-- [ ] Aggregate "X products have/don't have promos" was actually computed by
-      cross-referencing `list_promotions` ids, not assumed
+- [ ] Promotion claims come from `list_products` / `get_product` /
+      `list_product_promotions` / `list_promotions`
+- [ ] Aggregate "X products have/don't have promos" used `has_promotions` from paginated
+      `list_products` (or equivalent per-product fetches), not assumed
 - [ ] Reply is Spanish markdown for the restaurant owner — no raw JSON keys in the message
 - [ ] No delete/mutate actions — this skill is read-only
