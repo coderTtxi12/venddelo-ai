@@ -91,9 +91,12 @@ def create_category(
 @router.get("/restaurants/{restaurant_id}/categories", response_model=CursorPage[CategoryDTO])
 def list_categories(
     params: PaginationParams = Depends(pagination_params),
+    include_inactive: bool = Query(False),
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
 ) -> CursorPage[CategoryDTO]:
+    if include_inactive:
+        return service.list_all_categories(restaurant.id, params)
     return service.list_categories(restaurant.id, params)
 
 
