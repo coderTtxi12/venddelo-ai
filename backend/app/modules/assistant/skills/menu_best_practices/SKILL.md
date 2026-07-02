@@ -27,7 +27,7 @@ follow this order **before** proposing or applying changes:
 
 ```
 1. load_skill(menu_best_practices)   ← this guide (if not loaded this turn)
-2. menu_read tools                   ← live categories, products, promos, add-ons
+2. menu_read tools                   ← live categories, products, promos, AND add-ons
 3. Recommend or preview              ← combine guide + real data
 4. menu_write (optional)             ← only after owner confirms
 ```
@@ -35,6 +35,28 @@ follow this order **before** proposing or applying changes:
 **Do not skip step 1 or 2** to guess from memory or generic advice. If the owner names one
 product (e.g. "mejora la descripción de HAMBURGUESA"), still load this guide and read that
 product with `menu_read` (`search_products` / `get_product`) before drafting copy.
+
+### What "read the menu" actually requires
+
+For a **full audit**, read the whole picture — not a subset:
+
+| To comment on… | You must call | Note |
+|----------------|---------------|------|
+| Category structure / order | `list_categories` | — |
+| Products, names, prices, published state | `list_products` (paginate until `has_more=false`) | Covers every product |
+| **Photos, descriptions, complements/add-ons** | `list_products` | Each product already includes `image_path`, `description`, and full `option_groups` + items |
+| Promotions attached to a specific product | `get_product` | Adds `promotions` on top of the same product data |
+| All promotions | `list_promotions` | — |
+
+`list_products` returns the full product record (description, photo, price, complements), so
+it already covers products/photos/add-ons. `get_product` only adds the promotions affecting
+one product — use it when a promo interaction matters, not to see add-ons.
+
+**Hard rule — no unread claims.** Never say a product lacks a photo, has empty complements,
+has a bad description, or a wrong price unless a `menu_read` result **this turn** shows it.
+Reading only categories + promotions and then talking about products, photos, or add-ons is
+inventing data — forbidden. If you have not read products yet, read them before the audit
+(or tell the owner you still need to check them).
 
 ---
 
