@@ -16,6 +16,12 @@ from app.modules.assistant.skills.menu_write.bulk import (
     bulk_update_product_names,
     bulk_update_product_prices,
 )
+from app.modules.assistant.skills.menu_read.tools import (
+    DEFAULT_DIGITAL_MENU_LIMITED_TIME_CATEGORY_NAME,
+    DEFAULT_DIGITAL_MENU_PROMOTIONS_CATEGORY_NAME,
+    DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID,
+    DIGITAL_MENU_PROMOTIONS_CATEGORY_ID,
+)
 from app.modules.assistant.skills.product_resolve import resolve_product
 from app.modules.menu.schemas import (
     CategoryCreate,
@@ -33,6 +39,8 @@ from app.modules.menu.schemas import (
     ProductUpdate,
 )
 from app.modules.menu.service import MenuService
+from app.modules.restaurants.schemas import RestaurantDTO, RestaurantUpdate
+from app.modules.restaurants.service import RestaurantService
 
 
 def _resolve_product_id_for_write(
@@ -72,12 +80,115 @@ def _resolve_product_id_for_write(
     )
 
 
+_SPECIAL_CATEGORY_IDS = frozenset(
+    {
+        DIGITAL_MENU_PROMOTIONS_CATEGORY_ID,
+        DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID,
+    }
+)
+ALLOWED_DISPLAY_LAYOUTS = frozenset({"vertical", "horizontal", "grid"})
+
+
+def _is_special_category_id(value: str) -> bool:
+    return value in _SPECIAL_CATEGORY_IDS
+
+
+def _parse_display_layout(value: Any) -> str:
+    layout = _optional_str(value)
+    if layout is None:
+        raise ValidationError("display_layout cannot be empty")
+    if layout not in ALLOWED_DISPLAY_LAYOUTS:
+        allowed = ", ".join(sorted(ALLOWED_DISPLAY_LAYOUTS))
+        raise ValidationError(f"display_layout must be one of: {allowed}")
+    return layout
+
+
+def _special_category_payload(restaurant: RestaurantDTO, category_id: str) -> dict[str, Any]:
+    if category_id == DIGITAL_MENU_PROMOTIONS_CATEGORY_ID:
+        return {
+            "id": category_id,
+            "name": (
+                (restaurant.digital_menu_promotions_category_name or "").strip()
+                or DEFAULT_DIGITAL_MENU_PROMOTIONS_CATEGORY_NAME
+            ),
+            "category_type": "special_promotions",
+            "is_active": restaurant.digital_menu_promotions_category_enabled,
+            "stored_in": "restaurants",
+        }
+    return {
+        "id": category_id,
+        "name": (
+            (restaurant.digital_menu_limited_time_category_name or "").strip()
+            or DEFAULT_DIGITAL_MENU_LIMITED_TIME_CATEGORY_NAME
+        ),
+        "category_type": "special_limited_time",
+        "is_active": restaurant.digital_menu_limited_time_category_enabled,
+        "stored_in": "restaurants",
+    }
+
+
+def _update_special_category(
+    ctx: AgentContext,
+    category_id: str,
+    args: dict[str, Any],
+) -> ToolResult:
+    if "description" in args or "sort_index" in args or "display_layout" in args:
+        return ToolResult(
+            ok=False,
+            summary="description, sort_index, and display_layout do not apply to special categories",
+        )
+
+    update_fields: dict[str, Any] = {}
+    if category_id == DIGITAL_MENU_PROMOTIONS_CATEGORY_ID:
+        if "name" in args:
+            name = _optional_str(args.get("name"))
+            if not name:
+                return ToolResult(ok=False, summary="name cannot be empty")
+            update_fields["digital_menu_promotions_category_name"] = name
+        if "is_active" in args:
+            update_fields["digital_menu_promotions_category_enabled"] = bool(args["is_active"])
+    else:
+        if "name" in args:
+            name = _optional_str(args.get("name"))
+            if not name:
+                return ToolResult(ok=False, summary="name cannot be empty")
+            update_fields["digital_menu_limited_time_category_name"] = name
+        if "is_active" in args:
+            update_fields["digital_menu_limited_time_category_enabled"] = bool(args["is_active"])
+
+    if not update_fields:
+        return ToolResult(ok=False, summary="Provide at least one field to update")
+
+    def action() -> RestaurantDTO:
+        return RestaurantService(ctx.uow.restaurants).update(
+            ctx.restaurant_id,
+            RestaurantUpdate(**update_fields),
+        )
+
+    try:
+        restaurant = action()
+    except NotFoundError as exc:
+        return ToolResult(ok=False, summary=str(exc) or "Not found")
+    except ValidationError as exc:
+        return ToolResult(ok=False, summary=str(exc) or "Validation error")
+    except ConflictError as exc:
+        return ToolResult(ok=False, summary=str(exc) or "Conflict")
+
+    _invalidate_menu_cache(ctx)
+    return ToolResult(
+        ok=True,
+        summary="Updated special category",
+        data={"category": _special_category_payload(restaurant, category_id)},
+    )
+
+
 def _category_payload(category: CategoryDTO) -> dict[str, Any]:
     return {
         "id": str(category.id),
         "name": category.name,
         "description": category.description,
         "sort_index": category.sort_index,
+        "display_layout": category.display_layout,
         "is_active": category.is_active,
     }
 
@@ -205,16 +316,40 @@ class MenuWriteSkill:
             ToolDefinition(
                 name="update_category",
                 description=(
-                    "Update a category. Set is_active=false to disable (never delete)."
+                    "Update a regular or special digital-menu category. Regular categories use "
+                    "UUID ids from list_categories; special aisles use virtual ids "
+                    f"{DIGITAL_MENU_PROMOTIONS_CATEGORY_ID!r} (promotions) or "
+                    f"{DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID!r} (limited-time offers). "
+                    "For all types: set name to rename and is_active=false to hide the aisle "
+                    "(never delete). Special aisles accept only name and is_active — their "
+                    "display_layout is fixed to horizontal and cannot be changed. Regular "
+                    "categories also accept description, sort_index, and display_layout "
+                    "(vertical | horizontal | grid)."
                 ),
                 effect="mutate",
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "category_id": {"type": "string"},
+                        "category_id": {
+                            "type": "string",
+                            "description": (
+                                "Category UUID, or virtual id for special aisles: "
+                                f"{DIGITAL_MENU_PROMOTIONS_CATEGORY_ID} or "
+                                f"{DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID}."
+                            ),
+                        },
                         "name": {"type": "string"},
                         "description": {"type": "string"},
                         "sort_index": {"type": "integer"},
+                        "display_layout": {
+                            "type": "string",
+                            "enum": ["vertical", "horizontal", "grid"],
+                            "description": (
+                                "Digital menu product layout. Regular categories only — do not "
+                                "pass for special aisles (__dm_promotions__, __dm_limited_time__); "
+                                "those always use horizontal."
+                            ),
+                        },
                         "is_active": {"type": "boolean"},
                     },
                     "required": ["category_id"],
@@ -503,8 +638,15 @@ class MenuWriteSkill:
             return _run_mutation(ctx, action, summary=f"Created category {name!r}")
 
         if tool_name == "update_category":
+            category_id_raw = args.get("category_id")
+            if not category_id_raw:
+                return ToolResult(ok=False, summary="category_id is required")
+            category_id_str = str(category_id_raw).strip()
+            if _is_special_category_id(category_id_str):
+                return _update_special_category(ctx, category_id_str, args)
+
             try:
-                category_id = _parse_uuid(args.get("category_id"), "category_id")
+                category_id = _parse_uuid(category_id_str, "category_id")
             except ValidationError as exc:
                 return ToolResult(ok=False, summary=str(exc))
 
@@ -515,6 +657,11 @@ class MenuWriteSkill:
                 update_fields["description"] = _optional_str(args.get("description"))
             if "sort_index" in args:
                 update_fields["sort_index"] = int(args["sort_index"])
+            if "display_layout" in args:
+                try:
+                    update_fields["display_layout"] = _parse_display_layout(args.get("display_layout"))
+                except ValidationError as exc:
+                    return ToolResult(ok=False, summary=str(exc))
             if "is_active" in args:
                 update_fields["is_active"] = bool(args["is_active"])
             if not update_fields:
