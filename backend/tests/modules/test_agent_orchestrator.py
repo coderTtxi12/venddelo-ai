@@ -154,7 +154,14 @@ def test_orchestrator_answers_directly_without_tools():
 
 def test_orchestrator_streams_answer_deltas():
     provider = ScriptedProvider(
-        [{"content_chunks": [_agent_json(content="Me llamo **Mark**.")]}]
+        [
+            {
+                "content_chunks": [
+                    '{"reasoning":"Me presento.",',
+                    '"content":"Me llamo **Mark**."}',
+                ]
+            }
+        ]
     )
     events = _run(provider, "¿Cómo te llamas?", ["menu_read"])
 
