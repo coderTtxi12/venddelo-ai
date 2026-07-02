@@ -14,6 +14,7 @@ from app.core.llm.ports import (
     LLMProviderPort,
 )
 from app.modules.assistant.agent.response_format import (
+    AssistantTurnStreamParser,
     build_agent_runtime_section,
     parse_agent_response,
 )
@@ -103,14 +104,29 @@ class AssistantService:
 
             completion = ChatCompletionRequest(messages=messages)
             content_parts: list[str] = []
+            turn_parser = AssistantTurnStreamParser()
 
             try:
                 for event in self._provider.stream_chat(completion):
                     if event.event == "content.delta":
                         delta = event.data.get("delta")
                         if isinstance(delta, str) and delta:
-                            content_parts.append(delta)
-                        yield event
+                            for parsed in turn_parser.feed(delta):
+                                if parsed.get("event") == "content_delta":
+                                    content_delta = parsed.get("delta")
+                                    if isinstance(content_delta, str) and content_delta:
+                                        content_parts.append(content_delta)
+                                        yield ChatStreamEvent(
+                                            event="content.delta",
+                                            data={"delta": content_delta},
+                                        )
+                                elif parsed.get("event") == "thought":
+                                    text = parsed.get("text")
+                                    if isinstance(text, str) and text:
+                                        yield ChatStreamEvent(
+                                            event="agent.thought",
+                                            data={"text": text, "replace": True},
+                                        )
                         continue
 
                     if event.event == "error":
@@ -130,12 +146,18 @@ class AssistantService:
                         if final_reasoning:
                             yield ChatStreamEvent(
                                 event="agent.thought",
-                                data={"text": final_reasoning, "replace": False},
+                                data={"text": final_reasoning, "replace": True},
                             )
-                        if final_content and not content_parts:
+                        remaining = (
+                            final_content[turn_parser.emitted_content_len :]
+                            if final_content
+                            else ""
+                        )
+                        if remaining:
+                            content_parts.append(remaining)
                             yield ChatStreamEvent(
                                 event="content.delta",
-                                data={"delta": final_content},
+                                data={"delta": remaining},
                             )
                         yield ChatStreamEvent(
                             event="message.complete",
