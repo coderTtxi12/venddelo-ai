@@ -64,8 +64,8 @@ def build_load_skill_schema(skill_ids: list[str]) -> dict:
             "name": LOAD_SKILL_TOOL_NAME,
             "description": (
                 "Load the detailed guide for one skill before using its tools. "
-                "Use it when you need step-by-step instructions or best practices "
-                "for a domain. The skill's tools are already available to call."
+                "Required first step for menu improve/optimize/edit requests: "
+                "load_skill(menu_best_practices), then menu_read for live data."
             ),
             "parameters": {
                 "type": "object",
@@ -101,6 +101,21 @@ JSON (see below). For greetings, identity, or general advice, same JSON format.
   prefer `bulk_update_product_descriptions`, `bulk_update_product_prices`, or
   `bulk_update_product_names` after confirmation.
 
+## Menu improvement & edits (required workflow)
+
+When the owner asks to **improve, optimize, audit, recommend, or edit** the menu
+(descriptions, copy, structure, category order, products, promos, add-ons, photos, etc.):
+
+1. **`load_skill(menu_best_practices)`** — if not already loaded this turn, load the
+   quality guide first (criteria for good menus).
+2. **`menu_read` tools** — fetch the restaurant's **live** menu state (categories, products,
+   promos as needed). Never invent names, prices, or descriptions.
+3. **Propose** grounded in both the guide and live data. For writes: Preview → Confirm →
+   `menu_write`.
+
+Skip steps 1–2 only when this turn already has the loaded guide **and** accurate
+`menu_read` results for the items in scope.
+
 ## Activity reasoning (before tools)
 
 When you are about to call one or more tools, first write 1–2 short sentences in
@@ -124,17 +139,134 @@ When you are done (no more tool calls), respond with **only** a JSON object:
   Sé concreto. Cierra con próximos pasos o preguntas de seguimiento útiles.
 - Responde en español salvo que el dueño pida otro idioma.
 - No envuelvas el JSON en bloques de código ni añadas texto fuera del objeto.
+- Cierra el JSON con `}` solamente. Escapa comillas y saltos de línea dentro de strings
+  (`\\n`, `\\"`). No añadas corchetes ni texto después del cierre de `content`.
 """
 
 
 _FENCE_RE = re.compile(r"^```(?:json)?\s*\n?(.*?)\n?```\s*$", re.DOTALL | re.IGNORECASE)
+_JSON_STRING_FIELD_RE = re.compile(r'"(?P<field>reasoning|content)"\s*:\s*"', re.DOTALL)
+_JSON_ESCAPE_CHARS = {"n": "\n", "r": "\r", "t": "\t", '"': '"', "\\": "\\", "/": "/"}
+
+
+def _decode_json_string_partial(raw: str, start: int) -> str:
+    """Decode a (possibly incomplete) JSON string value after its opening quote."""
+    i = start
+    chars: list[str] = []
+    while i < len(raw):
+        ch = raw[i]
+        if ch == '"':
+            break
+        if ch == "\\":
+            if i + 1 >= len(raw):
+                break
+            nxt = raw[i + 1]
+            if nxt in _JSON_ESCAPE_CHARS:
+                chars.append(_JSON_ESCAPE_CHARS[nxt])
+                i += 2
+                continue
+            if nxt == "u":
+                if i + 5 >= len(raw):
+                    break
+                try:
+                    chars.append(chr(int(raw[i + 2 : i + 6], 16)))
+                except ValueError:
+                    break
+                i += 6
+                continue
+            break
+        chars.append(ch)
+        i += 1
+    return "".join(chars)
+
+
+def _extract_json_string_field(buffer: str, field: str) -> str:
+    """Best-effort decode of one JSON string field (works on truncated/malformed JSON)."""
+    for match in _JSON_STRING_FIELD_RE.finditer(buffer):
+        if match.group("field") != field:
+            continue
+        return _decode_json_string_partial(buffer, match.end())
+    return ""
+
+
+def _extract_json_content_value(buffer: str) -> str:
+    return _extract_json_string_field(buffer, "content")
+
+
+def _looks_like_json_envelope(text: str) -> bool:
+    stripped = text.lstrip()
+    return stripped.startswith("{") and (
+        '"content"' in stripped or '"reasoning"' in stripped
+    )
+
+
+def _parse_envelope_fields(text: str) -> dict[str, str] | None:
+    reasoning = _extract_json_string_field(text, "reasoning")
+    content = _extract_json_string_field(text, "content")
+    if not reasoning and not content:
+        return None
+    return {"reasoning": reasoning.strip(), "content": content.strip()}
+
+
+class AssistantTurnStreamParser:
+    """Route streaming assistant tokens to pre-tool reasoning or JSON ``content``."""
+
+    def __init__(self) -> None:
+        self._buffer = ""
+        self._mode: str = "undecided"
+        self._plain_buffer = ""
+        self._emitted_content_len = 0
+
+    @property
+    def emitted_content_len(self) -> int:
+        return self._emitted_content_len
+
+    @property
+    def is_json_mode(self) -> bool:
+        return self._mode == "json"
+
+    def feed(self, chunk: str) -> list[dict[str, object]]:
+        """Return incremental stream events for one token chunk."""
+        from app.modules.assistant.agent.activity_emit import normalize_llm_reasoning
+
+        events: list[dict[str, object]] = []
+        if self._mode == "plain":
+            self._plain_buffer += chunk
+            text = normalize_llm_reasoning(self._plain_buffer)
+            if text:
+                events.append({"event": "thought", "text": text, "replace": True})
+            return events
+
+        self._buffer += chunk
+        if self._mode == "undecided":
+            stripped = self._buffer.lstrip()
+            if not stripped:
+                return events
+            if stripped.startswith("{"):
+                self._mode = "json"
+            else:
+                self._mode = "plain"
+                self._plain_buffer = self._buffer
+                return self.feed("")
+
+        if self._mode != "json":
+            return events
+
+        decoded = _extract_json_content_value(self._buffer)
+        if len(decoded) > self._emitted_content_len:
+            delta = decoded[self._emitted_content_len :]
+            self._emitted_content_len = len(decoded)
+            if delta:
+                events.append({"event": "content_delta", "delta": delta})
+        return events
 
 
 def parse_agent_response(raw: str) -> dict[str, str]:
     """Parse the assistant's final JSON envelope.
 
-    Returns ``{"reasoning": str, "content": str}``. On parse failure, treats the
-    whole string as ``content`` so older/plain replies still reach the owner.
+    Returns ``{"reasoning": str, "content": str}``. Tries strict JSON first, then
+    field extraction when the model returns almost-valid JSON (common with long
+    markdown in ``content``). Plain non-JSON replies still pass through as ``content``.
     """
     text = (raw or "").strip()
     if not text:
@@ -147,9 +279,17 @@ def parse_agent_response(raw: str) -> dict[str, str]:
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
+        if _looks_like_json_envelope(text):
+            extracted = _parse_envelope_fields(text)
+            if extracted is not None:
+                return extracted
         return {"reasoning": "", "content": raw.strip()}
 
     if not isinstance(data, dict):
+        if _looks_like_json_envelope(text):
+            extracted = _parse_envelope_fields(text)
+            if extracted is not None:
+                return extracted
         return {"reasoning": "", "content": raw.strip()}
 
     reasoning = data.get("reasoning", "")
