@@ -392,6 +392,170 @@ def test_menu_write_bulk_updates_prices_by_name(session):
     assert loaded is not None
     assert loaded.price_cents == 10000
 
+
+@requires_db
+def test_menu_write_bulk_updates_category_fields(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Cat", subdomain="menu-write-bulk-cat")
+    )
+    tacos = uow.menu.add_category(
+        CategoryCreate(
+            restaurant_id=restaurant.id,
+            name="Tacos",
+            description="Vieja",
+            sort_index=1,
+        )
+    )
+    bebidas = uow.menu.add_category(
+        CategoryCreate(
+            restaurant_id=restaurant.id,
+            name="Bebidas",
+            description="Vieja",
+            sort_index=2,
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    descriptions = skill.execute(
+        "bulk_update_category_descriptions",
+        {
+            "items": [
+                {"category_name": "Tacos", "description": "Nueva tacos"},
+                {"category_id": str(bebidas.id), "description": "Nueva bebidas"},
+            ]
+        },
+        ctx,
+    )
+    assert descriptions.ok is True
+    assert descriptions.data["updated"] == 2
+
+    sort_indices = skill.execute(
+        "bulk_update_category_sort_indices",
+        {
+            "items": [
+                {"name": "Tacos", "sort_index": 10},
+                {"category_id": str(bebidas.id), "sort_index": 20},
+            ]
+        },
+        ctx,
+    )
+    assert sort_indices.ok is True
+    assert sort_indices.data["updated"] == 2
+
+    layouts = skill.execute(
+        "bulk_update_category_display_layout",
+        {
+            "items": [
+                {"category_name": "Tacos", "display_layout": "grid"},
+                {"category_id": str(bebidas.id), "display_layout": "horizontal"},
+            ]
+        },
+        ctx,
+    )
+    assert layouts.ok is True
+    assert layouts.data["updated"] == 2
+
+    renamed = skill.execute(
+        "bulk_update_category_names",
+        {
+            "items": [
+                {"category_name": "Tacos", "new_name": "Tacos premium"},
+            ]
+        },
+        ctx,
+    )
+    assert renamed.ok is True
+    assert renamed.data["updated"] == 1
+
+    loaded_tacos = uow.menu.get_category(tacos.id)
+    loaded_bebidas = uow.menu.get_category(bebidas.id)
+    assert loaded_tacos is not None
+    assert loaded_bebidas is not None
+    assert loaded_tacos.name == "Tacos premium"
+    assert loaded_tacos.description == "Nueva tacos"
+    assert loaded_tacos.sort_index == 10
+    assert loaded_tacos.display_layout == "grid"
+    assert loaded_bebidas.description == "Nueva bebidas"
+    assert loaded_bebidas.sort_index == 20
+    assert loaded_bebidas.display_layout == "horizontal"
+
+
+@requires_db
+def test_menu_write_bulk_updates_special_category_visibility(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Special", subdomain="menu-write-bulk-special")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_update_category_visibility",
+        {
+            "items": [
+                {
+                    "category_id": DIGITAL_MENU_PROMOTIONS_CATEGORY_ID,
+                    "is_active": False,
+                }
+            ]
+        },
+        ctx,
+    )
+
+    assert result.ok is True
+    assert result.data["updated"] == 1
+    updated = uow.restaurants.get(restaurant.id)
+    assert updated is not None
+    assert updated.digital_menu_promotions_category_enabled is False
+
+
+@requires_db
+def test_menu_write_bulk_rejects_description_on_special_category(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Special Desc", subdomain="menu-write-bulk-special-desc")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_update_category_descriptions",
+        {
+            "items": [
+                {
+                    "category_id": DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID,
+                    "description": "No permitido",
+                }
+            ]
+        },
+        ctx,
+    )
+
+    assert result.ok is False
+    assert result.data["updated"] == 0
+    assert result.data["failed"] == 1
+
+
     uow = SqlAlchemyUnitOfWork(lambda: session)
     uow.__enter__()
     restaurant = uow.restaurants.add(
