@@ -52,12 +52,17 @@ def _coerce_items_array(raw: Any) -> list[dict[str, Any]] | None:
     return None
 
 
-def _parse_items(raw: Any, *, max_items: int) -> tuple[list[dict[str, Any]], str | None]:
+def _parse_items(
+    raw: Any,
+    *,
+    max_items: int,
+    entity_label: str = "product",
+) -> tuple[list[dict[str, Any]], str | None]:
     coerced = _coerce_items_array(raw)
     if coerced is None:
-        return [], "Provide items: a non-empty array of product patches"
+        return [], f"Provide items: a non-empty array of {entity_label} patches"
     if not coerced:
-        return [], "Provide items: a non-empty array of product patches"
+        return [], f"Provide items: a non-empty array of {entity_label} patches"
     if len(coerced) > max_items:
         return [], f"At most {max_items} items per call (got {len(coerced)})"
     return coerced, None
