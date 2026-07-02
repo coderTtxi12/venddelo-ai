@@ -2,9 +2,15 @@ import uuid
 
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.agent.context import AgentContext
-from app.modules.assistant.skills.menu_read.tools import MenuReadSkill
+from app.modules.assistant.skills.menu_read.tools import (
+    DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID,
+    DIGITAL_MENU_PROMOTIONS_CATEGORY_ID,
+    MenuReadSkill,
+    _build_special_categories,
+)
 from app.modules.menu.schemas import (
     CategoryCreate,
+    CategoryUpdate,
     OptionGroupCreate,
     OptionItemCreate,
     ProductCreate,
@@ -13,6 +19,34 @@ from app.modules.promotions.pricing import CATALOG_DISCOUNT_PREFIX
 from app.modules.promotions.schemas import PromotionBundle, PromotionCreate
 from app.modules.restaurants.schemas import RestaurantCreate
 from tests.conftest import requires_db
+
+
+from types import SimpleNamespace
+
+
+def test_build_special_categories_orders_promotions_before_limited_time():
+    restaurant = SimpleNamespace(
+        digital_menu_promotions_category_enabled=True,
+        digital_menu_promotions_category_name="Ofertas",
+        digital_menu_limited_time_category_enabled=True,
+        digital_menu_limited_time_category_name="Por ultra ilimitado",
+    )
+    specials = _build_special_categories(
+        restaurant,
+        has_promotion_shortcuts=True,
+        has_limited_time_products=False,
+    )
+
+    assert len(specials) == 2
+    assert specials[0]["id"] == DIGITAL_MENU_PROMOTIONS_CATEGORY_ID
+    assert specials[0]["name"] == "Ofertas"
+    assert specials[0]["menu_order"] == 1
+    assert specials[0]["visible_in_digital_menu"] is True
+    assert specials[1]["id"] == DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID
+    assert specials[1]["name"] == "Por ultra ilimitado"
+    assert specials[1]["menu_order"] == 2
+    assert specials[1]["visible_in_digital_menu"] is False
+    assert specials[1]["is_active"] is True
 
 
 @requires_db
@@ -44,7 +78,14 @@ def test_menu_read_lists_categories_and_searches_products(session):
     products = skill.execute("search_products", {"query": "pastor"}, ctx)
 
     assert categories.ok is True
-    assert categories.data["categories"][0]["name"] == "Tacos"
+    assert categories.data["categories"][0]["category_type"] == "special_promotions"
+    assert categories.data["categories"][1]["category_type"] == "special_limited_time"
+    regular = categories.data["categories"][2]
+    assert regular["name"] == "Tacos"
+    assert regular["category_type"] == "regular"
+    assert regular["image_path"] is None
+    assert regular["display_layout"] is None
+    assert regular["is_active"] is True
     assert products.ok is True
     assert products.data["products"][0]["id"] == str(product.id)
 
@@ -86,6 +127,45 @@ def test_menu_read_search_tolerates_typos(session):
     assert other_language.ok is True
     assert other_language.data["products"] == []
     assert other_language.data["suggestions"] == []
+
+
+@requires_db
+def test_menu_read_list_categories_includes_image_and_display_layout(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Category Layout", subdomain="menu-read-cat-layout")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(
+            restaurant_id=restaurant.id,
+            name="Combos",
+            description="Los mejores combos",
+            image_path="categories/combos.png",
+            sort_index=1,
+        )
+    )
+    uow.menu.update_category(
+        restaurant.id,
+        category.id,
+        CategoryUpdate(display_layout="grid"),
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+
+    result = MenuReadSkill().execute("list_categories", {}, ctx)
+
+    assert result.ok is True
+    payload = next(
+        item for item in result.data["categories"] if item["category_type"] == "regular"
+    )
+    assert payload["name"] == "Combos"
+    assert payload["image_path"] == "categories/combos.png"
+    assert payload["display_layout"] == "grid"
 
 
 @requires_db
@@ -580,6 +660,21 @@ def test_menu_read_bundle_reports_non_participating_complements(session):
     assert participating_labels == ["BBQ"]
     assert not_participating_labels == ["Trufa premium"]
     assert str(excluded.id) in {it["id"] for it in participation["not_participating"]}
+
+    listed = MenuReadSkill().execute("list_products", {}, ctx)
+    assert listed.ok is True
+    listed_product = next(
+        item for item in listed.data["products"] if item["id"] == str(product.id)
+    )
+    assert listed_product["has_promotions"] is True
+    listed_bundle = next(
+        p for p in listed_product["promotions"] if p["id"] == str(bundle.id)
+    )
+    listed_participation = listed_bundle["option_participation"]
+    assert listed_participation["mode"] == "restricted"
+    assert [it["label"] for it in listed_participation["not_participating"]] == [
+        "Trufa premium"
+    ]
 
 
 @requires_db
