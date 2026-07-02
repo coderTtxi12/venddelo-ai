@@ -25,9 +25,9 @@ from app.modules.assistant.skills.product_resolve import (
     resolve_product,
     resolve_product_in_catalog,
 )
-from app.modules.menu.schemas import OptionGroupDTO, OptionItemDTO, ProductDTO
+from app.modules.menu.schemas import CategoryDTO, OptionGroupDTO, OptionItemDTO, ProductDTO
 from app.modules.menu.service import MenuService
-from app.modules.promotions.effective import effective_status, resolve_timezone
+from app.modules.promotions.effective import effective_status, is_promotion_effective, resolve_timezone
 from app.modules.promotions.schemas import PromotionDTO, enrich_promotion_dto
 from app.modules.promotions.service import PromotionService
 from app.modules.promotions.types import serialize_promotion_type
@@ -39,6 +39,14 @@ MAX_SEARCH_SUGGESTIONS = 5
 DEFAULT_LIST_PROMOTIONS_LIMIT = 20
 MAX_LIST_PROMOTIONS_LIMIT = 50
 PROMOTION_SCAN_LIMIT = 100
+LIST_CATEGORIES_LIMIT = 200
+
+DIGITAL_MENU_PROMOTIONS_CATEGORY_ID = "__dm_promotions__"
+DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID = "__dm_limited_time__"
+DEFAULT_DIGITAL_MENU_PROMOTIONS_CATEGORY_NAME = "Promociones"
+DEFAULT_DIGITAL_MENU_LIMITED_TIME_CATEGORY_NAME = "Por tiempo limitado"
+SPECIAL_PROMOTIONS_SORT_INDEX = -1000
+SPECIAL_LIMITED_TIME_SORT_INDEX = -999
 
 
 def _list_products_limit(args: dict[str, Any]) -> int:
@@ -152,6 +160,20 @@ def _option_participation(promo: PromotionDTO, product: ProductDTO) -> dict[str,
     }
 
 
+def _load_restaurant_promotions(
+    promo_service: PromotionService,
+    restaurant_id: uuid.UUID,
+    *,
+    timezone: str,
+) -> list[PromotionDTO]:
+    page = promo_service.list_for_admin(
+        restaurant_id,
+        PaginationParams(limit=PROMOTION_SCAN_LIMIT),
+        timezone=timezone,
+    )
+    return list(page.items)
+
+
 def _promotions_for_product(
     promo_service: PromotionService,
     product: ProductDTO,
@@ -160,15 +182,15 @@ def _promotions_for_product(
     product_names: dict[str, str],
     category_names: dict[str, str],
     effective_only: bool = False,
+    all_promotions: list[PromotionDTO] | None = None,
 ) -> list[dict[str, Any]]:
     """All promotions affecting ``product`` (product/category/order scope), labeled."""
-    page = promo_service.list_for_admin(
-        product.restaurant_id,
-        PaginationParams(limit=PROMOTION_SCAN_LIMIT),
-        timezone=timezone,
-    )
+    if all_promotions is None:
+        all_promotions = _load_restaurant_promotions(
+            promo_service, product.restaurant_id, timezone=timezone
+        )
     promotions: list[dict[str, Any]] = []
-    for promo in page.items:
+    for promo in all_promotions:
         applies_via = _promotion_applies_to_product(promo, product)
         if applies_via is None:
             continue
@@ -307,6 +329,250 @@ def _option_group_payload(group: OptionGroupDTO) -> dict[str, Any]:
     }
 
 
+def _category_payload(category: CategoryDTO) -> dict[str, Any]:
+    return {
+        "id": str(category.id),
+        "name": category.name,
+        "description": category.description,
+        "image_path": category.image_path,
+        "sort_index": category.sort_index,
+        "display_layout": category.display_layout,
+        "is_active": category.is_active,
+    }
+
+
+def _regular_category_payload(category: CategoryDTO) -> dict[str, Any]:
+    return {
+        **_category_payload(category),
+        "category_type": "regular",
+        "config_enabled": None,
+        "visible_in_digital_menu": category.is_active,
+        "auto_activates": False,
+        "stored_in": "categories",
+    }
+
+
+def _is_promotion_shortcut_candidate(promo: PromotionDTO) -> bool:
+    if is_catalog_discount(promo):
+        return False
+    if promo.scope == "order":
+        return False
+    return bool((promo.image_path or "").strip())
+
+
+def _products_participating_in_promotion(
+    products: list[ProductDTO], promo: PromotionDTO
+) -> list[ProductDTO]:
+    if promo.scope == "product":
+        product_ids = {str(pid) for pid in promo.product_ids}
+        return [product for product in products if str(product.id) in product_ids]
+    if promo.scope == "category":
+        category_ids = {str(cid) for cid in promo.category_ids}
+        explicit_product_ids = {str(pid) for pid in promo.product_ids}
+        matched: list[ProductDTO] = []
+        for product in products:
+            in_category = any(str(cid) in category_ids for cid in product.category_ids)
+            if not in_category:
+                continue
+            if promo.product_ids and str(product.id) not in explicit_product_ids:
+                continue
+            matched.append(product)
+        return matched
+    return []
+
+
+def _list_promotion_shortcuts(
+    promotions: list[PromotionDTO],
+    products: list[ProductDTO],
+    *,
+    now: datetime,
+    timezone: str,
+) -> list[PromotionDTO]:
+    tz = resolve_timezone(timezone)
+    shortcuts: list[PromotionDTO] = []
+    for promo in promotions:
+        if not _is_promotion_shortcut_candidate(promo):
+            continue
+        if not is_promotion_effective(promo, now, tz):
+            continue
+        if not _products_participating_in_promotion(products, promo):
+            continue
+        shortcuts.append(promo)
+    shortcuts.sort(key=lambda promo: promo.name.casefold())
+    return shortcuts
+
+
+def _product_has_active_menu_offer(
+    product: ProductDTO,
+    promotions: list[PromotionDTO],
+    *,
+    now: datetime,
+    timezone: str,
+) -> bool:
+    tz = resolve_timezone(timezone)
+    for promo in promotions:
+        if not is_promotion_effective(promo, now, tz):
+            continue
+        if _promotion_applies_to_product(promo, product) is None:
+            continue
+        api_type = serialize_promotion_type(promo.type)
+        if api_type in ("bundle", "combo", "percent", "amount"):
+            return True
+    return False
+
+
+def _has_limited_time_products(
+    products: list[ProductDTO],
+    promotions: list[PromotionDTO],
+    *,
+    now: datetime,
+    timezone: str,
+) -> bool:
+    return any(
+        _product_has_active_menu_offer(product, promotions, now=now, timezone=timezone)
+        for product in products
+    )
+
+
+def _special_category_payload(
+    *,
+    virtual_id: str,
+    name: str,
+    category_type: str,
+    sort_index: int,
+    menu_order: int,
+    config_enabled: bool,
+    visible_in_digital_menu: bool,
+    activation_rule: str,
+) -> dict[str, Any]:
+    return {
+        "id": virtual_id,
+        "name": name,
+        "description": activation_rule,
+        "image_path": None,
+        "sort_index": sort_index,
+        "display_layout": "horizontal",
+        "is_active": config_enabled,
+        "category_type": category_type,
+        "config_enabled": config_enabled,
+        "visible_in_digital_menu": visible_in_digital_menu,
+        "auto_activates": True,
+        "menu_order": menu_order,
+        "stored_in": "restaurants",
+    }
+
+
+def _build_special_categories(
+    restaurant: Any,
+    *,
+    has_promotion_shortcuts: bool,
+    has_limited_time_products: bool,
+) -> list[dict[str, Any]]:
+    promotions_enabled = bool(restaurant.digital_menu_promotions_category_enabled)
+    promotions_name = (
+        (restaurant.digital_menu_promotions_category_name or "").strip()
+        or DEFAULT_DIGITAL_MENU_PROMOTIONS_CATEGORY_NAME
+    )
+    limited_enabled = bool(restaurant.digital_menu_limited_time_category_enabled)
+    limited_name = (
+        (restaurant.digital_menu_limited_time_category_name or "").strip()
+        or DEFAULT_DIGITAL_MENU_LIMITED_TIME_CATEGORY_NAME
+    )
+
+    return [
+        _special_category_payload(
+            virtual_id=DIGITAL_MENU_PROMOTIONS_CATEGORY_ID,
+            name=promotions_name,
+            category_type="special_promotions",
+            sort_index=SPECIAL_PROMOTIONS_SORT_INDEX,
+            menu_order=1,
+            config_enabled=promotions_enabled,
+            visible_in_digital_menu=promotions_enabled and has_promotion_shortcuts,
+            activation_rule=(
+                "Virtual promotions aisle (not in categories table). Appears first on the "
+                "digital menu when enabled and at least one live marketing promotion has a "
+                "banner image_path with linked products."
+            ),
+        ),
+        _special_category_payload(
+            virtual_id=DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID,
+            name=limited_name,
+            category_type="special_limited_time",
+            sort_index=SPECIAL_LIMITED_TIME_SORT_INDEX,
+            menu_order=2,
+            config_enabled=limited_enabled,
+            visible_in_digital_menu=limited_enabled and has_limited_time_products,
+            activation_rule=(
+                "Virtual limited-time aisle (not in categories table). Appears second, "
+                "right after promotions, when enabled and at least one product has an "
+                "active promotion (2×1, percent, amount, combo)."
+            ),
+        ),
+    ]
+
+
+def _list_categories_result(service: MenuService, ctx: AgentContext) -> ToolResult:
+    restaurant = ctx.uow.restaurants.get(ctx.restaurant_id)
+    if restaurant is None:
+        return ToolResult(ok=False, summary="Restaurant not found")
+
+    page = service.list_all_categories(
+        ctx.restaurant_id, PaginationParams(limit=LIST_CATEGORIES_LIMIT)
+    )
+    regular = [_regular_category_payload(category) for category in page.items]
+    regular.sort(key=lambda item: (item["sort_index"], item["name"].casefold()))
+
+    timezone = _restaurant_timezone(ctx)
+    now = datetime.now(UTC)
+    products = iter_active_products(service, ctx.restaurant_id)
+    promo_service = PromotionService(ctx.uow.promotions)
+    promo_page = promo_service.list_for_admin(
+        ctx.restaurant_id,
+        PaginationParams(limit=PROMOTION_SCAN_LIMIT),
+        timezone=timezone,
+    )
+    promotions = list(promo_page.items)
+
+    has_shortcuts = bool(_list_promotion_shortcuts(promotions, products, now=now, timezone=timezone))
+    has_limited_time = _has_limited_time_products(
+        products, promotions, now=now, timezone=timezone
+    )
+    specials = _build_special_categories(
+        restaurant,
+        has_promotion_shortcuts=has_shortcuts,
+        has_limited_time_products=has_limited_time,
+    )
+    categories = specials + regular
+
+    active_regular = sum(1 for item in regular if item["is_active"])
+    inactive_regular = len(regular) - active_regular
+    visible_specials = sum(1 for item in specials if item["visible_in_digital_menu"])
+
+    return ToolResult(
+        ok=True,
+        summary=(
+            f"Found {len(categories)} categories: 2 special virtual aisles "
+            f"({visible_specials} visible now), {active_regular} active regular, "
+            f"{inactive_regular} inactive regular"
+        ),
+        data={
+            "categories": categories,
+            "special_categories_note": (
+                "Promotions and limited-time aisles are virtual: names live on restaurants "
+                "(digital_menu_promotions_category_name, digital_menu_limited_time_category_name). "
+                "They auto-appear at the top when enabled and their content conditions are met — "
+                "promotions first, limited-time second — before regular categories."
+            ),
+            "counts": {
+                "special_total": len(specials),
+                "special_visible_now": visible_specials,
+                "regular_active": active_regular,
+                "regular_inactive": inactive_regular,
+            },
+        },
+    )
+
+
 def _product_payload(product: ProductDTO) -> dict[str, Any]:
     groups = sorted(product.option_groups, key=lambda group: group.sort_index)
     return {
@@ -326,6 +592,43 @@ def _product_payload(product: ProductDTO) -> dict[str, Any]:
     }
 
 
+_PRODUCT_PROMOTIONS_DOC = (
+    "promotions[] (product/category/order scope: id, name, type, scope, schedule, "
+    "effective_status, pricing_note, applies_via, option_participation when relevant — "
+    "for bundle NxM: participating[] vs not_participating[] from promotion_option_items; "
+    "empty allow-list = all complements participate; for percent/amount: free_complements[] "
+    "vs charged_complements[]), has_promotions"
+)
+
+
+def _product_payload_with_promotions(
+    product: ProductDTO,
+    *,
+    promo_service: PromotionService,
+    timezone: str,
+    product_names: dict[str, str],
+    category_names: dict[str, str],
+    all_promotions: list[PromotionDTO] | None = None,
+    effective_only: bool = False,
+    match_score: float | None = None,
+) -> dict[str, Any]:
+    payload = _product_payload(product)
+    if match_score is not None:
+        payload["match_score"] = round(match_score, 3)
+    promotions = _promotions_for_product(
+        promo_service,
+        product,
+        timezone=timezone,
+        product_names=product_names,
+        category_names=category_names,
+        effective_only=effective_only,
+        all_promotions=all_promotions,
+    )
+    payload["promotions"] = promotions
+    payload["has_promotions"] = bool(promotions)
+    return payload
+
+
 class MenuReadSkill:
     id = "menu_read"
 
@@ -333,15 +636,45 @@ class MenuReadSkill:
         return [
             ToolDefinition(
                 name="list_categories",
-                description="List active menu categories for the current restaurant.",
+                description=(
+                    "List all menu categories for the digital menu: two virtual special aisles "
+                    "plus regular categories (active and inactive). Order in the response matches "
+                    "display order — promotions special aisle first, limited-time second, then "
+                    "regular categories by sort_index. Special aisles auto-appear when enabled and "
+                    "their content exists (not stored in categories table; names live on "
+                    "restaurants.digital_menu_*). Returns categories[] entries with: id, name, "
+                    "description, image_path, sort_index, display_layout, is_active "
+                    "(false = disabled regular category or special aisle toggled off), "
+                    "category_type (special_promotions | special_limited_time | regular), "
+                    "config_enabled, visible_in_digital_menu, auto_activates, menu_order "
+                    "(specials only), stored_in."
+                ),
                 effect="read",
                 input_schema={"type": "object", "properties": {}},
             ),
             ToolDefinition(
                 name="list_products",
                 description=(
-                    "List active products with cursor pagination. "
-                    "Omit category_id for all categories; set category_id to filter one category."
+                    "List products with cursor pagination. "
+                    "Omit category_id for all categories; set category_id to a regular category "
+                    "UUID from list_categories (not virtual special aisle ids). Returns products[] "
+                    "with: id, name, description, image_path (null if no photo), price_cents "
+                    "(always cents — 100 MXN = 10000), currency, is_active, is_published, "
+                    "approval_status, category_ids (UUIDs this product belongs to), "
+                    "category_sort_indices (order within each category), has_options, "
+                    "option_groups[] (complements/add-ons: id, title, required, selection "
+                    "single|multi, min_selections, max_selections, sort_index, is_active, "
+                    "selection_summary, items[] with id, label, price_delta_cents, sort_index, "
+                    "is_active). Also returns "
+                    f"{_PRODUCT_PROMOTIONS_DOC}, next_cursor, has_more, limit, and category_id "
+                    "when filtered. Paginate until has_more=false for a full catalog audit. "
+                    "Live-menu visibility (owner UI: En menú / Draft / Inactivo): "
+                    "is_published=true + approval_status=approved → listed on the public menu; "
+                    "is_active=true in that state → En menú (orderable); "
+                    "is_active=false + is_published=true + approval_status=approved → Inactivo "
+                    "(still visible on the live menu but shown as No disponible — not orderable); "
+                    "is_published=false or approval_status=draft → Draft (hidden from the live "
+                    "menu entirely — customers never see it)."
                 ),
                 effect="read",
                 input_schema={
@@ -379,7 +712,14 @@ class MenuReadSkill:
                 name="get_product",
                 description=(
                     "Get one product's full detail. Provide product_id (UUID) when known, "
-                    "or name to resolve it by fuzzy match. Provide at least one."
+                    "or name to resolve it by fuzzy match. Provide at least one. Returns "
+                    "product with: id, name, description, image_path, price_cents (cents), "
+                    "currency, is_active, is_published, approval_status, category_ids, "
+                    "category_sort_indices, has_options, option_groups[] (full complement "
+                    f"detail), {_PRODUCT_PROMOTIONS_DOC}. Live-menu visibility: "
+                    "is_published=true + approval_status=approved → on public menu; "
+                    "is_active=true → En menú (orderable); is_active=false + published → "
+                    "Inactivo (visible as No disponible); draft/unpublished → hidden from live menu."
                 ),
                 effect="read",
                 input_schema={
@@ -493,23 +833,7 @@ class MenuReadSkill:
     def execute(self, tool_name: str, args: dict[str, Any], ctx: AgentContext) -> ToolResult:
         service = MenuService(ctx.uow.menu)
         if tool_name == "list_categories":
-            page = service.list_categories(ctx.restaurant_id, PaginationParams(limit=100))
-            categories = [
-                {
-                    "id": str(category.id),
-                    "name": category.name,
-                    "description": category.description,
-                    "sort_index": category.sort_index,
-                    "is_active": category.is_active,
-                }
-                for category in page.items
-                if category.is_active
-            ]
-            return ToolResult(
-                ok=True,
-                summary=f"Found {len(categories)} active categories",
-                data={"categories": categories},
-            )
+            return _list_categories_result(service, ctx)
 
         if tool_name == "list_products":
             limit = _list_products_limit(args)
@@ -535,7 +859,24 @@ class MenuReadSkill:
             except NotFoundError:
                 return ToolResult(ok=False, summary="Category not found")
 
-            products = [_product_payload(product) for product in page.items if product.is_active]
+            promo_service = PromotionService(ctx.uow.promotions)
+            timezone = _restaurant_timezone(ctx)
+            product_names, category_names = _promotion_name_maps(service, ctx.restaurant_id)
+            all_promotions = _load_restaurant_promotions(
+                promo_service, ctx.restaurant_id, timezone=timezone
+            )
+            products = [
+                _product_payload_with_promotions(
+                    product,
+                    promo_service=promo_service,
+                    timezone=timezone,
+                    product_names=product_names,
+                    category_names=category_names,
+                    all_promotions=all_promotions,
+                )
+                for product in page.items
+                if product.is_active
+            ]
             data: dict[str, Any] = {
                 "products": products,
                 "next_cursor": page.next_cursor,
@@ -600,22 +941,23 @@ class MenuReadSkill:
             product_id_raw = args.get("product_id")
             name_raw = args.get("name") or args.get("query")
 
-            def _product_detail(payload: dict[str, Any], product: ProductDTO) -> ToolResult:
-                """Attach the product's promotions so a single lookup surfaces both."""
+            def _product_detail(
+                product: ProductDTO, *, match_score: float | None = None
+            ) -> ToolResult:
                 promo_service = PromotionService(ctx.uow.promotions)
                 timezone = _restaurant_timezone(ctx)
                 product_names, category_names = _promotion_name_maps(
                     service, ctx.restaurant_id
                 )
-                promotions = _promotions_for_product(
-                    promo_service,
+                payload = _product_payload_with_promotions(
                     product,
+                    promo_service=promo_service,
                     timezone=timezone,
                     product_names=product_names,
                     category_names=category_names,
+                    match_score=match_score,
                 )
-                payload["promotions"] = promotions
-                payload["has_promotions"] = bool(promotions)
+                promotions = payload["promotions"]
                 suffix = f" with {len(promotions)} promotions" if promotions else ""
                 return ToolResult(
                     ok=True,
@@ -627,7 +969,7 @@ class MenuReadSkill:
                 try:
                     product_id = uuid.UUID(str(product_id_raw))
                     product = service.get_product(ctx.restaurant_id, product_id)
-                    return _product_detail(_product_payload(product), product)
+                    return _product_detail(product)
                 except (ValueError, NotFoundError):
                     # Bad/unknown UUID — fall back to name resolution when available.
                     if not name_raw:
@@ -640,10 +982,7 @@ class MenuReadSkill:
                 if not ok:
                     return ToolResult(ok=False, summary=message, data=extra)
                 assert resolved.product is not None
-                return _product_detail(
-                    _scored_payload(1.0, resolved.product),
-                    resolved.product,
-                )
+                return _product_detail(resolved.product, match_score=1.0)
 
             return ToolResult(ok=False, summary="Provide product_id or name")
 
