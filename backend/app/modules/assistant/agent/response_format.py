@@ -1,11 +1,13 @@
 """Helpers for the native tool-calling agent loop.
 
-The agent uses the provider's native function calling, so there is no custom JSON
-envelope to parse or repair. This module only builds the OpenAI-format tool schemas
-exposed to the model and the runtime guidance appended to the system prompt.
+Builds OpenAI tool schemas, runtime guidance, and parses the assistant's final
+JSON envelope (``reasoning`` + ``content``).
 """
 
 from __future__ import annotations
+
+import json
+import re
 
 from app.modules.assistant.skills.base import ToolDefinition
 
@@ -85,8 +87,8 @@ def build_agent_runtime_section() -> str:
     return """## How you work
 
 You have native tools. To get live restaurant data or make changes, call a tool —
-never invent data. When you have enough information, reply directly with a normal
-message (no tool call). For greetings, identity, or general advice, just reply.
+never invent data. When you have enough information, send your **final** reply as
+JSON (see below). For greetings, identity, or general advice, same JSON format.
 
 - Default to answering. Call a tool only when live data is missing from the context,
   prior tool results, and your menu knowledge. Never call a tool "just in case".
@@ -99,15 +101,60 @@ message (no tool call). For greetings, identity, or general advice, just reply.
   prefer `bulk_update_product_descriptions`, `bulk_update_product_prices`, or
   `bulk_update_product_names` after confirmation.
 
-## Reply style
-
-Write for the restaurant owner, not for engineers. Reply in Spanish unless the owner
-asks otherwise, in valid Markdown.
-
 ## Activity reasoning (before tools)
 
 When you are about to call one or more tools, first write 1–2 short sentences in
 Spanish explaining what you will do and why (for the restaurant owner watching the
-activity panel). Then call the tool(s). Do not repeat this reasoning in your final
-answer to the owner.
+activity panel). Then call the tool(s). Plain text only — **no JSON** on tool rounds.
+
+## Final reply format (required)
+
+When you are done (no more tool calls), respond with **only** a JSON object:
+
+```json
+{
+  "reasoning": "1–4 oraciones en español: qué revisaste, qué herramientas usaste y por qué.",
+  "content": "Tu respuesta completa al dueño del restaurante en Markdown."
+}
+```
+
+- **`reasoning`**: resumen breve para el panel de actividad (pasos, datos consultados,
+  decisiones). No repitas esto en `content`.
+- **`content`**: respuesta al dueño en Markdown (negritas, listas, tablas cuando ayuden).
+  Sé concreto. Cierra con próximos pasos o preguntas de seguimiento útiles.
+- Responde en español salvo que el dueño pida otro idioma.
+- No envuelvas el JSON en bloques de código ni añadas texto fuera del objeto.
 """
+
+
+_FENCE_RE = re.compile(r"^```(?:json)?\s*\n?(.*?)\n?```\s*$", re.DOTALL | re.IGNORECASE)
+
+
+def parse_agent_response(raw: str) -> dict[str, str]:
+    """Parse the assistant's final JSON envelope.
+
+    Returns ``{"reasoning": str, "content": str}``. On parse failure, treats the
+    whole string as ``content`` so older/plain replies still reach the owner.
+    """
+    text = (raw or "").strip()
+    if not text:
+        return {"reasoning": "", "content": ""}
+
+    fence = _FENCE_RE.match(text)
+    if fence:
+        text = fence.group(1).strip()
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return {"reasoning": "", "content": raw.strip()}
+
+    if not isinstance(data, dict):
+        return {"reasoning": "", "content": raw.strip()}
+
+    reasoning = data.get("reasoning", "")
+    content = data.get("content", "")
+    return {
+        "reasoning": str(reasoning).strip() if reasoning is not None else "",
+        "content": str(content).strip() if content is not None else "",
+    }
