@@ -4,6 +4,7 @@ from app.modules.assistant.agent.response_format import (
     build_load_skill_schema,
     build_openai_tool_schemas,
     openai_function_name,
+    parse_agent_response,
     parse_function_name,
 )
 from app.modules.assistant.skills.base import ToolDefinition
@@ -62,5 +63,28 @@ def test_build_load_skill_schema_enumerates_skills():
 def test_runtime_section_has_style_and_tool_guidance():
     section = build_agent_runtime_section()
     assert "load_skill" in section
-    assert "Markdown" in section
+    assert "reasoning" in section
+    assert "content" in section
     assert "Never delete" in section
+
+
+def test_parse_agent_response_extracts_envelope():
+    raw = (
+        '{"reasoning": "Revisé el menú.", '
+        '"content": "Tienes **3 tacos** activos."}'
+    )
+    parsed = parse_agent_response(raw)
+    assert parsed["reasoning"] == "Revisé el menú."
+    assert parsed["content"] == "Tienes **3 tacos** activos."
+
+
+def test_parse_agent_response_strips_code_fence():
+    raw = '```json\n{"reasoning": "Ok", "content": "Hola"}\n```'
+    parsed = parse_agent_response(raw)
+    assert parsed == {"reasoning": "Ok", "content": "Hola"}
+
+
+def test_parse_agent_response_falls_back_to_plain_text():
+    parsed = parse_agent_response("Respuesta directa en Markdown.")
+    assert parsed["reasoning"] == ""
+    assert parsed["content"] == "Respuesta directa en Markdown."
