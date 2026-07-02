@@ -420,18 +420,75 @@ class SqlAlchemyMenuRepository(MenuRepository):
     def set_category_product_order(
         self, category_id: uuid.UUID, product_ids: list[uuid.UUID]
     ) -> None:
-        linked_ids = {
-            row.product_id
-            for row in self._session.execute(
-                select(product_categories.c.product_id).where(
-                    product_categories.c.category_id == category_id
-                )
-            ).all()
-        }
-        if set(product_ids) != linked_ids:
-            raise ValueError("product_ids must match products linked to category")
+        rows = self._session.execute(
+            select(
+                product_categories.c.product_id,
+                product_categories.c.sort_index,
+                Product.is_active,
+            )
+            .join(Product, Product.id == product_categories.c.product_id)
+            .where(product_categories.c.category_id == category_id)
+            .order_by(product_categories.c.sort_index, product_categories.c.product_id)
+        ).all()
 
-        for index, product_id in enumerate(product_ids):
+        linked_ids = {row.product_id for row in rows}
+        if not linked_ids:
+            if product_ids:
+                raise ValueError("Category has no linked products")
+            return
+
+        provided = list(product_ids)
+        provided_set = set(provided)
+        if len(provided) != len(provided_set):
+            raise ValueError("product_ids must not contain duplicates")
+
+        unknown = provided_set - linked_ids
+        if unknown:
+            raise ValueError("product_ids contains products not linked to category")
+
+        active_ids = {row.product_id for row in rows if row.is_active}
+        inactive_ids = linked_ids - active_ids
+
+        if provided_set == linked_ids:
+            final_order = provided
+        elif provided_set == active_ids:
+            inactive_order = sorted(
+                inactive_ids,
+                key=lambda product_id: next(
+                    row.sort_index
+                    for row in rows
+                    if row.product_id == product_id
+                ),
+            )
+            final_order = provided + inactive_order
+        else:
+            missing = linked_ids - provided_set
+            missing_active = sorted(active_ids - provided_set, key=str)
+            missing_inactive = sorted(inactive_ids - provided_set, key=str)
+            parts: list[str] = [
+                "product_ids must include every product linked to the category "
+                f"({len(active_ids)} active, {len(inactive_ids)} inactive), "
+                "or only the active ones in the desired order."
+            ]
+            if missing_active:
+                parts.append(
+                    "Missing active product id(s): "
+                    + ", ".join(str(product_id) for product_id in missing_active)
+                )
+            if missing_inactive:
+                parts.append(
+                    "Missing inactive product id(s) not shown by menu_read list_products: "
+                    + ", ".join(str(product_id) for product_id in missing_inactive)
+                    + ". Pass active ids in order only, or include inactive ids at the end."
+                )
+            if not missing_active and not missing_inactive and missing:
+                parts.append(
+                    "Missing linked product id(s): "
+                    + ", ".join(str(product_id) for product_id in sorted(missing, key=str))
+                )
+            raise ValueError(" ".join(parts))
+
+        for index, product_id in enumerate(final_order):
             self._session.execute(
                 update(product_categories)
                 .where(
