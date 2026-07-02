@@ -1,5 +1,6 @@
 from app.modules.assistant.agent.response_format import (
     LOAD_SKILL_TOOL_NAME,
+    AssistantTurnStreamParser,
     build_agent_runtime_section,
     build_load_skill_schema,
     build_openai_tool_schemas,
@@ -88,3 +89,45 @@ def test_parse_agent_response_falls_back_to_plain_text():
     parsed = parse_agent_response("Respuesta directa en Markdown.")
     assert parsed["reasoning"] == ""
     assert parsed["content"] == "Respuesta directa en Markdown."
+
+
+def test_parse_agent_response_recovers_malformed_json_envelope():
+    raw = (
+        '{"reasoning": "Revisé la descripción actual de HAMBURGUESA.", '
+        '"content": "HAMBURGUESA - Opciones\\n\\nOpción A\\n- Clásica con salsa especial.'
+        '\\n\\n¿Cuál opción te gustaría que aplique?"]}'
+    )
+    parsed = parse_agent_response(raw)
+    assert parsed["reasoning"] == "Revisé la descripción actual de HAMBURGUESA."
+    assert parsed["content"].startswith("HAMBURGUESA - Opciones")
+    assert "Opción A" in parsed["content"]
+    assert parsed["content"].endswith("¿Cuál opción te gustaría que aplique?")
+    assert "reasoning" not in parsed["content"]
+
+
+def test_stream_parser_emits_plain_reasoning_before_tools():
+    parser = AssistantTurnStreamParser()
+    events = parser.feed("Voy a buscar tacos al pastor.")
+    assert parser.is_json_mode is False
+    assert events
+    assert events[0]["event"] == "thought"
+    assert "buscar" in str(events[0]["text"])
+
+
+def test_stream_parser_streams_json_content_incrementally():
+    parser = AssistantTurnStreamParser()
+    chunks = [
+        '{"reasoning":"Revisé el menú.",',
+        '"content":"Hola **Mark**',
+        ' aquí."}',
+    ]
+    content_deltas: list[str] = []
+    thought_events: list[dict[str, object]] = []
+    for chunk in chunks:
+        for event in parser.feed(chunk):
+            if event["event"] == "content_delta":
+                content_deltas.append(str(event["delta"]))
+            elif event["event"] == "thought":
+                thought_events.append(event)
+    assert "".join(content_deltas) == "Hola **Mark** aquí."
+    assert not thought_events
