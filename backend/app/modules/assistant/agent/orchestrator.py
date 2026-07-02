@@ -34,6 +34,7 @@ from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.agent.prompt_composer import compose_system_prompt
 from app.modules.assistant.agent.response_format import (
     LOAD_SKILL_TOOL_NAME,
+    AssistantTurnStreamParser,
     build_agent_runtime_section,
     build_load_skill_schema,
     build_openai_tool_schemas,
@@ -57,6 +58,7 @@ def _yield_parsed_final_message(
     *,
     usage_payload: Any,
     content_parts: list[str],
+    streamed_content_len: int = 0,
 ) -> Iterator[ChatStreamEvent]:
     """Parse the JSON envelope and emit owner-facing stream events."""
     parsed = parse_agent_response(raw_content)
@@ -67,10 +69,11 @@ def _yield_parsed_final_message(
     if reasoning:
         yield ChatStreamEvent(
             event="agent.thought",
-            data={"text": reasoning, "replace": False},
+            data={"text": reasoning, "replace": True},
         )
-    if content:
-        yield ChatStreamEvent(event="content.delta", data={"delta": content})
+    remaining = content[streamed_content_len:] if content else ""
+    if remaining:
+        yield ChatStreamEvent(event="content.delta", data={"delta": remaining})
     yield ChatStreamEvent(
         event="message.complete",
         data={
@@ -186,7 +189,7 @@ class AgentOrchestrator:
                     )
 
                     turn_content: list[str] = []
-                    turn_reasoning: list[str] = []
+                    turn_parser = AssistantTurnStreamParser()
                     thought_started_this_turn = False
                     tool_calls: list[dict[str, Any]] | None = None
                     final_content = ""
@@ -197,22 +200,28 @@ class AgentOrchestrator:
                         if event.event == "content.delta":
                             delta = event.data.get("delta")
                             if isinstance(delta, str) and delta:
-                                if tools_enabled:
-                                    turn_reasoning.append(delta)
-                                    reasoning = normalize_llm_reasoning(
-                                        "".join(turn_reasoning)
-                                    )
-                                    if reasoning:
-                                        yield ChatStreamEvent(
-                                            event="agent.thought",
-                                            data={
-                                                "text": reasoning,
-                                                "replace": thought_started_this_turn,
-                                            },
-                                        )
-                                        thought_started_this_turn = True
-                                else:
-                                    turn_content.append(delta)
+                                for parsed in turn_parser.feed(delta):
+                                    if parsed.get("event") == "thought":
+                                        text = parsed.get("text")
+                                        if isinstance(text, str) and text:
+                                            yield ChatStreamEvent(
+                                                event="agent.thought",
+                                                data={
+                                                    "text": text,
+                                                    "replace": parsed.get("replace") is True
+                                                    or thought_started_this_turn,
+                                                },
+                                            )
+                                            thought_started_this_turn = True
+                                    elif parsed.get("event") == "content_delta":
+                                        content_delta = parsed.get("delta")
+                                        if isinstance(content_delta, str) and content_delta:
+                                            turn_content.append(content_delta)
+                                            content_parts.append(content_delta)
+                                            yield ChatStreamEvent(
+                                                event="content.delta",
+                                                data={"delta": content_delta},
+                                            )
                             continue
                         if event.event == "error":
                             yield event
@@ -224,7 +233,7 @@ class AgentOrchestrator:
                             final_content = (
                                 provider_content
                                 if isinstance(provider_content, str) and provider_content
-                                else "".join(turn_content or turn_reasoning)
+                                else "".join(turn_content)
                             )
                             usage_payload = event.data.get("usage")
                     if stream_failed:
@@ -235,10 +244,15 @@ class AgentOrchestrator:
                             final_content,
                             usage_payload=usage_payload,
                             content_parts=content_parts,
+                            streamed_content_len=turn_parser.emitted_content_len,
                         )
                         return
 
-                    turn_reasoning_text = normalize_llm_reasoning(final_content)
+                    turn_reasoning_text = (
+                        None
+                        if turn_parser.is_json_mode
+                        else normalize_llm_reasoning(final_content)
+                    )
                     if turn_reasoning_text:
                         yield ChatStreamEvent(
                             event="agent.thought",
