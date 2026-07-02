@@ -13,6 +13,10 @@ from app.core.llm.ports import (
     ChatStreamEvent,
     LLMProviderPort,
 )
+from app.modules.assistant.agent.response_format import (
+    build_agent_runtime_section,
+    parse_agent_response,
+)
 from app.modules.assistant.context.compressor import compress_history_for_llm
 from app.modules.assistant.prompts import ASSISTANT_CORE_POLICY
 from app.modules.assistant.schemas import AssistantChatHistoryMessage, AssistantChatRequest
@@ -76,7 +80,7 @@ class AssistantService:
             yield ChatStreamEvent(event="agent.phase", data={"phase": "analyzing"})
             yield ChatStreamEvent(event="agent.status", data={"status": "processing"})
 
-            system = system_prompt or ASSISTANT_CORE_POLICY
+            system = (system_prompt or ASSISTANT_CORE_POLICY) + "\n\n---\n\n" + build_agent_runtime_section()
             compression = compress_history_for_llm(
                 request.history,
                 system_prompt=system,
@@ -115,16 +119,30 @@ class AssistantService:
 
                     if event.event == "message.complete":
                         provider_content = event.data.get("content")
-                        final_content = (
+                        raw_content = (
                             provider_content
                             if isinstance(provider_content, str) and provider_content
                             else "".join(content_parts)
                         )
+                        parsed = parse_agent_response(raw_content)
+                        final_content = parsed["content"]
+                        final_reasoning = parsed["reasoning"]
+                        if final_reasoning:
+                            yield ChatStreamEvent(
+                                event="agent.thought",
+                                data={"text": final_reasoning, "replace": False},
+                            )
+                        if final_content and not content_parts:
+                            yield ChatStreamEvent(
+                                event="content.delta",
+                                data={"delta": final_content},
+                            )
                         yield ChatStreamEvent(
                             event="message.complete",
                             data={
                                 "message_id": resolved_message_id,
                                 "content": final_content,
+                                "reasoning": final_reasoning,
                                 "usage": event.data.get("usage"),
                                 "context_compression": compression.model_dump(mode="json"),
                             },
