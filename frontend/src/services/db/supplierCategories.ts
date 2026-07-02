@@ -32,6 +32,7 @@ export async function fetchSupplierCategoriesPage(
     restaurantId,
     CATEGORIES_PAGE_SIZE,
     args.cursor,
+    { includeInactive: true },
   );
 
   return {
