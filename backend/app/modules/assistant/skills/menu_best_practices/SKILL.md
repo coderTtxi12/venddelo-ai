@@ -1,22 +1,40 @@
 ---
 name: menu_best_practices
-description: Venddelo guide for menu quality — structure, copy, photos, add-ons, promotions, and audit checklists (no tools).
+description: Reference guide for digital menu quality — structure, category order, product copy, photos, add-ons, promotions, and audit checklists (no tools). Call load_skill when the owner asks for recommendations or wants to improve any menu element before using menu_read or menu_write.
 ---
 
 # menu_best_practices
 
-**Venddelo best-practices guide for digital menus**, aligned with proven
+**Best-practices guide for digital menus**, aligned with proven
 catalog standards and adapted to this platform's data model (categories, products, add-ons,
 promotions, branding).
 
 **This skill has no tools.** It does not read or write the menu. Use it as reference when:
 
 - The owner asks for **recommendations**, an audit, or "how do I improve my menu?".
-- You are about to activate **`menu_write`** and want quality criteria before/after editing.
+- You are about to use **`menu_write`** and want quality criteria before/after editing.
 - You need to explain **why** a structure works (categories, add-ons, promos).
 
-For live restaurant data, activate **`menu_read`**. To apply changes, activate **`menu_write`**.
+For live restaurant data, use **`menu_read`**. To apply changes, use **`menu_write`**.
 This guide tells you *what* to look for and *how* things should look; the other skills execute.
+
+---
+
+## Mandatory workflow (improve / optimize / edit)
+
+When the owner wants to **improve, optimize, recommend, audit, or edit** any menu element,
+follow this order **before** proposing or applying changes:
+
+```
+1. load_skill(menu_best_practices)   ← this guide (if not loaded this turn)
+2. menu_read tools                   ← live categories, products, promos, add-ons
+3. Recommend or preview              ← combine guide + real data
+4. menu_write (optional)             ← only after owner confirms
+```
+
+**Do not skip step 1 or 2** to guess from memory or generic advice. If the owner names one
+product (e.g. "mejora la descripción de HAMBURGUESA"), still load this guide and read that
+product with `menu_read` (`search_products` / `get_product`) before drafting copy.
 
 ---
 
