@@ -27,6 +27,7 @@ export type AssistantStreamCompletePayload = {
   conversation_id: string;
   message_id: string;
   content: string;
+  reasoning?: string;
 };
 
 export type AssistantStreamErrorPayload = {
@@ -399,6 +400,8 @@ export async function streamAssistantChat(
           conversation_id: String(payload.conversation_id ?? conversationId),
           message_id: String(payload.message_id ?? ''),
           content: String(payload.content ?? ''),
+          reasoning:
+            typeof payload.reasoning === 'string' ? payload.reasoning : undefined,
         });
         markFinished();
         break;
