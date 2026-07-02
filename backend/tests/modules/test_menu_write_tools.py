@@ -2,6 +2,10 @@ import uuid
 
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.menu_read.tools import (
+    DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID,
+    DIGITAL_MENU_PROMOTIONS_CATEGORY_ID,
+)
 from app.modules.assistant.skills.menu_write.tools import MenuWriteSkill
 from app.modules.menu.schemas import CategoryCreate, ProductCreate
 from app.modules.restaurants.schemas import RestaurantCreate
@@ -38,6 +42,143 @@ def test_menu_write_creates_and_updates_category(session):
     )
     assert updated.ok is True
     assert updated.data["category"]["name"] == "Bebidas frías"
+
+
+@requires_db
+def test_menu_write_updates_category_display_layout(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Layout Menu", subdomain="menu-write-cat-layout")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    created = skill.execute(
+        "create_category",
+        {"name": "Tacos", "description": "Clásicos"},
+        ctx,
+    )
+    assert created.ok is True
+    category_id = created.data["category"]["id"]
+
+    updated = skill.execute(
+        "update_category",
+        {"category_id": category_id, "display_layout": "grid"},
+        ctx,
+    )
+    assert updated.ok is True
+    assert updated.data["category"]["display_layout"] == "grid"
+
+
+@requires_db
+def test_menu_write_updates_special_categories(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Special Cats", subdomain="menu-write-special-cats")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    promotions = skill.execute(
+        "update_category",
+        {
+            "category_id": DIGITAL_MENU_PROMOTIONS_CATEGORY_ID,
+            "name": "Ofertas del día",
+            "is_active": False,
+        },
+        ctx,
+    )
+    assert promotions.ok is True
+    assert promotions.data["category"]["name"] == "Ofertas del día"
+    assert promotions.data["category"]["is_active"] is False
+    assert promotions.data["category"]["category_type"] == "special_promotions"
+
+    limited = skill.execute(
+        "update_category",
+        {
+            "category_id": DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID,
+            "name": "Solo hoy",
+            "is_active": True,
+        },
+        ctx,
+    )
+    assert limited.ok is True
+    assert limited.data["category"]["name"] == "Solo hoy"
+    assert limited.data["category"]["is_active"] is True
+    assert limited.data["category"]["category_type"] == "special_limited_time"
+
+    loaded = uow.restaurants.get(restaurant.id)
+    assert loaded is not None
+    assert loaded.digital_menu_promotions_category_name == "Ofertas del día"
+    assert loaded.digital_menu_promotions_category_enabled is False
+    assert loaded.digital_menu_limited_time_category_name == "Solo hoy"
+    assert loaded.digital_menu_limited_time_category_enabled is True
+
+
+@requires_db
+def test_menu_write_rejects_special_category_description(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Special Reject", subdomain="menu-write-special-reject")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "update_category",
+        {
+            "category_id": DIGITAL_MENU_PROMOTIONS_CATEGORY_ID,
+            "description": "No aplica",
+        },
+        ctx,
+    )
+    assert result.ok is False
+    assert "description" in result.summary
+
+
+@requires_db
+def test_menu_write_rejects_special_category_display_layout(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Special Layout", subdomain="menu-write-special-layout")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "update_category",
+        {
+            "category_id": DIGITAL_MENU_PROMOTIONS_CATEGORY_ID,
+            "display_layout": "grid",
+        },
+        ctx,
+    )
+    assert result.ok is False
+    assert "display_layout" in result.summary
 
 
 @requires_db
