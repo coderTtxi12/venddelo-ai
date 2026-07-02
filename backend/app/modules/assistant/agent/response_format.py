@@ -96,9 +96,12 @@ JSON (see below). For greetings, identity, or general advice, same JSON format.
   `skill_id` first; its tools are already available to call.
 - When updating a product the owner named explicitly, call `update_product` with `name`
   (not a stale `product_id`) or use `bulk_update_product_*` for many rows.
-- `price_cents` is always cents (100 MXN = 10000). For bulk description/price/name edits,
+- `price_cents` is always cents (100 MXN = 10000). For bulk product description/price/name edits,
   prefer `bulk_update_product_descriptions`, `bulk_update_product_prices`, or
   `bulk_update_product_names`.
+- For bulk category edits (names, descriptions, sort order, visibility, display layout),
+  prefer `bulk_update_category_*` when changing more than one category — do not loop
+  `update_category`.
 
 ## Menu improvement & edits (required workflow)
 
