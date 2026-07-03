@@ -1,0 +1,1131 @@
+[
+  {
+    "id": "original",
+    "label": "Original",
+    "description": "Aspecto neutro por defecto: blanco, grises slate y tipografía del sistema. El que tenías antes de los temas.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Vista limpia",
+      "Estilo delivery app"
+    ],
+    "recommendation": "Menús de cualquier tipo cuando quieres máxima claridad sin distraer del contenido. Ideal como punto de partida o si tu marca aún no tiene identidad visual definida.",
+    "style_keywords": [
+      "neutral",
+      "white",
+      "slate",
+      "clean"
+    ],
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "id": "original-verde",
+    "label": "Original+",
+    "description": "Igual que Original, con categorías en verde delivery (#06C167).",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Promos",
+      "Estilo delivery app"
+    ],
+    "recommendation": "Restaurantes con delivery activo, dark kitchens, comida rápida o cualquier menú que quiera transmitir agilidad y pedidos en línea sin cambiar mucho el look base.",
+    "style_keywords": [
+      "neutral",
+      "white",
+      "slate",
+      "mint accent"
+    ],
+    "is_active": true,
+    "sort_order": 1
+  },
+  {
+    "id": "clasico-rojo",
+    "label": "Clásico",
+    "description": "Paleta apetitosa rojo y dorado con tipografía editorial. Ideal como tema base de Venddelo.",
+    "bestFor": [
+      "Restaurante general",
+      "Comida casera",
+      "Menú multigusto"
+    ],
+    "recommendation": "Restaurantes de comida casera, fondas, cocina mexicana general, marisquerías familiares o cualquier menú multigusto que busque verse apetitoso y confiable.",
+    "style_keywords": [
+      "bold",
+      "energetic",
+      "food",
+      "high contrast"
+    ],
+    "is_active": true,
+    "sort_order": 2
+  },
+  {
+    "id": "taqueria-viva",
+    "label": "Taquería",
+    "description": "Tonos cálidos y tipografía amigable para tacos, antojitos y cocina mexicana informal.",
+    "bestFor": [
+      "Taquería",
+      "Antojitos",
+      "Food truck mexicano"
+    ],
+    "recommendation": "Taquerías, antojerías, fondas de barrio, food trucks mexicanos, tortas, quesadillas y menús con tacos, gringas, al pastor y bebidas aguas frescas.",
+    "style_keywords": [
+      "playful",
+      "block layout",
+      "duotone",
+      "youthful"
+    ],
+    "is_active": true,
+    "sort_order": 3
+  },
+  {
+    "id": "trattoria-roma",
+    "label": "Trattoria",
+    "description": "Elegancia italiana con serif editorial, rosa romántico y acentos dorados.",
+    "bestFor": [
+      "Trattoria",
+      "Pastas",
+      "Vino y cocina italiana"
+    ],
+    "recommendation": "Trattorias, pastelerías italianas, restaurantes de pasta fresca, vinos por copa y menús con risottos, carpaccios, lasañas y postres tiramisú.",
+    "style_keywords": [
+      "premium",
+      "fluid",
+      "editorial",
+      "romantic"
+    ],
+    "is_active": true,
+    "sort_order": 4
+  },
+  {
+    "id": "sushi-zen",
+    "label": "Sushi",
+    "description": "Minimalismo japonés: mucho blanco, negro profundo y acento dorado discreto.",
+    "bestFor": [
+      "Sushi bar",
+      "Ramen",
+      "Cocina japonesa"
+    ],
+    "recommendation": "Sushi bars, omakase, restaurantes de cocina japonesa premium, menús con nigiri, sashimi, rolls especiales y sake. Funciona cuando las fotos del pescado son protagonistas.",
+    "style_keywords": [
+      "minimal",
+      "whitespace",
+      "precise",
+      "calm"
+    ],
+    "is_active": true,
+    "sort_order": 5
+  },
+  {
+    "id": "cafe-artesanal",
+    "label": "Café",
+    "description": "Marrón café, crema cálida y tipografía handmade para coffee shops y panaderías de barrio.",
+    "bestFor": [
+      "Cafetería",
+      "Brunch",
+      "Panadería de especialidad"
+    ],
+    "recommendation": "Cafeterías de especialidad, panaderías artesanales, brunch de fin de semana, menús con espresso, matcha, croissants, avo toast y repostería de mostrador.",
+    "style_keywords": [
+      "oversized type",
+      "warm",
+      "craft",
+      "cozy"
+    ],
+    "is_active": true,
+    "sort_order": 6
+  },
+  {
+    "id": "burger-bold",
+    "label": "Burger",
+    "description": "Tipografía contundente y rojo apetitoso para fast food, burgers y wings.",
+    "bestFor": [
+      "Hamburguesas",
+      "Fast food",
+      "Alitas y comfort food"
+    ],
+    "recommendation": "Hamburgueserías gourmet o clásicas, wings, hot dogs, comfort food americano, menús con combos, papas, malteadas y promos 2x1.",
+    "style_keywords": [
+      "bold",
+      "block layout",
+      "high contrast",
+      "energetic"
+    ],
+    "is_active": true,
+    "sort_order": 7
+  },
+  {
+    "id": "ensalada-fresca",
+    "label": "Saludable",
+    "description": "Verdes orgánicos y cyan fresco para bowls, ensaladas y cocina consciente.",
+    "bestFor": [
+      "Ensaladas",
+      "Bowls",
+      "Vegan-friendly",
+      "Smoothies"
+    ],
+    "recommendation": "Ensaladerías, bowl bars, menús vegan-friendly, smoothies, jugos cold-pressed, poke saludable y opciones bajas en calorías o plant-based.",
+    "style_keywords": [
+      "nature",
+      "rounded",
+      "flowing",
+      "wellness"
+    ],
+    "is_active": true,
+    "sort_order": 8
+  },
+  {
+    "id": "fine-dining-oro",
+    "label": "Fine dining",
+    "description": "Piedra oscura, superficies claras y oro premium para alta cocina y cenas especiales.",
+    "bestFor": [
+      "Fine dining",
+      "Chef table",
+      "Cocina de autor"
+    ],
+    "recommendation": "Fine dining, chef table, cocina de autor, menús degustación, maridajes y restaurantes donde el ticket promedio es alto y la experiencia es el producto.",
+    "style_keywords": [
+      "luxury",
+      "premium",
+      "refined",
+      "editorial"
+    ],
+    "is_active": true,
+    "sort_order": 9
+  },
+  {
+    "id": "street-neon",
+    "label": "Street food",
+    "description": "Modo oscuro con acentos neón púrpura y rosa — ideal para street food nocturno y bares.",
+    "bestFor": [
+      "Street food",
+      "Night market",
+      "Bar snacks"
+    ],
+    "recommendation": "Street food nocturno, night markets, bares de botanas, menús con tacos al pastor de madrugada, wings, nachos y bebidas de bar.",
+    "style_keywords": [
+      "neon",
+      "dark",
+      "high contrast",
+      "urban"
+    ],
+    "is_active": true,
+    "sort_order": 10
+  },
+  {
+    "id": "mariscos-costa",
+    "label": "Mariscos",
+    "description": "Verde océano y azul costero con serif gastronómico para mariscos y cevicherías.",
+    "bestFor": [
+      "Mariscos",
+      "Cevichería",
+      "Pescadería restaurante"
+    ],
+    "recommendation": "Marisquerías, cevicherías, pescaderías-restaurante, menús con aguachile, cóctel de camarón, pescado zarandeado y micheladas.",
+    "style_keywords": [
+      "fresh",
+      "coastal",
+      "ocean",
+      "natural"
+    ],
+    "is_active": true,
+    "sort_order": 11
+  },
+  {
+    "id": "pizzeria-napoli",
+    "label": "Pizza",
+    "description": "Rojo tomate, verde albahaca y crema — paleta clásica napolitana (ajustada para legibilidad).",
+    "bestFor": [
+      "Pizzería",
+      "Calzones",
+      "Comida italiana casual"
+    ],
+    "recommendation": "Pizzerías artesanales, calzones, focaccias, menús italianos casuales con pastas simples, bruschettas y vino de mesa.",
+    "style_keywords": [
+      "classic",
+      "mediterranean",
+      "warm",
+      "artisan"
+    ],
+    "is_active": true,
+    "sort_order": 12
+  },
+  {
+    "id": "pasteleria-dulce",
+    "label": "Pastelería",
+    "description": "Pasteles suaves, tipografía redondeada y tonos miel-rosa para repostería y postres.",
+    "bestFor": [
+      "Pastelería",
+      "Repostería",
+      "Heladería",
+      "Postres"
+    ],
+    "recommendation": "Pastelerías, reposterías finas, heladerías artesanales, menús con pasteles, cupcakes, macarons, cafés con postre y pan dulce.",
+    "style_keywords": [
+      "soft",
+      "pastel",
+      "rounded",
+      "sweet"
+    ],
+    "is_active": true,
+    "sort_order": 13
+  },
+  {
+    "id": "korean-bbq",
+    "label": "K-BBQ",
+    "description": "Rojo intenso y negro carbón con tipografía coreana limpia. Ideal para parrilla coreana.",
+    "bestFor": [
+      "Korean BBQ",
+      "Parrilla asiática",
+      "Hot pot"
+    ],
+    "recommendation": "Korean BBQ, parrillas coreanas, hot pot, menús con bulgogi, galbi, banchan, soju y combos para compartir.",
+    "style_keywords": [
+      "bold",
+      "block layout",
+      "high contrast",
+      "energetic"
+    ],
+    "is_active": true,
+    "sort_order": 14
+  },
+  {
+    "id": "curry-india",
+    "label": "Curry",
+    "description": "Azafrán, naranja especiado y dorado cálido con serif editorial.",
+    "bestFor": [
+      "Comida india",
+      "Curry house",
+      "Tandoori"
+    ],
+    "recommendation": "Comida india, curry houses, tandoori, menús con butter chicken, naan, biryani, samosas y thali vegetariano.",
+    "style_keywords": [
+      "warm",
+      "spices",
+      "bold",
+      "inviting"
+    ],
+    "is_active": true,
+    "sort_order": 15
+  },
+  {
+    "id": "bistro-frances",
+    "label": "Bistro",
+    "description": "Marino elegante y acentos dorados — estilo hotel/bistro parisino.",
+    "bestFor": [
+      "Bistro francés",
+      "Brasserie",
+      "Crepes y vinos"
+    ],
+    "recommendation": "Bistros franceses, brasseries, crêperías, menús con croque monsieur, quiche, steak frites, vinos franceses y postres crème brûlée.",
+    "style_keywords": [
+      "luxury",
+      "refined",
+      "editorial",
+      "hospitality"
+    ],
+    "is_active": true,
+    "sort_order": 16
+  },
+  {
+    "id": "bbq-humo",
+    "label": "BBQ",
+    "description": "Marrón ahumado y ámbar rústico con tipografía craft handmade.",
+    "bestFor": [
+      "Smokehouse",
+      "Parrilla BBQ",
+      "Costillas y brisket"
+    ],
+    "recommendation": "Smokehouses, BBQ americano, parrillas de costilla y brisket, menús con ribs, pulled pork, mac & cheese y salsa BBQ artesanal.",
+    "style_keywords": [
+      "rustic",
+      "smoke",
+      "earthy",
+      "artisan"
+    ],
+    "is_active": true,
+    "sort_order": 17
+  },
+  {
+    "id": "vegan-verde",
+    "label": "Vegan",
+    "description": "Verde tierra y dorado cosecha — estilo agricultura/plant-based.",
+    "bestFor": [
+      "Vegan",
+      "Plant-based",
+      "Orgánico"
+    ],
+    "recommendation": "Restaurantes veganos, plant-based, menús sin animales con bowls, hamburguesas veggie, leches vegetales y ingredientes de temporada.",
+    "style_keywords": [
+      "nature",
+      "green",
+      "sustainable",
+      "wellness"
+    ],
+    "is_active": true,
+    "sort_order": 18
+  },
+  {
+    "id": "cava-vino",
+    "label": "Vino",
+    "description": "Borgoña profundo y oro craft — bodega y wine bar.",
+    "bestFor": [
+      "Wine bar",
+      "Bodega",
+      "Tapas y quesos"
+    ],
+    "recommendation": "Wine bars, bodegas, tapas con quesos y embutidos, menús con tablas de queso, croquetas, jamón ibérico y maridajes.",
+    "style_keywords": [
+      "premium",
+      "craft",
+      "elegant",
+      "hospitality"
+    ],
+    "is_active": true,
+    "sort_order": 19
+  },
+  {
+    "id": "diner-retro",
+    "label": "Diner Retro",
+    "description": "Estilo retro americano con tipografía pixel y acentos naranja.",
+    "bestFor": [
+      "Diner",
+      "Desayunos",
+      "Comida americana clásica"
+    ],
+    "recommendation": "Diners americanos, desayunos todo el día, menús con pancakes, huevos benedict, milkshakes, hamburguesas clásicas y café refill.",
+    "style_keywords": [
+      "retro",
+      "neon",
+      "vintage",
+      "playful"
+    ],
+    "is_active": true,
+    "sort_order": 20
+  },
+  {
+    "id": "mediterraneo",
+    "label": "Mediterráneo",
+    "description": "Terracota, oliva y crema — estética nature distilled artesanal.",
+    "bestFor": [
+      "Griego",
+      "Turco",
+      "Falafel",
+      "Hummus bar"
+    ],
+    "recommendation": "Cocina griega, turca, falafel, hummus bars, menús con gyros, shawarma, mezze, tabbouleh y pan de pita.",
+    "style_keywords": [
+      "terracotta",
+      "earth",
+      "handmade",
+      "warm"
+    ],
+    "is_active": true,
+    "sort_order": 21
+  },
+  {
+    "id": "thai-vibrante",
+    "label": "Thai",
+    "description": "Verde albahaca y naranja tailandés con Noto Sans Thai.",
+    "bestFor": [
+      "Comida tailandesa",
+      "Pad thai",
+      "Street food asiático"
+    ],
+    "recommendation": "Comida tailandesa, pad thai, curries verdes y rojos, tom yum, satay y menús con opciones picantes y hierbas frescas.",
+    "style_keywords": [
+      "vibrant",
+      "fresh",
+      "colorful",
+      "flowing"
+    ],
+    "is_active": true,
+    "sort_order": 22
+  },
+  {
+    "id": "ramen-miso",
+    "label": "Ramen",
+    "description": "Tonos miso cálidos y tipografía japonesa serif + sans.",
+    "bestFor": [
+      "Ramen",
+      "Udon",
+      "Cocina japonesa casual"
+    ],
+    "recommendation": "Ramen shops, udon, cocina japonesa casual, menús con tonkotsu, miso, gyoza, chashu y toppings de huevo y nori.",
+    "style_keywords": [
+      "warm",
+      "comfort",
+      "earthy",
+      "steam"
+    ],
+    "is_active": true,
+    "sort_order": 23
+  },
+  {
+    "id": "poke-hawaiian",
+    "label": "Poke",
+    "description": "Cian tropical y verde fresco — glassmorphism hawaiano.",
+    "bestFor": [
+      "Poke bowl",
+      "Hawaiian",
+      "Comida fresca de playa"
+    ],
+    "recommendation": "Poke bowls, cocina hawaiana, menús con atún crudo, salmón, arroz sushi, edamame, aguacate y bases personalizables.",
+    "style_keywords": [
+      "frosted",
+      "fresh",
+      "layered",
+      "tropical"
+    ],
+    "is_active": true,
+    "sort_order": 24
+  },
+  {
+    "id": "steak-carbon",
+    "label": "Steak",
+    "description": "Carbón oscuro, rojo carne y oro — steakhouse premium.",
+    "bestFor": [
+      "Steakhouse",
+      "Carnes",
+      "Asador premium"
+    ],
+    "recommendation": "Steakhouses, asadores premium, carnes argentinas, menús con ribeye, tomahawk, guarniciones clásicas y vinos robustos.",
+    "style_keywords": [
+      "premium",
+      "dark",
+      "luxury",
+      "refined"
+    ],
+    "is_active": true,
+    "sort_order": 25
+  },
+  {
+    "id": "dim-sum-china",
+    "label": "Dim Sum",
+    "description": "Rojo imperial y dorado con tipografía china serif + sans.",
+    "bestFor": [
+      "Dim sum",
+      "Comida china",
+      "Noodles y arroz"
+    ],
+    "recommendation": "Dim sum, comida cantonesa, menús con dumplings al vapor, baozi, noodles, arroz frito y té chino.",
+    "style_keywords": [
+      "bold",
+      "red",
+      "gold",
+      "festive"
+    ],
+    "is_active": true,
+    "sort_order": 26
+  },
+  {
+    "id": "ceviche-peru",
+    "label": "Perú",
+    "description": "Azul costero, amarillo cítrico y acentos latinos vibrantes.",
+    "bestFor": [
+      "Cevichería",
+      "Comida peruana",
+      "Anticuchos"
+    ],
+    "recommendation": "Cevicherías peruanas, anticuchos, menús con ceviche clásico, tiradito, causa limeña, chicha morada y comida criolla.",
+    "style_keywords": [
+      "fresh",
+      "coastal",
+      "layered",
+      "bright"
+    ],
+    "is_active": true,
+    "sort_order": 27
+  },
+  {
+    "id": "griego-aegeo",
+    "label": "Griego",
+    "description": "Azul aegeo y blanco — taverna mediterránea con glassmorphism.",
+    "bestFor": [
+      "Taverna griega",
+      "Gyros",
+      "Ensalada griega"
+    ],
+    "recommendation": "Tavernas griegas, gyros, ensalada griega, menús con souvlaki, moussaka, tzatziki, feta y vino retsina.",
+    "style_keywords": [
+      "blue",
+      "white",
+      "aegean",
+      "fresh"
+    ],
+    "is_active": true,
+    "sort_order": 28
+  },
+  {
+    "id": "pho-saigon",
+    "label": "Pho",
+    "description": "Caldo cálido y tipografía Be Vietnam Pro — fiel al design system vietnamita.",
+    "bestFor": [
+      "Pho",
+      "Banh mi",
+      "Comida vietnamita"
+    ],
+    "recommendation": "Pho, banh mi, comida vietnamita, menús con sopas de fideos, rollitos primavera, café con leche condensada y hierbas frescas.",
+    "style_keywords": [
+      "warm",
+      "broth",
+      "comfort",
+      "asian"
+    ],
+    "is_active": true,
+    "sort_order": 29
+  },
+  {
+    "id": "helado-gelato",
+    "label": "Helado",
+    "description": "Pasteles rosa y lavanda — exaggerated minimalism para heladerías.",
+    "bestFor": [
+      "Heladería",
+      "Gelato",
+      "Postres fríos"
+    ],
+    "recommendation": "Heladerías, gelaterías, menús con sabores artesanales, paletas, sundaes, waffles con helado y toppings.",
+    "style_keywords": [
+      "pastel",
+      "sweet",
+      "soft",
+      "playful"
+    ],
+    "is_active": true,
+    "sort_order": 30
+  },
+  {
+    "id": "cubano-caribe",
+    "label": "Cubano",
+    "description": "Coral caribeño y azul profundo — sándwiches y cocina tropical.",
+    "bestFor": [
+      "Cubano",
+      "Caribe",
+      "Tropical casual"
+    ],
+    "recommendation": "Cocina cubana, caribeña tropical casual, menús con sandwich cubano, ropa vieja, tostones, mojitos y plátanos.",
+    "style_keywords": [
+      "tropical",
+      "coral",
+      "coastal",
+      "vibrant"
+    ],
+    "is_active": true,
+    "sort_order": 31
+  },
+  {
+    "id": "tex-mex-cantina",
+    "label": "Tex-Mex",
+    "description": "Rosa vibrante y azul engagement — estilo cantina tex-mex.",
+    "bestFor": [
+      "Tex-Mex",
+      "Cantina",
+      "Nachos y fajitas"
+    ],
+    "recommendation": "Tex-Mex, cantinas, menús con fajitas, nachos, queso fundido, burritos grandes, margaritas y combos para grupos.",
+    "style_keywords": [
+      "rose",
+      "blue",
+      "festive",
+      "bold"
+    ],
+    "is_active": true,
+    "sort_order": 32
+  },
+  {
+    "id": "food-truck",
+    "label": "Truck",
+    "description": "Amarillo llamativo y rojo urbano — food truck callejero.",
+    "bestFor": [
+      "Food truck",
+      "Street food diurno",
+      "Festival"
+    ],
+    "recommendation": "Food trucks, street food diurno, festivales gastronómicos, menús cortos con 5-10 ítems estrella y promos del día.",
+    "style_keywords": [
+      "yellow",
+      "red",
+      "urban",
+      "street"
+    ],
+    "is_active": true,
+    "sort_order": 33
+  },
+  {
+    "id": "granja-organica",
+    "label": "Granja",
+    "description": "Farm-to-table con verdes tierra y tipografía Lora + Raleway (Organic Biophilic).",
+    "bestFor": [
+      "Farm-to-table",
+      "Orgánico",
+      "Mercado local"
+    ],
+    "recommendation": "Farm-to-table, orgánico, mercados locales, menús de temporada con verduras de huerto, carnes de granja y proveedores nombrados.",
+    "style_keywords": [
+      "farm",
+      "earth",
+      "sustainable",
+      "natural"
+    ],
+    "is_active": true,
+    "sort_order": 34
+  },
+  {
+    "id": "lounge-nocturno",
+    "label": "Lounge",
+    "description": "Oscuro con oro y acentos rojos — bar lounge nocturno.",
+    "bestFor": [
+      "Bar lounge",
+      "Coctelería",
+      "Música en vivo"
+    ],
+    "recommendation": "Bar lounge, coctelería, música en vivo, menús con botanas premium, tablas para compartir, tragos de autor y ambiente after-office.",
+    "style_keywords": [
+      "dark",
+      "gold",
+      "nightlife",
+      "premium"
+    ],
+    "is_active": true,
+    "sort_order": 35
+  },
+  {
+    "id": "brunch-dorado",
+    "label": "Brunch",
+    "description": "Naranja mimosa y dorado — brunch de fin de semana.",
+    "bestFor": [
+      "Brunch",
+      "Mimosa bar",
+      "Desayunos gourmet"
+    ],
+    "recommendation": "Brunch, mimosa bar, desayunos gourmet de fin de semana, menús con eggs benedict, french toast, avocado toast y jugos frescos.",
+    "style_keywords": [
+      "mimosa",
+      "orange",
+      "gold",
+      "brunch"
+    ],
+    "is_active": true,
+    "sort_order": 36
+  },
+  {
+    "id": "libanes-fenix",
+    "label": "Libanés",
+    "description": "Terracota y oliva con nature distilled — mezze y falafel.",
+    "bestFor": [
+      "Libanés",
+      "Mezze",
+      "Shawarma"
+    ],
+    "recommendation": "Libanés, mezze, shawarma, menús con falafel, kibbeh, tabbouleh, fatayer y combinados para compartir.",
+    "style_keywords": [
+      "terracotta",
+      "olive",
+      "mezze",
+      "warm"
+    ],
+    "is_active": true,
+    "sort_order": 37
+  },
+  {
+    "id": "obsidiana-oro",
+    "label": "Obsidiana",
+    "description": "Negro absoluto con oro premium — steakhouse, fine dining y menús de alta cocina nocturna.",
+    "bestFor": [
+      "Fine dining",
+      "Steakhouse",
+      "Bar premium"
+    ],
+    "recommendation": "Fine dining nocturno, steakhouse premium, bar de alta cocina, menús con cortes exclusivos, maridajes y experiencias íntimas.",
+    "style_keywords": [
+      "black",
+      "gold",
+      "luxury",
+      "noir"
+    ],
+    "is_active": true,
+    "sort_order": 38
+  },
+  {
+    "id": "neon-tokyo",
+    "label": "Tokyo",
+    "description": "Negro total con cian eléctrico y magenta — ramen, izakaya y street food japonés nocturno.",
+    "bestFor": [
+      "Ramen",
+      "Izakaya",
+      "Sushi bar nocturno"
+    ],
+    "recommendation": "Ramen nocturno, izakaya, sushi bar de noche, street food japonés y menús con ambiente cyberpunk o juvenil.",
+    "style_keywords": [
+      "neon",
+      "cyber",
+      "cyan",
+      "magenta"
+    ],
+    "is_active": true,
+    "sort_order": 39
+  },
+  {
+    "id": "carbon-bbq",
+    "label": "Carbon",
+    "description": "Humo y brasas sobre negro puro — BBQ, parrilla y smokehouse con acentos ámbar encendidos.",
+    "bestFor": [
+      "BBQ",
+      "Smokehouse",
+      "Parrilla americana"
+    ],
+    "recommendation": "BBQ nocturno, smokehouse, parrilla americana, menús con brisket, ribs ahumadas y sides clásicos en ambiente oscuro.",
+    "style_keywords": [
+      "ember",
+      "smoke",
+      "orange",
+      "bold"
+    ],
+    "is_active": true,
+    "sort_order": 40
+  },
+  {
+    "id": "midnight-taco",
+    "label": "Midnight",
+    "description": "Taquería nocturna: negro absoluto con rosa neón y lima eléctrica — antojitos después del sunset.",
+    "bestFor": [
+      "Taquería nocturna",
+      "Antojitos",
+      "Food truck"
+    ],
+    "recommendation": "Taquería nocturna, antojitos de madrugada, food trucks mexicanos nocturnos, menús con tacos, volcanes y bebidas frías.",
+    "style_keywords": [
+      "neon",
+      "lime",
+      "pink",
+      "night"
+    ],
+    "is_active": true,
+    "sort_order": 41
+  },
+  {
+    "id": "void-omakase",
+    "label": "Omakase",
+    "description": "Omakase minimalista: negro total, oro tenue y jade neón — experiencia íntima y exclusiva.",
+    "bestFor": [
+      "Omakase",
+      "Sushi bar",
+      "Chef table"
+    ],
+    "recommendation": "Omakase, sushi bar premium, chef table, menús degustación japoneses con pocos platos curados y precio por persona.",
+    "style_keywords": [
+      "minimal",
+      "black",
+      "gold",
+      "jade"
+    ],
+    "is_active": true,
+    "sort_order": 42
+  },
+  {
+    "id": "noir-copa",
+    "label": "Noir",
+    "description": "Bar de vinos y coctelería: negro absoluto, burdeos profundo y champagne eléctrico.",
+    "bestFor": [
+      "Wine bar",
+      "Coctelería",
+      "Speakeasy"
+    ],
+    "recommendation": "Wine bar, coctelería, speakeasy, menús con vinos por copa, charcutería, ostras y tragos clásicos en ambiente oscuro.",
+    "style_keywords": [
+      "burgundy",
+      "champagne",
+      "noir",
+      "elegant"
+    ],
+    "is_active": true,
+    "sort_order": 43
+  },
+  {
+    "id": "cyber-void",
+    "label": "Cyber",
+    "description": "Street food gamer: negro puro, púrpura ultravioleta y cian láser — mercados nocturnos urbanos.",
+    "bestFor": [
+      "Street food",
+      "Night market",
+      "Burger nocturno"
+    ],
+    "recommendation": "Street food nocturno, burgers de madrugada, night markets urbanos y menús juveniles con promos gaming o eventos.",
+    "style_keywords": [
+      "cyber",
+      "purple",
+      "cyan",
+      "neon"
+    ],
+    "is_active": true,
+    "sort_order": 44
+  },
+  {
+    "id": "lampara-ramen",
+    "label": "Lámpara",
+    "description": "Ramen de madrugada: negro total, rojo linterna y amarillo caldo neón — calidez en la oscuridad.",
+    "bestFor": [
+      "Ramen",
+      "Udon",
+      "Comida caliente nocturna"
+    ],
+    "recommendation": "Ramen nocturno, udon, comida caliente de madrugada, menús con caldos, gyoza y cerveza japonesa.",
+    "style_keywords": [
+      "lantern",
+      "red",
+      "yellow",
+      "night"
+    ],
+    "is_active": true,
+    "sort_order": 45
+  },
+  {
+    "id": "abisal-mar",
+    "label": "Abisal",
+    "description": "Mariscos de profundidad: negro absoluto con turquesa bioluminiscente — ceviche, ostiones y barra cruda nocturna.",
+    "bestFor": [
+      "Mariscos",
+      "Cevichería",
+      "Raw bar"
+    ],
+    "recommendation": "Mariscos premium nocturnos, cevichería de autor, raw bar, menús con ostiones, tiraditos y pescado del día en ambiente oscuro.",
+    "style_keywords": [
+      "ocean",
+      "turquoise",
+      "deep",
+      "noir"
+    ],
+    "is_active": true,
+    "sort_order": 46
+  },
+  {
+    "id": "forno-notte",
+    "label": "Forno",
+    "description": "Pizzería nocturna: negro total, rojo tomate ardiente y verde albahaca neón — horno italiano después del anochecer.",
+    "bestFor": [
+      "Pizzería",
+      "Trattoria",
+      "Pasta nocturna"
+    ],
+    "recommendation": "Pizzería nocturna, trattoria de cena, pasta y pizza después de las 8pm, menús con horno de leña y vino tinto.",
+    "style_keywords": [
+      "tomato",
+      "basil",
+      "italian",
+      "night"
+    ],
+    "is_active": true,
+    "sort_order": 47
+  },
+  {
+    "id": "subway-nocturno",
+    "label": "Subway",
+    "description": "Estilo sandwich chain sobre negro puro: verde Subway vibrante y amarillo dorado — subs, wraps y bowls personalizables.",
+    "bestFor": [
+      "Sandwiches",
+      "Subs",
+      "Fast casual saludable",
+      "Wraps y bowls"
+    ],
+    "recommendation": "Cadenas de subs, sandwich shops, menús build-your-own, wraps, ensaladas en bowl, opciones saludables y combos de comida rápida con personalización.",
+    "style_keywords": [
+      "subway",
+      "green",
+      "bold",
+      "fast casual",
+      "dark"
+    ],
+    "is_active": true,
+    "sort_order": 48
+  },
+  {
+    "id": "septiembre-patrio",
+    "label": "Patrio",
+    "description": "Verde, blanco y rojo de la bandera — mes de la independencia (15-16 sep).",
+    "bestFor": [
+      "Septiembre",
+      "Fiestas patrias",
+      "Menú especial 16 de sep"
+    ],
+    "recommendation": "Menús especiales de septiembre, fiestas patrias, promos del 15-16 de septiembre, chiles en nogada y platillos mexicanos icónicos.",
+    "style_keywords": [
+      "patriotic",
+      "tricolor",
+      "bold",
+      "fiesta"
+    ],
+    "is_active": true,
+    "sort_order": 49
+  },
+  {
+    "id": "grito-independencia",
+    "label": "Grito",
+    "description": "Noche del 15 de septiembre: verde profundo, rojo y oro en ambiente nocturno.",
+    "bestFor": [
+      "Noche del Grito",
+      "15-16 sep",
+      "Celebración nocturna"
+    ],
+    "recommendation": "Cena del Grito, noche del 15 de septiembre, eventos patrios nocturnos, menús con pozole, tostadas y tequila.",
+    "style_keywords": [
+      "night",
+      "grito",
+      "gold",
+      "patriotic"
+    ],
+    "is_active": true,
+    "sort_order": 50
+  },
+  {
+    "id": "dia-muertos",
+    "label": "Muertos",
+    "description": "Naranja cempasúchil, morado y rosa — ofrenda y papel picado.",
+    "bestFor": [
+      "1-2 Nov",
+      "Día de Muertos",
+      "Ofrendas y pan de muerto"
+    ],
+    "recommendation": "Menús del 1-2 de noviembre, pan de muerto, platillos de ofrenda, mole, tamales y bebidas tradicionales de Día de Muertos.",
+    "style_keywords": [
+      "marigold",
+      "purple",
+      "ofrenda",
+      "cultural"
+    ],
+    "is_active": true,
+    "sort_order": 51
+  },
+  {
+    "id": "mundial-2026",
+    "label": "Mundial",
+    "description": "Verde cancha, oro y tricolor — Copa del Mundo en México.",
+    "bestFor": [
+      "World Cup 2026",
+      "Promos deportivas",
+      "Ver partidos en el local"
+    ],
+    "recommendation": "Promos del Mundial 2026, ver partidos en el local, combos para grupos, botanas de bar y menús temáticos deportivos.",
+    "style_keywords": [
+      "soccer",
+      "world cup",
+      "stadium",
+      "energy"
+    ],
+    "is_active": true,
+    "sort_order": 52
+  },
+  {
+    "id": "navidad-posadas",
+    "label": "Navidad",
+    "description": "Rojo posada, verde pino y dorado — diciembre mexicano.",
+    "bestFor": [
+      "Navidad",
+      "Posadas",
+      "Cena de fin de año"
+    ],
+    "recommendation": "Navidad, posadas, cena de fin de año, menús con bacalao, romeritos, pierna, ponche y postres navideños.",
+    "style_keywords": [
+      "christmas",
+      "posada",
+      "warm",
+      "gold"
+    ],
+    "is_active": true,
+    "sort_order": 53
+  },
+  {
+    "id": "cinco-mayo",
+    "label": "5 Mayo",
+    "description": "Tricolor festivo con verde, rojo y oro — batalla de Puebla.",
+    "bestFor": [
+      "5 de Mayo",
+      "Promos Puebla",
+      "Fiesta mexicana"
+    ],
+    "recommendation": "Promos del 5 de mayo, fiesta mexicana, menús con chiles en nogada, mole poblano, antojitos y margaritas.",
+    "style_keywords": [
+      "fiesta",
+      "papel picado",
+      "colorful",
+      "celebration"
+    ],
+    "is_active": true,
+    "sort_order": 54
+  },
+  {
+    "id": "revolucion-mx",
+    "label": "Revolución",
+    "description": "Tierra, verde oliva y oro viejo — 20 de noviembre.",
+    "bestFor": [
+      "20 de Nov",
+      "Revolución mexicana",
+      "Cocina tradicional"
+    ],
+    "recommendation": "Menús del 20 de noviembre, cocina tradicional mexicana, platillos de revolución, mole, barbacoa y comida de pueblo.",
+    "style_keywords": [
+      "historical",
+      "earth",
+      "tradition",
+      "rustic"
+    ],
+    "is_active": true,
+    "sort_order": 55
+  },
+  {
+    "id": "roastery-latte",
+    "label": "Roastery",
+    "description": "Terracota, crema y arena cálida con serif orgánica — tostador de especialidad y pan de masa madre.",
+    "bestFor": [
+      "Tostador de café",
+      "Panadería artesanal",
+      "Brunch de barrio"
+    ],
+    "recommendation": "Tostadores de especialidad, panaderías de masa madre, cafés de barrio con repostería propia, menús con pour-over, latte art, croissants, sourdough y brunch de fin de semana.",
+    "style_keywords": [
+      "terracotta",
+      "sand",
+      "organic",
+      "artisan",
+      "warm"
+    ],
+    "is_active": true,
+    "sort_order": 56
+  },
+  {
+    "id": "maitre-elegance",
+    "label": "Maître",
+    "description": "Piedra premium, oro refinado y serif Cormorant — alta cocina, cava y experiencias de autor.",
+    "bestFor": [
+      "Alta cocina",
+      "Chef table",
+      "Wine pairing"
+    ],
+    "recommendation": "Restaurantes de alta cocina, chef table, cavas con maridaje, menús degustación, omakase premium en sala clara y venues donde el ticket y la experiencia son el protagonista.",
+    "style_keywords": [
+      "luxury",
+      "gold",
+      "refined",
+      "premium",
+      "editorial"
+    ],
+    "is_active": true,
+    "sort_order": 57
+  },
+  {
+    "id": "antojo-urbano",
+    "label": "Antojo",
+    "description": "Naranja callejero, bloques bold y sans geométrica — puestos, esquites y antojitos de avenida.",
+    "bestFor": [
+      "Antojitos",
+      "Puesto callejero",
+      "Comida rápida urbana"
+    ],
+    "recommendation": "Puestos de esquites, elotes, tortas ambulantes, marquesitas, antojerías urbanas y menús cortos de comida rápida mexicana con promos del día y combos accesibles.",
+    "style_keywords": [
+      "orange",
+      "bold",
+      "block layout",
+      "street",
+      "energetic"
+    ],
+    "is_active": true,
+    "sort_order": 58
+  }
+]
