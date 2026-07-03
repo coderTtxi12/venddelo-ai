@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import ForbiddenError, NotFoundError
@@ -19,6 +19,7 @@ from app.modules.assistant.conversation_cache import AssistantConversationCache
 from app.modules.assistant.profile.schemas import AssistantProfileSnapshot
 from app.modules.assistant.profile.service import AssistantProfileService
 from app.modules.assistant.repository import AssistantRepository
+from app.modules.assistant.import_assets import validate_import_asset_path
 from app.modules.assistant.schemas import (
     AssistantChatHistoryMessage,
     AssistantChatRequest,
@@ -26,6 +27,7 @@ from app.modules.assistant.schemas import (
     AssistantConversationDTO,
     AssistantConversationUpdate,
     AssistantMessageDTO,
+    ChatAttachmentRef,
 )
 from app.modules.assistant.service import AssistantService
 from app.modules.assistant.skills.registry import SkillRegistry
@@ -177,6 +179,18 @@ class AssistantConversationService:
         self._cache.set_recent_messages(conversation_id, rows)
         return [AssistantChatHistoryMessage(role=item.role, content=item.content) for item in rows]
 
+    def _validate_chat_attachments(
+        self,
+        restaurant_id: uuid.UUID,
+        attachments: list[ChatAttachmentRef],
+    ) -> None:
+        for attachment in attachments:
+            validate_import_asset_path(
+                restaurant_id,
+                attachment.storage_path,
+                kind=attachment.kind,
+            )
+
     def stream_chat(
         self,
         restaurant_id: uuid.UUID,
@@ -185,9 +199,13 @@ class AssistantConversationService:
         message: str,
         profile_version: int,
         profile_snapshot: AssistantProfileSnapshot | None = None,
+        attachments: list[ChatAttachmentRef] | None = None,
     ) -> Iterator[ChatStreamEvent]:
         if self._profile_service is None:
             raise RuntimeError("Assistant profile service is not configured")
+
+        attachment_refs = attachments or []
+        self._validate_chat_attachments(restaurant_id, attachment_refs)
 
         conversation = self._require_conversation(restaurant_id, conversation_id)
         profile_record, effective_skills = self._profile_service.resolve_profile_for_chat(
@@ -199,17 +217,27 @@ class AssistantConversationService:
 
         user_created_at = datetime.now(UTC)
         history = self._load_context_messages(conversation_id)
+        user_metadata: dict[str, Any] | None = None
+        if attachment_refs:
+            user_metadata = {
+                "attachments": [attachment.model_dump() for attachment in attachment_refs],
+            }
         self._repo.add_message(
             conversation_id=conversation_id,
             role="user",
             content=message,
+            metadata=user_metadata,
             created_at=user_created_at,
         )
         self._cache.invalidate_messages(conversation_id)
 
         assistant_message_id = uuid.uuid4()
         content_parts: list[str] = []
-        request = AssistantChatRequest(message=message, history=history)
+        request = AssistantChatRequest(
+            message=message,
+            history=history,
+            attachments=attachment_refs,
+        )
 
         if not self._lane.try_acquire(conversation_id):
             yield ChatStreamEvent(

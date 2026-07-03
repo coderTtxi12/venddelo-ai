@@ -133,7 +133,7 @@ class AgentOrchestrator:
         system_prompt = (
             compose_system_prompt(profile, effective_skill_ids=catalog_skill_ids)
             + "\n\n---\n\n"
-            + build_agent_runtime_section()
+            + build_agent_runtime_section(entitled_skill_ids)
         )
         tool_schemas = build_openai_tool_schemas(entitled_tools)
         if entitled_skill_ids:
@@ -158,6 +158,7 @@ class AgentOrchestrator:
             "restaurant_id": str(ctx.restaurant_id),
             "conversation_id": str(ctx.conversation_id),
             "entitled_skill_ids": entitled_skill_ids,
+            "attachments": [attachment.model_dump() for attachment in request.attachments],
         }
 
         with trace(
