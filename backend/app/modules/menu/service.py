@@ -96,6 +96,13 @@ class MenuService:
             raise NotFoundError("Product not found")
         return prod
 
+    def get_product_by_id(self, restaurant_id: uuid.UUID, product_id: uuid.UUID) -> ProductDTO:
+        """Return a product even when inactive (for owner/admin flows)."""
+        prod = self._repo.get_product_by_id(product_id)
+        if prod is None or prod.restaurant_id != restaurant_id:
+            raise NotFoundError("Product not found")
+        return prod
+
     def list_products(
         self, restaurant_id: uuid.UUID, params: PaginationParams
     ) -> CursorPage[ProductDTO]:
