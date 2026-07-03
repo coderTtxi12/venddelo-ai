@@ -60,8 +60,9 @@ def normalize_product_query(query: str) -> str:
     return normalized
 
 
-def score_product(query: str, product: ProductDTO) -> float:
-    if not product.is_active:
+def score_product(query: str, product: ProductDTO, *, active_only: bool = False) -> float:
+    """Score how well ``query`` matches a product **by name** (description ignored)."""
+    if active_only and not product.is_active:
         return 0.0
     normalized_query = normalize_product_query(query)
     if not normalized_query:
@@ -69,12 +70,14 @@ def score_product(query: str, product: ProductDTO) -> float:
     normalized_name = normalize_text(product.name)
     if normalized_query == normalized_name:
         return 1.0
-    return match_score(normalized_query, product.name, product.description or "")
+    return match_score(normalized_query, product.name)
 
 
 def resolve_product_in_catalog(
     query: str,
     products: list[ProductDTO],
+    *,
+    active_only: bool = False,
 ) -> ProductResolveResult:
     """Resolve one product by name within an in-memory catalog slice."""
     cleaned = normalize_product_query(query)
@@ -83,7 +86,7 @@ def resolve_product_in_catalog(
 
     exact: list[ProductDTO] = []
     for product in products:
-        if not product.is_active:
+        if active_only and not product.is_active:
             continue
         if normalize_text(product.name) == cleaned:
             exact.append(product)
@@ -104,7 +107,7 @@ def resolve_product_in_catalog(
 
     scored: list[tuple[float, ProductDTO]] = []
     for product in products:
-        score = score_product(query, product)
+        score = score_product(query, product, active_only=active_only)
         if score >= SUGGESTION_THRESHOLD:
             scored.append((score, product))
     scored.sort(key=lambda pair: pair[0], reverse=True)
@@ -140,13 +143,13 @@ def resolve_product_in_catalog(
     )
 
 
-def iter_active_products(
+def iter_catalog_products(
     service: MenuService,
     restaurant_id: uuid.UUID,
     *,
     page_size: int = 100,
 ) -> list[ProductDTO]:
-    """Load all active products for a restaurant (paginated internally)."""
+    """Load all products for a restaurant (active and inactive)."""
     products: list[ProductDTO] = []
     cursor: str | None = None
     while True:
@@ -161,11 +164,23 @@ def iter_active_products(
     return products
 
 
+def iter_active_products(
+    service: MenuService,
+    restaurant_id: uuid.UUID,
+    *,
+    page_size: int = 100,
+) -> list[ProductDTO]:
+    """Load active products only (legacy helper for promo/category scans)."""
+    return [product for product in iter_catalog_products(service, restaurant_id, page_size=page_size) if product.is_active]
+
+
 def resolve_product(
     service: MenuService,
     restaurant_id: uuid.UUID,
     query: str,
+    *,
+    active_only: bool = False,
 ) -> ProductResolveResult:
-    """Resolve a product name against the full tenant catalog."""
-    catalog = iter_active_products(service, restaurant_id)
-    return resolve_product_in_catalog(query, catalog)
+    """Resolve a product name against the tenant catalog (includes inactive by default)."""
+    catalog = iter_catalog_products(service, restaurant_id)
+    return resolve_product_in_catalog(query, catalog, active_only=active_only)
