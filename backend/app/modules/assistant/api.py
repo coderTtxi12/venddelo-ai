@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import pagination_params, require_owned_restaurant
@@ -43,6 +43,7 @@ from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.infra.llm.factory import build_llm_provider
 from app.infra.redis.factory import build_cache
 from app.modules.assistant.conversation_service import AssistantConversationService
+from app.modules.assistant.import_assets import upload_import_asset
 from app.modules.assistant.profile.cache import AssistantProfileCache
 from app.modules.assistant.profile.schemas import AssistantProfileResponse, AssistantProfileUpdate
 from app.modules.assistant.profile.service import AssistantProfileService
@@ -52,6 +53,7 @@ from app.modules.assistant.schemas import (
     AssistantConversationDTO,
     AssistantConversationUpdate,
     AssistantMessageDTO,
+    ImportAssetUploadDTO,
 )
 from app.modules.assistant.service import AssistantService
 from app.modules.assistant.skills import build_skill_registry
@@ -246,6 +248,27 @@ def delete_conversation(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.post(
+    "/restaurants/{restaurant_id}/assistant/import/assets",
+    response_model=ImportAssetUploadDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+def upload_import_asset_route(
+    kind: str = Query(...),
+    file: UploadFile = File(...),
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+) -> ImportAssetUploadDTO:
+    content = file.file.read()
+    content_type = file.content_type or "application/octet-stream"
+    return upload_import_asset(
+        restaurant.id,
+        kind,
+        file.filename or "upload",
+        content,
+        content_type,
+    )
+
+
 @router.post("/restaurants/{restaurant_id}/assistant/conversations/{conversation_id}/chat")
 def stream_conversation_chat(
     conversation_id: uuid.UUID,
@@ -305,6 +328,7 @@ def stream_conversation_chat(
             restaurant_id,
             conversation_id,
             message=body.message,
+            attachments=body.attachments,
             profile_version=body.profile_version,
             profile_snapshot=body.profile_snapshot,
         )
