@@ -82,8 +82,32 @@ def build_load_skill_schema(skill_ids: list[str]) -> dict:
     }
 
 
-def build_agent_runtime_section() -> str:
+def build_agent_runtime_section(effective_skill_ids: list[str] | None = None) -> str:
     """Runtime guidance appended once to the system prompt for the tool-calling loop."""
+    entitled = set(effective_skill_ids or [])
+    menu_import_section = ""
+    if "menu_import" in entitled:
+        menu_import_section = """
+## Menu import onboarding (required workflow)
+
+When the owner wants to **import or digitize** their menu (PDF, DOCX, photos):
+
+1. **`load_skill(menu_import)`** first if not already loaded this turn.
+2. **`start_menu_import_session`** — one active session per restaurant.
+3. Follow the phased workflow in the skill guide: discovery → upload sources →
+   **`start_menu_extraction_batch`** → clarify open questions → collect photos →
+   theme selection → **`preview_import_batch`** → **`apply_menu_batch`** (only with
+   `confirmed: true` after owner approval) → photo match → optional description/image
+   enhancement → **`update_menu_knowledge`** to close the session.
+4. Extraction, apply, and photo matching run **synchronously** in this chat turn —
+   tell the owner you are processing and keep activity reasoning brief between tool calls.
+5. For products without photos after import, use **`request_image_enhancement`** then
+   **`menu_media`** tools (separate skill) with owner confirmation.
+
+Never call `apply_menu_batch`, `apply_photo_mappings`, or `apply_description_enhancements`
+without explicit owner confirmation (`confirmed: true`).
+
+"""
     return """## How you work
 
 You have native tools. To get live restaurant data or make changes, call a tool —
@@ -113,7 +137,8 @@ When the owner asks to **improve, optimize, audit, recommend, or edit** the menu
 2. **`menu_read` tools** — fetch the restaurant's **live** menu state. For a **full menu
    audit** you MUST read, at minimum:
    `list_categories` + `list_products` (paginate until `has_more=false`) + `list_promotions`.
-   `list_products` already returns each product's description, photo, price, and complements
+   `list_products` returns **all** products (active and inactive). Exact product names beat
+   fuzzy neighbors in `search_products` / `get_product` — match by **name**, not description.
    (option groups + items), so it is enough to judge products, photos, and add-ons. Use
    `get_product` only when you also need the promotions attached to a specific product.
    Reading only categories + promotions is NOT enough to talk about products.
@@ -127,7 +152,7 @@ now or say you have not reviewed them yet — never guess.
 
 Skip steps 1–2 only when this turn already has the loaded guide **and** accurate
 `menu_read` results for the exact items in scope.
-
+""" + menu_import_section + """
 ## Activity reasoning (before tools)
 
 When you are about to call one or more tools, first write 1–2 short sentences in

@@ -27,6 +27,30 @@ _TOOL_GOALS: dict[str, str] = {
     "bulk_update_category_sort_indices": "Reordenar categorías en lote",
     "bulk_update_category_visibility": "Cambiar visibilidad de categorías en lote",
     "bulk_update_category_display_layout": "Cambiar layout de categorías en lote",
+    "generate_product_image": "Generar foto de producto",
+    "bulk_generate_product_images": "Generar fotos de productos en lote",
+    "analyze_product_image": "Analizar foto del producto",
+    "suggest_complements": "Sugerir complementos",
+    "start_menu_import_session": "Iniciar importación de menú",
+    "get_import_session": "Consultar sesión de importación",
+    "save_discovery_answers": "Guardar respuestas de descubrimiento",
+    "register_menu_source_file": "Registrar archivo del menú",
+    "start_menu_extraction_batch": "Extraer contenido del menú (OCR)",
+    "get_extraction_status": "Consultar estado de extracción",
+    "save_clarification_answers": "Guardar aclaraciones del menú",
+    "list_menu_themes": "Listar temas del menú digital",
+    "recommend_menu_theme": "Recomendar tema visual",
+    "apply_menu_theme": "Aplicar tema del menú",
+    "register_product_image": "Registrar foto de producto",
+    "match_photos_to_products": "Emparejar fotos con productos",
+    "resolve_uncertain_image": "Resolver foto incierta",
+    "preview_import_batch": "Vista previa del lote de importación",
+    "apply_menu_batch": "Aplicar lote al menú digital",
+    "apply_photo_mappings": "Aplicar fotos a productos",
+    "preview_description_enhancements": "Vista previa de descripciones mejoradas",
+    "apply_description_enhancements": "Aplicar descripciones mejoradas",
+    "request_image_enhancement": "Listar productos sin foto",
+    "update_menu_knowledge": "Actualizar conocimiento del menú",
     "update_category": "Actualizar categoría",
     "create_category": "Crear categoría",
 }
@@ -66,7 +90,7 @@ def goal_for_call(fn_name: str, args: dict[str, Any]) -> str:
         query = args.get("query") or args.get("name")
         if isinstance(query, str) and query.strip():
             return f'{base} «{query.strip()}»'
-    if tool_name in {"get_product", "update_product"}:
+    if tool_name in {"get_product", "update_product", "generate_product_image", "analyze_product_image", "suggest_complements"}:
         for key in ("name", "product_name", "query"):
             value = args.get(key)
             if isinstance(value, str) and value.strip():
@@ -79,11 +103,28 @@ def goal_for_call(fn_name: str, args: dict[str, Any]) -> str:
         count = len(items) if isinstance(items, list) else 0
         if count:
             return f"{base} ({count} producto{'s' if count != 1 else ''})"
+    if tool_name == "bulk_generate_product_images":
+        product_ids = args.get("product_ids")
+        count = len(product_ids) if isinstance(product_ids, list) else 0
+        if count:
+            return f"{base} ({count} producto{'s' if count != 1 else ''})"
+        limit = args.get("limit")
+        if isinstance(limit, int) and limit > 0:
+            return f"{base} (hasta {limit})"
     if tool_name.startswith("bulk_update_category"):
         items = args.get("items") or args.get("categories")
         count = len(items) if isinstance(items, list) else 0
         if count:
             return f"{base} ({count} categoría{'s' if count != 1 else ''})"
+    if tool_name in {"preview_import_batch", "apply_menu_batch"}:
+        batch_index = args.get("batch_index")
+        if isinstance(batch_index, int):
+            return f"{base} (lote {batch_index})"
+    if tool_name in {"register_menu_source_file", "register_product_image"}:
+        name = args.get("original_name") or args.get("storage_path")
+        if isinstance(name, str) and name.strip():
+            short = name.strip().rsplit("/", 1)[-1]
+            return f"{base}: «{short}»"
 
     return base
 
