@@ -42,8 +42,7 @@ def compose_system_prompt(
             skill_lines.append(f"- **{skill_id}**: {summary}")
         sections.append("## Active skills\n\n" + "\n".join(skill_lines))
 
-    # Temporarily disabled — per-restaurant MENU markdown (see profile/menu_markdown.py)
-    # if profile.menu_markdown.strip():
-    #     sections.append(f"## MENU knowledge\n\n{profile.menu_markdown.strip()}")
+    if profile.menu_markdown.strip():
+        sections.append(f"## MENU knowledge\n\n{profile.menu_markdown.strip()}")
 
     return "\n\n---\n\n".join(sections)

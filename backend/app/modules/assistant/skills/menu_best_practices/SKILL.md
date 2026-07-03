@@ -105,7 +105,7 @@ Respond to the owner in **Spanish**, with clear markdown.
 | Visual badge, no math | `promotions` type `combo` (`priced_in_cart=false`) | `create_promotion` |
 | Logo / cover / theme | `restaurants` branding | `update_restaurant` |
 | "Turn off" a product | `is_active=false` (never delete) | `set_product_active`, `update_option_*` |
-| Photos | `image_path` on product/category/promo | `generate_image`, `enhance_image` + `update_*` |
+| Photos | `image_path` on product/category/promo | `generate_product_image`, `bulk_generate_product_images` (menu_media) + `update_*` |
 
 ---
 
@@ -216,7 +216,8 @@ Venddelo recommends that **every dish should have a quality photo**. Checklist:
 | Consistency | Photo must match name and description |
 | Forbidden in photo | Prices, discount %, phone numbers, logo >25% of frame, unappealing disposable packaging, inappropriate content |
 
-On this platform: if `image_path` is missing, offer **`generate_image`** or **`enhance_image`**
+On this platform: if `image_path` is missing, offer **`generate_product_image`** or
+**`bulk_generate_product_images`** (skill **`menu_media`**) after confirming with the owner;
 (via `menu_write`) with concrete prompts (dish, visible ingredients, natural light, neutral
 background). After generating, apply with `update_product` / `update_category`.
 

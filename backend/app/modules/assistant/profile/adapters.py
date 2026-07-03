@@ -95,10 +95,8 @@ class SqlAlchemyAssistantProfileRepository(AssistantProfileRepository):
         # if behavior_markdown is not None:
         #     obj.behavior_markdown = behavior_markdown
         _ = behavior_markdown
-        # Temporarily disabled — see profile/menu_markdown.py
-        # if menu_markdown is not None:
-        #     obj.menu_markdown = menu_markdown
-        _ = menu_markdown
+        if menu_markdown is not None:
+            obj.menu_markdown = menu_markdown_for_persist(menu_markdown)
         if enabled_skill_ids is not None:
             obj.enabled_skill_ids = enabled_skill_ids
 

@@ -7,7 +7,7 @@ product re-enables custom menu knowledge blocks per restaurant.
 from __future__ import annotations
 
 # Set True to restore DB + prompt wiring for menu_markdown.
-MENU_MARKDOWN_ENABLED = False
+MENU_MARKDOWN_ENABLED = True
 
 
 def menu_markdown_for_runtime(stored: str) -> str:

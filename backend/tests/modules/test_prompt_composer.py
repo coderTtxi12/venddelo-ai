@@ -17,11 +17,12 @@ def test_compose_system_prompt_includes_display_name():
         updated_at=datetime.now(UTC),
     )
     prompt = compose_system_prompt(record, effective_skill_ids=["menu_read"])
-    assert 'Your assistant display name is "Luna"' in prompt
+    assert 'Your name is "Luna"' in prompt
     assert "Tu nombre es" not in prompt
     assert "Respond in Spanish" in prompt
     assert "# Identity" not in prompt
     assert "# Behavior" not in prompt
     assert "**menu_read**" in prompt
     assert "Read-only access" in prompt
-    assert "# Menu rules" not in prompt
+    assert "# Menu rules" in prompt
+    assert "## MENU knowledge" in prompt
