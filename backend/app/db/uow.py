@@ -16,6 +16,8 @@ from app.modules.assistant.entitlements.adapters import SqlAlchemyEntitlementOve
 from app.modules.assistant.profile.adapters import SqlAlchemyAssistantProfileRepository
 from app.modules.assistant.usage.adapters import SqlAlchemyAssistantUsageRepository
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
+from app.modules.assistant.skills.menu_import.session_repository import MenuImportSessionRepository
+from app.modules.digital_menu_themes.repository import DigitalMenuThemeRepository
 from app.modules.menu.adapters import SqlAlchemyMenuRepository
 from app.modules.orders.adapters import SqlAlchemyOrderRepository
 from app.modules.promotions.adapters import SqlAlchemyPromotionRepository
@@ -63,6 +65,8 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.assistant_profiles = SqlAlchemyAssistantProfileRepository(self.session)
         self.assistant_entitlements = SqlAlchemyEntitlementOverridesRepository(self.session)
         self.assistant_usage = SqlAlchemyAssistantUsageRepository(self.session)
+        self.digital_menu_themes = DigitalMenuThemeRepository(self.session)
+        self.menu_import_sessions = MenuImportSessionRepository(self.session)
         self.idempotency = CompositeIdempotencyRepository(
             cache,
             db_idempotency,
