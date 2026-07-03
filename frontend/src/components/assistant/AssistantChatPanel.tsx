@@ -49,7 +49,9 @@ import {
   updateAssistantProfile,
   type AssistantConversation,
   type AssistantProfile,
+  type ChatAttachmentRef,
 } from '@/lib/api/assistant';
+import { uploadImportAsset } from '@/lib/api/assistantImport';
 import {
   MAX_CHAT_PANEL_WIDTH,
   MIN_CHAT_PANEL_WIDTH,
@@ -132,6 +134,7 @@ export default function AssistantChatPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const pendingAttachmentsRef = useRef<ChatAttachment[]>([]);
+  const attachmentFilesRef = useRef<Map<string, File>>(new Map());
   const streamAbortRef = useRef<AbortController | null>(null);
   const sendInFlightRef = useRef(false);
   const activeConversationIdRef = useRef<string | null>(null);
@@ -246,6 +249,7 @@ export default function AssistantChatPanel() {
 
   const clearPendingAttachments = useCallback(() => {
     revokeAttachmentPreviews(pendingAttachmentsRef.current);
+    attachmentFilesRef.current.clear();
     setPendingAttachments([]);
   }, []);
 
@@ -279,12 +283,18 @@ export default function AssistantChatPanel() {
   }, [draft, resizeTextarea]);
 
   const addAttachments = useCallback((files: FileList | File[]) => {
-    const incoming = createAttachmentsFromFileList(files);
+    const fileArray = Array.from(files);
+    const incoming = createAttachmentsFromFileList(fileArray);
     if (incoming.length === 0) return;
+    incoming.forEach((attachment, index) => {
+      const file = fileArray[index];
+      if (file) attachmentFilesRef.current.set(attachment.id, file);
+    });
     setPendingAttachments((prev) => [...prev, ...incoming]);
   }, []);
 
   const removePendingAttachment = useCallback((id: string) => {
+    attachmentFilesRef.current.delete(id);
     setPendingAttachments((prev) => {
       const target = prev.find((item) => item.id === id);
       if (target) revokeAttachmentPreviews([target]);
@@ -293,7 +303,11 @@ export default function AssistantChatPanel() {
   }, []);
 
   const requestAssistantReply = useCallback(
-    async (outboundMessage: string, userMessage: ChatMessage) => {
+    async (
+      outboundMessage: string,
+      userMessage: ChatMessage,
+      attachmentRefs: ChatAttachmentRef[] = [],
+    ) => {
       if (sendInFlightRef.current) return;
 
       const conversationId = activeConversationIdRef.current;
@@ -556,6 +570,7 @@ export default function AssistantChatPanel() {
           {
             profileVersion: profile.version,
             profileSnapshot,
+            attachments: attachmentRefs,
           },
         );
         if (!streamFinished) {
@@ -605,6 +620,52 @@ export default function AssistantChatPanel() {
       if ((!text && attachments.length === 0) || isBusy || sendInFlightRef.current) return;
 
       setIsBusy(true);
+
+      let attachmentRefs: ChatAttachmentRef[] = [];
+      if (attachments.length > 0) {
+        if (!accessToken || !restaurantId) {
+          setIsBusy(false);
+          return;
+        }
+
+        try {
+          attachmentRefs = await Promise.all(
+            attachments.map(async (attachment) => {
+              const file = attachmentFilesRef.current.get(attachment.id);
+              if (!file) {
+                throw new Error(`No se encontró el archivo "${attachment.name}".`);
+              }
+              const uploaded = await uploadImportAsset(accessToken, restaurantId, file);
+              attachmentFilesRef.current.delete(attachment.id);
+              return {
+                storage_path: uploaded.path,
+                original_name: uploaded.original_name,
+                mime_type: uploaded.mime_type,
+                kind: uploaded.kind,
+                size_bytes: uploaded.size_bytes,
+              };
+            }),
+          );
+        } catch (error) {
+          const message =
+            error instanceof ApiError
+              ? error.message
+              : error instanceof Error && error.message
+                ? error.message
+                : 'No se pudieron subir los archivos adjuntos.';
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: createId(),
+              role: 'assistant',
+              content: `Error al subir archivos: ${message}`,
+            },
+          ]);
+          setIsBusy(false);
+          return;
+        }
+      }
+
       const outboundMessage = buildOutboundMessage(text, attachments);
       const userMessage: ChatMessage = {
         id: createId(),
@@ -615,9 +676,9 @@ export default function AssistantChatPanel() {
 
       setDraft('');
       setPendingAttachments([]);
-      await requestAssistantReply(outboundMessage, userMessage);
+      await requestAssistantReply(outboundMessage, userMessage, attachmentRefs);
     },
-    [isBusy, requestAssistantReply],
+    [accessToken, isBusy, restaurantId, requestAssistantReply],
   );
 
   const handleSubmit = () => {

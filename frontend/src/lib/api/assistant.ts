@@ -73,9 +73,18 @@ export type AssistantProfileSnapshot = {
   enabled_skill_ids: string[];
 };
 
+export type ChatAttachmentRef = {
+  storage_path: string;
+  original_name: string;
+  mime_type: string;
+  kind: 'menu_source' | 'product_photo';
+  size_bytes: number;
+};
+
 export type AssistantChatStreamOptions = {
   profileVersion: number;
   profileSnapshot?: AssistantProfileSnapshot;
+  attachments?: ChatAttachmentRef[];
 };
 
 export type AssistantToolStartPayload = {
@@ -229,6 +238,7 @@ export async function streamAssistantChat(
           message,
           profile_version: options?.profileVersion ?? 1,
           profile_snapshot: options?.profileSnapshot,
+          attachments: options?.attachments ?? [],
         }),
         signal,
       },
