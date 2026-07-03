@@ -60,9 +60,14 @@ def _resolve_product_id_for_write(
     product_id_raw = args.get("product_id")
     if product_id_raw:
         try:
-            return _parse_uuid(product_id_raw, "product_id"), None
+            product_id = _parse_uuid(product_id_raw, "product_id")
         except ValidationError as exc:
             return None, ToolResult(ok=False, summary=str(exc))
+        try:
+            product = service.get_product_by_id(ctx.restaurant_id, product_id)
+            return product.id, None
+        except NotFoundError:
+            return None, ToolResult(ok=False, summary="Product not found")
 
     name_raw = args.get("name") or args.get("product_name")
     if not name_raw:
