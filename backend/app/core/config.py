@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -46,12 +46,23 @@ class Settings(BaseSettings):
     assistant_context_max_tokens: int = 8000
     assistant_context_compression_threshold_ratio: float = 0.70
     assistant_context_recent_window_turns: int = 6
-    assistant_max_tool_iterations: int = 8
+    assistant_max_tool_iterations: int = 32
+    menu_import_batch_max_products: int = 15
+    menu_import_photo_match_confidence_threshold: float = Field(
+        default=0.72,
+        validation_alias="MENU_IMPORT_PHOTO_MATCH_THRESHOLD",
+    )
+    menu_import_max_source_bytes: int = 15 * 1024 * 1024
+    menu_import_max_photo_bytes: int = 5 * 1024 * 1024
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+    openai_image_model: str = "gpt-image-2"
+    openai_vision_model: str = "gpt-5.4-nano-2026-03-17"
     llm_provider: str = "stub"
+    image_provider: str = "openai"
+    vision_provider: str = "openai"
     langsmith_tracing: bool = False
     langsmith_api_key: str | None = None
     langsmith_project: str = "venddelo-ai"
