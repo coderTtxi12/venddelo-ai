@@ -21,9 +21,11 @@ from app.modules.assistant.skills.menu_read.search import (
 from app.modules.assistant.skills.product_resolve import (
     ProductResolveResult,
     iter_active_products,
+    iter_catalog_products,
     normalize_product_query,
     resolve_product,
     resolve_product_in_catalog,
+    score_product,
 )
 from app.modules.menu.schemas import CategoryDTO, OptionGroupDTO, OptionItemDTO, ProductDTO
 from app.modules.menu.service import MenuService
@@ -222,12 +224,17 @@ def _score_promotions(
     return scored
 
 
-def _score_catalog(query: str, products: list[ProductDTO]) -> list[tuple[float, ProductDTO]]:
-    """Rank active products by fuzzy similarity to ``query`` (best first)."""
+def _score_catalog(
+    query: str,
+    products: list[ProductDTO],
+    *,
+    active_only: bool = False,
+) -> list[tuple[float, ProductDTO]]:
+    """Rank products by fuzzy similarity to ``query`` on **name only** (best first)."""
     cleaned = normalize_product_query(query)
     if not cleaned:
         return []
-    resolved = resolve_product_in_catalog(cleaned, products)
+    resolved = resolve_product_in_catalog(cleaned, products, active_only=active_only)
     if resolved.status == "found" and resolved.product is not None:
         return [(1.0, resolved.product)]
     if resolved.status == "ambiguous":
@@ -236,9 +243,7 @@ def _score_catalog(query: str, products: list[ProductDTO]) -> list[tuple[float, 
         return list(resolved.suggestions)
     scored: list[tuple[float, ProductDTO]] = []
     for product in products:
-        if not product.is_active:
-            continue
-        score = match_score(cleaned, product.name, product.description or "")
+        score = score_product(cleaned, product, active_only=active_only)
         if score >= SUGGESTION_THRESHOLD:
             scored.append((score, product))
     scored.sort(key=lambda pair: pair[0], reverse=True)
@@ -700,11 +705,24 @@ class MenuReadSkill:
             ),
             ToolDefinition(
                 name="search_products",
-                description="Search products by name or description in the current restaurant.",
+                description=(
+                    "Search products by **name** (exact name wins over fuzzy neighbors; "
+                    "descriptions are ignored so shared words like 'hamburguesa' in another "
+                    "product's copy do not hijack the match). Includes inactive products by "
+                    "default — check is_active on each hit. Set active_only=true to limit to "
+                    "En menú items only."
+                ),
                 effect="read",
                 input_schema={
                     "type": "object",
-                    "properties": {"query": {"type": "string"}},
+                    "properties": {
+                        "query": {"type": "string"},
+                        "active_only": {
+                            "type": "boolean",
+                            "description": "When true, ignore inactive products.",
+                            "default": False,
+                        },
+                    },
                     "required": ["query"],
                 },
             ),
@@ -875,13 +893,18 @@ class MenuReadSkill:
                     all_promotions=all_promotions,
                 )
                 for product in page.items
-                if product.is_active
             ]
+            active_count = sum(1 for product in page.items if product.is_active)
+            inactive_count = len(page.items) - active_count
             data: dict[str, Any] = {
                 "products": products,
                 "next_cursor": page.next_cursor,
                 "has_more": page.has_more,
                 "limit": limit,
+                "counts": {
+                    "active": active_count,
+                    "inactive": inactive_count,
+                },
             }
             if category_id is not None:
                 data["category_id"] = str(category_id)
@@ -889,20 +912,25 @@ class MenuReadSkill:
             return ToolResult(
                 ok=True,
                 summary=(
-                    f"Listed {len(products)} active products ({scope}, "
-                    f"has_more={page.has_more})"
+                    f"Listed {len(products)} products ({active_count} active, "
+                    f"{inactive_count} inactive, {scope}, has_more={page.has_more})"
                 ),
                 data=data,
             )
 
         if tool_name == "search_products":
             query = str(args.get("query", "")).strip()
-            catalog = iter_active_products(service, ctx.restaurant_id)
+            active_only = bool(args.get("active_only", False))
+            catalog = (
+                iter_active_products(service, ctx.restaurant_id)
+                if active_only
+                else iter_catalog_products(service, ctx.restaurant_id)
+            )
 
             if not query:
-                scored = [(1.0, product) for product in catalog if product.is_active]
+                scored = [(1.0, product) for product in catalog if product.is_active or not active_only]
             else:
-                scored = _score_catalog(query, catalog)
+                scored = _score_catalog(query, catalog, active_only=active_only)
 
             strong = [
                 _scored_payload(score, product)
@@ -968,7 +996,7 @@ class MenuReadSkill:
             if product_id_raw:
                 try:
                     product_id = uuid.UUID(str(product_id_raw))
-                    product = service.get_product(ctx.restaurant_id, product_id)
+                    product = service.get_product_by_id(ctx.restaurant_id, product_id)
                     return _product_detail(product)
                 except (ValueError, NotFoundError):
                     # Bad/unknown UUID — fall back to name resolution when available.

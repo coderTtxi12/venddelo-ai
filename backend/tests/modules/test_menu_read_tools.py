@@ -14,6 +14,7 @@ from app.modules.menu.schemas import (
     OptionGroupCreate,
     OptionItemCreate,
     ProductCreate,
+    ProductUpdate,
 )
 from app.modules.promotions.pricing import CATALOG_DISCOUNT_PREFIX
 from app.modules.promotions.schemas import PromotionBundle, PromotionCreate
@@ -882,3 +883,57 @@ def test_menu_read_get_product_returns_owned_product(session):
 
     assert result.ok is True
     assert result.data["product"]["name"] == "Taco suadero"
+
+
+@requires_db
+def test_menu_read_search_hamburguesa_prefers_exact_name_over_neighbor_description(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Burger Menu", subdomain="menu-read-hamburguesa")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Hamburguesas", sort_index=1)
+    )
+    hamburguesa = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="HAMBURGUESA",
+            description="Clásica",
+            price_cents=10000,
+            category_ids=[category.id],
+            is_published=True,
+        ),
+    )
+    hamburguesa = uow.menu.update_product(
+        hamburguesa.id,
+        ProductUpdate(is_active=False),
+    )
+    uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BURGER & BONELESS",
+            description="Combo de hamburguesa con boneless",
+            price_cents=10000,
+            category_ids=[category.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+    skill = MenuReadSkill()
+
+    search = skill.execute("search_products", {"query": "hamburguesa"}, ctx)
+    get_by_name = skill.execute("get_product", {"name": "Hamburguesa"}, ctx)
+    listed = skill.execute("list_products", {}, ctx)
+
+    assert search.ok is True
+    assert len(search.data["products"]) == 1
+    assert search.data["products"][0]["name"] == "HAMBURGUESA"
+    assert get_by_name.ok is True
+    assert get_by_name.data["product"]["id"] == str(hamburguesa.id)
+    assert get_by_name.data["product"]["is_active"] is False
+    assert any(item["name"] == "HAMBURGUESA" for item in listed.data["products"])

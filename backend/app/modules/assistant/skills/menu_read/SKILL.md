@@ -139,15 +139,16 @@ from `price_cents`). Never dump raw tool JSON keys or snake_case field names in 
 | `cursor` | no | From previous `list_products` response |
 | `limit` | no | Page size (default 20, max 50) |
 
-**Returns:** `products[]` (each with `id`, `name`, `description`, `image_path`, `price_cents`, `currency`, `is_active`, `is_published`, `approval_status`, `category_ids`, `category_sort_indices`, `has_options`, `option_groups[]` with full complement/add-on detail, **`promotions[]` / `has_promotions`** including `option_participation` when relevant), `next_cursor`, `has_more`, `limit`, optional `category_id`
+**Returns:** `products[]` (active **and inactive** — check `is_active` on each row; each with `id`, `name`, `description`, `image_path`, `price_cents`, `currency`, `is_active`, `is_published`, `approval_status`, `category_ids`, `category_sort_indices`, `has_options`, `option_groups[]` with full complement/add-on detail, **`promotions[]` / `has_promotions`** including `option_participation` when relevant), `next_cursor`, `has_more`, `limit`, `counts`, optional `category_id`
 
-**Use when:** Full browse, "how many products", complements/photos audit, or all items in one category. Paginate until `has_more=false`.
+**Use when:** Full browse, "how many products", complements/photos audit, finding **inactive** items to re-enable, or all items in one category. Paginate until `has_more=false`.
 
 ### `search_products`
 
 | Arg | Required | Meaning |
 |-----|----------|---------|
-| `query` | yes | Fuzzy, accent-insensitive match on name + description |
+| `query` | yes | Fuzzy, accent-insensitive match on **product name** (descriptions ignored) |
+| `active_only` | no | When `true`, skip inactive products (default `false`) |
 
 **Returns:**
 
@@ -158,6 +159,9 @@ from `price_cents`). Never dump raw tool JSON keys or snake_case field names in 
 | `query` | Echo of the searched term |
 
 Matching tolerates typos and accents ("wins" → "WINGS & FRIES", "limon" → "Limón").
+**Exact name wins** over neighbors (e.g. query "Hamburguesa" matches product `HAMBURGUESA`,
+not `BURGER & BONELESS` even if its description mentions hamburguesa). Includes inactive
+products unless `active_only=true`.
 It does **not** cross languages — see Step 2b for the `list_products` fallback.
 
 **Use when:** Named item lookup ("pastor", "limonada"), not full catalog export.
