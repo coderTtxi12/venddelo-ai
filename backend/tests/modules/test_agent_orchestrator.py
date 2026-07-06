@@ -8,7 +8,7 @@ from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.agent.orchestrator import AgentOrchestrator
 from app.modules.assistant.agent.response_format import openai_function_name
 from app.modules.assistant.profile.schemas import AssistantProfileRecord
-from app.modules.assistant.schemas import AssistantChatRequest
+from app.modules.assistant.schemas import AssistantChatHistoryMessage, AssistantChatRequest, ChatAttachmentRef
 from app.modules.assistant.skills.base import SkillPort, ToolDefinition, ToolResult
 from app.modules.assistant.skills.registry import SkillRegistry
 
@@ -255,3 +255,47 @@ def test_orchestrator_no_tools_when_skill_not_entitled():
 
     assert any(e.event == "message.complete" for e in events)
     assert not any(e.event == "tool.start" for e in events)
+
+
+class CapturingProvider(ScriptedProvider):
+    def __init__(self, turns: list[dict]) -> None:
+        super().__init__(turns)
+        self.last_request: ChatCompletionRequest | None = None
+
+    def stream_chat(self, request: ChatCompletionRequest) -> Iterator[ChatStreamEvent]:
+        self.last_request = request
+        yield from super().stream_chat(request)
+
+
+def test_orchestrator_injects_attachment_storage_paths_into_user_message():
+    restaurant_id = uuid.uuid4()
+    storage_path = f"restaurants/{restaurant_id}/import/product_photo/newcombo.png"
+    provider = CapturingProvider(
+        [{"content": _agent_json(content="Listo, foto asignada.")}]
+    )
+    orchestrator = AgentOrchestrator(provider=provider, registry=SkillRegistry([FakeReadSkill()]))
+    list(
+        orchestrator.stream_chat(
+            AssistantChatRequest(
+                message="Asigna esta foto a Chilaquiles",
+                attachments=[
+                    ChatAttachmentRef(
+                        storage_path=storage_path,
+                        original_name="newcombo.png",
+                        mime_type="image/png",
+                        kind="product_photo",
+                        size_bytes=4096,
+                    )
+                ],
+            ),
+            profile=_profile(),
+            ctx=_ctx(["menu_read"]),
+        )
+    )
+
+    assert provider.last_request is not None
+    user_messages = [m for m in provider.last_request.messages if m.role == "user"]
+    assert user_messages
+    assert storage_path in user_messages[-1].content
+    assert "newcombo.png" in user_messages[-1].content
+    assert "## Chat attachments" in user_messages[-1].content

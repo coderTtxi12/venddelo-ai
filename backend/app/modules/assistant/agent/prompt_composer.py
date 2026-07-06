@@ -40,9 +40,17 @@ def compose_system_prompt(
                 or (catalog.label if catalog else skill_id)
             )
             skill_lines.append(f"- **{skill_id}**: {summary}")
-        sections.append("## Active skills\n\n" + "\n".join(skill_lines))
+        sections.append(
+            "## Active skills\n\n"
+            "Each entry below is a skill enabled for this restaurant. A skill is an on-demand "
+            "**guide**—workflows, quality standards. "
+            "Tools are already callable; call `load_skill(skill_id)` when the task needs that "
+            "guide. "
+            "Do not guess from memory when a guide applies.\n\n"
+            + "\n".join(skill_lines)
+        )
 
-    if profile.menu_markdown.strip():
-        sections.append(f"## MENU knowledge\n\n{profile.menu_markdown.strip()}")
+    # if profile.menu_markdown.strip():
+    #     sections.append(f"## MENU knowledge\n\n{profile.menu_markdown.strip()}")
 
     return "\n\n---\n\n".join(sections)

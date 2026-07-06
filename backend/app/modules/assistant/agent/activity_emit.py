@@ -17,6 +17,11 @@ _TOOL_GOALS: dict[str, str] = {
     "list_promotions": "Listar promociones",
     "get_promotion": "Obtener detalle de promoción",
     "list_product_promotions": "Revisar promos del producto",
+    "create_promotion": "Crear promoción",
+    "update_promotion": "Actualizar promoción",
+    "set_promotion_targets": "Asignar productos a promoción",
+    "disable_promotion": "Desactivar promoción",
+    "generate_promotion_banner": "Generar banner de promoción",
     "update_product": "Actualizar producto",
     "create_product": "Crear producto",
     "bulk_update_product_names": "Renombrar productos en lote",
@@ -27,8 +32,14 @@ _TOOL_GOALS: dict[str, str] = {
     "bulk_update_category_sort_indices": "Reordenar categorías en lote",
     "bulk_update_category_visibility": "Cambiar visibilidad de categorías en lote",
     "bulk_update_category_display_layout": "Cambiar layout de categorías en lote",
+    "bulk_update_option_item_visibility": "Cambiar visibilidad de complementos en lote",
+    "bulk_update_option_item_labels": "Renombrar complementos en lote",
+    "bulk_update_option_item_prices": "Actualizar precios de complementos en lote",
+    "bulk_add_option_items": "Agregar complementos en lote",
+    "bulk_add_option_groups": "Agregar grupos de complementos en lote",
+    "delete_option_item": "Eliminar complemento",
+    "bulk_delete_option_items": "Eliminar complementos en lote",
     "generate_product_image": "Generar foto de producto",
-    "bulk_generate_product_images": "Generar fotos de productos en lote",
     "analyze_product_image": "Analizar foto del producto",
     "suggest_complements": "Sugerir complementos",
     "start_menu_import_session": "Iniciar importación de menú",
@@ -38,21 +49,26 @@ _TOOL_GOALS: dict[str, str] = {
     "start_menu_extraction_batch": "Extraer contenido del menú (OCR)",
     "get_extraction_status": "Consultar estado de extracción",
     "save_clarification_answers": "Guardar aclaraciones del menú",
+    "optimize_import_draft": "Optimizar menú y complementos",
+    "preview_full_import": "Vista previa del menú completo",
+    "apply_full_import": "Publicar menú completo",
     "list_menu_themes": "Listar temas del menú digital",
+    "get_current_menu_theme": "Consultar tema actual del menú",
     "recommend_menu_theme": "Recomendar tema visual",
     "apply_menu_theme": "Aplicar tema del menú",
-    "register_product_image": "Registrar foto de producto",
-    "match_photos_to_products": "Emparejar fotos con productos",
-    "resolve_uncertain_image": "Resolver foto incierta",
+    "assign_product_image": "Asignar foto a producto",
+    "bulk_assign_product_images": "Asignar fotos en lote",
+    "match_product_photos": "Emparejar fotos con productos",
     "preview_import_batch": "Vista previa del lote de importación",
     "apply_menu_batch": "Aplicar lote al menú digital",
-    "apply_photo_mappings": "Aplicar fotos a productos",
     "preview_description_enhancements": "Vista previa de descripciones mejoradas",
     "apply_description_enhancements": "Aplicar descripciones mejoradas",
     "request_image_enhancement": "Listar productos sin foto",
     "update_menu_knowledge": "Actualizar conocimiento del menú",
     "update_category": "Actualizar categoría",
     "create_category": "Crear categoría",
+    "set_product_option_group_order": "Reordenar grupos de complementos",
+    "set_option_group_item_order": "Reordenar complementos en grupo",
 }
 
 
@@ -103,24 +119,71 @@ def goal_for_call(fn_name: str, args: dict[str, Any]) -> str:
         count = len(items) if isinstance(items, list) else 0
         if count:
             return f"{base} ({count} producto{'s' if count != 1 else ''})"
-    if tool_name == "bulk_generate_product_images":
-        product_ids = args.get("product_ids")
-        count = len(product_ids) if isinstance(product_ids, list) else 0
-        if count:
-            return f"{base} ({count} producto{'s' if count != 1 else ''})"
-        limit = args.get("limit")
-        if isinstance(limit, int) and limit > 0:
-            return f"{base} (hasta {limit})"
     if tool_name.startswith("bulk_update_category"):
         items = args.get("items") or args.get("categories")
         count = len(items) if isinstance(items, list) else 0
         if count:
             return f"{base} ({count} categoría{'s' if count != 1 else ''})"
+    if tool_name.startswith("bulk_update_option_item"):
+        items = args.get("items") or args.get("option_items")
+        count = len(items) if isinstance(items, list) else 0
+        if count:
+            return f"{base} ({count} complemento{'s' if count != 1 else ''})"
+    if tool_name.startswith("bulk_add_option_item"):
+        items = args.get("items") or args.get("option_items")
+        count = len(items) if isinstance(items, list) else 0
+        if count:
+            return f"{base} ({count} complemento{'s' if count != 1 else ''})"
+    if tool_name.startswith("bulk_delete_option_item"):
+        items = args.get("items") or args.get("option_items")
+        count = len(items) if isinstance(items, list) else 0
+        if count:
+            return f"{base} ({count} complemento{'s' if count != 1 else ''})"
+    if tool_name == "delete_option_item":
+        label = args.get("expected_label") or args.get("label")
+        if isinstance(label, str) and label.strip():
+            return f'{base}: «{label.strip()}»'
+    if tool_name == "bulk_update_option_item_visibility":
+        match_label = args.get("match_label") or args.get("complement_label")
+        if isinstance(match_label, str) and match_label.strip():
+            return f'{base}: «{match_label.strip()}» en todo el menú'
+    if tool_name == "bulk_add_option_groups":
+        items = args.get("items") or args.get("groups") or args.get("option_groups")
+        count = len(items) if isinstance(items, list) else 0
+        if count:
+            return f"{base} ({count} grupo{'s' if count != 1 else ''})"
+    if tool_name.startswith("bulk_assign_product_image"):
+        items = args.get("items") or args.get("photos") or args.get("mappings")
+        count = len(items) if isinstance(items, list) else 0
+        if count:
+            return f"{base} ({count} foto{'s' if count != 1 else ''})"
+    if tool_name == "match_product_photos":
+        paths = args.get("image_paths") or args.get("storage_paths") or args.get("paths")
+        count = len(paths) if isinstance(paths, list) else 0
+        if count:
+            return f"{base} ({count} foto{'s' if count != 1 else ''})"
     if tool_name in {"preview_import_batch", "apply_menu_batch"}:
         batch_index = args.get("batch_index")
         if isinstance(batch_index, int):
             return f"{base} (lote {batch_index})"
-    if tool_name in {"register_menu_source_file", "register_product_image"}:
+    if tool_name in {"get_promotion", "update_promotion", "set_promotion_targets", "disable_promotion"}:
+        for key in ("name", "promotion_name", "query"):
+            value = args.get(key)
+            if isinstance(value, str) and value.strip():
+                return f'{base}: «{value.strip()}»'
+        promotion_id = args.get("promotion_id")
+        if isinstance(promotion_id, str) and promotion_id:
+            return f"{base} (id …{promotion_id[-6:]})"
+    if tool_name == "create_promotion":
+        name = args.get("name")
+        if isinstance(name, str) and name.strip():
+            return f'{base}: «{name.strip()}»'
+    if tool_name == "generate_promotion_banner":
+        for key in ("name", "promotion_name"):
+            value = args.get(key)
+            if isinstance(value, str) and value.strip():
+                return f'{base}: «{value.strip()}»'
+    if tool_name in {"register_menu_source_file", "assign_product_image"}:
         name = args.get("original_name") or args.get("storage_path")
         if isinstance(name, str) and name.strip():
             short = name.strip().rsplit("/", 1)[-1]
