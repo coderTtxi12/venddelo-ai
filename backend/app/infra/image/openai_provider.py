@@ -40,7 +40,7 @@ class OpenAIImageProvider(ImageGenerationPort):
         extra_body: dict[str, object] = {}
 
         if _is_gpt_image_model(self._model):
-            extra_body["quality"] = "high"
+            extra_body["quality"] = "medium"
             extra_body["output_format"] = "webp"
             extra_body["output_compression"] = 85
         else:

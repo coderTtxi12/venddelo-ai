@@ -10,15 +10,13 @@ Generate **appetizing food photography** for products on the digital menu.
 ## When to use
 
 - Owner asks to **create/generate photos** for products without `image_path`.
-- Bulk request: *"ponle foto a todos los que no tienen imagen"*.
-- After **`menu_read`** shows products with `image_path: null`.
 
 ## Workflow
 
-1. **`menu_read`** — `list_products` (or `get_product`) to see which items lack photos and to preview names.
+1. **`menu_read`** — `list_products` (or `get_product`)
 2. **Confirm with the owner** — list the products you will generate for (names + count). Image generation is a **mutation** and costs API credits.
-3. **`generate_product_image`** — one product, or **`bulk_generate_product_images`** — many (max 10 per call).
-4. Summarize results with product names and mention they can review photos in the menu admin.
+3. **`generate_product_image`** — one product per call.
+4. Summarize results with product names and mention they can review photos in the live menu.
 
 Optional: **`load_skill(menu_best_practices)`** for photo quality guidelines before proposing generation.
 
@@ -36,15 +34,9 @@ Generates one photo and sets `image_path` on the product.
 
 **Args:** `product_id` or `name` / `product_name`; optional `style_notes`; `force=true` to replace an existing image.
 
-### `bulk_generate_product_images` (mutate)
+If many products need images, list them for the owner, confirm priorities, then call this tool once per product (or in small batches the owner approves).
 
-Same context gathering per product. Default: active products **without** `image_path`.
-
-**Args:** optional `product_ids[]`; `only_missing` (default true); `limit` (max 10); optional `style_notes`; `force`.
-
-If more than 10 products need images, run multiple bulk calls or ask the owner to prioritize.
-
-## Quality rules (built into prompts)
+## Quality rules
 
 - Professional menu-style food photography
 - Warm lighting, appetizing, photorealistic
@@ -56,4 +48,4 @@ Do **not** invent dish details beyond what `menu_read` / the tool context provid
 
 - Product already has an image → use `force=true` or skip.
 - Ambiguous name → disambiguate with the owner, then retry with `product_id`.
-- Generation/storage failure → report which product failed; others in a bulk call may still succeed.
+- Generation/storage failure → report which product failed.

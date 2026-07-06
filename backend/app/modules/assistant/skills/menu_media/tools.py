@@ -16,7 +16,6 @@ from app.modules.assistant.skills.base import ToolDefinition, ToolResult
 from app.modules.assistant.skills.menu_media.product_context import (
     gather_product_context,
     product_has_image,
-    resolve_product_ids,
 )
 from app.modules.assistant.skills.menu_media.prompt import build_food_image_prompt
 from app.modules.assistant.skills.menu_media.storage_paths import (
@@ -27,21 +26,12 @@ from app.modules.assistant.skills.product_resolve import resolve_product
 from app.modules.menu.schemas import ProductDTO, ProductUpdate
 from app.modules.menu.service import MenuService
 
-BULK_IMAGE_LIMIT = 10
-PRODUCT_SCAN_LIMIT = 500
-
 
 def _parse_uuid(value: Any, field: str) -> uuid.UUID:
     try:
         return uuid.UUID(str(value))
     except (TypeError, ValueError) as exc:
         raise ValidationError(f"Invalid {field}") from exc
-
-
-def _parse_uuid_list(value: Any, field: str) -> list[uuid.UUID]:
-    if not isinstance(value, list) or not value:
-        raise ValidationError(f"{field} must be a non-empty array")
-    return [_parse_uuid(item, field) for item in value]
 
 
 def _optional_str(value: Any) -> str | None:
@@ -168,9 +158,11 @@ class MenuMediaSkill:
                     "Generate an appetizing AI food photo for ONE product and attach it to "
                     "the menu. Before generating, the tool loads full product context "
                     "(name, description, categories, add-ons/complements, promotions). "
-                    "Use after menu_read when the owner confirms. Skips products that already "
-                    "have image_path unless force=true. Requires owner confirmation before "
-                    "calling (mutates the product)."
+                    "Skips products that already have image_path unless force=true. "
+                    "Requires owner confirmation before calling (mutates the product). "
+                    "Quality rules: professional menu-style food photography; warm lighting, "
+                    "appetizing, photorealistic; no text, logos, watermarks, people, or hands "
+                    "in the image. Do not invent dish details beyond menu_read / tool context."
                 ),
                 effect="mutate",
                 input_schema={
@@ -200,47 +192,6 @@ class MenuMediaSkill:
                     "required": [],
                 },
             ),
-            ToolDefinition(
-                name="bulk_generate_product_images",
-                description=(
-                    "Generate appetizing AI food photos for MANY products in one call. "
-                    "Each product is loaded with full context before generation. "
-                    "Default: only active products missing image_path. "
-                    f"Max {BULK_IMAGE_LIMIT} products per call. "
-                    "Confirm the product list with the owner before calling."
-                ),
-                effect="mutate",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "product_ids": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": (
-                                "Explicit product UUIDs to generate for. "
-                                "When omitted, scans the catalog for products without images."
-                            ),
-                        },
-                        "only_missing": {
-                            "type": "boolean",
-                            "description": "Skip products that already have image_path.",
-                            "default": True,
-                        },
-                        "limit": {
-                            "type": "integer",
-                            "description": f"Max products to process (1–{BULK_IMAGE_LIMIT}).",
-                            "default": BULK_IMAGE_LIMIT,
-                        },
-                        "style_notes": {"type": "string"},
-                        "force": {
-                            "type": "boolean",
-                            "description": "Replace existing images when true.",
-                            "default": False,
-                        },
-                    },
-                    "required": [],
-                },
-            ),
         ]
 
     def execute(self, tool_name: str, args: dict[str, Any], ctx: AgentContext) -> ToolResult:
@@ -257,84 +208,6 @@ class MenuMediaSkill:
                 product=product,
                 style_notes=_optional_str(args.get("style_notes")),
                 force=bool(args.get("force", False)),
-            )
-
-        if tool_name == "bulk_generate_product_images":
-            only_missing = bool(args.get("only_missing", True))
-            force = bool(args.get("force", False))
-            if force:
-                only_missing = False
-
-            limit_raw = args.get("limit", BULK_IMAGE_LIMIT)
-            try:
-                limit = int(limit_raw)
-            except (TypeError, ValueError):
-                return ToolResult(ok=False, summary="limit must be an integer")
-            limit = max(1, min(limit, BULK_IMAGE_LIMIT))
-
-            product_ids: list[uuid.UUID] | None = None
-            if args.get("product_ids") is not None:
-                try:
-                    product_ids = _parse_uuid_list(args.get("product_ids"), "product_ids")
-                except ValidationError as exc:
-                    return ToolResult(ok=False, summary=str(exc))
-
-            try:
-                products = resolve_product_ids(
-                    service,
-                    ctx.restaurant_id,
-                    product_ids=product_ids,
-                    only_missing=only_missing,
-                    limit=limit,
-                )
-            except NotFoundError as exc:
-                return ToolResult(ok=False, summary=str(exc) or "Product not found")
-
-            if not products:
-                return ToolResult(
-                    ok=True,
-                    summary="No products need image generation",
-                    data={"results": [], "processed": 0, "succeeded": 0, "failed": 0},
-                )
-
-            results: list[dict[str, Any]] = []
-            succeeded = 0
-            failed = 0
-            for product in products:
-                outcome = _generate_and_attach_image(
-                    ctx=ctx,
-                    service=service,
-                    product=product,
-                    style_notes=_optional_str(args.get("style_notes")),
-                    force=force,
-                )
-                row = {
-                    "product_id": str(product.id),
-                    "name": product.name,
-                    "ok": outcome.ok,
-                    "summary": outcome.summary,
-                }
-                if outcome.ok:
-                    succeeded += 1
-                    row["image_path"] = outcome.data.get("product", {}).get("image_path")
-                    row["public_url"] = outcome.data.get("product", {}).get("public_url")
-                else:
-                    failed += 1
-                    row["error"] = outcome.summary
-                results.append(row)
-
-            return ToolResult(
-                ok=failed == 0,
-                summary=(
-                    f"Generated images for {succeeded} of {len(products)} products"
-                    + (f" ({failed} failed)" if failed else "")
-                ),
-                data={
-                    "results": results,
-                    "processed": len(products),
-                    "succeeded": succeeded,
-                    "failed": failed,
-                },
             )
 
         return ToolResult(ok=False, summary=f"Unknown tool: {tool_name}")

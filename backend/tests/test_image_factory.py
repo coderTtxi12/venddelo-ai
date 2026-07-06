@@ -30,7 +30,7 @@ def test_gpt_image_request_omits_response_format():
     kwargs = provider._build_request(ImageGenerationRequest(prompt="Taco al pastor"))
     assert "response_format" not in kwargs
     assert kwargs["extra_body"] == {
-        "quality": "high",
+        "quality": "medium",
         "output_format": "webp",
         "output_compression": 85,
     }
