@@ -16,6 +16,7 @@ from app.modules.assistant.agent.orchestrator import AgentOrchestrator
 from app.modules.assistant.agent.prompt_composer import compose_system_prompt
 from app.modules.assistant.agent.response_format import parse_agent_response
 from app.modules.assistant.conversation_cache import AssistantConversationCache
+from app.modules.assistant.chat_attachments import enrich_user_message_from_metadata
 from app.modules.assistant.profile.schemas import AssistantProfileSnapshot
 from app.modules.assistant.profile.service import AssistantProfileService
 from app.modules.assistant.repository import AssistantRepository
@@ -163,6 +164,9 @@ class AssistantConversationService:
             raise NotFoundError("Conversation not found")
         self._cache.invalidate_conversation(restaurant_id, conversation_id)
 
+    def _context_content_from_message(self, item: AssistantMessageDTO) -> str:
+        return enrich_user_message_from_metadata(item.content, item.metadata)
+
     def _load_context_messages(
         self,
         conversation_id: uuid.UUID,
@@ -170,14 +174,23 @@ class AssistantConversationService:
         cached = self._cache.get_recent_messages(conversation_id)
         if cached is not None:
             return [
-                AssistantChatHistoryMessage(role=item.role, content=item.content)
+                AssistantChatHistoryMessage(
+                    role=item.role,
+                    content=self._context_content_from_message(item),
+                )
                 for item in cached
             ]
 
         limit = self._settings.assistant_llm_context_message_limit
         rows = self._repo.list_recent_messages_for_context(conversation_id, limit=limit)
         self._cache.set_recent_messages(conversation_id, rows)
-        return [AssistantChatHistoryMessage(role=item.role, content=item.content) for item in rows]
+        return [
+            AssistantChatHistoryMessage(
+                role=item.role,
+                content=self._context_content_from_message(item),
+            )
+            for item in rows
+        ]
 
     def _validate_chat_attachments(
         self,

@@ -5,6 +5,10 @@ from pydantic import ValidationError as PydanticValidationError
 
 from app.core.exceptions import ValidationError
 from app.modules.assistant.import_assets import validate_import_asset_path
+from app.modules.assistant.chat_attachments import (
+    enrich_user_message_from_metadata,
+    enrich_user_message_with_attachments,
+)
 from app.modules.assistant.schemas import (
     AssistantConversationChatRequest,
     ChatAttachmentRef,
@@ -62,3 +66,47 @@ def test_chat_attachment_ref_serializes_expected_fields():
         "kind": "menu_source",
         "size_bytes": 1024,
     }
+
+
+def test_enrich_user_message_with_attachments_includes_storage_path():
+    restaurant_id = uuid.uuid4()
+    path = f"restaurants/{restaurant_id}/import/product_photo/newcombo.png"
+    attachment = ChatAttachmentRef(
+        storage_path=path,
+        original_name="newcombo.png",
+        mime_type="image/png",
+        kind="product_photo",
+        size_bytes=2048,
+    )
+
+    enriched = enrich_user_message_with_attachments(
+        "Asigna esta foto a Chilaquiles",
+        [attachment],
+    )
+
+    assert path in enriched
+    assert "newcombo.png" in enriched
+    assert "## Chat attachments" in enriched
+    assert "Do not ask the owner for storage_path" in enriched
+
+
+def test_enrich_user_message_from_metadata_restores_paths_in_history():
+    restaurant_id = uuid.uuid4()
+    path = f"restaurants/{restaurant_id}/import/product_photo/taco.jpg"
+    content = enrich_user_message_from_metadata(
+        "Subí la foto del taco",
+        {
+            "attachments": [
+                {
+                    "storage_path": path,
+                    "original_name": "taco.jpg",
+                    "mime_type": "image/jpeg",
+                    "kind": "product_photo",
+                    "size_bytes": 1500,
+                }
+            ]
+        },
+    )
+
+    assert path in content
+    assert "## Chat attachments" in content

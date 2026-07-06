@@ -41,6 +41,7 @@ from app.modules.assistant.agent.response_format import (
     parse_agent_response,
     parse_function_name,
 )
+from app.modules.assistant.chat_attachments import enrich_user_message_with_attachments
 from app.modules.assistant.context.compressor import compress_history_for_llm
 from app.modules.assistant.entitlements.catalog import SKILL_CATALOG
 from app.modules.assistant.profile.schemas import AssistantProfileRecord
@@ -143,7 +144,10 @@ class AgentOrchestrator:
         messages = self._build_messages(
             request=request,
             system_prompt=system_prompt,
-            user_message=request.message,
+            user_message=enrich_user_message_with_attachments(
+                request.message,
+                request.attachments,
+            ),
         )
 
         max_tool_iterations = self._settings.assistant_max_tool_iterations
