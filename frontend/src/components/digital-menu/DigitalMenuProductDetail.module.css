@@ -719,6 +719,46 @@
   color: var(--dm-text-muted, #64748b);
 }
 
+.optionItemSoldOut {
+  cursor: not-allowed;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  border-color: var(--dm-border, #eef2f7);
+  background: var(--dm-unavailable-notice-bg, #f8fafc);
+}
+
+.optionItemSoldOut:hover {
+  border-color: var(--dm-border, #eef2f7);
+  background: var(--dm-unavailable-notice-bg, #f8fafc);
+}
+
+.optionItemSoldOut .optionItemLabel {
+  color: var(--dm-text-muted, #64748b);
+}
+
+.optionItemSoldOut .optionItemPrice {
+  color: var(--dm-text-secondary, #94a3b8);
+}
+
+.optionSoldOutBadge {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--dm-unavailable-badge-bg, #f1f5f9);
+  color: var(--dm-unavailable-badge-text, #64748b);
+  border: 1px solid var(--dm-unavailable-badge-border, #e2e8f0);
+}
+
+.optionControlSoldOut {
+  border-color: color-mix(in srgb, var(--dm-border, #eef2f7) 85%, var(--dm-text-muted, #94a3b8));
+  background: color-mix(in srgb, var(--dm-border, #eef2f7) 55%, transparent);
+}
+
 .emptyOptions {
   margin-top: 24px;
   padding: 16px;

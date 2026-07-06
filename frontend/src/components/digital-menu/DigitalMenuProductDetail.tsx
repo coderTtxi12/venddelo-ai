@@ -24,7 +24,12 @@ import {
   type BundleComplementRules,
 } from '@/lib/promotions/bundlePromoEligibility';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
-import { activeOptionGroups, optionGroupSelectionHint } from './optionGroupHint';
+import {
+  activeOptionGroups,
+  displayOptionGroups,
+  OPTION_ITEM_SOLD_OUT_LABEL,
+  optionGroupSelectionHint,
+} from './optionGroupHint';
 import {
   reorderActiveOptionGroups,
   reorderActiveOptionItems,
@@ -173,7 +178,8 @@ export function DigitalMenuProductDetail({
   const [addBtnAttention, setAddBtnAttention] = useState(false);
 
   const imageUrl = storagePublicUrl(product.image_path);
-  const groups = activeOptionGroups(product);
+  const displayGroups = displayOptionGroups(product);
+  const activeGroups = activeOptionGroups(product);
   const canReorder = onReorderGroups != null && onReorderItems != null;
   const isAvailable = product.is_active;
   const unitPrice =
@@ -182,8 +188,8 @@ export function DigitalMenuProductDetail({
       : product.price_cents / 100;
 
   const incompleteRequiredGroups = useMemo(
-    () => getIncompleteRequiredGroups(groups, selections),
-    [groups, selections],
+    () => getIncompleteRequiredGroups(activeGroups, selections),
+    [activeGroups, selections],
   );
   const canAdd = useMemo(
     () => isAvailable && incompleteRequiredGroups.length === 0,
@@ -199,8 +205,8 @@ export function DigitalMenuProductDetail({
     ? incompleteRequiredGroups.map((group) => group.id)
     : [];
   const lineTotal = useMemo(
-    () => computeLineTotal(unitPrice, groups, selections, quantity),
-    [unitPrice, groups, selections, quantity],
+    () => computeLineTotal(unitPrice, activeGroups, selections, quantity),
+    [unitPrice, activeGroups, selections, quantity],
   );
 
   useEffect(() => {
@@ -258,8 +264,8 @@ export function DigitalMenuProductDetail({
 
   const handleGroupDrop = (targetGroupId: string) => {
     if (!canReorder || !onReorderGroups || !dragGroupId || dragGroupId === targetGroupId) return;
-    const from = groups.findIndex((group) => group.id === dragGroupId);
-    const to = groups.findIndex((group) => group.id === targetGroupId);
+    const from = displayGroups.findIndex((group) => group.id === dragGroupId);
+    const to = displayGroups.findIndex((group) => group.id === targetGroupId);
     if (from < 0 || to < 0) return;
     const reordered = reorderActiveOptionGroups(product.option_groups, from, to);
     setDragGroupId(null);
@@ -279,7 +285,8 @@ export function DigitalMenuProductDetail({
     void onReorderItems(group.id, reorderedGroup);
   };
 
-  const handleOptionToggle = (group: OptionGroup, itemId: string) => {
+  const handleOptionToggle = (group: OptionGroup, itemId: string, itemActive: boolean) => {
+    if (!itemActive) return;
     const wasSelected = isItemSelected(selections, group.id, itemId);
     const next = toggleOptionSelection(group, itemId, selections);
     const selectedIds = getGroupSelection(next, group.id);
@@ -297,7 +304,7 @@ export function DigitalMenuProductDetail({
   const isGroupExpanded = (groupId: string) => expandedGroups[groupId] !== false;
 
   const revealIncompleteSelections = () => {
-    const incomplete = getIncompleteRequiredGroups(groups, selections);
+    const incomplete = getIncompleteRequiredGroups(activeGroups, selections);
     if (incomplete.length === 0) return;
 
     setSelectionValidationAttempted(true);
@@ -420,10 +427,10 @@ export function DigitalMenuProductDetail({
             ) : null}
           </div>
 
-          {groups.length > 0 ? (
+          {displayGroups.length > 0 ? (
             <div className={styles.optionSections}>
-              {groups.map((group) => {
-                const activeItems = group.items.filter((item) => item.is_active);
+              {displayGroups.map((group) => {
+                const displayItems = group.items;
                 const selectedIds = getGroupSelection(selections, group.id);
                 const isComplete = isGroupSelectionComplete(group, selectedIds);
                 const isExpanded = isGroupExpanded(group.id);
@@ -563,9 +570,11 @@ export function DigitalMenuProductDetail({
                             role={group.selection === 'single' ? 'radiogroup' : 'group'}
                             aria-label={group.title}
                           >
-                        {activeItems.map((item) => {
-                          const selected = isItemSelected(selections, group.id, item.id);
+                        {displayItems.map((item) => {
+                          const isSoldOut = !item.is_active;
+                          const selected = !isSoldOut && isItemSelected(selections, group.id, item.id);
                           const excludedFromPromo =
+                            !isSoldOut &&
                             bundleComplementRules &&
                             isOptionExcludedFromBundlePromo(item.id, bundleComplementRules);
                           return (
@@ -579,7 +588,7 @@ export function DigitalMenuProductDetail({
                                 : ''
                             }`}
                             onDragOver={
-                              canReorder
+                              canReorder && !isSoldOut
                                 ? (e) => {
                                     e.preventDefault();
                                     if (dragItemId && dragItemId !== item.id) {
@@ -589,14 +598,14 @@ export function DigitalMenuProductDetail({
                                 : undefined
                             }
                             onDragLeave={
-                              canReorder
+                              canReorder && !isSoldOut
                                 ? () => {
                                     if (dropItemId === item.id) setDropItemId(null);
                                   }
                                 : undefined
                             }
                             onDrop={
-                              canReorder
+                              canReorder && !isSoldOut
                                 ? (e) => {
                                     e.preventDefault();
                                     handleItemDrop(group, item.id);
@@ -604,7 +613,7 @@ export function DigitalMenuProductDetail({
                                 : undefined
                             }
                           >
-                            {canReorder ? (
+                            {canReorder && !isSoldOut ? (
                             <button
                               type="button"
                               className={styles.itemDragHandle}
@@ -636,6 +645,33 @@ export function DigitalMenuProductDetail({
                               <DragIndicatorIcon sx={{ fontSize: 16 }} aria-hidden />
                             </button>
                             ) : null}
+                            {isSoldOut ? (
+                              <div
+                                className={`${styles.optionItem} ${styles.optionItemSoldOut}`}
+                                role="listitem"
+                                aria-disabled="true"
+                                aria-label={`${item.label}, ${OPTION_ITEM_SOLD_OUT_LABEL.toLowerCase()}${
+                                  item.price_delta_cents
+                                    ? `, ${formatMoney(item.price_delta_cents / 100, product.currency)} extra`
+                                    : ''
+                                }`}
+                              >
+                                <span
+                                  className={`${styles.optionControl} ${
+                                    group.selection === 'single'
+                                      ? styles.optionControlSingle
+                                      : styles.optionControlMulti
+                                  } ${styles.optionControlSoldOut}`}
+                                  aria-hidden
+                                />
+                                <span className={styles.optionItemLabelWrap}>
+                                  <span className={styles.optionItemLabel}>{item.label}</span>
+                                </span>
+                                <span className={styles.optionSoldOutBadge}>
+                                  {OPTION_ITEM_SOLD_OUT_LABEL}
+                                </span>
+                              </div>
+                            ) : (
                             <button
                               type="button"
                               className={`${styles.optionItem} ${selected ? styles.optionItemSelected : ''} ${
@@ -657,7 +693,7 @@ export function DigitalMenuProductDetail({
                                   ? bundleComplementExcludedTitle(bundleComplementRules.promoName)
                                   : undefined
                               }
-                              onClick={() => handleOptionToggle(group, item.id)}
+                              onClick={() => handleOptionToggle(group, item.id, item.is_active)}
                             >
                               <span
                                 className={`${styles.optionControl} ${
@@ -685,6 +721,7 @@ export function DigitalMenuProductDetail({
                                 </span>
                               ) : null}
                             </button>
+                            )}
                           </li>
                           );
                         })}
