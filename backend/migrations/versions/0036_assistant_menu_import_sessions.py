@@ -1,6 +1,6 @@
 """assistant menu import sessions
 
-Revision ID: 0036_assistant_menu_import_sessions
+Revision ID: 0036_menu_import_sessions
 Revises: 0035_digital_menu_themes
 Create Date: 2026-07-02
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0036_assistant_menu_import_sessions"
+revision: str = "0036_menu_import_sessions"
 down_revision: str | None = "0035_digital_menu_themes"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

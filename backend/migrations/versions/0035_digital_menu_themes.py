@@ -18,6 +18,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    op.execute(sa.text("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)"))
     op.create_table(
         "digital_menu_themes",
         sa.Column("id", sa.String(length=64), nullable=False),
