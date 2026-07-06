@@ -112,9 +112,14 @@
   border-top: 1px solid var(--color-border);
 }
 
+.tableWrapper {
+  margin: 0 0 0.65rem;
+  overflow-x: auto;
+}
+
 .markdown table {
   width: 100%;
-  margin: 0 0 0.65rem;
+  margin: 0;
   border-collapse: collapse;
   font-size: 0.8125rem;
 }

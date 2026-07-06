@@ -58,3 +58,40 @@ test('parseBlocks renders product detail markdown structure', () => {
 
   assert.equal(blocks[blocks.length - 1]?.type, 'blockquote');
 });
+
+test('parseBlocks renders markdown tables', () => {
+  const content = `Tabla de productos en el menú en vivo (activos):
+
+| Producto | Precio |
+|---|---|
+| BURGER & BONELESS | $100.00 MXN |
+| BONELESS & FRIES WITC SAUCE | $229.00 MXN |
+| WINGS & FRIES | $244.00 MXN |
+
+¿Quieres que lo exporte a CSV?`;
+
+  const blocks = parseBlocks(content);
+
+  assert.equal(blocks[0]?.type, 'paragraph');
+  assert.equal(
+    blocks[0]?.type === 'paragraph' ? blocks[0].text : null,
+    'Tabla de productos en el menú en vivo (activos):',
+  );
+
+  assert.equal(blocks[1]?.type, 'table');
+  assert.deepEqual(
+    blocks[1]?.type === 'table' ? blocks[1].headers : null,
+    ['Producto', 'Precio'],
+  );
+  assert.deepEqual(blocks[1]?.type === 'table' ? blocks[1].rows : null, [
+    ['BURGER & BONELESS', '$100.00 MXN'],
+    ['BONELESS & FRIES WITC SAUCE', '$229.00 MXN'],
+    ['WINGS & FRIES', '$244.00 MXN'],
+  ]);
+
+  assert.equal(blocks[2]?.type, 'paragraph');
+  assert.equal(
+    blocks[2]?.type === 'paragraph' ? blocks[2].text : null,
+    '¿Quieres que lo exporte a CSV?',
+  );
+});

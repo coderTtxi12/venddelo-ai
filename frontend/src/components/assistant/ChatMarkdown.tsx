@@ -104,6 +104,35 @@ function renderBlockquote(lines: string[], key: string): ReactNode {
   );
 }
 
+function renderTable(headers: string[], rows: string[][], key: string): ReactNode {
+  return (
+    <div key={key} className={styles.tableWrapper}>
+      <table>
+        <thead>
+          <tr>
+            {headers.map((header, headerIndex) => (
+              <th key={`${key}-th-${headerIndex}`}>
+                {parseInline(header, `${key}-th-${headerIndex}`)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={`${key}-tr-${rowIndex}`}>
+              {row.map((cell, cellIndex) => (
+                <td key={`${key}-td-${rowIndex}-${cellIndex}`}>
+                  {parseInline(cell, `${key}-td-${rowIndex}-${cellIndex}`)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function ChatMarkdown({ content }: ChatMarkdownProps) {
   const blocks = parseBlocks(content);
 
@@ -142,6 +171,10 @@ function ChatMarkdown({ content }: ChatMarkdownProps) {
               ))}
             </ol>
           );
+        }
+
+        if (block.type === 'table') {
+          return renderTable(block.headers, block.rows, key);
         }
 
         return renderParagraph(block.text, key);
