@@ -1,14 +1,33 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from app.modules.assistant.skills.menu_import.price_units import (
+    _coerce_legacy_cents_field,
+    mxn_to_cents,
+)
 
 
 class ImportOptionItem(BaseModel):
     ref: str
     label: str
-    price_delta_cents: int = 0
+    price_delta_mxn: float = 0
+    sort_order: int = 0
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_price_delta(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            return _coerce_legacy_cents_field(
+                data, mxn_key="price_delta_mxn", cents_key="price_delta_cents"
+            )
+        return data
+
+    @property
+    def price_delta_cents(self) -> int:
+        return mxn_to_cents(self.price_delta_mxn)
 
 
 class ImportOptionGroup(BaseModel):
@@ -18,6 +37,7 @@ class ImportOptionGroup(BaseModel):
     required: bool = False
     min_selections: int = 0
     max_selections: int = 1
+    sort_order: int = 0
     items: list[ImportOptionItem] = Field(default_factory=list)
 
 
@@ -25,11 +45,26 @@ class ImportProduct(BaseModel):
     ref: str
     name: str
     description: str | None = None
-    price_cents: int = 0
+    price_mxn: float = 0
     currency: str = "MXN"
     is_available: bool = True
+    sort_order: int = 0
     option_groups: list[ImportOptionGroup] = Field(default_factory=list)
     constraints_notes: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_price(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            return _coerce_legacy_cents_field(data, mxn_key="price_mxn", cents_key="price_cents")
+        return data
+
+    @property
+    def price_cents(self) -> int:
+        return mxn_to_cents(self.price_mxn)
+
+
+DisplayLayout = Literal["vertical", "horizontal", "grid"]
 
 
 class ImportCategory(BaseModel):
@@ -37,6 +72,7 @@ class ImportCategory(BaseModel):
     name: str
     description: str | None = None
     sort_order: int = 0
+    display_layout: DisplayLayout | None = None
     products: list[ImportProduct] = Field(default_factory=list)
 
 
@@ -57,7 +93,7 @@ class ImportPromotion(BaseModel):
     type: Literal["two_for_one", "percent", "amount", "combo"]
     scope: Literal["product", "category", "order"] = "product"
     percent: float | None = None
-    amount_cents: int | None = None
+    amount_mxn: float | None = None
     bundle: PromotionBundle | None = None
     target_product_refs: list[str] = Field(default_factory=list)
     target_category_refs: list[str] = Field(default_factory=list)
@@ -65,6 +101,19 @@ class ImportPromotion(BaseModel):
     schedule_notes: str | None = None
     schedule: PromotionSchedule | None = None
     constraints_notes: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_amount(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            return _coerce_legacy_cents_field(data, mxn_key="amount_mxn", cents_key="amount_cents")
+        return data
+
+    @property
+    def amount_cents(self) -> int | None:
+        if self.amount_mxn is None:
+            return None
+        return mxn_to_cents(self.amount_mxn)
 
 
 class OpenQuestion(BaseModel):

@@ -8,7 +8,7 @@ from app.modules.assistant.skills.menu_import.draft_schema import ImportCategory
 
 
 def _product(ref: str, name: str) -> ImportProduct:
-    return ImportProduct(ref=ref, name=name, price_cents=1000)
+    return ImportProduct(ref=ref, name=name, price_mxn=10)
 
 
 def _category(ref: str, name: str, product_count: int) -> ImportCategory:

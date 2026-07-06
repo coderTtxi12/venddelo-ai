@@ -8,6 +8,7 @@ class MenuImportSessionStatus(StrEnum):
     COLLECTING_SOURCES = "collecting_sources"
     EXTRACTING = "extracting"
     CLARIFYING = "clarifying"
+    OPTIMIZING = "optimizing"
     COLLECTING_IMAGES = "collecting_images"
     SELECTING_THEME = "selecting_theme"
     PREVIEW_BATCH = "preview_batch"
