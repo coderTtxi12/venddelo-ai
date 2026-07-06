@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     assistant_context_recent_window_turns: int = 6
     assistant_max_tool_iterations: int = 32
     menu_import_batch_max_products: int = 15
+    menu_import_full_max_products: int = 200
     menu_import_photo_match_confidence_threshold: float = Field(
         default=0.72,
         validation_alias="MENU_IMPORT_PHOTO_MATCH_THRESHOLD",
