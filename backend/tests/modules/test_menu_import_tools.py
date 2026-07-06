@@ -16,7 +16,10 @@ def test_menu_import_skill_registered():
     names = {tool.name for tool in tools}
     assert "start_menu_import_session" in names
     assert "update_menu_knowledge" in names
-    assert len(names) == 20
+    assert len(names) == 16
+    assert "optimize_import_draft" in names
+    assert "preview_full_import" in names
+    assert "apply_full_import" in names
 
 
 def test_menu_import_skill_exposes_expected_tool_effects():
@@ -24,7 +27,6 @@ def test_menu_import_skill_exposes_expected_tool_effects():
     by_name = {tool.name: tool.effect for tool in skill.tool_definitions()}
     assert by_name["get_import_session"] == "read"
     assert by_name["apply_menu_batch"] == "mutate"
-    assert by_name["match_photos_to_products"] == "read"
     assert by_name["update_menu_knowledge"] == "mutate"
 
 

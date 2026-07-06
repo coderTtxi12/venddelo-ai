@@ -13,8 +13,12 @@ from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.import_assets import validate_import_asset_path
 from app.modules.assistant.profile.menu_markdown import menu_markdown_for_persist
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
-from app.modules.assistant.skills.menu_import.apply_batch import apply_import_batch
+from app.modules.assistant.skills.menu_import.apply_batch import apply_full_import, apply_import_batch
 from app.modules.assistant.skills.menu_import.batching import count_batch_products, split_draft_into_batches
+from app.modules.assistant.skills.menu_import.draft_merge import merge_draft_batches
+from app.modules.assistant.skills.menu_import.optimization import optimize_draft
+from app.modules.assistant.skills.menu_import.preview_full import build_full_import_preview
+from app.modules.assistant.skills.menu_write.theme_tools import list_menu_themes, recommend_menu_theme
 from app.modules.assistant.skills.menu_import.description_enhance import (
     apply_description_enhancements,
     preview_description_enhancements,
@@ -26,18 +30,8 @@ from app.modules.assistant.skills.menu_import.extraction import (
     extract_from_text,
     merge_page_drafts,
 )
-from app.modules.assistant.skills.menu_import.photo_match import (
-    apply_photo_mappings,
-    match_photos_to_products,
-    resolve_uncertain_image,
-)
 from app.modules.assistant.skills.menu_import.session_repository import MenuImportSessionRepository
 from app.modules.assistant.skills.menu_import.session_schemas import MenuImportSessionStatus
-from app.modules.assistant.skills.menu_import.theme_tools import (
-    apply_menu_theme,
-    list_menu_themes,
-    recommend_menu_theme,
-)
 from app.modules.menu.service import MenuService
 
 
@@ -91,8 +85,8 @@ def _session_summary(session: MenuImportSession) -> dict[str, Any]:
     }
 
 
-def _format_price_cents(cents: int, currency: str = "MXN") -> str:
-    return f"{cents / 100:.2f} {currency}"
+def _format_price_mxn(mxn: float, currency: str = "MXN") -> str:
+    return f"${mxn:,.2f} {currency}" if mxn % 1 else f"${mxn:,.0f} {currency}"
 
 
 def _preview_batch_markdown(batch: ImportBatch) -> str:
@@ -115,7 +109,7 @@ def _preview_batch_markdown(batch: ImportBatch) -> str:
         for product in category.products:
             lines.append(
                 f"| {category.name} | {product.name} | "
-                f"{_format_price_cents(product.price_cents, product.currency)} |"
+                f"{_format_price_mxn(product.price_mxn, product.currency)} |"
             )
 
     if batch.promotions:
@@ -281,7 +275,7 @@ class MenuImportSkill:
                 name="save_clarification_answers",
                 description=(
                     "Save owner answers to open_questions from extraction. "
-                    "Advances to photo collection when all questions are answered."
+                    "Advances to optimizing when all questions are answered."
                 ),
                 effect="mutate",
                 input_schema={
@@ -296,69 +290,40 @@ class MenuImportSkill:
                 },
             ),
             ToolDefinition(
-                name="list_menu_themes",
-                description="List active digital menu themes from the database catalog.",
-                effect="read",
-                input_schema={"type": "object", "properties": {}, "required": []},
-            ),
-            ToolDefinition(
-                name="recommend_menu_theme",
+                name="optimize_import_draft",
                 description=(
-                    "Recommend top 3 digital menu themes using discovery answers and the theme catalog."
-                ),
-                effect="read",
-                input_schema={"type": "object", "properties": {}, "required": []},
-            ),
-            ToolDefinition(
-                name="apply_menu_theme",
-                description=(
-                    "Apply a digital menu theme to the restaurant. "
-                    "theme_id must exist in the active themes catalog."
+                    "Merge all extraction batches, optimize order/layout/copy/complement rules "
+                    "(required/optional, min/max selections), recommend theme, and rewrite draft_batches."
                 ),
                 effect="mutate",
-                input_schema={
-                    "type": "object",
-                    "properties": {"theme_id": {"type": "string"}},
-                    "required": ["theme_id"],
-                },
+                input_schema={"type": "object", "properties": {}, "required": []},
             ),
             ToolDefinition(
-                name="register_product_image",
+                name="preview_full_import",
                 description=(
-                    "Register an uploaded product photo path (from import assets API) on the session."
+                    "Executive markdown preview of the full optimized menu (prices in MXN), "
+                    "including complement groups with required/optional and min/max."
+                ),
+                effect="read",
+                input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
+                name="apply_full_import",
+                description=(
+                    "Apply ALL pending import batches in one call. Requires confirmed=true and "
+                    "no unanswered open_questions."
                 ),
                 effect="mutate",
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "storage_path": {"type": "string"},
-                        "original_name": {"type": "string"},
+                        "confirmed": {
+                            "type": "boolean",
+                            "description": "Owner must confirm before applying.",
+                            "default": False,
+                        },
                     },
-                    "required": ["storage_path"],
-                },
-            ),
-            ToolDefinition(
-                name="match_photos_to_products",
-                description=(
-                    "Match registered product photos to imported products using vision AI. "
-                    "Returns matched, uncertain, and unmatched groupings."
-                ),
-                effect="read",
-                input_schema={"type": "object", "properties": {}, "required": []},
-            ),
-            ToolDefinition(
-                name="resolve_uncertain_image",
-                description=(
-                    "Manually assign a product_ref to an uncertain photo after owner confirmation."
-                ),
-                effect="mutate",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "image_path": {"type": "string"},
-                        "product_ref": {"type": "string"},
-                    },
-                    "required": ["image_path", "product_ref"],
+                    "required": [],
                 },
             ),
             ToolDefinition(
@@ -391,24 +356,6 @@ class MenuImportSkill:
                         },
                     },
                     "required": ["batch_index"],
-                },
-            ),
-            ToolDefinition(
-                name="apply_photo_mappings",
-                description=(
-                    "Set image_path on products for matched and resolved photos. "
-                    "Requires confirmed=true."
-                ),
-                effect="mutate",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "confirmed": {
-                            "type": "boolean",
-                            "default": False,
-                        },
-                    },
-                    "required": [],
                 },
             ),
             ToolDefinition(
@@ -505,6 +452,8 @@ class MenuImportSkill:
                 conversation_id=ctx.conversation_id,
                 status=MenuImportSessionStatus.DISCOVERY,
             )
+            session.discovery_answers = {"concierge_mode": True}
+            repo.update(session)
             return ToolResult(
                 ok=True,
                 summary="Started menu import session",
@@ -595,7 +544,7 @@ class MenuImportSkill:
             session.status = (
                 MenuImportSessionStatus.CLARIFYING.value
                 if merged.open_questions
-                else MenuImportSessionStatus.PREVIEW_BATCH.value
+                else MenuImportSessionStatus.OPTIMIZING.value
             )
             _repo(ctx).update(session)
             product_count = sum(count_batch_products(batch) for batch in batches)
@@ -663,7 +612,7 @@ class MenuImportSkill:
             if unanswered:
                 session.status = MenuImportSessionStatus.CLARIFYING.value
             else:
-                session.status = MenuImportSessionStatus.COLLECTING_IMAGES.value
+                session.status = MenuImportSessionStatus.OPTIMIZING.value
             _repo(ctx).update(session)
             return ToolResult(
                 ok=True,
@@ -671,94 +620,82 @@ class MenuImportSkill:
                 data={**_session_summary(session), "unanswered_question_ids": unanswered},
             )
 
-        if tool_name == "list_menu_themes":
-            themes = list_menu_themes(ctx)
-            return ToolResult(
-                ok=True,
-                summary=f"Listed {len(themes)} active theme(s)",
-                data={"themes": themes},
-            )
-
-        if tool_name == "recommend_menu_theme":
-            recommendations = recommend_menu_theme(ctx, session)
-            return ToolResult(
-                ok=True,
-                summary=f"Recommended {len(recommendations)} theme(s)",
-                data={
-                    "recommendations": [
-                        {
-                            "theme_id": rec.theme_id,
-                            "label": rec.label,
-                            "reason_es": rec.reason_es,
-                        }
-                        for rec in recommendations
-                    ]
-                },
-            )
-
-        if tool_name == "apply_menu_theme":
-            theme_id = str(args.get("theme_id") or "").strip()
+        if tool_name == "optimize_import_draft":
+            batches = [ImportBatch.model_validate(entry) for entry in _batch_entries(session)]
+            if not batches:
+                return ToolResult(ok=False, summary="Run extraction before optimizing")
+            merged = merge_draft_batches(batches)
+            opt = optimize_draft(merged, _extraction_context(session))
+            theme_id = opt.recommended_theme_id
             if not theme_id:
-                return ToolResult(ok=False, summary="theme_id is required")
-            result = apply_menu_theme(ctx, theme_id, session=session)
+                recs = recommend_menu_theme(ctx, session=session)
+                if recs:
+                    theme_id = recs[0].theme_id
+            if theme_id:
+                session.selected_theme_id = theme_id
+            discovery = dict(session.discovery_answers or {})
+            discovery["concierge_mode"] = True
+            discovery["optimization_notes_es"] = opt.optimization_notes_es
+            session.discovery_answers = discovery
+            optimized_batches = split_draft_into_batches(opt.draft)
+            session.draft_batches = [batch.model_dump() for batch in optimized_batches]
             session.status = MenuImportSessionStatus.PREVIEW_BATCH.value
             _repo(ctx).update(session)
             return ToolResult(
                 ok=True,
-                summary=f"Applied theme {result['label']!r}",
-                data={**result, **_session_summary(session)},
-            )
-
-        if tool_name == "register_product_image":
-            storage_path = str(args.get("storage_path") or "").strip()
-            original_name = str(args.get("original_name") or "").strip() or storage_path.rsplit("/", 1)[-1]
-            if not storage_path:
-                return ToolResult(ok=False, summary="storage_path is required")
-            validate_import_asset_path(ctx.restaurant_id, storage_path, kind="product_photo")
-            product_images = list(session.product_images or [])
-            product_images.append(
-                {
-                    "path": storage_path,
-                    "original_name": original_name,
-                    "status": "registered",
-                    "registered_at": datetime.now(UTC).isoformat(),
-                }
-            )
-            session.product_images = product_images
-            session.status = MenuImportSessionStatus.COLLECTING_IMAGES.value
-            _repo(ctx).update(session)
-            return ToolResult(
-                ok=True,
-                summary=f"Registered product photo {original_name!r}",
-                data={**_session_summary(session), "image": product_images[-1]},
-            )
-
-        if tool_name == "match_photos_to_products":
-            result = match_photos_to_products(session, ctx)
-            session.status = MenuImportSessionStatus.MATCHING_IMAGES.value
-            _repo(ctx).update(session)
-            return ToolResult(
-                ok=True,
-                summary=(
-                    f"Matched {len(result.matched)}, uncertain {len(result.uncertain)}, "
-                    f"unmatched {len(result.unmatched)}"
-                ),
+                summary="Optimized import draft for full preview",
                 data={
-                    "matched": result.matched,
-                    "uncertain": result.uncertain,
-                    "unmatched": result.unmatched,
+                    "optimization_notes_es": opt.optimization_notes_es,
+                    "recommended_theme_id": theme_id,
+                    "product_count": sum(count_batch_products(batch) for batch in optimized_batches),
+                    **_session_summary(session),
                 },
             )
 
-        if tool_name == "resolve_uncertain_image":
-            image_path = str(args.get("image_path") or "").strip()
-            product_ref = str(args.get("product_ref") or "").strip()
-            resolve_uncertain_image(session, image_path, product_ref)
-            _repo(ctx).update(session)
+        if tool_name == "preview_full_import":
+            merged = merge_draft_batches(
+                [ImportBatch.model_validate(entry) for entry in _batch_entries(session)]
+            )
+            discovery = session.discovery_answers or {}
+            notes = discovery.get("optimization_notes_es") or []
+            theme_id = session.selected_theme_id
+            theme_label = theme_id
+            if theme_id:
+                themes = {entry["id"]: entry.get("label", entry["id"]) for entry in list_menu_themes(ctx)}
+                theme_label = themes.get(theme_id, theme_id)
+            markdown = build_full_import_preview(
+                merged,
+                optimization_notes_es=notes if isinstance(notes, list) else [],
+                recommended_theme_id=theme_id,
+                theme_label=theme_label,
+            )
             return ToolResult(
                 ok=True,
-                summary=f"Resolved {image_path!r} → {product_ref!r}",
-                data=_session_summary(session),
+                summary="Full import preview ready",
+                data={
+                    "markdown": markdown,
+                    "open_questions": [question.model_dump() for question in merged.open_questions],
+                },
+            )
+
+        if tool_name == "apply_full_import":
+            confirmed = bool(args.get("confirmed", False))
+            result = apply_full_import(ctx, session, confirmed=confirmed)
+            if result.ok:
+                session.status = MenuImportSessionStatus.MATCHING_IMAGES.value
+                _repo(ctx).update(session)
+            return ToolResult(
+                ok=result.ok,
+                summary=result.summary,
+                data={
+                    "batches_applied": result.batches_applied,
+                    "categories": result.categories,
+                    "products": result.products,
+                    "option_groups": result.option_groups,
+                    "option_items": result.option_items,
+                    "promotions": result.promotions,
+                    **_session_summary(session),
+                },
             )
 
         if tool_name == "preview_import_batch":
@@ -809,18 +746,6 @@ class MenuImportSkill:
                     "ref_map": result.ref_map,
                     **_session_summary(session),
                 },
-            )
-
-        if tool_name == "apply_photo_mappings":
-            confirmed = bool(args.get("confirmed", False))
-            result = apply_photo_mappings(session, ctx, confirmed=confirmed)
-            if result.ok:
-                session.status = MenuImportSessionStatus.ENHANCING.value
-                _repo(ctx).update(session)
-            return ToolResult(
-                ok=result.ok,
-                summary=result.summary,
-                data={"updated": result.updated, **_session_summary(session)},
             )
 
         if tool_name == "preview_description_enhancements":
@@ -901,7 +826,9 @@ class MenuImportSkill:
                     "use_skill": "menu_media",
                     "tools": [
                         "menu_media__generate_product_image",
-                        "menu_media__bulk_generate_product_images",
+                        "menu_write__match_product_photos",
+                        "menu_write__assign_product_image",
+                        "menu_write__bulk_assign_product_images",
                     ],
                     **_session_summary(session),
                 },
