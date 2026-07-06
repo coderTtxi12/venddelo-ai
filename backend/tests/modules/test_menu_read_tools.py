@@ -449,6 +449,7 @@ def test_menu_read_product_payload_exposes_option_context(session):
     assert result.ok is True
     payload = result.data["product"]
     assert payload["image_path"] == "products/burger.png"
+    assert payload["live_menu_status"] == "draft"
     assert payload["has_options"] is True
     assert payload["category_sort_indices"][str(category.id)] == 0
 

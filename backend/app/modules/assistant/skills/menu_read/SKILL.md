@@ -13,22 +13,6 @@ guide on disk; you do not need a separate "activation" step.
 
 ---
 
-## How the data relates (quick map)
-
-```
-restaurant
- ├─ categories                      → list_categories
- └─ products (price_cents, flags)   → list_products / search_products / get_product
-      ├─ product_categories         → category_ids + category_sort_indices (order in a category)
-      └─ option_groups              → option_groups[] (size, extras…)
-           └─ option_items          → items[] (label, price_delta_cents)
-
-promotions (type, scope)            → list_promotions / get_promotion
- ├─ promotion_products              → product_ids   (scope=product)
- ├─ promotion_categories            → category_ids  (scope=category → hits products in those categories)
- └─ promotion_option_items          → option_item_ids (bundle allow-list / waived add-ons)
-```
-
 **Key links to remember:**
 - A product ↔ promotion link lives in the **promotion**, not the product. A promo reaches a
   product by `product_ids` (scope=product), by `category_ids` (scope=category), or applies to
@@ -44,9 +28,7 @@ promotions (type, scope)            → list_promotions / get_promotion
 
 ## When to Use This Skill
 
-Use **`menu_read` tools** when the owner asks about **live catalog data** that is not already in:
-
-- Conversation history or prior tool results in this turn
+Use **`menu_read` tools** when the owner asks about **live catalog data**:
 
 Typical intents:
 
@@ -139,7 +121,7 @@ from `price_cents`). Never dump raw tool JSON keys or snake_case field names in 
 | `cursor` | no | From previous `list_products` response |
 | `limit` | no | Page size (default 20, max 50) |
 
-**Returns:** `products[]` (active **and inactive** — check `is_active` on each row; each with `id`, `name`, `description`, `image_path`, `price_cents`, `currency`, `is_active`, `is_published`, `approval_status`, `category_ids`, `category_sort_indices`, `has_options`, `option_groups[]` with full complement/add-on detail, **`promotions[]` / `has_promotions`** including `option_participation` when relevant), `next_cursor`, `has_more`, `limit`, `counts`, optional `category_id`
+**Returns:** `products[]` (check `live_menu_status` on each row: `en_menu`, `inactivo`, `draft`; each with `id`, `name`, `description`, `image_path`, `price_cents`, `currency`, `is_active`, `is_published`, `approval_status`, `live_menu_status`, `category_ids`, `category_sort_indices`, `has_options`, `option_groups[]` with full complement/add-on detail, **`promotions[]` / `has_promotions`** including `option_participation` when relevant), `next_cursor`, `has_more`, `limit`, `counts` (`total`, `en_menu`, `inactivo`, `draft` — owner UI states; use these for "¿cuántos productos?" not `is_active`), optional `category_id`
 
 **Use when:** Full browse, "how many products", complements/photos audit, finding **inactive** items to re-enable, or all items in one category. Paginate until `has_more=false`.
 
@@ -317,7 +299,8 @@ Each product includes (see `docs/live-menu-product-reference.en.md`):
 | `image_path` | Storage object path (not a full URL); `null` if no photo |
 | `price_cents`, `currency` | **Base** unit price in cents. Format as `price_cents / 100` (e.g. `12000` → `$120.00 MXN`) |
 | `is_active` | Soft-delete flag. `false` = unavailable; live menu disables "Add to cart" |
-| `is_published`, `approval_status` | Publish workflow. Live menu shows only `is_published=true` + `approval_status="approved"` |
+| `is_published`, `approval_status` | Publish workflow (used by writes). Prefer `live_menu_status` when talking to the owner |
+| `live_menu_status` | Owner UI state: `en_menu` (visible + orderable), `inactivo` (visible as No disponible), `draft` (hidden from live menu) |
 | `category_ids` | Categories the product belongs to |
 | `category_sort_indices` | `{ category_id → sort_index }`; display order **within** each category (lower = first) |
 | `has_options` | `true` when the product has at least one option group |

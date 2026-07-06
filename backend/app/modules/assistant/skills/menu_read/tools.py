@@ -578,6 +578,23 @@ def _list_categories_result(service: MenuService, ctx: AgentContext) -> ToolResu
     )
 
 
+def _live_menu_status(product: ProductDTO) -> str:
+    """Owner-facing live menu state derived from publish + active flags."""
+    on_live_menu = product.is_published and product.approval_status == "approved"
+    if not on_live_menu:
+        return "draft"
+    if product.is_active:
+        return "en_menu"
+    return "inactivo"
+
+
+def _live_menu_status_counts(products: list[ProductDTO]) -> dict[str, int]:
+    counts = {"en_menu": 0, "inactivo": 0, "draft": 0}
+    for product in products:
+        counts[_live_menu_status(product)] += 1
+    return counts
+
+
 def _product_payload(product: ProductDTO) -> dict[str, Any]:
     groups = sorted(product.option_groups, key=lambda group: group.sort_index)
     return {
@@ -590,6 +607,7 @@ def _product_payload(product: ProductDTO) -> dict[str, Any]:
         "is_active": product.is_active,
         "is_published": product.is_published,
         "approval_status": product.approval_status,
+        "live_menu_status": _live_menu_status(product),
         "category_ids": [str(item) for item in product.category_ids],
         "category_sort_indices": dict(product.category_sort_indices),
         "has_options": bool(groups),
@@ -665,21 +683,19 @@ class MenuReadSkill:
                     "UUID from list_categories (not virtual special aisle ids). Returns products[] "
                     "with: id, name, description, image_path (null if no photo), price_cents "
                     "(always cents — 100 MXN = 10000), currency, is_active, is_published, "
-                    "approval_status, category_ids (UUIDs this product belongs to), "
+                    "approval_status, live_menu_status (en_menu | inactivo | draft — owner UI "
+                    "state; prefer this over interpreting flags), category_ids (UUIDs this product "
                     "category_sort_indices (order within each category), has_options, "
                     "option_groups[] (complements/add-ons: id, title, required, selection "
                     "single|multi, min_selections, max_selections, sort_index, is_active, "
                     "selection_summary, items[] with id, label, price_delta_cents, sort_index, "
                     "is_active). Also returns "
-                    f"{_PRODUCT_PROMOTIONS_DOC}, next_cursor, has_more, limit, and category_id "
-                    "when filtered. Paginate until has_more=false for a full catalog audit. "
-                    "Live-menu visibility (owner UI: En menú / Draft / Inactivo): "
-                    "is_published=true + approval_status=approved → listed on the public menu; "
-                    "is_active=true in that state → En menú (orderable); "
-                    "is_active=false + is_published=true + approval_status=approved → Inactivo "
-                    "(still visible on the live menu but shown as No disponible — not orderable); "
-                    "is_published=false or approval_status=draft → Draft (hidden from the live "
-                    "menu entirely — customers never see it)."
+                    f"{_PRODUCT_PROMOTIONS_DOC}, next_cursor, has_more, limit, counts "
+                    "(total, en_menu, inactivo, draft — owner UI states; use for totals), "
+                    "and category_id when filtered. Paginate until has_more=false for a full catalog audit. "
+                    "live_menu_status mapping: en_menu = published+approved+active (orderable); "
+                    "inactivo = published+approved+inactive (visible as No disponible); "
+                    "draft = unpublished or not approved (hidden from live menu)."
                 ),
                 effect="read",
                 input_schema={
@@ -732,12 +748,11 @@ class MenuReadSkill:
                     "Get one product's full detail. Provide product_id (UUID) when known, "
                     "or name to resolve it by fuzzy match. Provide at least one. Returns "
                     "product with: id, name, description, image_path, price_cents (cents), "
-                    "currency, is_active, is_published, approval_status, category_ids, "
+                    "currency, is_active, is_published, approval_status, live_menu_status "
+                    "(en_menu | inactivo | draft), category_ids, "
                     "category_sort_indices, has_options, option_groups[] (full complement "
-                    f"detail), {_PRODUCT_PROMOTIONS_DOC}. Live-menu visibility: "
-                    "is_published=true + approval_status=approved → on public menu; "
-                    "is_active=true → En menú (orderable); is_active=false + published → "
-                    "Inactivo (visible as No disponible); draft/unpublished → hidden from live menu."
+                    f"detail), {_PRODUCT_PROMOTIONS_DOC}. Prefer live_menu_status for owner-facing "
+                    "visibility; raw flags remain for writes."
                 ),
                 effect="read",
                 input_schema={
@@ -894,16 +909,15 @@ class MenuReadSkill:
                 )
                 for product in page.items
             ]
-            active_count = sum(1 for product in page.items if product.is_active)
-            inactive_count = len(page.items) - active_count
+            status_counts = _live_menu_status_counts(page.items)
             data: dict[str, Any] = {
                 "products": products,
                 "next_cursor": page.next_cursor,
                 "has_more": page.has_more,
                 "limit": limit,
                 "counts": {
-                    "active": active_count,
-                    "inactive": inactive_count,
+                    "total": len(page.items),
+                    **status_counts,
                 },
             }
             if category_id is not None:
@@ -912,8 +926,10 @@ class MenuReadSkill:
             return ToolResult(
                 ok=True,
                 summary=(
-                    f"Listed {len(products)} products ({active_count} active, "
-                    f"{inactive_count} inactive, {scope}, has_more={page.has_more})"
+                    f"Listed {len(products)} products "
+                    f"({status_counts['en_menu']} en_menu, "
+                    f"{status_counts['inactivo']} inactivo, "
+                    f"{status_counts['draft']} draft, {scope}, has_more={page.has_more})"
                 ),
                 data=data,
             )
