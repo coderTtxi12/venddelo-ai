@@ -57,6 +57,31 @@ def test_registry_rejects_delete_tools():
         raise AssertionError("delete tool was accepted")
 
 
+def test_registry_allows_complement_delete_tools():
+    class ComplementDeleteSkill(FakeReadSkill):
+        id = "menu_write"
+
+        def tool_definitions(self) -> list[ToolDefinition]:
+            return [
+                ToolDefinition(
+                    name="delete_option_item",
+                    description="Remove one complement",
+                    effect="mutate",
+                    input_schema={"type": "object", "properties": {}},
+                ),
+                ToolDefinition(
+                    name="bulk_delete_option_items",
+                    description="Remove many complements from one product",
+                    effect="mutate",
+                    input_schema={"type": "object", "properties": {}},
+                ),
+            ]
+
+    registry = SkillRegistry([ComplementDeleteSkill()])
+    names = {tool.name for tool in registry.tool_definitions(["menu_write"])}
+    assert names == {"delete_option_item", "bulk_delete_option_items"}
+
+
 def test_registry_loads_skill_guide_from_skill_md():
     registry = SkillRegistry([MenuReadSkill()])
     sections = registry.system_prompt_sections(["menu_read"])

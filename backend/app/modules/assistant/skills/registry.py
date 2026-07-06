@@ -4,7 +4,8 @@ Collects tool executors discovered under ``skills/<id>/tools.py``. Behavioral gu
 live in each skill's ``SKILL.md`` and are loaded on demand via ``load_skill`` (see
 ``skills/markdown.py``), not injected into the initial system prompt.
 
-Delete-effect tools are rejected at construction time. ``execute`` re-checks
+Delete-effect tools are rejected at construction time, except complement delete tools
+(``delete_option_item``, ``bulk_delete_option_items``). ``execute`` re-checks
 entitlements against ``AgentContext`` before delegating to the skill.
 """
 
@@ -17,6 +18,22 @@ from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.skills.base import SkillPort, ToolDefinition, ToolResult
 from app.modules.assistant.skills.markdown import load_skill_guide
 
+# Hard-delete is forbidden for assistant tools except complement removal on one product.
+_ALLOWED_DELETE_TOOLS: frozenset[str] = frozenset(
+    {
+        "delete_option_item",
+        "bulk_delete_option_items",
+    }
+)
+
+
+def _is_forbidden_delete_tool(tool: ToolDefinition) -> bool:
+    if tool.name in _ALLOWED_DELETE_TOOLS:
+        return False
+    if tool.effect == "delete":
+        return True
+    return tool.name.lower().startswith("delete_")
+
 
 class SkillRegistry:
     """Lookup table of registered skills and their tools for one process lifetime."""
@@ -26,7 +43,7 @@ class SkillRegistry:
         self._skills = {skill.id: skill for skill in skills}
         for skill in self._skills.values():
             for tool in skill.tool_definitions():
-                if tool.effect == "delete" or tool.name.lower().startswith("delete_"):
+                if _is_forbidden_delete_tool(tool):
                     raise ValueError(f"delete tools are not allowed: {tool.name}")
 
     def registered_skill_ids(self) -> list[str]:
