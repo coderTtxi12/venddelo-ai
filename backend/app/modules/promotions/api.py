@@ -7,6 +7,11 @@ from app.api.cache_helpers import invalidate_restaurant_menu_cache
 from app.api.deps import pagination_params, require_owned_restaurant
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
+from app.modules.menu.service import MenuService
+from app.modules.promotions.option_item_sync import (
+    is_nxm_bundle_promo,
+    sync_option_items_for_product_change,
+)
 from app.modules.promotions.schemas import PromotionCreate, PromotionDTO, PromotionUpdate
 from app.modules.promotions.service import PromotionService
 from app.modules.restaurants.schemas import RestaurantDTO
@@ -106,7 +111,20 @@ def set_promotion_products(
     service: PromotionService = Depends(_service),
     uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
+    promo = service.get(restaurant.id, promotion_id)
+    previous_product_ids = list(promo.product_ids)
     service.set_products(restaurant.id, promotion_id, body.ids)
+    if is_nxm_bundle_promo(promo) and promo.option_item_ids:
+        menu = MenuService(uow.menu)
+        synced = sync_option_items_for_product_change(
+            menu,
+            restaurant.id,
+            previous_product_ids=previous_product_ids,
+            new_product_ids=body.ids,
+            current_option_item_ids=promo.option_item_ids,
+        )
+        if synced != promo.option_item_ids:
+            service.set_option_items(restaurant.id, promotion_id, synced)
     invalidate_restaurant_menu_cache(uow, restaurant.id)
 
 
