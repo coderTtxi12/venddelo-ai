@@ -78,6 +78,16 @@ class MenuRepository(ABC):
     ) -> None: ...
 
     @abstractmethod
+    def set_product_option_group_order(
+        self, product_id: uuid.UUID, group_ids: list[uuid.UUID]
+    ) -> None: ...
+
+    @abstractmethod
+    def set_option_group_item_order(
+        self, option_group_id: uuid.UUID, item_ids: list[uuid.UUID]
+    ) -> None: ...
+
+    @abstractmethod
     def soft_delete_product(self, id: uuid.UUID) -> bool: ...
 
     # Options

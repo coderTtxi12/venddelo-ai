@@ -14,12 +14,14 @@ from app.modules.menu.schemas import (
     OptionGroupCreate,
     OptionGroupDTO,
     OptionGroupUpdate,
+    OptionGroupItemOrderUpdate,
     OptionItemCreate,
     OptionItemDTO,
     OptionItemUpdate,
     ProductCreate,
     ProductDTO,
     ProductUpdate,
+    ProductOptionGroupOrderUpdate,
 )
 
 
@@ -159,6 +161,37 @@ class MenuService:
         except ValueError as exc:
             raise ValidationError(str(exc)) from exc
 
+    def set_product_option_group_order(
+        self,
+        restaurant_id: uuid.UUID,
+        product_id: uuid.UUID,
+        data: ProductOptionGroupOrderUpdate,
+    ) -> None:
+        self.get_product(restaurant_id, product_id)
+        if len(data.group_ids) < 1:
+            raise ValidationError("At least one option group is required")
+        try:
+            self._repo.set_product_option_group_order(product_id, data.group_ids)
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from exc
+
+    def set_option_group_item_order(
+        self,
+        restaurant_id: uuid.UUID,
+        product_id: uuid.UUID,
+        group_id: uuid.UUID,
+        data: OptionGroupItemOrderUpdate,
+    ) -> None:
+        product = self.get_product(restaurant_id, product_id)
+        if not any(group.id == group_id for group in product.option_groups):
+            raise NotFoundError("Option group not found")
+        if len(data.item_ids) < 1:
+            raise ValidationError("At least one option item is required")
+        try:
+            self._repo.set_option_group_item_order(group_id, data.item_ids)
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from exc
+
     def set_approval(
         self, restaurant_id: uuid.UUID, product_id: uuid.UUID, status: str
     ) -> ProductDTO:
@@ -222,6 +255,12 @@ class MenuService:
         group_id: uuid.UUID,
         item_id: uuid.UUID,
     ) -> None:
+        prod = self.get_product(restaurant_id, product_id)
+        group = next((g for g in prod.option_groups if g.id == group_id), None)
+        if group is None:
+            raise NotFoundError("Option group not found")
+        if not any(item.id == item_id for item in group.items):
+            raise NotFoundError("Option item not found")
         if not self._repo.delete_option_item(item_id):
             raise NotFoundError("Option item not found")
 

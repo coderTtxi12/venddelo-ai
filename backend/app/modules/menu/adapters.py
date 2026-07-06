@@ -59,6 +59,67 @@ def _category_sort_indices_batch(
     return result
 
 
+def _resolve_active_first_entity_order(
+    *,
+    linked_rows: list[tuple[uuid.UUID, int, bool]],
+    provided_ids: list[uuid.UUID],
+    ids_field_name: str,
+    entity_label: str,
+    parent_label: str,
+) -> list[uuid.UUID]:
+    linked_ids = {row[0] for row in linked_rows}
+    if not linked_ids:
+        if provided_ids:
+            raise ValueError(f"{parent_label} has no linked {entity_label}s")
+        return []
+
+    provided = list(provided_ids)
+    provided_set = set(provided)
+    if len(provided) != len(provided_set):
+        raise ValueError(f"{ids_field_name} must not contain duplicates")
+
+    unknown = provided_set - linked_ids
+    if unknown:
+        raise ValueError(f"{ids_field_name} contains unknown ids for {parent_label}")
+
+    active_ids = {row[0] for row in linked_rows if row[2]}
+    inactive_ids = linked_ids - active_ids
+
+    if provided_set == linked_ids:
+        return provided
+    if provided_set == active_ids:
+        inactive_order = sorted(
+            inactive_ids,
+            key=lambda entity_id: next(row[1] for row in linked_rows if row[0] == entity_id),
+        )
+        return provided + inactive_order
+
+    missing = linked_ids - provided_set
+    missing_active = sorted(active_ids - provided_set, key=str)
+    missing_inactive = sorted(inactive_ids - provided_set, key=str)
+    parts: list[str] = [
+        f"{ids_field_name} must include every {entity_label} linked to {parent_label} "
+        f"({len(active_ids)} active, {len(inactive_ids)} inactive), "
+        "or only the active ones in the desired order."
+    ]
+    if missing_active:
+        parts.append(
+            "Missing active id(s): " + ", ".join(str(entity_id) for entity_id in missing_active)
+        )
+    if missing_inactive:
+        parts.append(
+            "Missing inactive id(s) not shown in menu_read active lists: "
+            + ", ".join(str(entity_id) for entity_id in missing_inactive)
+            + ". Pass active ids in order only, or include inactive ids at the end."
+        )
+    if not missing_active and not missing_inactive and missing:
+        parts.append(
+            "Missing linked id(s): "
+            + ", ".join(str(entity_id) for entity_id in sorted(missing, key=str))
+        )
+    raise ValueError(" ".join(parts))
+
+
 def _product_to_dto(
     obj: Product,
     session: Session | None = None,
@@ -495,6 +556,54 @@ class SqlAlchemyMenuRepository(MenuRepository):
                     product_categories.c.category_id == category_id,
                     product_categories.c.product_id == product_id,
                 )
+                .values(sort_index=index)
+            )
+        self._session.flush()
+
+    def set_product_option_group_order(
+        self, product_id: uuid.UUID, group_ids: list[uuid.UUID]
+    ) -> None:
+        rows = self._session.execute(
+            select(OptionGroup.id, OptionGroup.sort_index, OptionGroup.is_active)
+            .where(OptionGroup.product_id == product_id)
+            .order_by(OptionGroup.sort_index, OptionGroup.id)
+        ).all()
+        linked_rows = [(row.id, row.sort_index, row.is_active) for row in rows]
+        final_order = _resolve_active_first_entity_order(
+            linked_rows=linked_rows,
+            provided_ids=group_ids,
+            ids_field_name="group_ids",
+            entity_label="option group",
+            parent_label="product",
+        )
+        for index, group_id in enumerate(final_order):
+            self._session.execute(
+                update(OptionGroup)
+                .where(OptionGroup.id == group_id)
+                .values(sort_index=index)
+            )
+        self._session.flush()
+
+    def set_option_group_item_order(
+        self, option_group_id: uuid.UUID, item_ids: list[uuid.UUID]
+    ) -> None:
+        rows = self._session.execute(
+            select(OptionItem.id, OptionItem.sort_index, OptionItem.is_active)
+            .where(OptionItem.option_group_id == option_group_id)
+            .order_by(OptionItem.sort_index, OptionItem.id)
+        ).all()
+        linked_rows = [(row.id, row.sort_index, row.is_active) for row in rows]
+        final_order = _resolve_active_first_entity_order(
+            linked_rows=linked_rows,
+            provided_ids=item_ids,
+            ids_field_name="item_ids",
+            entity_label="option item",
+            parent_label="option group",
+        )
+        for index, item_id in enumerate(final_order):
+            self._session.execute(
+                update(OptionItem)
+                .where(OptionItem.id == item_id)
                 .values(sort_index=index)
             )
         self._session.flush()

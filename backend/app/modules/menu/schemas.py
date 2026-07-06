@@ -143,6 +143,14 @@ class CategoryProductOrderUpdate(BaseModel):
     product_ids: list[uuid.UUID]
 
 
+class ProductOptionGroupOrderUpdate(BaseModel):
+    group_ids: list[uuid.UUID]
+
+
+class OptionGroupItemOrderUpdate(BaseModel):
+    item_ids: list[uuid.UUID]
+
+
 class FullMenuDTO(BaseModel):
     restaurant_id: uuid.UUID
     categories: list[CategoryDTO]

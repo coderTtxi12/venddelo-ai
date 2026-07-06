@@ -8,6 +8,7 @@ from app.modules.menu.schemas import (
     CategoryUpdate,
     OptionGroupCreate,
     OptionItemCreate,
+    OptionItemUpdate,
     ProductCreate,
     ProductUpdate,
 )
@@ -235,6 +236,87 @@ def test_set_category_product_order_active_only_when_inactive_linked(session):
     assert loaded_inactive is not None
     assert loaded_active.category_sort_indices[str(cat.id)] == 0
     assert loaded_inactive.category_sort_indices[str(cat.id)] == 1
+
+
+@requires_db
+def test_set_product_option_group_order(session):
+    r = _restaurant(session, "menu-option-group-order")
+    repo = SqlAlchemyMenuRepository(session)
+    product = repo.add_product(ProductCreate(restaurant_id=r.id, name="Burger", price_cents=10000))
+    extras = repo.add_option_group(
+        product.id,
+        OptionGroupCreate(title="Extras", sort_index=0),
+    )
+    salsa = repo.add_option_group(
+        product.id,
+        OptionGroupCreate(title="Salsa", sort_index=1),
+    )
+
+    repo.set_product_option_group_order(product.id, [salsa.id, extras.id])
+
+    loaded = repo.get_product(product.id)
+    assert loaded is not None
+    titles = [group.title for group in sorted(loaded.option_groups, key=lambda g: g.sort_index)]
+    assert titles == ["Salsa", "Extras"]
+
+
+@requires_db
+def test_set_option_group_item_order(session):
+    r = _restaurant(session, "menu-option-item-order")
+    repo = SqlAlchemyMenuRepository(session)
+    product = repo.add_product(ProductCreate(restaurant_id=r.id, name="Taco", price_cents=1000))
+    group = repo.add_option_group(
+        product.id,
+        OptionGroupCreate(
+            title="Extras",
+            items=[
+                OptionItemCreate(label="Cebolla", sort_index=0),
+                OptionItemCreate(label="Sprite", sort_index=1),
+            ],
+        ),
+    )
+    cebolla_id = group.items[0].id
+    sprite_id = group.items[1].id
+
+    repo.set_option_group_item_order(group.id, [sprite_id, cebolla_id])
+
+    loaded = repo.get_product(product.id)
+    assert loaded is not None
+    labels = [
+        item.label
+        for item in sorted(loaded.option_groups[0].items, key=lambda item: item.sort_index)
+    ]
+    assert labels == ["Sprite", "Cebolla"]
+
+
+@requires_db
+def test_set_option_group_item_order_active_only_when_inactive_linked(session):
+    r = _restaurant(session, "menu-option-item-order-active")
+    repo = SqlAlchemyMenuRepository(session)
+    product = repo.add_product(ProductCreate(restaurant_id=r.id, name="Combo", price_cents=2000))
+    group = repo.add_option_group(
+        product.id,
+        OptionGroupCreate(
+            title="Bebidas",
+            items=[
+                OptionItemCreate(label="Sprite", sort_index=0),
+                OptionItemCreate(label="Cebolla", sort_index=1),
+            ],
+        ),
+    )
+    sprite_id = group.items[0].id
+    cebolla_id = group.items[1].id
+    repo.update_option_item(cebolla_id, OptionItemUpdate(is_active=False))
+
+    repo.set_option_group_item_order(group.id, [sprite_id])
+
+    loaded = repo.get_product(product.id)
+    assert loaded is not None
+    items = sorted(loaded.option_groups[0].items, key=lambda item: item.sort_index)
+    assert items[0].label == "Sprite"
+    assert items[0].is_active is True
+    assert items[1].label == "Cebolla"
+    assert items[1].is_active is False
 
 
 @requires_db

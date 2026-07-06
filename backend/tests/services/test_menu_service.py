@@ -113,6 +113,16 @@ class FakeMenuRepo(MenuRepository):
     ) -> None:
         return None
 
+    def set_product_option_group_order(
+        self, product_id: uuid.UUID, group_ids: list[uuid.UUID]
+    ) -> None:
+        return None
+
+    def set_option_group_item_order(
+        self, option_group_id: uuid.UUID, item_ids: list[uuid.UUID]
+    ) -> None:
+        return None
+
     def soft_delete_product(self, id):
         return True
 
