@@ -1,377 +1,350 @@
 ---
 name: menu_best_practices
-description: Reference guide for digital menu quality — structure, category order, product copy, photos, add-ons, promotions, and audit checklists (no tools). Call load_skill when the owner asks for recommendations or wants to improve any menu element before using menu_read or menu_write.
+description: Guía de referencia para calidad del menú digital — estructura, orden de categorías, copy de productos, fotos, complementos, promociones y checklists de auditoría (sin tools). Cárgala cuando el dueño pida optimización o recomendaciones o intente subir muchos productos a la vez; antes de asesorar u optimizar, lee el menú con menu_read y combina esos datos con esta guía.
 ---
 
 # menu_best_practices
 
-**Best-practices guide for digital menus**, aligned with proven
-catalog standards and adapted to this platform's data model (categories, products, add-ons,
-promotions, branding).
+**Guía de mejores prácticas para menús digitales**, alineada con estándares de catálogo
+probados y adaptada al modelo de datos de esta plataforma (categorías, productos, complementos,
+promociones, branding).
 
-**This skill has no tools.** It does not read or write the menu. Use it as reference when:
+Al emitir recomendaciones, céntrate únicamente en productos, promociones, complementos y demás
+ítems que estén activos y visibles en el menú digital—lo que el cliente final puede ver hoy.
 
-- The owner asks for **recommendations**, an audit, or "how do I improve my menu?".
-- You are about to use **`menu_write`** and want quality criteria before/after editing.
-- You need to explain **why** a structure works (categories, add-ons, promos).
+**Esta skill no tiene tools.** No lee ni escribe el menú. Úsala como referencia cuando:
 
-For live restaurant data, use **`menu_read`**. To apply changes, use **`menu_write`**.
-This guide tells you *what* to look for and *how* things should look; the other skills execute.
+- El dueño pida **recomendaciones**, optimizaciones o quiera mejorar su menú.
+- Estés a punto de usar **`menu_write`** y quieras criterios de calidad
+- Necesites explicar **por qué** una estructura funciona (categorías, complementos, promos).
+
+Para datos en vivo del restaurante, usa la skill **`menu_read`**. Para aplicar cambios, usa **`menu_write`**.
+Esta guía te dice *qué* buscar y *cómo* deben verse las cosas; las otras skills ejecutan.
 
 ---
 
-## Mandatory workflow (improve / optimize / edit)
+## Flujo obligatorio (mejorar / optimizar / editar)
 
-When the owner wants to **improve, optimize, recommend, audit, or edit** any menu element,
-follow this order **before** proposing or applying changes:
+Cuando el dueño quiera **mejorar, optimizar, recomendar, auditar** cualquier elemento
+del menú, sigue este orden **antes** de proponer o aplicar cambios:
 
 ```
-1. load_skill(menu_best_practices)   ← this guide (if not loaded this turn)
-2. menu_read tools                   ← live categories, products, promos, AND add-ons
-3. Recommend or preview              ← combine guide + real data
-4. menu_write (optional)             ← only after owner confirms
+1. load_skill(menu_best_practices)   ← esta guía (si no se cargó en este turno)
+2. tools de menu_read                ← categorías, productos, complementos y promos en vivo;
+                                      céntrate en lo que el cliente final ve (nombres, fotos,
+                                      descripciones, precios publicados, complementos), no en metadatos internos
+3. Recomendar o previsualizar        ← combina guía + datos reales
+4. menu_write (opcional)             ← solo después de confirmación del dueño
 ```
 
-**Do not skip step 1 or 2** to guess from memory or generic advice. If the owner names one
-product (e.g. "mejora la descripción de HAMBURGUESA"), still load this guide and read that
-product with `menu_read` (`search_products` / `get_product`) before drafting copy.
+### Qué implica realmente "leer el menú"
 
-### What "read the menu" actually requires
+Para una **auditoría completa**, lee el panorama entero — no un subconjunto.
 
-For a **full audit**, read the whole picture — not a subset:
-
-| To comment on… | You must call | Note |
-|----------------|---------------|------|
-| Category structure / order | `list_categories` | — |
-| Products, names, prices, published state | `list_products` (paginate until `has_more=false`) | Covers every product |
-| **Photos, descriptions, complements/add-ons** | `list_products` | Each product already includes `image_path`, `description`, and full `option_groups` + items |
-| Promotions attached to a specific product | `get_product` | Adds `promotions` on top of the same product data |
-| All promotions | `list_promotions` | — |
-
-`list_products` returns the full product record (description, photo, price, complements), so
-it already covers products/photos/add-ons. `get_product` only adds the promotions affecting
-one product — use it when a promo interaction matters, not to see add-ons.
-
-**Hard rule — no unread claims.** Never say a product lacks a photo, has empty complements,
-has a bad description, or a wrong price unless a `menu_read` result **this turn** shows it.
-Reading only categories + promotions and then talking about products, photos, or add-ons is
-inventing data — forbidden. If you have not read products yet, read them before the audit
-(or tell the owner you still need to check them).
+**Regla estricta — sin afirmaciones sin leer.** Nunca digas que un producto no tiene foto, tiene
+complementos vacíos, mala descripción o precio incorrecto a menos que un resultado de `menu_read`
+**en este turno** lo muestre. Leer solo categorías + promociones y luego hablar de productos,
+fotos o complementos es inventar datos — prohibido. Si aún no leíste productos, léelos antes de
+la auditoría (o dile al dueño que aún necesitas revisarlos).
 
 ---
 
-## Impact (why it matters)
+## BEST PRACTICES TO ORGANICE OR CREATE YOUR DIGITAL MENU:
 
-On Venddelo, a digital menu with **photos, complete names, and descriptions** can
-**increase conversion by up to ~90%**. An attractive photo **doubles** purchase
-probability. Customers decide from what they see and read — not from the physical menu.
+## Impacto
 
-Operational translation for the agent:
+Un menú digital con **fotos, nombres completos y descripciones** puede
+**aumentar la conversión hasta ~90%**. Una foto atractiva **duplica** la probabilidad de compra.
+Los clientes deciden por lo que ven y leen — no por el menú físico.
 
-| Menu signal | Expected effect |
-|-------------|-----------------|
-| Product without photo | Far fewer clicks and add-to-cart events |
-| Vague name ("Special combo") | Abandonment / confusion |
-| Empty or generic description | Less trust, more support tickets |
-| Messy or too many categories | Decision fatigue |
-| No add-ons on main dishes | Lower average ticket |
-| Price differs from the physical store | Bad reviews and cancellations |
+Traducción operativa para el agente:
 
----
-
-## When to activate this skill
-
-| Owner intent | What to do |
-|--------------|------------|
-| "How do I optimize my menu?" / "give me tips" | Activate this skill → respond with concrete recommendations |
-| "Review my menu" / "what's missing?" | Activate **`menu_read`** + this skill → audit against the checklist |
-| "Improve descriptions / photos / order" | Activate **`menu_read`**, **`menu_write`**, and this skill → propose Venddelo-aligned changes |
-| "How do I set up a 2×1 / promo?" | This skill (rules) + **`menu_read`** (state) + **`menu_write`** (create) |
-
-Respond to the owner in **Spanish**, with clear markdown.
+| Señal del menú | Efecto esperado |
+|----------------|-----------------|
+| Producto sin foto | Muchos menos clics y eventos de agregar al carrito |
+| Nombre vago ("Combo especial") | Abandono / confusión |
+| Descripción vacía o genérica | Menos confianza, más tickets de soporte |
+| Categorías desordenadas o demasiadas | Fatiga de decisión |
+| Sin complementos en platillos principales | Ticket promedio más bajo |
+| Precio distinto al de la tienda física | Malas reseñas y cancelaciones |
 
 ---
 
-## Map: catalog concepts → this system
+## Cuándo activar esta skill
 
-| Delivery menu concept | On Venddelo | Typical tools |
-|-----------------------|-------------|---------------|
-| Aisle / category | `categories` (`name`, `sort_index`, `display_layout`, `is_active`) | `list_categories`, `create_category`, `reorder_categories`, `update_category` |
-| Product / dish | `products` (`name`, `description`, `price_cents`, `image_path`, M:N categories) | `list_products`, `get_product`, `create_product`, `update_product` |
-| Topping group | `option_groups` (`title`, `required`, `selection`, `min/max_selections`) | `add_option_group`, `update_option_group` |
-| Topping / option | `option_items` (`label`, `price_delta_cents`, `is_active`) | `add_option_item`, `update_option_item` |
-| Marketing promo (2×1, banner) | `promotions` type `bundle` (NxM), scope product/category | `create_promotion`, `set_promotion_targets` |
-| Product discount | `promotions` type `percent` / `amount` (`is_catalog_discount`) | `apply_product_discount`, `update_promotion` |
-| Visual badge, no math | `promotions` type `combo` (`priced_in_cart=false`) | `create_promotion` |
-| Logo / cover / theme | `restaurants` branding | `update_restaurant` |
-| "Turn off" a product | `is_active=false` (never delete) | `set_product_active`, `update_option_*` |
-| Photos | `image_path` on product/category/promo | `generate_product_image`, `bulk_generate_product_images` (menu_media) + `update_*` |
+| Intención del dueño | Qué hacer |
+|---------------------|-----------|
+| "¿Cómo optimizo mi menú?" / "dame tips" | Activa esta skill → responde con recomendaciones concretas |
+| "Revisa mi menú" / "¿qué me falta?" | Activa **`menu_read`** + esta skill → audita contra el checklist |
+| "Mejora descripciones / fotos / orden" | Activa **`menu_read`**, **`menu_write`** y esta skill → propone cambios alineados |
+| "¿Cómo configuro un 2×1 / promo?" | Esta skill (reglas) + **`menu_read`** (estado) + **`load_skill(promotions)`** + **`create_promotion`** |
+
+Responde al dueño en **español**, con markdown claro.
 
 ---
 
-## 1. Category structure (aisles)
+## Mapa: conceptos de catálogo → este sistema
 
-### Count and order
-
-Venddelo recommends **5–7 intuitive categories**, ordered by **commercial importance**:
-
-1. **Promotions** (dedicated aisle — e.g. "Promociones" or "Ofertas") By default the system puts this at first
-2. **Starters** / snacks
-3. **Main dishes** / best sellers
-4. **Sides**
-5. **Desserts** and **Drinks** (sometimes split)
-
-On this platform: `reorder_categories` + `sort_index` on each category. The **first two
-categories** should hold best sellers and/or highest-ticket items — that's what the customer
-scrolls first.
-
-### Category names
-
-| Venddelo rule | Application |
-|---------------|-------------|
-| Short and precise: "Burgers", "Combos", "Drinks" | Avoid long phrases in the name |
-| Max **~30 characters** in-app | If the name is long, shorten the title and detail in the category description |
-| No duplicate aisle names | One "Drinks", one "Promos" |
-| Min **3 products** per normal aisle | Promo aisle: min **1** product |
-| Don't put combo price in the aisle name | Use a "Promotions" category and describe the deal on the product/description |
-
-**Bad:** "All burgers + Fries for $199"  
-**Good:** category **Promotions** → product **Burger + Fries Combo** with a clear description.
-
-### Category layout
-
-Use `display_layout` when it helps:
-
-- **`list`** — default; many items with longer text
-- **`grid`** — drinks, desserts, visual items
-- **`horizontal`** — featured carousel
-
-Example: Drinks category in **`grid`** improves visual scanning.
+| Concepto de menú delivery | En Venddelo | Tools típicas |
+|---------------------------|-------------|---------------|
+| Pasillo / categoría | `categories` (`name`, `sort_index`, `display_layout`, `is_active`) | `list_categories`, `create_category`, `reorder_categories`, `update_category` |
+| Producto / platillo | `products` (`name`, `description`, `price_cents`, `image_path`, M:N categories) | `list_products`, `get_product`, `create_product`, `update_product` |
+| Grupo de complementos | `option_groups` (`title`, `required`, `selection`, `min/max_selections`) | `add_option_group`, `update_option_group` |
+| Complemento / opción | `option_items` (`label`, `price_delta_cents`, `is_active`) | `add_option_item`, `update_option_item` |
+| Promo de marketing (2×1, banner) | `promotions` type `bundle` (NxM), scope product/category | `create_promotion`, `set_promotion_targets` (`load_skill(promotions)`) |
+| Descuento en producto | `promotions` type `percent` / `amount` (`is_catalog_discount`) | Admin UI / `apply_product_discount` (pendiente en agente) |
+| Badge visual, sin cálculo | `promotions` type `combo` (`priced_in_cart=false`) | `create_promotion` |
+| Logo / portada / tema | branding de `restaurants` | `menu_write` `list_menu_themes`, `apply_menu_theme` |
+| "Apagar" un producto | `is_active=false` (nunca eliminar) | `set_product_active`, `update_option_*` |
+| Fotos | `image_path` en producto/categoría/promo | Fotos subidas: `assign_product_image` / `bulk_assign_product_images` (menu_write); generación IA: `generate_product_image` (menu_media) |
 
 ---
 
-## 2. Products: name, description, price
+## 1. Estructura de categorías
 
-### Name (max ~40 characters)
+### Cantidad y orden
 
-- **Specific and self-explanatory** — the customer should understand the dish from the title alone.
-- **No emojis**, no unnecessary special characters.
-- **No price or discount %** in the name (Venddelo catalog review rejects this).
-- Include **dish type** in the name when ambiguous:
-  - Good: "Beef burger", "Green salad", "Pepperoni pizza"
-  - Bad: "House special", "Combo 1"
+Venddelo recomienda **5–7 categorías intuitivas**, ordenadas por **importancia comercial**:
 
-If the name **does not** state the type (e.g. "The special"), the **description must**.
+1. **Promociones** (categoría dedicado — p. ej. "Promociones" u "Ofertas") Por defecto el sistema lo coloca primero y no se pueden reordenar estas categorias especiales.
+2. **Entradas** / botanas
+3. **Platillos principales** / best sellers
+4. **Acompañamientos**
+5. **Postres** y **Bebidas** (a veces separados)
 
-### Description (max ~150 characters)
+En esta plataforma: `reorder_categories` + `sort_index` en cada categoría. Las **primeras dos
+categorías** deben tener best sellers y/o productos de mayor ticket — es lo primero que el
+cliente ve al hacer scroll.
 
-Must be **objective and useful**, not empty marketing:
+### Nombres de categoría
 
-| Include | Avoid |
-|---------|-------|
-| Main ingredients | "Delicious", "tasty", "exquisite" |
-| Size / pieces / ml ("12 BBQ wings", "350 ml") | Repeating price or "50% off" |
-| What a combo includes (each item + drink size) | Subjective filler that wastes characters |
-| Mandatory add-on choice when applicable | Description that contradicts `option_groups` |
+| Regla Venddelo | Aplicación |
+|----------------|------------|
+| Cortos y precisos: "Hamburguesas", "Combos", "Bebidas" | Evita frases largas en el nombre |
+| Máx. **~30 caracteres** en la app | Si el nombre es largo, acorta el título y detalla en la descripción de la categoría |
+| Sin nombres de categorías duplicados | Una "Bebidas", una "Promos" |
+| Mín. **3 productos** por categoría normal | Categoría de promos: mín. **1** producto |
 
-**Recommended examples:**
+**Mal:** "Todas las hamburguesas + papas por $199"  
+**Bien:** categoría **Promociones** → producto **Combo Hamburguesa + Papas** con descripción clara.
 
-- "Spaghetti, bolognese sauce, ground beef, parmesan and oregano."
-- "12 BBQ wings with ranch dressing."
-- "150 g beef burger, tomato, onion, lettuce, cheddar cheese."
-- Combo: "150 g beef burger, medium fries and 400 ml soda of your choice."
+### Categorías especiales del sistema
 
-If the description says "drink of your choice", a matching **add-on group must exist** —
-don't list options in text only.
+Por defecto hay dos **categorías virtuales** al inicio del menú — **Promociones** y **Por tiempo
+limitado** — que no viven en la tabla `categories` (`__dm_promotions__`, `__dm_limited_time__`)
+y **no se pueden reordenar**.
 
-### Price
+| Categoría | El cliente la ve cuando… |
+|-----------|--------------------------|
+| **Promociones** (1.er lugar) | Está habilitada y hay al menos una promo de marketing activa con banner (`image_path`) y productos ligados |
+| **Por tiempo limitado** (2.º lugar) | Está habilitada y al menos un producto tiene una promo activa (2×1/NxM, %, monto o combo) |
 
-- **Same as the physical store** (same currency/experience). In system: integer `price_cents` (MXN).
-- Base price **does not include** promos; explain them separately (`promotions` on `get_product`).
-- Sharp increases (>10% may trigger a catalog warning) — warn the owner before a large hike.
+El dueño puede renombrarlas o desactivarlas con `update_category`; el sistema las muestra u
+oculta automáticamente según las promos vigentes.
 
-### Branded drinks
+### Layout de categoría
 
-Venddelo requires **Brand + variation/flavor + size**:
+Usa `display_layout` cuando ayude:
 
-- Product: **Coca-Cola Original 350 ml** (Drinks category)
-- Description: type such as "Soft drink" or "Soda"
+- **`list`** — default; muchos items con texto más largo
+- **`grid`** — bebidas, postres, items visuales
+- **`horizontal`** — carrusel destacado
 
-**Do not** use standalone drinks as toppings except in combos where the customer **chooses**
-among brands in a "Choose your drink" group. Outside combos, each drink = its own **product**.
-
----
-
-## 3. Photography
-
-Venddelo recommends that **every dish should have a quality photo**. Checklist:
-
-| Criterion | Detail |
-|-----------|--------|
-| Framing | Horizontal; product **centered**; **100%** of the dish visible |
-| Lighting | Natural light; no harsh flash; no strong shadows |
-| Background | Neutral and **consistent** across the store's products |
-| Presentation | Fresh, clean plate; no distractions |
-| Angle | ~**45°**, same angle per category when possible |
-| Consistency | Photo must match name and description |
-| Forbidden in photo | Prices, discount %, phone numbers, logo >25% of frame, unappealing disposable packaging, inappropriate content |
-
-On this platform: if `image_path` is missing, offer **`generate_product_image`** or
-**`bulk_generate_product_images`** (skill **`menu_media`**) after confirming with the owner;
-(via `menu_write`) with concrete prompts (dish, visible ingredients, natural light, neutral
-background). After generating, apply with `update_product` / `update_category`.
+Ejemplo: categoría Bebidas en **`grid`** mejora el escaneo visual.
 
 ---
 
-## 4. Add-ons (groups and options)
+## 2. Productos: nombre, descripción, precio
 
-On Venddelo, topping groups = **`option_groups`** + **`option_items`**.
+### Nombre (máx. ~40 caracteres)
 
-### When to use them
+- **Específico y autoexplicativo** — el cliente debe entender el platillo solo con el título.
+- **Sin emojis**, sin caracteres especiales innecesarios.
+- **Sin precio ni % de descuento** en el nombre (la revisión de catálogo de Venddelo lo rechaza).
+- Incluye **tipo de platillo** en el nombre cuando sea ambiguo:
+  - Bien: "Hamburguesa de res", "Ensalada verde", "Pizza pepperoni"
+  - Mal: "Especial de la casa", "Combo 1"
 
-- **Whenever the dish allows** — they increase ticket size and clarity. The objetive is that the customer has all the information and doesn't need to contact the restaurant. 
-- Sizes, protein, sauces, extras, drink choice in combos.
-- Included drink "of your choice" → required group with each brand/size as a separate item.
+Si el nombre **no** indica el tipo (p. ej. "La especial"), la **descripción debe hacerlo**.
 
-### Recommended configuration
+### Descripción (máx. ~150 caracteres)
 
-| Field | Guidance |
-|-------|----------|
-| `title` | Clear: "Size", "Choose your drink", "Extras" |
-| `required` | `true` when the customer **must** choose (size, combo drink) |
-| `selection` | `single` for one choice; `multi` for several extras |
-| `min_selections` / `max_selections` | Match the business rule |
-| `price_delta_cents` | $0 for included items; positive for upsell |
-| `is_active` | Disable out-of-stock toppings without deleting |
+Debe ser **objetiva y útil**, no marketing vacío:
 
-### Common mistakes (catalog rejection reasons)
+| Incluir | Evitar |
+|---------|--------|
+| Ingredientes principales | "Delicioso", "sabroso", "exquisito" |
+| Tamaño / piezas / ml ("12 alitas BBQ", "350 ml") | Repetir precio o "50% off" |
+| Qué incluye un combo (cada item + tamaño de bebida) | Relleno subjetivo que desperdicia caracteres |
+| Elección obligatoria de complemento cuando aplique | Descripción que contradiga `option_groups` |
 
-| Mistake | Fix |
-|---------|-----|
-| Group created **with no items** | Add each option with `add_option_item` |
-| All drinks in **one** item | Split: Coca-Cola Original 350 ml; Fanta Orange 350 ml; … |
-| Topping "Coca-Cola" without size/brand | Full Brand + variation + ml format |
-| Description says "of your choice" but no group | Create matching required group |
-| Standalone drink sold as topping | Create product in Drinks category |
+**Ejemplos recomendados:**
 
-### Reuse
+- "Espagueti, salsa bolognesa, carne molida, parmesano y orégano."
+- "12 alitas BBQ con aderezo ranch."
+- "Hamburguesa de res 150 g, tomate, cebolla, lechuga, queso cheddar."
+- Combo: "Hamburguesa de res 150 g, papas medianas y refresco 400 ml a tu elección."
 
-When several products share the same structure (e.g. "Choose your drink"), replicate the same
-group/item pattern for consistency — reuse an existing group's structure across products.
+Si la descripción dice "bebida a tu elección", debe existir un **grupo de complementos
+correspondiente** — no listes opciones solo en texto.
+
+### Precio
+
+- **Igual que en la tienda física** (misma moneda/experiencia). En el sistema: entero `price_cents` (MXN).
+- El precio base **no incluye** promos; explícalas por separado (`promotions` en `get_product`).
+- Subidas bruscas (>10% puede disparar alerta de catálogo) — avisa al dueño antes de un aumento grande.
+
+### Bebidas de marca
+
+Venddelo exige **Marca + variación/sabor + tamaño**:
+
+- Producto: **Coca-Cola Original 350 ml** (categoría Bebidas)
+- Descripción: tipo como "Refresco" o "Bebida gaseosa"
+
+**No** uses bebidas sueltas como complememtos excepto en combos donde el cliente **elige**
+entre marcas en un grupo "Elige tu bebida". Fuera de combos, cada bebida = su propio **producto**.
 
 ---
 
-## 5. Promotions and discounts
+## 3. Fotografía
 
-This system separates **marketing campaigns** from **catalog discounts**. Don't mix concepts when advising.
+Venddelo recomienda que **cada platillo tenga una foto de calidad**. Checklist:
+
+| Criterio | Detalle |
+|----------|---------|
+| Encuadre | Horizontal; producto **centrado**; **100%** del platillo visible |
+| Iluminación | Luz natural; sin flash fuerte; sin sombras duras |
+| Fondo | Neutro y **consistente** entre productos de la tienda |
+| Presentación | Plato fresco, limpio; sin distracciones |
+| Ángulo | ~**45°**, mismo ángulo por categoría cuando sea posible |
+| Consistencia | La foto debe coincidir con nombre y descripción |
+| Prohibido en la foto | Precios, % de descuento, teléfonos, logo >25% del encuadre, empaque desechable poco apetitoso, contenido inapropiado |
+
+En esta plataforma: si falta `image_path`, ofrece **`generate_product_image`** (skill
+**`menu_media`**).
+
+---
+
+## 4. Complementos (grupos y opciones)
+
+En Venddelo, los grupos de complementos = **`option_groups`** + **`option_items`**.
+
+### Cuándo usarlos
+
+- **Siempre que el platillo lo permita** — aumentan el ticket y la claridad. El objetivo es que el cliente tenga toda la información y no necesite contactar al restaurante.
+- Tamaños, proteína, salsas, extras, elección de bebida en combos.
+- Bebida incluida "a tu elección" → grupo obligatorio con cada marca/tamaño como item separado.
+
+### Configuración recomendada
+
+| Campo | Guía |
+|-------|------|
+| `title` | Claro: "Tamaño", "Elige tu bebida", "Extras" |
+| `required` | `true` cuando el cliente **deba** elegir (tamaño, bebida de combo) |
+| `selection` | `single` para una elección; `multi` para varios extras |
+| `min_selections` / `max_selections` | Deben reflejar la regla del negocio |
+| `price_delta_cents` | $0 para items incluidos; positivo para upsell |
+| `is_active` | Desactiva toppings agotados sin eliminar |
+
+### Errores comunes (motivos de rechazo de catálogo)
+
+| Error | Corrección |
+|-------|------------|
+| Grupo creado **sin items** | Agrega cada opción con `add_option_item` |
+| Todas las bebidas en **un** item | Separa: Coca-Cola Original 350 ml; Fanta Naranja 350 ml; … |
+| Complemento "Coca-Cola" sin tamaño/marca | Formato completo Marca + variación + ml |
+| Descripción dice "a tu elección" pero no hay grupo | Crea el grupo obligatorio correspondiente |
+| Bebida suelta vendida como topping | Crea producto en categoría Bebidas |
+
+### Reutilización
+
+Cuando varios productos comparten la misma estructura (p. ej. "Elige tu bebida"), replica el
+mismo patrón de grupo/items para consistencia — reutiliza, copia la estructura de un grupo existente
+entre productos.
+
+---
+
+## 5. Promociones y descuentos
+
+Este sistema separa **campañas de marketing** de **descuentos de catálogo**. No mezcles conceptos al asesorar.
 
 ### NxM / 2×1 (`type: bundle`)
 
-- Dedicated aisle or highlighted products under **Promotions**.
-- Requires a banner **`image_path`** when creating a marketing campaign.
-- Scope **`product`**, **`products`** or **`category`** — does not apply to the whole order.
-- Explain to the owner: paid add-ons **are always charged**; some add-ons can **drop a unit
-  from the 2×1** if listed as non-participants (`option_participation` in `menu_read`).
+- Pasillo dedicado o productos destacados bajo **Promociones**.
+- Requiere banner con **`image_path`** al crear una campaña de marketing.
+- Scope **`product`**, **`products`** o **`category`** — no aplica a todo el pedido.
+- Explícale al dueño: los complementos de pago **siempre se cobran**; algunos complementos pueden
+  **sacar una unidad del 2×1** si están listados como no participantes (`option_participation` en `menu_read`).
 
-### Percent / amount discounts
+### Descuentos percent / amount
 
-- For "15% off these products" → `apply_product_discount` (no banner).
-- **Do not** put the % in the product name.
+- Para "15% off en estos productos" → `apply_product_discount` (sin banner).
+- **No** pongas el % en el nombre del producto.
 
-### Combo badge (`type: combo`)
+### Badge combo (`type: combo`)
 
-- Visual label only; **does not change** checkout total.
-- Useful for pre-built packages priced in `price_cents`.
+- Etiqueta visual solamente; **no cambia** el total en checkout.
+- Útil para paquetes prearmados con precio en `price_cents`.
 
-### Good practices
+### Buenas prácticas
 
-- Short promo name ("2×1 Wings", "Family Combo").
-- Clear targets (`set_promotion_targets`).
-- Schedule/dates when temporary (`starts_at`, `ends_at`, schedule).
-- Disable with `disable_promotion` when it ends — never "delete".
-
----
-
-## 6. Order within categories
-
-Venddelo and delivery conversion research agree:
-
-- **Positions 1–3** in each category: best sellers and most profitable dishes.
-- **Don't** default to alphabetical order if it hurts sales.
-- Price anchoring: showing premium options first makes the rest feel reasonable.
-
-Tool: `reorder_products` with `category_id` + ordered `product_ids` list.
+- Nombre corto de promo ("2×1 Alitas", "Combo Familiar").
+- Targets claros (`set_promotion_targets`).
+- Fechas/horario cuando sea temporal (`starts_at`, `ends_at`, schedule).
+- Desactiva con `disable_promotion` cuando termine — nunca "eliminar".
 
 ---
 
-## 7. Store branding
+## 6. Orden dentro de categorías
 
-Logo, cover, and restaurant description build trust in the Venddelo storefront.
+Venddelo y la investigación de conversión en delivery coinciden:
 
-- **`update_restaurant`**: `name`, `description`, `logo_path`, `cover_path`, theme/colors.
-- Visual consistency between cover and product photos.
-- Toggle automatic **Promotions** / **Limited time** category if the owner uses those dynamic aisles.
+- **Posiciones 1–3** en cada categoría: best sellers y platillos más rentables.
+- **No** uses orden alfabético por default si perjudica ventas.
+- Anclaje de precio: mostrar opciones premium primero hace que el resto se sienta razonable.
 
----
-
-## 8. Availability
-
-Venddelo lets merchants turn off products/toppings for a day, a week, or indefinitely.
-
-Here: **`set_product_active(false)`** or `update_option_item(is_active=false)` — never delete.
-Tell the owner to disable out-of-stock items **before** impossible orders arrive.
+Tool: `reorder_products` con `category_id` + lista ordenada de `product_ids`.
 
 ---
 
-## 9. Audit checklist (with `menu_read`)
+## 7. Branding de la tienda
 
-When the owner asks for a review, walk through in this order:
+Logo, portada y descripción del restaurante generan confianza en la vitrina Venddelo.
 
-1. **`list_categories`** — reasonable count (5–7)? commercial order? short names?
-2. **`list_products`** (paginated) — per product note:
-   - Has `image_path`?
-   - Name ≤40 chars, specific, no price/promo in title?
-   - Description ≤150 chars with ingredients/size?
-   - Price consistent with what the owner says?
-3. **`get_product`** on key items — do `option_groups` match the description?
-   Required groups where needed?
-4. **`list_promotions`** — clear active promos? NxM with image? discounts not spammed in names?
-5. Summarize findings by **priority**: critical (catalog rejection / zero conversion) → improvement → nice-to-have.
-6. Offer a **`menu_write`** plan in small batches; confirm before bulk changes.
+- **`update_restaurant`**: `name`, `description`, `logo_path`, `cover_path` (tema del menú digital:
+  `menu_write` `apply_menu_theme`).
+- Consistencia visual entre portada y fotos de productos.
+- Activa/desactiva categorías automáticas **Promociones** / **Tiempo limitado** si el dueño usa esos pasillos dinámicos.
 
 ---
 
-## 10. How to propose improvements (tone and process)
+## 8. Disponibilidad
 
-1. **Diagnosis** — 3–5 concrete bullets with examples from *their* products (after `menu_read`).
-2. **Quick wins** — missing photos, rename 2–3 items, reorder main category.
-3. **Next step** — ask whether they want you to apply changes or guidance only.
-4. When writing new descriptions, respect ~150 character limit and include objective facts.
-5. When generating images, describe the real dish + 45° angle + neutral background + natural light.
+Venddelo permite a comercios apagar productos/toppings por un día, una semana o indefinidamente.
 
-Do not claim exact metrics for the owner's restaurant; you may cite general Venddelo benchmarks
-(~90% conversion with a complete menu, 2× probability with a good photo).
+Aquí: **`set_product_active(false)`** o `update_option_item(is_active=false)` — nunca eliminar.
+Dile al dueño que desactive items agotados **antes** de que lleguen pedidos imposibles.
 
 ---
 
-## 11. Anti-patterns (summary)
+## 9. Anti-patrones (resumen)
 
-| Avoid | Do instead |
-|-------|------------|
-| "Special combo" with no detail | Name + itemized description |
-| Promo only in the name | Promo in Promotions section + `create_promotion` |
-| 15+ categories | Consolidate into 5–7 aisles |
-| Orphan products with no category | Always ≥1 `category_id` on create |
-| Empty or generic "Extras" group | Items with price and full name |
-| Discount in title | `apply_product_discount` |
-| Inventing ingredients | Ask the owner or read the current menu |
-| Asserting final promo price | Explain base + promo; checkout computes total |
+| Evitar | Hacer en su lugar |
+|--------|-------------------|
+| "Combo especial" sin detalle | Nombre + descripción itemizada |
+| Promo solo en el nombre | Promo en sección Promociones + `create_promotion` |
+| 15+ categorías | Consolidar en 5–7 pasillos |
+| Productos huérfanos sin categoría | Siempre ≥1 `category_id` al crear |
+| Grupo "Extras" vacío o genérico | Items con precio y nombre completo |
+| Descuento en el título | `apply_product_discount` |
+| Inventar ingredientes | Pregunta al dueño o lee el menú actual |
+| Afirmar precio final con promo | Explica base + promo; checkout calcula el total |
 
 ---
 
-## Scope of this guide
+## Alcance de esta guía
 
-These rules reflect **Venddelo catalog standards** for categories, products, add-ons,
-photography, and promotions (`categories`, `products`, `option_groups`, `promotions`,
-branding). When a generic suggestion conflicts with the restaurant's live data, **the live
-menu wins** (`menu_read`).
+Estas reglas reflejan **estándares de catálogo Venddelo** para categorías, productos, complementos,
+fotografía y promociones (`categories`, `products`, `option_groups`, `promotions`,
+branding). Cuando una sugerencia genérica choque con los datos en vivo del restaurante, **gana el menú
+en vivo** (`menu_read`).
