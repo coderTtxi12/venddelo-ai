@@ -32,7 +32,7 @@ TAQUERIA_FIXTURE = {
                     "ref": "prod_1",
                     "name": "Pastor",
                     "description": "Con piña",
-                    "price_cents": 8500,
+                    "price_mxn": 85,
                     "currency": "MXN",
                     "is_available": True,
                     "option_groups": [],
@@ -59,7 +59,7 @@ PAGE_TWO_FIXTURE = {
                     "ref": "prod_2",
                     "name": "Suadero",
                     "description": None,
-                    "price_cents": 9000,
+                    "price_mxn": 90,
                     "currency": "MXN",
                     "is_available": True,
                     "option_groups": [],
@@ -77,7 +77,7 @@ PAGE_TWO_FIXTURE = {
                     "ref": "prod_3",
                     "name": "Agua",
                     "description": None,
-                    "price_cents": 2500,
+                    "price_mxn": 25,
                     "currency": "MXN",
                     "is_available": True,
                     "option_groups": [],
@@ -125,13 +125,21 @@ class FixtureLLMProvider(LLMProviderPort):
         )
 
 
+def test_extraction_prompt_includes_complement_rules():
+    prompt = build_extraction_prompt({})
+    assert "Complement groups" in prompt
+    assert "min_selections" in prompt
+    assert "open_questions" in prompt
+
+
 def test_extraction_prompt_includes_discovery_context():
     prompt = build_extraction_prompt(
         {"discovery_answers": {"currency": "USD", "cuisine_type": "taqueria"}}
     )
     assert "USD" in prompt
     assert "taqueria" in prompt
-    assert "Transcribe literally" in prompt
+    assert "price_mxn" in prompt
+    assert "Never use centavos" in prompt
 
 
 def test_extraction_parses_taqueria_fixture():
@@ -140,6 +148,7 @@ def test_extraction_parses_taqueria_fixture():
         context={},
         vision=FixtureVisionProvider(),
     )
+    assert draft.categories[0].products[0].price_mxn == 85
     assert draft.categories[0].products[0].price_cents == 8500
     assert draft.categories[0].products[0].name == "Pastor"
 
@@ -166,6 +175,7 @@ def test_extract_from_text_uses_llm_json():
         context={"discovery_answers": {"currency": "MXN"}},
         llm=FixtureLLMProvider(TAQUERIA_FIXTURE),
     )
+    assert draft.categories[0].products[0].price_mxn == 85
     assert draft.categories[0].products[0].price_cents == 8500
 
 

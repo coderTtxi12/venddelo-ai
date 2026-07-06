@@ -26,11 +26,22 @@ Default currency: {currency}.{cuisine_line}{context_block}
 
 Rules:
 - Transcribe literally; never invent categories, products, prices, or promotions.
+- **Prices in pesos ({currency}) as printed on the menu** — use `price_mxn` / `price_delta_mxn` /
+  `amount_mxn` as whole pesos or decimals (e.g. $229 → 229, $85.50 → 85.5). **Never use centavos.**
 - Assign stable refs: cat_1, prod_1, og_1, oi_1, promo_1 (unique within this extraction).
 - Ambiguous or illegible prices → add to unmapped_text and open_questions; do not guess.
 - Partially readable promo or complement rules → mandatory open_questions entry (question_es in Spanish).
 - Preserve product availability as is_available=true unless explicitly marked unavailable.
-- option_groups.selection is "single" or "multi"; set min_selections/max_selections accordingly.
+- **Complement groups (option_groups)** — infer from menu text when visible:
+  - "Elige tamaño", "Tamaño", size choices → required=true, selection=single, min_selections=1, max_selections=1
+  - "Elige salsa", "Escoge", mandatory wording → required=true, single, min=1, max=1
+  - "Extras", "Agrega", "Adicionales", items with "+$" → required=false, selection=multi, min_selections=0,
+    max_selections=number of items (or 5 if many)
+  - Optional free choices ("Sin costo", "Incluye") → required=false, single, min=0, max=1
+  - If menu marks a choice as included in base price → required=true for that group
+  - Set price_delta_mxn when menu shows "+$X" or extra charge next to the item
+  - If required vs optional is unclear → open_questions (do not guess)
+- option_groups.selection is "single" or "multi"; min_selections/max_selections must match required flag.
 - Promotion types: two_for_one, percent, amount, combo. scope: product, category, or order.
 
 Return a single JSON object with this shape:
@@ -44,7 +55,7 @@ Return a single JSON object with this shape:
       "ref": "prod_1",
       "name": "string",
       "description": "string | null",
-      "price_cents": 0,
+      "price_mxn": 0,
       "currency": "{currency}",
       "is_available": true,
       "option_groups": [{{
@@ -54,7 +65,7 @@ Return a single JSON object with this shape:
         "required": false,
         "min_selections": 0,
         "max_selections": 1,
-        "items": [{{"ref": "oi_1", "label": "string", "price_delta_cents": 0}}]
+        "items": [{{"ref": "oi_1", "label": "string", "price_delta_mxn": 0}}]
       }}],
       "constraints_notes": "string | null"
     }}]
@@ -65,7 +76,7 @@ Return a single JSON object with this shape:
     "type": "two_for_one | percent | amount | combo",
     "scope": "product | category | order",
     "percent": null,
-    "amount_cents": null,
+    "amount_mxn": null,
     "bundle": null,
     "target_product_refs": [],
     "target_category_refs": [],
@@ -84,4 +95,7 @@ Return a single JSON object with this shape:
   }}]
 }}
 
-Output JSON only. No markdown fences."""
+Output JSON only. No markdown fences.
+
+The import draft stores prices in MXN pesos. The application layer converts to integer
+centavos when writing to the live menu database (multiply by 100, round)."""
