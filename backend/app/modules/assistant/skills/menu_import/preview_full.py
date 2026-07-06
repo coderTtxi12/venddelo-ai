@@ -1,0 +1,85 @@
+from __future__ import annotations
+
+from app.modules.assistant.skills.menu_import.batching import count_batch_products
+from app.modules.assistant.skills.menu_import.draft_schema import ImportBatch, ImportDraft
+
+
+def _format_price_mxn(mxn: float, currency: str = "MXN") -> str:
+    return f"${mxn:,.2f} {currency}" if mxn % 1 else f"${mxn:,.0f} {currency}"
+
+
+def _format_option_group(group) -> str:
+    req = "obligatorio" if group.required else "opcional"
+    sel = "multi" if group.selection == "multi" else "single"
+    return f"{group.title} ({req}, {sel}, min={group.min_selections}, max={group.max_selections})"
+
+
+def build_full_import_preview(
+    draft: ImportDraft,
+    *,
+    optimization_notes_es: list[str] | None = None,
+    recommended_theme_id: str | None = None,
+    theme_label: str | None = None,
+) -> str:
+    batch = ImportBatch(batch_index=0, categories=draft.categories, promotions=draft.promotions)
+    product_count = count_batch_products(batch)
+    complement_groups = sum(
+        len(product.option_groups) for category in draft.categories for product in category.products
+    )
+    lines = [
+        "## Tu menú digital quedaría así",
+        "",
+        f"**Productos:** {product_count} · todos activos y publicados",
+        f"**Grupos de complementos:** {complement_groups}",
+        f"**Promociones:** {len(draft.promotions)}",
+        "",
+        "### Categorías (orden optimizado)",
+    ]
+    for index, category in enumerate(
+        sorted(draft.categories, key=lambda c: (c.sort_order, c.name)), start=1
+    ):
+        layout = category.display_layout or "vertical"
+        lines.append(f"{index}. **{category.name}** — layout `{layout}`")
+    if optimization_notes_es:
+        lines.extend(["", "### Optimizaciones", ""])
+        lines.extend(f"- {note}" for note in optimization_notes_es)
+    if recommended_theme_id:
+        label = theme_label or recommended_theme_id
+        lines.extend(["", f"**Tema visual:** {label} (`{recommended_theme_id}`)"])
+    lines.extend(["", "### Productos", "", "| Categoría | Producto | Precio |", "| --- | --- | --- |"])
+    for category in sorted(draft.categories, key=lambda c: (c.sort_order, c.name)):
+        for product in sorted(category.products, key=lambda p: (p.sort_order, p.name)):
+            lines.append(
+                f"| {category.name} | {product.name} | "
+                f"{_format_price_mxn(product.price_mxn, product.currency)} |"
+            )
+    products_with_complements = [
+        (category.name, product)
+        for category in draft.categories
+        for product in category.products
+        if product.option_groups
+    ]
+    if products_with_complements:
+        lines.extend(["", "### Complementos", ""])
+        for category_name, product in products_with_complements:
+            lines.append(f"**{product.name}** ({category_name})")
+            for group in sorted(product.option_groups, key=lambda g: (g.sort_order, g.title)):
+                lines.append(f"- {_format_option_group(group)}")
+                for item in sorted(group.items, key=lambda i: (i.sort_order, i.label)):
+                    extra = (
+                        f" (+{_format_price_mxn(item.price_delta_mxn)})"
+                        if item.price_delta_mxn
+                        else ""
+                    )
+                    lines.append(f"  - {item.label}{extra}")
+            lines.append("")
+    if draft.promotions:
+        lines.extend(["### Promociones", ""])
+        for promo in draft.promotions:
+            lines.append(f"- **{promo.name}** ({promo.type})")
+    if draft.open_questions:
+        lines.extend(["", "### Pendiente de aclarar", ""])
+        for question in draft.open_questions:
+            lines.append(f"- [{question.id}] {question.question_es}")
+    lines.extend(["", "_Precios en pesos MXN. Al publicar se guardan en centavos._"])
+    return "\n".join(lines)
