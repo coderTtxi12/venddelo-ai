@@ -1,13 +1,15 @@
 ---
 name: menu_write
-description: Create and update menu categories, products, options, and availability.
+description: Create and update menu categories, products, options, digital menu theme, product photos, and availability. Guides owners step-by-step when adding a new product (secretary-style onboarding). For promotions use the promotions skill.
 ---
 
 # menu_write
 
 Mutating access to the current restaurant menu. All writes are tenant-scoped. **Never delete**
-records — disable with `is_active=false` on `update_category`, `update_product`,
-`update_option_group`, or `update_option_item`.
+categories, products, or option groups — disable with `is_active=false` on `update_category`,
+`update_product`, or `update_option_group`. Complement choices may be **hard-deleted** only
+when the owner explicitly asks to remove them (`delete_option_item` /
+`bulk_delete_option_items`); prefer `is_active=false` when temporarily unavailable.
 
 ---
 
@@ -17,8 +19,10 @@ Use `menu_write` when the owner asks to **change** the menu:
 
 - Add or rename categories or products
 - Update prices, descriptions, or availability flags
-- Reorder items within a category
+- Reorder items within a category or complement groups/items on a product
 - Attach option groups or adjust add-on prices
+- Change the **digital menu theme** (look & feel of the public menu)
+- Assign **uploaded photos** to products (single or bulk, with optional vision matching)
 
 Use `menu_read` first when you need live data before proposing a change.
 
@@ -31,14 +35,130 @@ criteria, then read the live menu before previewing or mutating.
 ## Safety rules
 
 1. **Read before write** — inspect the current record with `menu_read` when IDs or names are unclear.
-2. **Never delete** — use `is_active=false` only (no delete tools exist).
+2. **Never delete categories, products, or groups** — use `is_active=false`. To **remove a complement**
+   permanently, use `delete_option_item` or `bulk_delete_option_items` only after owner confirmation;
+   each row needs `expected_label` from `menu_read`. For out-of-stock, use
+   `bulk_update_option_item_visibility` instead.
 3. **Bulk edits** — for many products (descriptions, prices, names), use the matching
    `bulk_update_product_*`; for many categories (names, descriptions, sort order,
-   visibility, display layout), use the matching `bulk_update_category_*`; do not loop
-   `update_product` / `update_category`.
+   visibility, display layout), use the matching `bulk_update_category_*`; for many
+   complement/add-on choices (visibility, labels, prices), use the matching
+   `bulk_update_option_item_*`; to add many complements or groups, use
+   `bulk_add_option_items` or `bulk_add_option_groups`; to remove many complements from one
+   product, use `bulk_delete_option_items`; do not loop `update_product`,
+   `update_category`, `update_option_item`, `add_option_item`, or `add_option_group`.
 4. **Resolve by exact name** — when the owner confirms a product (e.g. "este HAMBURGUESA"),
    pass that name to `update_product` or bulk tools; never reuse a `product_id` from an
    earlier ambiguous candidate list.
+
+---
+
+## Alta de producto (flujo secretaria)
+
+When the owner wants to **add one new product** — "agregar un platillo", "nuevo producto",
+"dar de alta X", "quiero subir un taco" — act as a **friendly secretary**: warm Spanish,
+**one question per turn**, no technical jargon (no UUIDs, `price_cents`, flags).
+
+### Before you ask anything
+
+1. **`list_categories`** — you need the real category list; never invent categories.
+2. If there are **no regular categories**, offer to create one first (`create_category`),
+   then continue the product flow.
+
+### Step order (skip steps the owner already answered)
+
+| Step | What you collect | How to ask (examples) |
+|------|------------------|------------------------|
+| 1 | **Category** | "Estas son tus categorías: **Tacos**, **Bebidas**, **Postres**. ¿En cuál va este platillo?" (several OK) |
+| 2 | **Name** | "¿Cómo se llama el producto?" |
+| 3 | **Price** | "¿A cuánto lo vendes?" — repeat back in **pesos** ($120 MXN), store as cents in the tool |
+| 4 | **Description** (optional) | "¿Le ponemos descripción para el menú digital? Si no, lo dejamos sin descripción por ahora." |
+| 5 | **Recap + confirm** | Short bullet recap in Spanish; end with "¿Lo damos de alta así?" / "¿Confirmo?" |
+
+Only after **explicit yes** on the recap → **`create_product`**.
+
+### After create (optional, same conversation or later)
+
+- **Photo:** offer `menu_media` `generate_product_image` if they want a picture.
+- **Complements:** offer `add_option_group` / `add_option_item` if they want extras or sizes.
+- **Publish:** new products can stay draft until they ask to publish — explain in plain language if they ask.
+
+### Secretary rules
+
+- **One question per message** — do not dump a form with five fields at once.
+- **Never call `create_product`** until category + name + price are known **and** the owner confirmed the recap.
+- If the owner gives everything in one message, still **recap and confirm** before mutating.
+- Use category **names** from `list_categories`; map to `category_ids` only inside the tool call.
+- Owner says price in pesos → you convert to `price_cents` (×100) silently; never say "centavos" to them.
+
+### Example dialogue (compressed)
+
+```
+Owner: Quiero agregar un producto
+You:  [list_categories] Claro. Hoy tienes: Tacos, Bebidas, Hamburguesas. ¿En qué categoría va el nuevo platillo?
+
+Owner: Hamburguesas
+You:  Perfecto. ¿Cómo se llama?
+
+Owner: BBQ Bacon Burger
+You:  ¿A cuánto la vendes?
+
+Owner: 189
+You:  Quedaría así:
+      - **BBQ Bacon Burger** en Hamburguesas
+      - **$189.00 MXN**
+      ¿Lo damos de alta?
+
+Owner: Sí
+You:  [create_product] Listo, ya está en tu menú.
+```
+
+---
+
+## Fotos de productos (subidas por el dueño)
+
+When the owner **uploads product photos** in chat (`kind: product_photo` via the import assets API)
+or already has images in storage:
+
+Each upload appears in the user message under **## Chat attachments** with `storage_path`,
+`kind`, and `original_name`. Use those paths directly in tools — **never ask the owner for
+storage_path**.
+
+### One photo → one product
+
+`assign_product_image` with `storage_path` + `product_id` or product **name**.
+
+### Many photos
+
+1. **`match_product_photos`** — vision AI suggests `product_id` per image (matched / uncertain / unmatched).
+2. Owner confirms uncertain rows.
+3. **`bulk_assign_product_images`** — `items[]` with `storage_path` + `product_id` or name (up to 50).
+
+Paths must be under `restaurants/{id}/import/product_photo/` or `restaurants/{id}/products/`.
+Pass `force=true` to replace an existing `image_path`.
+
+For **AI-generated** food photos (no upload), use skill **`menu_media`** → `generate_product_image`.
+
+---
+
+## Tema del menú digital
+
+When the owner wants to **change how the public menu looks** — "cambia el tema", "otro diseño",
+"menú más oscuro", "estilo taquería" — no import session required.
+
+### Typical flow
+
+1. **`get_current_menu_theme`** (optional) — show what they have now.
+2. **`list_menu_themes`** — show real theme labels from the catalog; never invent theme ids.
+3. **`recommend_menu_theme`** (optional) — when they describe vibe/cuisine but have not picked one.
+4. Owner picks a theme by **label** (you map to `theme_id` inside the tool).
+5. Short recap → **`apply_menu_theme`** after explicit confirmation.
+
+### Rules
+
+- Confirm the theme **name** with the owner before applying.
+- `theme_id` must come from `list_menu_themes` — never guess slugs.
+- During an active **menu import**, applying a theme still works and advances the import session.
 
 ---
 
@@ -59,10 +179,26 @@ criteria, then read the live menu before previewing or mutating.
 | `bulk_update_category_visibility` | Show/hide up to 50 categories (`is_active`; special aisles supported) |
 | `bulk_update_category_display_layout` | Set `display_layout` (`vertical` \| `horizontal` \| `grid`) for up to 50 regular categories |
 | `set_category_product_order` | Reorder products in one category (`category_id` or `category_name`, ordered `product_ids`; active-only list OK — inactive stay at end) |
+| `set_product_option_group_order` | Reorder complement groups on one product (`product_id` or name, ordered `group_ids`; active-only OK) |
+| `set_option_group_item_order` | Reorder complements inside one group (`product_id`, `group_id`, ordered `item_ids`; active-only OK) |
 | `add_option_group` | Add size/extras group to a product |
 | `update_option_group` | Change group rules or disable with `is_active=false` |
 | `add_option_item` | Add one add-on choice to a group |
 | `update_option_item` | Change label/price or disable with `is_active=false` |
+| `bulk_update_option_item_visibility` | Show/hide complements. Prefer `match_label` + `is_active` for menu-wide changes (e.g. Sprite agotado); `items[]` requires `expected_label` per row |
+| `bulk_update_option_item_labels` | Rename up to 50 complement labels (`items[]` with `new_label` + ids) |
+| `bulk_update_option_item_prices` | Change up to 50 complement prices (`price_delta_cents` + ids) |
+| `bulk_add_option_items` | Add up to 50 complement choices to existing groups (`group_id` + `label`) |
+| `bulk_add_option_groups` | Create up to 50 complement groups across products (`title` + optional `items[]`) |
+| `delete_option_item` | Permanently remove one complement (`expected_label` + ids; owner must confirm) |
+| `bulk_delete_option_items` | Remove up to 50 complements from **one** product (`product_id`/name + `items[]` with `expected_label`) |
+| `list_menu_themes` | List active digital menu themes from the catalog |
+| `get_current_menu_theme` | Read the restaurant's current theme id and label |
+| `recommend_menu_theme` | Suggest top 3 themes (optional `hints` object with cuisine/vibe) |
+| `apply_menu_theme` | Set `digital_menu_theme_id` after owner confirms (`theme_id` from catalog) |
+| `assign_product_image` | Assign one uploaded photo (`storage_path`) to a product by id or name |
+| `bulk_assign_product_images` | Assign up to 50 uploaded photos (`items[]` with `storage_path` + product) |
+| `match_product_photos` | Vision-match many uploaded photos to live menu products (read-only suggestions) |
 
 Prices are always in **cents** (e.g. $24.40 → `2440`).
 

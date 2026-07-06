@@ -17,6 +17,20 @@ from app.modules.assistant.skills.menu_write.bulk import (
     bulk_update_product_names,
     bulk_update_product_prices,
 )
+from app.modules.assistant.skills.menu_write.option_item_bulk import (
+    bulk_add_option_groups,
+    bulk_add_option_items,
+    bulk_delete_option_items,
+    bulk_option_group_add_tool_description,
+    bulk_option_item_add_tool_description,
+    bulk_option_item_delete_tool_description,
+    bulk_option_item_tool_description,
+    bulk_option_item_visibility_tool_description,
+    delete_option_item,
+    bulk_update_option_item_labels,
+    bulk_update_option_item_prices,
+    bulk_update_option_item_visibility,
+)
 from app.modules.assistant.skills.menu_write.category_bulk import (
     bulk_category_tool_description,
     bulk_update_category_descriptions,
@@ -24,6 +38,17 @@ from app.modules.assistant.skills.menu_write.category_bulk import (
     bulk_update_category_names,
     bulk_update_category_sort_indices,
     bulk_update_category_visibility,
+)
+from app.modules.assistant.skills.menu_write.product_photos import (
+    assign_product_image,
+    bulk_assign_product_images,
+    match_product_photos,
+)
+from app.modules.assistant.skills.menu_write.theme_tools import (
+    apply_menu_theme,
+    get_current_menu_theme,
+    list_menu_themes,
+    recommend_menu_theme,
 )
 from app.modules.assistant.skills.menu_read.tools import (
     DEFAULT_DIGITAL_MENU_LIMITED_TIME_CATEGORY_NAME,
@@ -36,6 +61,8 @@ from app.modules.menu.schemas import (
     CategoryCreate,
     CategoryDTO,
     CategoryProductOrderUpdate,
+    OptionGroupItemOrderUpdate,
+    ProductOptionGroupOrderUpdate,
     CategoryUpdate,
     OptionGroupCreate,
     OptionGroupDTO,
@@ -372,7 +399,9 @@ class MenuWriteSkill:
             ToolDefinition(
                 name="create_product",
                 description=(
-                    "Create a product in one or more categories. Price is in cents."
+                    "Create a product after the owner confirmed the recap in the secretary "
+                    "onboarding flow (category, name, price). Price is in cents. Do not call "
+                    "until category_ids, name, and price_cents are known and the owner said yes."
                 ),
                 effect="mutate",
                 input_schema={
@@ -694,6 +723,60 @@ class MenuWriteSkill:
                 },
             ),
             ToolDefinition(
+                name="set_product_option_group_order",
+                description=(
+                    "Reorder complement/add-on groups within one product. Pass the full "
+                    "ordered group_ids list from menu_read get_product / list_products. You may "
+                    "pass only the active groups in the desired order; any inactive groups "
+                    "stay linked at the end in their previous relative order."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "product_id": {"type": "string"},
+                        "name": {"type": "string"},
+                        "product_name": {"type": "string"},
+                        "group_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "All active option group ids in desired order, or every "
+                                "linked group id."
+                            ),
+                        },
+                    },
+                    "required": ["group_ids"],
+                },
+            ),
+            ToolDefinition(
+                name="set_option_group_item_order",
+                description=(
+                    "Reorder complement choices within one option group. Pass the full ordered "
+                    "item_ids list from menu_read. You may pass only the active items in the "
+                    "desired order; inactive items stay at the end in their previous order."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "product_id": {"type": "string"},
+                        "name": {"type": "string"},
+                        "product_name": {"type": "string"},
+                        "group_id": {"type": "string"},
+                        "item_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "All active option item ids in desired order, or every item id "
+                                "in the group."
+                            ),
+                        },
+                    },
+                    "required": ["product_id", "group_id", "item_ids"],
+                },
+            ),
+            ToolDefinition(
                 name="add_option_group",
                 description="Add an option group (size, extras, etc.) to a product.",
                 effect="mutate",
@@ -781,6 +864,373 @@ class MenuWriteSkill:
                         "is_active": {"type": "boolean"},
                     },
                     "required": ["product_id", "group_id", "item_id"],
+                },
+            ),
+            ToolDefinition(
+                name="delete_option_item",
+                description=bulk_option_item_delete_tool_description(
+                    action="Permanently delete ONE complement from a product."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "product_id": {"type": "string"},
+                        "group_id": {"type": "string"},
+                        "item_id": {"type": "string"},
+                        "expected_label": {"type": "string"},
+                        "label": {"type": "string"},
+                    },
+                    "required": ["product_id", "group_id", "item_id", "expected_label"],
+                },
+            ),
+            ToolDefinition(
+                name="bulk_delete_option_items",
+                description=bulk_option_item_delete_tool_description(
+                    action="Permanently delete MANY complements from the same product in one call."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "product_id": {"type": "string"},
+                        "product_name": {"type": "string"},
+                        "name": {"type": "string"},
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "group_id": {"type": "string"},
+                                    "item_id": {"type": "string"},
+                                    "expected_label": {"type": "string"},
+                                    "label": {"type": "string"},
+                                },
+                                "required": ["group_id", "item_id", "expected_label"],
+                            },
+                        },
+                    },
+                    "required": ["items"],
+                },
+            ),
+            ToolDefinition(
+                name="bulk_update_option_item_visibility",
+                description=bulk_option_item_visibility_tool_description(
+                    action=(
+                        "Show or hide MANY complement/add-on choices in one call "
+                        "(is_active=false disables; never delete)."
+                    )
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "match_label": {
+                            "type": "string",
+                            "description": (
+                                "Disable or enable every complement with this label across "
+                                "the menu. Preferred for out-of-stock cases (e.g. Sprite). "
+                                "Use with is_active; omit items when set."
+                            ),
+                        },
+                        "complement_label": {
+                            "type": "string",
+                            "description": "Alias for match_label.",
+                        },
+                        "is_active": {
+                            "type": "boolean",
+                            "description": "Target visibility when using match_label.",
+                        },
+                        "visible": {"type": "boolean"},
+                        "items": {
+                            "type": "array",
+                            "description": (
+                                "Explicit rows from menu_read. Each row requires "
+                                "expected_label matching the live complement label."
+                            ),
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "product_id": {"type": "string"},
+                                    "product_name": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "group_id": {"type": "string"},
+                                    "item_id": {"type": "string"},
+                                    "expected_label": {"type": "string"},
+                                    "match_label": {"type": "string"},
+                                    "complement_label": {"type": "string"},
+                                    "is_active": {"type": "boolean"},
+                                    "visible": {"type": "boolean"},
+                                },
+                                "required": ["group_id", "item_id", "expected_label"],
+                            },
+                        },
+                    },
+                },
+            ),
+            ToolDefinition(
+                name="bulk_update_option_item_labels",
+                description=bulk_option_item_tool_description(
+                    action="Rename MANY complement/add-on labels in one call."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "product_id": {"type": "string"},
+                                    "product_name": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "group_id": {"type": "string"},
+                                    "item_id": {"type": "string"},
+                                    "new_label": {"type": "string"},
+                                    "label": {"type": "string"},
+                                },
+                                "required": ["group_id", "item_id"],
+                            },
+                        }
+                    },
+                    "required": ["items"],
+                },
+            ),
+            ToolDefinition(
+                name="bulk_update_option_item_prices",
+                description=bulk_option_item_tool_description(
+                    action=(
+                        "Change price_delta_cents for MANY complement/add-on choices "
+                        "in one call (cents)."
+                    )
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "product_id": {"type": "string"},
+                                    "product_name": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "group_id": {"type": "string"},
+                                    "item_id": {"type": "string"},
+                                    "price_delta_cents": {"type": "integer"},
+                                },
+                                "required": ["group_id", "item_id", "price_delta_cents"],
+                            },
+                        }
+                    },
+                    "required": ["items"],
+                },
+            ),
+            ToolDefinition(
+                name="bulk_add_option_items",
+                description=bulk_option_item_add_tool_description(
+                    action="Add MANY complement/add-on choices to existing groups in one call."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "product_id": {"type": "string"},
+                                    "product_name": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "group_id": {"type": "string"},
+                                    "label": {"type": "string"},
+                                    "price_delta_cents": {"type": "integer"},
+                                    "sort_index": {"type": "integer"},
+                                },
+                                "required": ["group_id", "label"],
+                            },
+                        }
+                    },
+                    "required": ["items"],
+                },
+            ),
+            ToolDefinition(
+                name="bulk_add_option_groups",
+                description=bulk_option_group_add_tool_description(
+                    action="Create MANY complement groups across products in one call."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "product_id": {"type": "string"},
+                                    "product_name": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "title": {"type": "string"},
+                                    "required": {"type": "boolean"},
+                                    "selection": {
+                                        "type": "string",
+                                        "enum": ["single", "multi"],
+                                    },
+                                    "min_selections": {"type": "integer"},
+                                    "max_selections": {"type": "integer"},
+                                    "sort_index": {"type": "integer"},
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "label": {"type": "string"},
+                                                "price_delta_cents": {"type": "integer"},
+                                                "sort_index": {"type": "integer"},
+                                            },
+                                            "required": ["label"],
+                                        },
+                                    },
+                                },
+                                "required": ["title"],
+                            },
+                        }
+                    },
+                    "required": ["items"],
+                },
+            ),
+            ToolDefinition(
+                name="assign_product_image",
+                description=(
+                    "Assign ONE uploaded product photo (storage_path from chat upload API) to a "
+                    "product by product_id or name. Sets image_path on the product. Pass force=true "
+                    "to replace an existing photo. Requires owner confirmation."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "storage_path": {"type": "string"},
+                        "image_path": {
+                            "type": "string",
+                            "description": "Alias for storage_path.",
+                        },
+                        "product_id": {"type": "string"},
+                        "name": {"type": "string"},
+                        "product_name": {"type": "string"},
+                        "force": {"type": "boolean", "default": False},
+                    },
+                    "required": [],
+                },
+            ),
+            ToolDefinition(
+                name="bulk_assign_product_images",
+                description=(
+                    "Assign MANY uploaded product photos in one call. Each row needs storage_path "
+                    "(or image_path) plus product_id or product name. Up to 50 per call. "
+                    "Use after match_product_photos when the owner confirms mappings."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "force": {"type": "boolean", "default": False},
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "storage_path": {"type": "string"},
+                                    "image_path": {"type": "string"},
+                                    "product_id": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "product_name": {"type": "string"},
+                                    "force": {"type": "boolean"},
+                                },
+                            },
+                        },
+                    },
+                    "required": ["items"],
+                },
+            ),
+            ToolDefinition(
+                name="match_product_photos",
+                description=(
+                    "Match MANY uploaded product photos to live menu products using vision AI. "
+                    "Returns matched, uncertain, and unmatched groups with product_id suggestions. "
+                    "Does not mutate — follow with bulk_assign_product_images after owner confirms."
+                ),
+                effect="read",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "image_paths": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "storage_paths": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Alias for image_paths.",
+                        },
+                        "original_names": {
+                            "type": "object",
+                            "description": "Optional map of storage_path → original filename.",
+                        },
+                    },
+                    "required": [],
+                },
+            ),
+            ToolDefinition(
+                name="list_menu_themes",
+                description=(
+                    "List active digital menu themes from the database catalog. "
+                    "Use before apply_menu_theme when the owner wants to change the menu look."
+                ),
+                effect="read",
+                input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
+                name="get_current_menu_theme",
+                description="Read the restaurant's current digital_menu_theme_id and catalog label.",
+                effect="read",
+                input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
+                name="recommend_menu_theme",
+                description=(
+                    "Recommend top 3 digital menu themes using restaurant context, optional "
+                    "owner hints, or import discovery answers when an import session is active."
+                ),
+                effect="read",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "hints": {
+                            "type": "object",
+                            "description": (
+                                "Optional owner context (cuisine, vibe, colors) to rank themes."
+                            ),
+                        },
+                    },
+                    "required": [],
+                },
+            ),
+            ToolDefinition(
+                name="apply_menu_theme",
+                description=(
+                    "Apply a digital menu theme to the restaurant (sets digital_menu_theme_id). "
+                    "theme_id must exist in the active themes catalog. Confirm with the owner first."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {"theme_id": {"type": "string"}},
+                    "required": ["theme_id"],
                 },
             ),
         ]
@@ -946,6 +1396,34 @@ class MenuWriteSkill:
             return bulk_update_category_display_layout(
                 service, ctx, args, invalidate=_invalidate_menu_cache
             )
+        if tool_name == "bulk_update_option_item_visibility":
+            return bulk_update_option_item_visibility(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
+        if tool_name == "bulk_update_option_item_labels":
+            return bulk_update_option_item_labels(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
+        if tool_name == "bulk_update_option_item_prices":
+            return bulk_update_option_item_prices(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
+        if tool_name == "bulk_add_option_items":
+            return bulk_add_option_items(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
+        if tool_name == "bulk_add_option_groups":
+            return bulk_add_option_groups(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
+        if tool_name == "delete_option_item":
+            return delete_option_item(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
+        if tool_name == "bulk_delete_option_items":
+            return bulk_delete_option_items(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
 
         if tool_name == "set_category_product_order":
             try:
@@ -1015,6 +1493,61 @@ class MenuWriteSkill:
                 data={
                     "category_id": str(category_id),
                     "product_ids": [str(product_id) for product_id in product_ids],
+                },
+            )
+
+        if tool_name == "set_product_option_group_order":
+            try:
+                group_ids = _parse_uuid_list(args.get("group_ids"), "group_ids")
+            except ValidationError as exc:
+                return ToolResult(ok=False, summary=str(exc))
+
+            product_id, resolve_error = _resolve_product_id_for_write(service, ctx, args)
+            if resolve_error is not None:
+                return resolve_error
+            assert product_id is not None
+
+            def action() -> None:
+                service.set_product_option_group_order(
+                    restaurant_id,
+                    product_id,
+                    ProductOptionGroupOrderUpdate(group_ids=group_ids),
+                )
+
+            return _run_mutation(
+                ctx,
+                action,
+                summary=f"Reordered {len(group_ids)} option groups on product",
+                data={
+                    "product_id": str(product_id),
+                    "group_ids": [str(group_id) for group_id in group_ids],
+                },
+            )
+
+        if tool_name == "set_option_group_item_order":
+            try:
+                product_id = _parse_uuid(args.get("product_id"), "product_id")
+                group_id = _parse_uuid(args.get("group_id"), "group_id")
+                item_ids = _parse_uuid_list(args.get("item_ids"), "item_ids")
+            except ValidationError as exc:
+                return ToolResult(ok=False, summary=str(exc))
+
+            def action() -> None:
+                service.set_option_group_item_order(
+                    restaurant_id,
+                    product_id,
+                    group_id,
+                    OptionGroupItemOrderUpdate(item_ids=item_ids),
+                )
+
+            return _run_mutation(
+                ctx,
+                action,
+                summary=f"Reordered {len(item_ids)} option items in group",
+                data={
+                    "product_id": str(product_id),
+                    "group_id": str(group_id),
+                    "item_ids": [str(item_id) for item_id in item_ids],
                 },
             )
 
@@ -1156,5 +1689,83 @@ class MenuWriteSkill:
                 )
 
             return _run_mutation(ctx, action, summary="Updated option item")
+
+        if tool_name == "assign_product_image":
+            return assign_product_image(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
+        if tool_name == "bulk_assign_product_images":
+            return bulk_assign_product_images(
+                service, ctx, args, invalidate=_invalidate_menu_cache
+            )
+        if tool_name == "match_product_photos":
+            return match_product_photos(service, ctx, args)
+
+        if tool_name == "list_menu_themes":
+            themes = list_menu_themes(ctx)
+            return ToolResult(
+                ok=True,
+                summary=f"Listed {len(themes)} active theme(s)",
+                data={"themes": themes},
+            )
+
+        if tool_name == "get_current_menu_theme":
+            current = get_current_menu_theme(ctx)
+            if current is None:
+                return ToolResult(ok=True, summary="No theme set", data={"theme": None})
+            label = current.get("label", current.get("theme_id"))
+            return ToolResult(
+                ok=True,
+                summary=f"Current theme: {label!r}",
+                data={"theme": current},
+            )
+
+        if tool_name == "recommend_menu_theme":
+            hints = args.get("hints")
+            if hints is not None and not isinstance(hints, dict):
+                return ToolResult(ok=False, summary="hints must be an object")
+            from app.modules.assistant.skills.menu_import.session_repository import (
+                MenuImportSessionRepository,
+            )
+
+            import_session = MenuImportSessionRepository(
+                ctx.uow.session
+            ).get_active_for_restaurant(ctx.restaurant_id)
+            recommendations = recommend_menu_theme(
+                ctx,
+                session=import_session,
+                hints=hints if isinstance(hints, dict) else None,
+            )
+            return ToolResult(
+                ok=True,
+                summary=f"Recommended {len(recommendations)} theme(s)",
+                data={
+                    "recommendations": [
+                        {
+                            "theme_id": rec.theme_id,
+                            "label": rec.label,
+                            "reason_es": rec.reason_es,
+                        }
+                        for rec in recommendations
+                    ]
+                },
+            )
+
+        if tool_name == "apply_menu_theme":
+            theme_id = str(args.get("theme_id") or "").strip()
+            if not theme_id:
+                return ToolResult(ok=False, summary="theme_id is required")
+            try:
+                result = apply_menu_theme(ctx, theme_id)
+            except NotFoundError as exc:
+                return ToolResult(ok=False, summary=str(exc))
+            except ValidationError as exc:
+                return ToolResult(ok=False, summary=str(exc))
+            _invalidate_menu_cache(ctx)
+            return ToolResult(
+                ok=True,
+                summary=f"Applied theme {result['label']!r}",
+                data=result,
+            )
 
         return ToolResult(ok=False, summary=f"Unknown tool: {tool_name}")

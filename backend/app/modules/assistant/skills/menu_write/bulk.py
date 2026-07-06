@@ -113,7 +113,12 @@ def _resolve_product_id(
     return None, f"Product not found for name {lookup_name!r}"
 
 
-def bulk_tool_result(*, entity_label: str, results: list[BulkRowResult]) -> ToolResult:
+def bulk_tool_result(
+    *,
+    entity_label: str,
+    results: list[BulkRowResult],
+    verb: str = "Updated",
+) -> ToolResult:
     updated = sum(1 for row in results if row.ok)
     failed = len(results) - updated
     data: dict[str, Any] = {
@@ -132,11 +137,11 @@ def bulk_tool_result(*, entity_label: str, results: list[BulkRowResult]) -> Tool
     }
     ok = updated > 0
     if failed == 0:
-        summary = f"Updated {updated} {entity_label}(s)"
+        summary = f"{verb} {updated} {entity_label}(s)"
     elif updated == 0:
-        summary = f"Failed to update any {entity_label} ({failed} error(s))"
+        summary = f"Failed to {verb.lower()} any {entity_label} ({failed} error(s))"
     else:
-        summary = f"Updated {updated} {entity_label}(s); {failed} failed"
+        summary = f"{verb} {updated} {entity_label}(s); {failed} failed"
     return ToolResult(ok=ok, summary=summary, data=data)
 
 

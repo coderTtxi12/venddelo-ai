@@ -6,10 +6,19 @@ from app.modules.assistant.skills.menu_read.tools import (
     DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID,
     DIGITAL_MENU_PROMOTIONS_CATEGORY_ID,
 )
+from app.modules.assistant.skills.menu_write.option_item_bulk import option_item_label_matches
 from app.modules.assistant.skills.menu_write.tools import MenuWriteSkill
-from app.modules.menu.schemas import CategoryCreate, ProductCreate
+from app.modules.menu.schemas import CategoryCreate, OptionGroupCreate, OptionItemCreate, ProductCreate
 from app.modules.restaurants.schemas import RestaurantCreate
 from tests.conftest import requires_db
+
+
+def test_option_item_label_matches_exact_and_rejects_wrong_complement():
+    assert option_item_label_matches("Sprite", "Sprite")
+    assert option_item_label_matches("sprite", "Sprite")
+    assert option_item_label_matches("Sprite", "Refresco Sprite")
+    assert not option_item_label_matches("Sprite", "Cebolla")
+    assert not option_item_label_matches("sprite", "Cebolla")
 
 
 @requires_db
@@ -556,6 +565,8 @@ def test_menu_write_bulk_rejects_description_on_special_category(session):
     assert result.data["failed"] == 1
 
 
+@requires_db
+def test_menu_write_option_group_and_item(session):
     uow = SqlAlchemyUnitOfWork(lambda: session)
     uow.__enter__()
     restaurant = uow.restaurants.add(
@@ -606,3 +617,670 @@ def test_menu_write_bulk_rejects_description_on_special_category(session):
     )
     assert item.ok is True
     assert item.data["option_item"]["label"] == "Buffalo"
+
+
+@requires_db
+def test_menu_write_bulk_updates_option_item_visibility(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Options", subdomain="menu-write-bulk-options")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Tacos", sort_index=1)
+    )
+    first = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Taco uno",
+            price_cents=1000,
+            category_ids=[category.id],
+        )
+    )
+    second = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Taco dos",
+            price_cents=1200,
+            category_ids=[category.id],
+        )
+    )
+    first_group = uow.menu.add_option_group(
+        first.id,
+        OptionGroupCreate(title="Extras", items=[OptionItemCreate(label="Cebolla")]),
+    )
+    second_group = uow.menu.add_option_group(
+        second.id,
+        OptionGroupCreate(title="Extras", items=[OptionItemCreate(label="Cebolla")]),
+    )
+    first_item_id = first_group.items[0].id
+    second_item_id = second_group.items[0].id
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_update_option_item_visibility",
+        {
+            "items": [
+                {
+                    "product_id": str(first.id),
+                    "group_id": str(first_group.id),
+                    "item_id": str(first_item_id),
+                    "expected_label": "Cebolla",
+                    "is_active": False,
+                },
+                {
+                    "name": "Taco dos",
+                    "group_id": str(second_group.id),
+                    "item_id": str(second_item_id),
+                    "expected_label": "Cebolla",
+                    "is_active": False,
+                },
+            ]
+        },
+        ctx,
+    )
+
+    assert result.ok is True
+    assert result.data["updated"] == 2
+    assert result.data["failed"] == 0
+
+    loaded_first = uow.menu.get_product(first.id)
+    loaded_second = uow.menu.get_product(second.id)
+    assert loaded_first is not None
+    assert loaded_second is not None
+    assert loaded_first.option_groups[0].items[0].is_active is False
+    assert loaded_second.option_groups[0].items[0].is_active is False
+
+
+@requires_db
+def test_menu_write_bulk_visibility_by_match_label(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Label Match", subdomain="menu-write-bulk-label-match")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Bebidas", sort_index=1)
+    )
+    burger = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BURGER & BONELESS",
+            price_cents=10000,
+            category_ids=[category.id],
+        )
+    )
+    taco = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Taco combo",
+            price_cents=8000,
+            category_ids=[category.id],
+        )
+    )
+    uow.menu.add_option_group(
+        burger.id,
+        OptionGroupCreate(
+            title="Elige tus extras",
+            items=[
+                OptionItemCreate(label="Sprite"),
+                OptionItemCreate(label="Cebolla"),
+            ],
+        ),
+    )
+    uow.menu.add_option_group(
+        taco.id,
+        OptionGroupCreate(title="Extras", items=[OptionItemCreate(label="Sprite")]),
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_update_option_item_visibility",
+        {"match_label": "Sprite", "is_active": False},
+        ctx,
+    )
+
+    assert result.ok is True
+    assert result.data["updated"] == 2
+    assert result.data["failed"] == 0
+
+    loaded_burger = uow.menu.get_product(burger.id)
+    loaded_taco = uow.menu.get_product(taco.id)
+    assert loaded_burger is not None
+    assert loaded_taco is not None
+    burger_labels = {item.label: item.is_active for item in loaded_burger.option_groups[0].items}
+    taco_labels = {item.label: item.is_active for item in loaded_taco.option_groups[0].items}
+    assert burger_labels["Sprite"] is False
+    assert burger_labels["Cebolla"] is True
+    assert taco_labels["Sprite"] is False
+
+
+@requires_db
+def test_menu_write_bulk_visibility_rejects_expected_label_mismatch(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Label Guard", subdomain="menu-write-bulk-label-guard")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Combo wings",
+            price_cents=24400,
+            category_ids=[category.id],
+        )
+    )
+    group = uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(
+            title="Extras",
+            items=[
+                OptionItemCreate(label="Sprite"),
+                OptionItemCreate(label="Cebolla"),
+            ],
+        ),
+    )
+    cebolla_id = next(item.id for item in group.items if item.label == "Cebolla")
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_update_option_item_visibility",
+        {
+            "items": [
+                {
+                    "product_id": str(product.id),
+                    "group_id": str(group.id),
+                    "item_id": str(cebolla_id),
+                    "expected_label": "Sprite",
+                    "is_active": False,
+                }
+            ]
+        },
+        ctx,
+    )
+
+    assert result.ok is False
+    assert result.data["updated"] == 0
+    assert result.data["failed"] == 1
+    assert "does not match live label" in result.data["results"][0]["error"]
+
+    loaded = uow.menu.get_product(product.id)
+    assert loaded is not None
+    labels = {item.label: item.is_active for item in loaded.option_groups[0].items}
+    assert labels["Cebolla"] is True
+    assert labels["Sprite"] is True
+
+
+@requires_db
+def test_menu_write_deletes_option_item(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Delete Option", subdomain="menu-write-delete-option")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Tacos", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Taco al pastor",
+            price_cents=8000,
+            category_ids=[category.id],
+        )
+    )
+    group = uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(
+            title="Extras",
+            items=[
+                OptionItemCreate(label="Cebolla"),
+                OptionItemCreate(label="Cilantro"),
+            ],
+        ),
+    )
+    cebolla_id = next(item.id for item in group.items if item.label == "Cebolla")
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "delete_option_item",
+        {
+            "product_id": str(product.id),
+            "group_id": str(group.id),
+            "item_id": str(cebolla_id),
+            "expected_label": "Cebolla",
+        },
+        ctx,
+    )
+
+    assert result.ok is True
+    loaded = uow.menu.get_product(product.id)
+    assert loaded is not None
+    labels = [item.label for item in loaded.option_groups[0].items]
+    assert labels == ["Cilantro"]
+
+
+@requires_db
+def test_menu_write_bulk_deletes_option_items_same_product(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Delete Options", subdomain="menu-write-bulk-delete-options")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Burgers", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BURGER & BONELESS",
+            price_cents=24400,
+            category_ids=[category.id],
+        )
+    )
+    sauces = uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(
+            title="Salsas",
+            items=[
+                OptionItemCreate(label="BBQ"),
+                OptionItemCreate(label="Buffalo"),
+            ],
+        ),
+    )
+    extras = uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(title="Extras", items=[OptionItemCreate(label="Queso extra")]),
+    )
+    bbq_id = next(item.id for item in sauces.items if item.label == "BBQ")
+    queso_id = extras.items[0].id
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_delete_option_items",
+        {
+            "product_id": str(product.id),
+            "items": [
+                {
+                    "group_id": str(sauces.id),
+                    "item_id": str(bbq_id),
+                    "expected_label": "BBQ",
+                },
+                {
+                    "group_id": str(extras.id),
+                    "item_id": str(queso_id),
+                    "expected_label": "Queso extra",
+                },
+            ],
+        },
+        ctx,
+    )
+
+    assert result.ok is True
+    assert result.data["updated"] == 2
+    assert result.data["failed"] == 0
+
+    loaded = uow.menu.get_product(product.id)
+    assert loaded is not None
+    sauce_labels = [item.label for item in loaded.option_groups[0].items]
+    extra_labels = [item.label for item in loaded.option_groups[1].items]
+    assert sauce_labels == ["Buffalo"]
+    assert extra_labels == []
+
+
+@requires_db
+def test_menu_write_delete_rejects_expected_label_mismatch(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Delete Label Guard", subdomain="menu-write-delete-label-guard")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Bebidas", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Refresco",
+            price_cents=3000,
+            category_ids=[category.id],
+        )
+    )
+    group = uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(
+            title="Sabor",
+            items=[OptionItemCreate(label="Sprite"), OptionItemCreate(label="Cebolla")],
+        ),
+    )
+    sprite_id = next(item.id for item in group.items if item.label == "Sprite")
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_delete_option_items",
+        {
+            "name": "Refresco",
+            "items": [
+                {
+                    "group_id": str(group.id),
+                    "item_id": str(sprite_id),
+                    "expected_label": "Cebolla",
+                }
+            ],
+        },
+        ctx,
+    )
+
+    assert result.ok is False
+    assert result.data["updated"] == 0
+    assert result.data["failed"] == 1
+    assert "does not match live label" in result.data["results"][0]["error"]
+
+    loaded = uow.menu.get_product(product.id)
+    assert loaded is not None
+    labels = [item.label for item in loaded.option_groups[0].items]
+    assert labels == ["Sprite", "Cebolla"]
+
+
+@requires_db
+def test_menu_write_reorders_option_groups_and_items(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Reorder Options", subdomain="menu-write-reorder-options")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BURGER & BONELESS",
+            price_cents=24400,
+            category_ids=[category.id],
+        )
+    )
+    extras = uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(
+            title="Extras",
+            sort_index=0,
+            items=[
+                OptionItemCreate(label="Sprite", sort_index=0),
+                OptionItemCreate(label="Cebolla", sort_index=1),
+            ],
+        ),
+    )
+    salsa = uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(title="Salsa", sort_index=1, items=[OptionItemCreate(label="BBQ")]),
+    )
+    sprite_id = extras.items[0].id
+    cebolla_id = extras.items[1].id
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    group_result = skill.execute(
+        "set_product_option_group_order",
+        {
+            "name": "BURGER & BONELESS",
+            "group_ids": [str(salsa.id), str(extras.id)],
+        },
+        ctx,
+    )
+    assert group_result.ok is True
+
+    item_result = skill.execute(
+        "set_option_group_item_order",
+        {
+            "product_id": str(product.id),
+            "group_id": str(extras.id),
+            "item_ids": [str(cebolla_id), str(sprite_id)],
+        },
+        ctx,
+    )
+    assert item_result.ok is True
+
+    loaded = uow.menu.get_product(product.id)
+    assert loaded is not None
+    group_titles = [group.title for group in sorted(loaded.option_groups, key=lambda g: g.sort_index)]
+    assert group_titles == ["Salsa", "Extras"]
+    extras_group = next(group for group in loaded.option_groups if group.title == "Extras")
+    item_labels = [item.label for item in sorted(extras_group.items, key=lambda item: item.sort_index)]
+    assert item_labels == ["Cebolla", "Sprite"]
+
+
+@requires_db
+def test_menu_write_bulk_adds_option_items(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Add Items", subdomain="menu-write-bulk-add-items")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Tacos", sort_index=1)
+    )
+    first = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Taco uno",
+            price_cents=1000,
+            category_ids=[category.id],
+        )
+    )
+    second = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Taco dos",
+            price_cents=1200,
+            category_ids=[category.id],
+        )
+    )
+    first_group = uow.menu.add_option_group(
+        first.id,
+        OptionGroupCreate(title="Extras", items=[OptionItemCreate(label="Limón")]),
+    )
+    second_group = uow.menu.add_option_group(
+        second.id,
+        OptionGroupCreate(title="Extras", items=[OptionItemCreate(label="Limón")]),
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_add_option_items",
+        {
+            "items": [
+                {
+                    "product_id": str(first.id),
+                    "group_id": str(first_group.id),
+                    "label": "Guacamole",
+                    "price_delta_cents": 2000,
+                },
+                {
+                    "name": "Taco dos",
+                    "group_id": str(second_group.id),
+                    "label": "Guacamole",
+                    "price_delta_cents": 2000,
+                },
+            ]
+        },
+        ctx,
+    )
+
+    assert result.ok is True
+    assert result.data["updated"] == 2
+    assert result.data["failed"] == 0
+
+    loaded_first = uow.menu.get_product(first.id)
+    loaded_second = uow.menu.get_product(second.id)
+    assert loaded_first is not None
+    assert loaded_second is not None
+    first_labels = [item.label for item in loaded_first.option_groups[0].items]
+    second_labels = [item.label for item in loaded_second.option_groups[0].items]
+    assert "Guacamole" in first_labels
+    assert "Guacamole" in second_labels
+
+
+@requires_db
+def test_menu_write_bulk_adds_option_groups(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Add Groups", subdomain="menu-write-bulk-add-groups")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Tacos", sort_index=1)
+    )
+    first = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Taco uno",
+            price_cents=1000,
+            category_ids=[category.id],
+        )
+    )
+    second = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Taco dos",
+            price_cents=1200,
+            category_ids=[category.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_add_option_groups",
+        {
+            "items": [
+                {
+                    "product_id": str(first.id),
+                    "title": "Salsa",
+                    "selection": "single",
+                    "items": [
+                        {"label": "Roja", "price_delta_cents": 0},
+                        {"label": "Verde", "price_delta_cents": 0},
+                    ],
+                },
+                {
+                    "name": "Taco dos",
+                    "title": "Salsa",
+                    "selection": "single",
+                    "items": [{"label": "Roja", "price_delta_cents": 0}],
+                },
+            ]
+        },
+        ctx,
+    )
+
+    assert result.ok is True
+    assert result.data["updated"] == 2
+    assert result.data["failed"] == 0
+
+    loaded_first = uow.menu.get_product(first.id)
+    loaded_second = uow.menu.get_product(second.id)
+    assert loaded_first is not None
+    assert loaded_second is not None
+    assert any(group.title == "Salsa" for group in loaded_first.option_groups)
+    assert any(group.title == "Salsa" for group in loaded_second.option_groups)
+    first_salsa = next(group for group in loaded_first.option_groups if group.title == "Salsa")
+    assert len(first_salsa.items) == 2
+
+
+@requires_db
+def test_menu_write_applies_menu_theme_without_import_session(session):
+    from app.modules.digital_menu_themes.repository import DigitalMenuThemeRepository
+
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Theme Write", subdomain="menu-write-theme")
+    )
+    DigitalMenuThemeRepository(session).upsert(
+        {
+            "id": "taqueria-viva",
+            "label": "Taquería",
+            "description": "Warm taqueria theme.",
+            "best_for": ["Taquería"],
+            "recommendation": "Mexican street food menus.",
+            "style_keywords": ["warm"],
+            "is_active": True,
+            "sort_order": 1,
+        }
+    )
+    session.flush()
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    listed = skill.execute("list_menu_themes", {}, ctx)
+    assert listed.ok is True
+    assert any(theme["id"] == "taqueria-viva" for theme in listed.data["themes"])
+
+    applied = skill.execute("apply_menu_theme", {"theme_id": "taqueria-viva"}, ctx)
+    assert applied.ok is True
+    assert applied.data["label"] == "Taquería"
+
+    loaded = uow.restaurants.get(restaurant.id)
+    assert loaded is not None
+    assert loaded.digital_menu_theme_id == "taqueria-viva"
