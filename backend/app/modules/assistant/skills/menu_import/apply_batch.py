@@ -18,9 +18,13 @@ from app.modules.assistant.skills.menu_import.draft_schema import (
     ImportProduct,
     ImportPromotion,
 )
+from app.modules.assistant.skills.menu_import.price_units import mxn_to_cents
 from app.modules.assistant.skills.menu_import.session_repository import MenuImportSessionRepository
+from app.core.config import get_settings
+from app.modules.assistant.skills.menu_import.batching import count_batch_products
 from app.modules.menu.schemas import (
     CategoryCreate,
+    CategoryUpdate,
     OptionGroupCreate,
     OptionItemCreate,
     ProductCreate,
@@ -29,6 +33,18 @@ from app.modules.menu.schemas import (
 from app.modules.menu.service import MenuService
 from app.modules.promotions.schemas import PromotionBundle, PromotionCreate, PromotionScheduleInput
 from app.modules.promotions.service import PromotionService
+
+
+@dataclass(frozen=True, slots=True)
+class ApplyFullResult:
+    ok: bool
+    summary: str
+    batches_applied: int = 0
+    categories: int = 0
+    products: int = 0
+    option_groups: int = 0
+    option_items: int = 0
+    promotions: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,7 +135,7 @@ def _build_promotion_create(
         type=promo.type,
         scope=promo.scope,
         percent=int(promo.percent) if promo.percent is not None else None,
-        amount_cents=promo.amount_cents,
+        amount_cents=mxn_to_cents(promo.amount_mxn) if promo.amount_mxn is not None else None,
         bundle=bundle,
         schedule=schedule,
         product_ids=_resolve_refs(promo.target_product_refs, ref_map),
@@ -145,6 +161,12 @@ def _apply_categories(
             )
         )
         ref_map[category.ref] = created.id
+        if category.display_layout in {"vertical", "horizontal", "grid"}:
+            menu.update_category(
+                ctx.restaurant_id,
+                created.id,
+                CategoryUpdate(display_layout=category.display_layout),
+            )
         count += 1
     return count
 
@@ -158,25 +180,24 @@ def _apply_products(
     count = 0
     for category in categories:
         category_id = ref_map[category.ref]
-        for product in category.products:
+        sorted_products = sorted(category.products, key=lambda p: (p.sort_order, p.name))
+        for product in sorted_products:
             created = menu.create_product(
                 ctx.restaurant_id,
                 ProductCreate(
                     restaurant_id=ctx.restaurant_id,
                     name=product.name,
                     description=product.description,
-                    price_cents=product.price_cents,
+                    price_cents=mxn_to_cents(product.price_mxn),
                     currency=product.currency,
                     category_ids=[category_id],
                 ),
             )
             ref_map[product.ref] = created.id
+            product_update = ProductUpdate(is_published=True)
             if not product.is_available:
-                menu.update_product(
-                    ctx.restaurant_id,
-                    created.id,
-                    ProductUpdate(is_active=False),
-                )
+                product_update = ProductUpdate(is_published=True, is_active=False)
+            menu.update_product(ctx.restaurant_id, created.id, product_update)
             count += 1
     return count
 
@@ -192,7 +213,8 @@ def _apply_option_groups(
     for category in categories:
         for product in category.products:
             product_id = ref_map[product.ref]
-            for group in product.option_groups:
+            sorted_groups = sorted(product.option_groups, key=lambda g: (g.sort_order, g.title))
+            for group in sorted_groups:
                 group_count, item_count = _apply_single_option_group(
                     menu,
                     ctx,
@@ -214,13 +236,14 @@ def _apply_single_option_group(
     group_count: int,
     item_count: int,
 ) -> tuple[int, int]:
+    sorted_items = sorted(group.items, key=lambda i: (i.sort_order, i.label))
     items = [
         OptionItemCreate(
             label=item.label,
-            price_delta_cents=item.price_delta_cents,
-            sort_index=index,
+            price_delta_cents=mxn_to_cents(item.price_delta_mxn),
+            sort_index=item.sort_order,
         )
-        for index, item in enumerate(group.items)
+        for item in sorted_items
     ]
     created_group = menu.add_option_group(
         ctx.restaurant_id,
@@ -231,13 +254,13 @@ def _apply_single_option_group(
             selection=group.selection,
             min_selections=group.min_selections,
             max_selections=group.max_selections,
-            sort_index=0,
+            sort_index=group.sort_order,
             items=items,
         ),
     )
     ref_map[group.ref] = created_group.id
     group_count += 1
-    for import_item, created_item in zip(group.items, created_group.items, strict=True):
+    for import_item, created_item in zip(sorted_items, created_group.items, strict=True):
         ref_map[import_item.ref] = created_item.id
         item_count += 1
     return group_count, item_count
@@ -331,4 +354,94 @@ def apply_import_batch(
         option_items=items_created,
         promotions=promotions_created,
         ref_map=batch_entry["ref_map"],
+    )
+
+
+def _count_session_products(session: MenuImportSession) -> int:
+    total = 0
+    for entry in session.draft_batches or []:
+        if isinstance(entry, dict):
+            total += count_batch_products(ImportBatch.model_validate(entry))
+    return total
+
+
+def _all_unanswered_question_ids(session: MenuImportSession) -> list[str]:
+    unanswered: list[str] = []
+    for entry in session.draft_batches or []:
+        if not isinstance(entry, dict):
+            continue
+        batch = ImportBatch.model_validate(entry)
+        unanswered.extend(
+            _unanswered_question_ids(batch, session.clarification_answers or {})
+        )
+    return unanswered
+
+
+def apply_full_import(
+    ctx: AgentContext,
+    session: MenuImportSession,
+    *,
+    confirmed: bool,
+) -> ApplyFullResult:
+    if not confirmed:
+        return ApplyFullResult(ok=False, summary="confirmed=true is required to apply full import")
+
+    product_total = _count_session_products(session)
+    limit = get_settings().menu_import_full_max_products
+    if product_total > limit:
+        return ApplyFullResult(
+            ok=False,
+            summary=f"Menu has {product_total} products; full import limit is {limit}",
+        )
+
+    unanswered = _all_unanswered_question_ids(session)
+    if unanswered:
+        return ApplyFullResult(
+            ok=False,
+            summary=(
+                "Import has unanswered open_questions; save clarification answers first: "
+                + ", ".join(unanswered)
+            ),
+        )
+
+    batches = list(session.draft_batches or [])
+    pending_indexes = [
+        index
+        for index, entry in enumerate(batches)
+        if isinstance(entry, dict) and not entry.get("applied_at")
+    ]
+    if not pending_indexes:
+        return ApplyFullResult(ok=False, summary="No pending batches to apply")
+
+    totals = ApplyFullResult(ok=True, summary="")
+    for batch_index in pending_indexes:
+        result = apply_import_batch(ctx, session, batch_index, confirmed=True)
+        if not result.ok:
+            return ApplyFullResult(ok=False, summary=result.summary)
+        totals = ApplyFullResult(
+            ok=True,
+            summary=totals.summary,
+            batches_applied=totals.batches_applied + 1,
+            categories=totals.categories + result.categories,
+            products=totals.products + result.products,
+            option_groups=totals.option_groups + result.option_groups,
+            option_items=totals.option_items + result.option_items,
+            promotions=totals.promotions + result.promotions,
+        )
+
+    summary = (
+        f"Applied full import: {totals.batches_applied} batch(es), "
+        f"{totals.categories} categories, {totals.products} products, "
+        f"{totals.option_groups} option groups, {totals.option_items} option items, "
+        f"{totals.promotions} promotions"
+    )
+    return ApplyFullResult(
+        ok=True,
+        summary=summary,
+        batches_applied=totals.batches_applied,
+        categories=totals.categories,
+        products=totals.products,
+        option_groups=totals.option_groups,
+        option_items=totals.option_items,
+        promotions=totals.promotions,
     )

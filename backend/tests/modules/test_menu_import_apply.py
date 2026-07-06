@@ -8,7 +8,9 @@ from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.skills.menu_import.apply_batch import (
     ApplyBatchResult,
+    ApplyFullResult,
     _unanswered_question_ids,
+    apply_full_import,
     apply_import_batch,
 )
 from app.modules.assistant.skills.menu_import.draft_schema import ImportBatch, OpenQuestion
@@ -76,7 +78,7 @@ def _sample_batch_payload() -> dict:
                         "ref": "prod_pastor",
                         "name": "Taco al Pastor",
                         "description": "Con piña",
-                        "price_cents": 3500,
+                        "price_mxn": 35,
                         "currency": "MXN",
                         "is_available": True,
                         "option_groups": [
@@ -91,7 +93,7 @@ def _sample_batch_payload() -> dict:
                                     {
                                         "ref": "oi_verde",
                                         "label": "Verde",
-                                        "price_delta_cents": 0,
+                                        "price_delta_mxn": 0,
                                     }
                                 ],
                             }
@@ -101,7 +103,7 @@ def _sample_batch_payload() -> dict:
                         "ref": "prod_asada",
                         "name": "Taco de Asada",
                         "description": None,
-                        "price_cents": 4000,
+                        "price_mxn": 40,
                         "currency": "MXN",
                         "is_available": True,
                         "option_groups": [],
@@ -128,8 +130,81 @@ def _sample_batch_payload() -> dict:
     }
 
 
+def test_apply_full_import_rejects_unconfirmed_without_db():
+    uow = MagicMock()
+    ctx = AgentContext(
+        restaurant_id=uuid.uuid4(),
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_import"],
+    )
+    session = MagicMock()
+    session.draft_batches = [
+        {"batch_index": 0, "categories": [], "promotions": [], "open_questions": []}
+    ]
+    session.clarification_answers = {}
+
+    result = apply_full_import(ctx, session, confirmed=False)
+    assert isinstance(result, ApplyFullResult)
+    assert result.ok is False
+
+
 @requires_db
-def test_apply_import_batch_materializes_menu(session):
+def test_apply_full_import_applies_all_pending_batches(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant_id, conversation_id = _create_restaurant_and_conversation(session)
+    repo = MenuImportSessionRepository(session)
+    import_session = repo.create(
+        restaurant_id=restaurant_id,
+        conversation_id=conversation_id,
+        status=MenuImportSessionStatus.PREVIEW_BATCH,
+    )
+    batch = _sample_batch_payload()
+    import_session.draft_batches = [
+        batch,
+        {
+            **batch,
+            "batch_index": 1,
+            "categories": [
+                {
+                    "ref": "cat_bebidas",
+                    "name": "Bebidas",
+                    "sort_order": 1,
+                    "products": [
+                        {
+                            "ref": "prod_agua",
+                            "name": "Agua",
+                            "price_mxn": 20,
+                            "currency": "MXN",
+                            "is_available": True,
+                            "option_groups": [],
+                        }
+                    ],
+                }
+            ],
+            "promotions": [],
+        },
+    ]
+    repo.update(import_session)
+    ctx = AgentContext(
+        restaurant_id=restaurant_id,
+        conversation_id=conversation_id,
+        uow=uow,
+        effective_skill_ids=["menu_import"],
+    )
+
+    result = apply_full_import(ctx, import_session, confirmed=True)
+
+    assert result.ok is True
+    assert result.batches_applied == 2
+    assert result.products == 3
+    assert import_session.draft_batches[0]["applied_at"]
+    assert import_session.draft_batches[1]["applied_at"]
+
+
+@requires_db
+def test_apply_import_batch_publishes_products(session):
     uow = SqlAlchemyUnitOfWork(lambda: session)
     uow.__enter__()
     restaurant_id, conversation_id = _create_restaurant_and_conversation(session)
@@ -172,6 +247,8 @@ def test_apply_import_batch_materializes_menu(session):
     )
     assert len(products.items) == 2
     pastor = next(item for item in products.items if item.name == "Taco al Pastor")
+    assert pastor.price_cents == 3500
+    assert pastor.is_published is True
     assert pastor.option_groups
     assert pastor.option_groups[0].items[0].label == "Verde"
 
