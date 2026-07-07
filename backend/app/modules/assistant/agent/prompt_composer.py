@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from app.modules.assistant.entitlements.catalog import SKILL_CATALOG
 from app.modules.assistant.profile.schemas import AssistantProfileRecord
 from app.modules.assistant.prompts import ASSISTANT_CORE_POLICY
-from app.modules.assistant.skills.markdown import load_skill_metadata
 
 
 def compose_system_prompt(
@@ -30,25 +28,13 @@ def compose_system_prompt(
     # if profile.behavior_markdown.strip():
     #     sections.append(f"## BEHAVIOR\n\n{profile.behavior_markdown.strip()}")
 
-    if effective_skill_ids:
-        skill_lines = []
-        for skill_id in effective_skill_ids:
-            meta = load_skill_metadata(skill_id)
-            catalog = SKILL_CATALOG.get(skill_id)
-            summary = (
-                meta.get("description")
-                or (catalog.label if catalog else skill_id)
-            )
-            skill_lines.append(f"- **{skill_id}**: {summary}")
-        sections.append(
-            "## Active skills\n\n"
-            "Each entry below is a skill enabled for this restaurant. A skill is an on-demand "
-            "**guide**—workflows, quality standards. "
-            "Tools are already callable; call `load_skill(skill_id)` when the task needs that "
-            "guide. "
-            "Do not guess from memory when a guide applies.\n\n"
-            + "\n".join(skill_lines)
-        )
+    # Temporarily disabled — on-demand skill guides via load_skill (see
+    # backend/docs/assistant-load-skill-integration.md to re-enable).
+    # if effective_skill_ids:
+    #     skill_lines = []
+    #     for skill_id in effective_skill_ids:
+    #         meta = load_skill_metadata(skill_id)
+    #         ...
 
     # if profile.menu_markdown.strip():
     #     sections.append(f"## MENU knowledge\n\n{profile.menu_markdown.strip()}")
