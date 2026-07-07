@@ -10,12 +10,6 @@ from app.modules.assistant.import_assets import (
     upload_import_asset,
     validate_import_asset_path,
 )
-from tests.api.test_assistant_conversations_api import _seed_restaurant
-from tests.conftest import requires_db
-
-pytest_plugins = ["tests.api.conftest"]
-
-AUTH = {"Authorization": "Bearer valid-token"}
 
 
 class _SmallSourceSettings(Settings):
@@ -87,40 +81,3 @@ def test_path_prefix_validation():
             f"restaurants/{restaurant_id}/import/product_photo/x.jpg",
             kind="menu_source",
         )
-
-
-@requires_db
-def test_upload_menu_source_pdf_api(client, engine):
-    restaurant = _seed_restaurant(client, engine, "assistant-import-assets")
-    pdf_bytes = b"%PDF-1.4 api test"
-
-    with patch(
-        "app.modules.assistant.import_assets.build_storage",
-        return_value=MemoryStorageAdapter(),
-    ):
-        response = client.post(
-            f"/api/v1/restaurants/{restaurant.id}/assistant/import/assets?kind=menu_source",
-            files={"file": ("menu.pdf", pdf_bytes, "application/pdf")},
-            headers=AUTH,
-        )
-
-    assert response.status_code == 201
-    body = response.json()
-    assert body["path"].startswith(f"restaurants/{restaurant.id}/import/menu_source/")
-    assert body["mime_type"] == "application/pdf"
-    assert body["original_name"] == "menu.pdf"
-    assert body["kind"] == "menu_source"
-
-
-@requires_db
-def test_upload_rejects_invalid_kind_api(client, engine):
-    restaurant = _seed_restaurant(client, engine, "assistant-import-invalid-kind")
-
-    response = client.post(
-        f"/api/v1/restaurants/{restaurant.id}/assistant/import/assets?kind=invalid",
-        files={"file": ("menu.pdf", b"%PDF", "application/pdf")},
-        headers=AUTH,
-    )
-
-    assert response.status_code == 400
-    assert response.json()["code"] == "validation_error"

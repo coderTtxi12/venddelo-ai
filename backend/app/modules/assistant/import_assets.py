@@ -5,12 +5,22 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
+from pydantic import BaseModel, Field
+
 from app.core.config import Settings, get_settings
 from app.core.exceptions import ValidationError
 from app.infra.storage.factory import build_storage
-from app.modules.assistant.schemas import ImportAssetUploadDTO
 
 ImportAssetKind = Literal["menu_source", "product_photo"]
+
+
+class ImportAssetUploadDTO(BaseModel):
+    path: str = Field(min_length=1)
+    public_url: str = Field(min_length=1)
+    mime_type: str = Field(min_length=1)
+    size_bytes: int = Field(ge=0)
+    original_name: str = Field(min_length=1)
+    kind: ImportAssetKind
 
 ALLOWED_KINDS = frozenset({"menu_source", "product_photo"})
 
