@@ -1,6 +1,3 @@
-from datetime import UTC, datetime
-import uuid
-
 from app.modules.assistant.skills.menu_read.search import (
     STRONG_MATCH_THRESHOLD,
     SUGGESTION_THRESHOLD,
@@ -8,70 +5,6 @@ from app.modules.assistant.skills.menu_read.search import (
     normalize_text,
     tokenize,
 )
-from app.modules.assistant.skills.menu_read.tools import _live_menu_status, _live_menu_status_counts
-from app.modules.menu.schemas import ProductDTO
-
-
-def _product_dto(**overrides) -> ProductDTO:
-    base = {
-        "id": uuid.uuid4(),
-        "restaurant_id": uuid.uuid4(),
-        "name": "Test",
-        "price_cents": 1000,
-        "currency": "MXN",
-        "approval_status": "draft",
-        "is_published": False,
-        "is_active": True,
-        "created_at": datetime.now(UTC),
-        "updated_at": datetime.now(UTC),
-    }
-    base.update(overrides)
-    return ProductDTO(**base)
-
-
-def test_live_menu_status_draft_when_unpublished_or_not_approved():
-    assert _live_menu_status(_product_dto()) == "draft"
-    assert (
-        _live_menu_status(
-            _product_dto(is_published=True, approval_status="draft", is_active=True)
-        )
-        == "draft"
-    )
-    assert (
-        _live_menu_status(
-            _product_dto(is_published=False, approval_status="approved", is_active=True)
-        )
-        == "draft"
-    )
-
-
-def test_live_menu_status_en_menu_and_inactivo_when_published_approved():
-    assert (
-        _live_menu_status(
-            _product_dto(is_published=True, approval_status="approved", is_active=True)
-        )
-        == "en_menu"
-    )
-    assert (
-        _live_menu_status(
-            _product_dto(is_published=True, approval_status="approved", is_active=False)
-        )
-        == "inactivo"
-    )
-
-
-def test_live_menu_status_counts_groups_owner_states():
-    products = [
-        _product_dto(is_published=True, approval_status="approved", is_active=True),
-        _product_dto(is_published=True, approval_status="approved", is_active=True),
-        _product_dto(is_published=True, approval_status="draft", is_active=True),
-        _product_dto(is_published=True, approval_status="approved", is_active=False),
-    ]
-    assert _live_menu_status_counts(products) == {
-        "en_menu": 2,
-        "inactivo": 1,
-        "draft": 1,
-    }
 
 
 def test_normalize_strips_accents_and_case():
@@ -121,3 +54,9 @@ def test_match_score_prefers_the_correct_product():
     assert correct == 1.0
     assert correct > wrong
     assert wrong < STRONG_MATCH_THRESHOLD
+
+
+def test_match_score_wings_aliases_to_boneless_product_name():
+    score = match_score("Wings & Fries", "BONELESS & FRIES WITC SAUCE")
+    assert score >= STRONG_MATCH_THRESHOLD
+    assert match_score("Wings & Fries", "BURGER & BONELESS") < STRONG_MATCH_THRESHOLD

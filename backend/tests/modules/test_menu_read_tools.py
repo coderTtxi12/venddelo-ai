@@ -1,7 +1,7 @@
 import uuid
 
 from app.db.uow import SqlAlchemyUnitOfWork
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.menu_read.tools import (
     DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID,
     DIGITAL_MENU_PROMOTIONS_CATEGORY_ID,
@@ -215,6 +215,193 @@ def test_menu_read_get_product_disambiguates_shared_token_names(session):
 
 
 @requires_db
+def test_menu_read_search_wings_fries_matches_boneless_when_no_exact_name(session):
+    """When no product is literally named WINGS & FRIES, alias matching picks boneless."""
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Wings Alias", subdomain="menu-read-wings-alias")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+    )
+    boneless_fries = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BONELESS & FRIES WITC SAUCE",
+            price_cents=22900,
+            category_ids=[category.id],
+        )
+    )
+    uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BURGER & BONELESS",
+            price_cents=25900,
+            category_ids=[category.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+
+    result = MenuReadSkill().execute("search_products", {"query": "Wings & Fries"}, ctx)
+
+    assert result.ok is True
+    assert [item["id"] for item in result.data["products"]] == [str(boneless_fries.id)]
+    assert result.data["suggestions"] == []
+
+
+@requires_db
+def test_menu_read_search_wild_rooster_prefers_exact_inactive_wings_and_fries(session):
+    """Wild Rooster has an inactive WINGS & FRIES plus active boneless neighbors."""
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Wild Rooster", subdomain="menu-read-wild-rooster")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+    )
+    wings_fries = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="WINGS & FRIES",
+            description="Alitas crujientes con papas.",
+            price_cents=24400,
+            category_ids=[category.id],
+            status="active",
+        )
+    )
+    wings_fries = uow.menu.update_product(
+        wings_fries.id,
+        ProductUpdate(status="inactive"),
+    )
+    uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BONELESS & FRIES WITC SAUCE",
+            price_cents=22900,
+            category_ids=[category.id],
+            status="active",
+        )
+    )
+    uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BURGER & BONELESS",
+            price_cents=25900,
+            category_ids=[category.id],
+            status="active",
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+
+    result = MenuReadSkill().execute("search_products", {"query": "Wings & Fries"}, ctx)
+
+    assert result.ok is True
+    assert result.summary == "Found 1 matching products"
+    assert [item["id"] for item in result.data["products"]] == [str(wings_fries.id)]
+    assert result.data["products"][0]["name"] == "WINGS & FRIES"
+    assert result.data["products"][0]["status"] == "inactive"
+    assert result.data["products"][0]["match_score"] == 1.0
+    assert result.data["suggestions"] == []
+
+
+@requires_db
+def test_menu_read_search_ignores_legacy_active_only_arg(session):
+    """active_only was removed; search always uses the full owner catalog."""
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Wild Rooster Legacy Arg", subdomain="menu-read-wr-legacy-arg")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+    )
+    wings_fries = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="WINGS & FRIES",
+            price_cents=24400,
+            category_ids=[category.id],
+            status="active",
+        )
+    )
+    wings_fries = uow.menu.update_product(
+        wings_fries.id,
+        ProductUpdate(status="inactive"),
+    )
+    uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BONELESS & FRIES WITC SAUCE",
+            price_cents=22900,
+            category_ids=[category.id],
+            status="active",
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+
+    result = MenuReadSkill().execute(
+        "search_products",
+        {"query": "Wings & Fries", "active_only": True},
+        ctx,
+    )
+
+    assert result.ok is True
+    assert [item["id"] for item in result.data["products"]] == [str(wings_fries.id)]
+    assert result.data["products"][0]["name"] == "WINGS & FRIES"
+    assert result.data["products"][0]["match_score"] == 1.0
+
+
+@requires_db
+def test_menu_read_search_finds_draft_products(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Draft Search", subdomain="menu-read-draft-search")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+    )
+    draft_product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Wings & Fries",
+            price_cents=22900,
+            category_ids=[category.id],
+            status="draft",
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+
+    result = MenuReadSkill().execute("search_products", {"query": "Wings & Fries"}, ctx)
+
+    assert result.ok is True
+    assert [item["id"] for item in result.data["products"]] == [str(draft_product.id)]
+    assert result.data["products"][0]["status"] == "draft"
+
+
+@requires_db
 def test_menu_read_get_product_is_tenant_scoped(session):
     uow = SqlAlchemyUnitOfWork(lambda: session)
     uow.__enter__()
@@ -296,6 +483,41 @@ def test_menu_read_list_products_paginates_all_active_products(session):
     assert third.ok is True
     assert len(third.data["products"]) == 1
     assert third.data["has_more"] is False
+
+
+@requires_db
+def test_menu_read_list_products_counts_catalog_total_not_page_size(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Catalog Counts", subdomain="menu-read-counts")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Tacos", sort_index=1)
+    )
+    for index in range(5):
+        uow.menu.add_product(
+            ProductCreate(
+                restaurant_id=restaurant.id,
+                name=f"Taco {index}",
+                price_cents=1000 + index,
+                category_ids=[category.id],
+            )
+        )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+
+    result = MenuReadSkill().execute("list_products", {"limit": 1}, ctx)
+
+    assert result.ok is True
+    assert len(result.data["products"]) == 1
+    assert result.data["has_more"] is True
+    assert result.data["counts"]["total"] == 5
+    assert result.data["page_counts"]["total"] == 1
 
 
 @requires_db
@@ -449,7 +671,7 @@ def test_menu_read_product_payload_exposes_option_context(session):
     assert result.ok is True
     payload = result.data["product"]
     assert payload["image_path"] == "products/burger.png"
-    assert payload["live_menu_status"] == "draft"
+    assert payload["status"] == "draft"
     assert payload["has_options"] is True
     assert payload["category_sort_indices"][str(category.id)] == 0
 
@@ -903,12 +1125,12 @@ def test_menu_read_search_hamburguesa_prefers_exact_name_over_neighbor_descripti
             description="Clásica",
             price_cents=10000,
             category_ids=[category.id],
-            is_published=True,
+            status="active",
         ),
     )
     hamburguesa = uow.menu.update_product(
         hamburguesa.id,
-        ProductUpdate(is_active=False),
+        ProductUpdate(status="inactive"),
     )
     uow.menu.add_product(
         ProductCreate(
@@ -936,5 +1158,127 @@ def test_menu_read_search_hamburguesa_prefers_exact_name_over_neighbor_descripti
     assert search.data["products"][0]["name"] == "HAMBURGUESA"
     assert get_by_name.ok is True
     assert get_by_name.data["product"]["id"] == str(hamburguesa.id)
-    assert get_by_name.data["product"]["is_active"] is False
+    assert get_by_name.data["product"]["status"] == "inactive"
     assert any(item["name"] == "HAMBURGUESA" for item in listed.data["products"])
+
+
+def test_menu_read_parse_bulk_get_product_refs():
+    from app.modules.assistant.skills.menu_read.tools import _parse_bulk_get_product_refs
+
+    refs, err = _parse_bulk_get_product_refs(
+        {
+            "product_ids": ["13871a47-cf3e-47a2-86b7-2bd15a1d2826"],
+            "names": ["Wings & Fries"],
+            "items": [{"name": "Burger"}],
+        }
+    )
+    assert err is None
+    assert refs == [
+        {"product_id": "13871a47-cf3e-47a2-86b7-2bd15a1d2826"},
+        {"name": "Wings & Fries"},
+        {"name": "Burger"},
+    ]
+
+    empty_refs, empty_err = _parse_bulk_get_product_refs({})
+    assert empty_refs == []
+    assert empty_err is not None
+
+
+@requires_db
+def test_menu_read_bulk_get_products_by_ids_and_names(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Get", subdomain="menu-read-bulk-get")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+    )
+    wings = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="WINGS & FRIES",
+            price_cents=24400,
+            category_ids=[category.id],
+            status="active",
+        )
+    )
+    boneless = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BONELESS & FRIES WITC SAUCE",
+            price_cents=22900,
+            category_ids=[category.id],
+            status="active",
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+    skill = MenuReadSkill()
+
+    result = skill.execute(
+        "bulk_get_products",
+        {
+            "product_ids": [str(wings.id)],
+            "names": ["boneless & fries"],
+        },
+        ctx,
+    )
+
+    assert result.ok is True
+    assert result.data["found"] == 2
+    assert result.data["failed"] == 0
+    assert {item["name"] for item in result.data["products"]} == {
+        "WINGS & FRIES",
+        "BONELESS & FRIES WITC SAUCE",
+    }
+    assert all("status" in item for item in result.data["products"])
+    assert all(row["ok"] for row in result.data["results"])
+
+
+@requires_db
+def test_menu_read_bulk_get_products_reports_partial_misses(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Get Miss", subdomain="menu-read-bulk-get-miss")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Tacos", sort_index=1)
+    )
+    taco = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Taco al pastor",
+            price_cents=1200,
+            category_ids=[category.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+    skill = MenuReadSkill()
+
+    result = skill.execute(
+        "bulk_get_products",
+        {
+            "items": [
+                {"product_id": str(taco.id)},
+                {"name": "sushi"},
+            ]
+        },
+        ctx,
+    )
+
+    assert result.ok is True
+    assert result.data["found"] == 1
+    assert result.data["failed"] == 1
+    assert result.data["products"][0]["name"] == "Taco al pastor"
+    assert result.data["results"][1]["ok"] is False
