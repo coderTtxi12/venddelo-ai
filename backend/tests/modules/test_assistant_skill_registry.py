@@ -1,5 +1,5 @@
 
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.base import SkillPort, ToolDefinition, ToolResult
 from app.modules.assistant.skills.menu_read.tools import MenuReadSkill
 from app.modules.assistant.skills.registry import SkillRegistry
@@ -82,9 +82,10 @@ def test_registry_allows_complement_delete_tools():
     assert names == {"delete_option_item", "bulk_delete_option_items"}
 
 
-def test_registry_loads_skill_guide_from_skill_md():
+def test_registry_resolve_tool_by_name():
     registry = SkillRegistry([MenuReadSkill()])
-    sections = registry.system_prompt_sections(["menu_read"])
-    assert len(sections) == 1
-    assert "list_categories" in sections[0]
-    assert sections[0].startswith("# menu_read")
+    resolved = registry.resolve_tool("list_products", ["menu_read"])
+    assert resolved is not None
+    skill_id, tool = resolved
+    assert skill_id == "menu_read"
+    assert tool.name == "list_products"

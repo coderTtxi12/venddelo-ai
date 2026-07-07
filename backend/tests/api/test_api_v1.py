@@ -88,8 +88,7 @@ def test_public_menu_and_order(client, engine):
                 restaurant_id=r.id,
                 name="Taco",
                 price_cents=500,
-                approval_status="approved",
-                is_published=True,
+                status="active",
                 category_ids=[cat.id],
             )
         )
