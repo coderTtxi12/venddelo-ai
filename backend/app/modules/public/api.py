@@ -259,11 +259,7 @@ def quote_public_cart(
         product = uow.menu.get_product(line.product_id)
         if product is None or product.restaurant_id != restaurant.id:
             raise NotFoundError(f"Product {line.product_id} not found")
-        if (
-            not product.is_active
-            or not product.is_published
-            or product.approval_status != "approved"
-        ):
+        if product.status != "active":
             raise NotFoundError(f"Product {line.product_id} not found")
         products_by_id[product.id] = product
 

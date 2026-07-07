@@ -85,24 +85,21 @@ def seed() -> None:
             name="Taco al Pastor",
             description="Marinated pork taco",
             price_cents=2500,
-            approval_status="approved",
-            is_published=True,
+            status="active",
         )
         pastor.categories.append(tacos)
         suadero = Product(
             restaurant_id=restaurant.id,
             name="Taco de Suadero",
             price_cents=2500,
-            approval_status="approved",
-            is_published=True,
+            status="active",
         )
         suadero.categories.append(tacos)
         agua = Product(
             restaurant_id=restaurant.id,
             name="Agua de Horchata",
             price_cents=2000,
-            approval_status="approved",
-            is_published=True,
+            status="active",
         )
         agua.categories.append(drinks)
         session.add_all([pastor, suadero, agua])
