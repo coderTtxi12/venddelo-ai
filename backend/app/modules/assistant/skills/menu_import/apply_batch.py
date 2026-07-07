@@ -18,6 +18,7 @@ from app.modules.assistant.skills.menu_import.draft_schema import (
     ImportProduct,
     ImportPromotion,
 )
+from app.modules.assistant.skills.menu_import.menu_reconcile import ReconciliationPlan
 from app.modules.assistant.skills.menu_import.price_units import mxn_to_cents
 from app.modules.assistant.skills.menu_import.session_repository import MenuImportSessionRepository
 from app.core.config import get_settings
@@ -149,24 +150,43 @@ def _apply_categories(
     ctx: AgentContext,
     categories: list[ImportCategory],
     ref_map: dict[str, uuid.UUID],
+    reconciliation: ReconciliationPlan | None,
 ) -> int:
     count = 0
     for category in categories:
-        created = menu.create_category(
-            CategoryCreate(
-                restaurant_id=ctx.restaurant_id,
-                name=category.name,
-                description=category.description,
-                sort_index=category.sort_order,
-            )
+        layout = (
+            category.display_layout
+            if category.display_layout in {"vertical", "horizontal", "grid"}
+            else None
         )
-        ref_map[category.ref] = created.id
-        if category.display_layout in {"vertical", "horizontal", "grid"}:
+        existing_id = reconciliation.category_id_for(category.ref) if reconciliation else None
+        if existing_id is not None:
             menu.update_category(
                 ctx.restaurant_id,
-                created.id,
-                CategoryUpdate(display_layout=category.display_layout),
+                existing_id,
+                CategoryUpdate(
+                    description=category.description,
+                    sort_index=category.sort_order,
+                    display_layout=layout,
+                ),
             )
+            ref_map[category.ref] = existing_id
+        else:
+            created = menu.create_category(
+                CategoryCreate(
+                    restaurant_id=ctx.restaurant_id,
+                    name=category.name,
+                    description=category.description,
+                    sort_index=category.sort_order,
+                )
+            )
+            ref_map[category.ref] = created.id
+            if layout is not None:
+                menu.update_category(
+                    ctx.restaurant_id,
+                    created.id,
+                    CategoryUpdate(display_layout=layout),
+                )
         count += 1
     return count
 
@@ -176,28 +196,41 @@ def _apply_products(
     ctx: AgentContext,
     categories: list[ImportCategory],
     ref_map: dict[str, uuid.UUID],
+    reconciliation: ReconciliationPlan | None,
 ) -> int:
     count = 0
     for category in categories:
         category_id = ref_map[category.ref]
         sorted_products = sorted(category.products, key=lambda p: (p.sort_order, p.name))
         for product in sorted_products:
-            created = menu.create_product(
-                ctx.restaurant_id,
-                ProductCreate(
-                    restaurant_id=ctx.restaurant_id,
-                    name=product.name,
+            existing_id = reconciliation.product_id_for(product.ref) if reconciliation else None
+            if existing_id is not None:
+                product_update = ProductUpdate(
                     description=product.description,
                     price_cents=mxn_to_cents(product.price_mxn),
-                    currency=product.currency,
-                    category_ids=[category_id],
-                ),
-            )
-            ref_map[product.ref] = created.id
-            product_update = ProductUpdate(is_published=True)
-            if not product.is_available:
-                product_update = ProductUpdate(is_published=True, is_active=False)
-            menu.update_product(ctx.restaurant_id, created.id, product_update)
+                    is_published=True,
+                )
+                if not product.is_available:
+                    product_update = product_update.model_copy(update={"is_active": False})
+                menu.update_product(ctx.restaurant_id, existing_id, product_update)
+                ref_map[product.ref] = existing_id
+            else:
+                created = menu.create_product(
+                    ctx.restaurant_id,
+                    ProductCreate(
+                        restaurant_id=ctx.restaurant_id,
+                        name=product.name,
+                        description=product.description,
+                        price_cents=mxn_to_cents(product.price_mxn),
+                        currency=product.currency,
+                        category_ids=[category_id],
+                    ),
+                )
+                ref_map[product.ref] = created.id
+                product_update = ProductUpdate(is_published=True)
+                if not product.is_available:
+                    product_update = ProductUpdate(is_published=True, is_active=False)
+                menu.update_product(ctx.restaurant_id, created.id, product_update)
             count += 1
     return count
 
@@ -207,11 +240,17 @@ def _apply_option_groups(
     ctx: AgentContext,
     categories: list[ImportCategory],
     ref_map: dict[str, uuid.UUID],
+    reconciliation: ReconciliationPlan | None,
 ) -> tuple[int, int]:
     group_count = 0
     item_count = 0
+    skip_refs = (
+        reconciliation.products_with_existing_groups if reconciliation else frozenset()
+    )
     for category in categories:
         for product in category.products:
+            if product.ref in skip_refs:
+                continue
             product_id = ref_map[product.ref]
             sorted_groups = sorted(product.option_groups, key=lambda g: (g.sort_order, g.title))
             for group in sorted_groups:
@@ -288,6 +327,7 @@ def apply_import_batch(
     batch_index: int,
     *,
     confirmed: bool,
+    reconciliation: ReconciliationPlan | None = None,
 ) -> ApplyBatchResult:
     if not confirmed:
         return ApplyBatchResult(ok=False, summary="confirmed=true is required to apply a batch")
@@ -319,10 +359,14 @@ def apply_import_batch(
     ref_map = _accumulated_ref_map(draft_batches)
 
     try:
-        categories_created = _apply_categories(menu, ctx, batch.categories, ref_map)
-        products_created = _apply_products(menu, ctx, batch.categories, ref_map)
+        categories_created = _apply_categories(
+            menu, ctx, batch.categories, ref_map, reconciliation
+        )
+        products_created = _apply_products(
+            menu, ctx, batch.categories, ref_map, reconciliation
+        )
         groups_created, items_created = _apply_option_groups(
-            menu, ctx, batch.categories, ref_map
+            menu, ctx, batch.categories, ref_map, reconciliation
         )
         promotions_created = _apply_promotions(
             promo_service, ctx, batch.promotions, ref_map
@@ -382,6 +426,7 @@ def apply_full_import(
     session: MenuImportSession,
     *,
     confirmed: bool,
+    reconciliation: ReconciliationPlan | None = None,
 ) -> ApplyFullResult:
     if not confirmed:
         return ApplyFullResult(ok=False, summary="confirmed=true is required to apply full import")
@@ -415,7 +460,9 @@ def apply_full_import(
 
     totals = ApplyFullResult(ok=True, summary="")
     for batch_index in pending_indexes:
-        result = apply_import_batch(ctx, session, batch_index, confirmed=True)
+        result = apply_import_batch(
+            ctx, session, batch_index, confirmed=True, reconciliation=reconciliation
+        )
         if not result.ok:
             return ApplyFullResult(ok=False, summary=result.summary)
         totals = ApplyFullResult(
