@@ -1,33 +1,16 @@
-import { apiRequest } from './client';
-import { fetchAllPages } from './pagination';
 import { ApiError } from './types';
-import type { CursorPage } from './types';
+import type { StepStatus, WorkflowPhaseId } from '@/lib/assistant/workflowTelemetry';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api/v1';
 
-export type AssistantConversation = {
-  id: string;
-  restaurant_id: string;
-  title: string;
-  last_message_at: string;
-  created_at: string;
-  updated_at: string;
-};
-
-export type AssistantMessage = {
-  id: string;
-  conversation_id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
+export type AssistantChatRequest = {
+  message: string;
+  conversation_id?: string | null;
 };
 
 export type AssistantStreamCompletePayload = {
   conversation_id: string;
-  message_id: string;
   content: string;
-  reasoning?: string;
 };
 
 export type AssistantStreamErrorPayload = {
@@ -35,214 +18,77 @@ export type AssistantStreamErrorPayload = {
   message: string;
 };
 
-export type AssistantSkillCatalogEntry = {
-  id: string;
-  label: string;
-  granted: boolean;
-  enabled: boolean;
-  effective: boolean;
-  lock_reason: string | null;
-};
-
-export type AssistantProfile = {
-  restaurant_id: string;
-  display_name: string;
-  identity_markdown: string;
-  behavior_markdown: string;
-  menu_markdown: string;
-  enabled_skill_ids: string[];
-  granted_skill_ids: string[];
-  effective_skill_ids: string[];
-  skills_catalog: AssistantSkillCatalogEntry[];
-  version: number;
-  chat_ready: boolean;
-  updated_at: string;
-};
-
-export type AssistantProfileUpdate = {
-  display_name?: string;
-  identity_markdown?: string;
-  behavior_markdown?: string;
-  menu_markdown?: string;
-  enabled_skill_ids?: string[];
-  expected_version: number;
-};
-
-export type AssistantProfileSnapshot = {
-  display_name: string;
-  enabled_skill_ids: string[];
-};
-
-export type ChatAttachmentRef = {
-  storage_path: string;
-  original_name: string;
-  mime_type: string;
-  kind: 'menu_source' | 'product_photo';
-  size_bytes: number;
-};
-
-export type AssistantChatStreamOptions = {
-  profileVersion: number;
-  profileSnapshot?: AssistantProfileSnapshot;
-  attachments?: ChatAttachmentRef[];
-};
-
-export type AssistantToolStartPayload = {
-  call_id?: string;
-  tool: string;
-  skill_id?: string;
-  args_summary?: Record<string, unknown>;
-  effect?: string;
-};
-
-export type AssistantToolResultPayload = {
-  call_id?: string;
-  tool: string;
-  ok: boolean;
-  summary?: string;
-};
-
-export type AssistantSkillsPayload = {
-  skills: Array<{ id: string; label: string }>;
-  active: string[];
-};
-
-export type AssistantPlanPayload = {
-  steps: unknown;
-  reason?: string;
-};
-
-export type AssistantPlanUpdatePayload = {
-  steps: unknown;
-  decision: 'continue' | 'replan' | 'finish';
-  reason?: string;
-};
-
 export type AssistantStreamHandlers = {
   onDelta: (delta: string) => void;
   onComplete: (payload: AssistantStreamCompletePayload) => void;
   onError: (payload: AssistantStreamErrorPayload) => void;
-  onAgentPhase?: (phase: string) => void;
   onAgentStatus?: (status: string) => void;
-  onAgentThought?: (text: string, options?: { replace?: boolean }) => void;
-  onAgentPlan?: (payload: AssistantPlanPayload) => void;
-  onAgentPlanUpdate?: (payload: AssistantPlanUpdatePayload) => void;
-  onAgentSkills?: (payload: AssistantSkillsPayload) => void;
-  onToolStart?: (payload: AssistantToolStartPayload) => void;
-  onToolResult?: (payload: AssistantToolResultPayload) => void;
-  onToolError?: (payload: AssistantToolResultPayload) => void;
+  onAgentPhase?: (payload: { phase: WorkflowPhaseId; label: string }) => void;
+  onAgentPlan?: (payload: {
+    summary: string;
+    steps: Array<{ id: string; goal: string; tool_hint?: string | null }>;
+    replan?: boolean;
+  }) => void;
+  onAgentStep?: (payload: {
+    step_id: string;
+    index: number;
+    goal: string;
+    tool_hint?: string | null;
+    status: StepStatus;
+  }) => void;
+  onAgentEvaluation?: (payload: {
+    ok: boolean;
+    should_replan: boolean;
+    issues: string[];
+  }) => void;
 };
 
-export function getAssistantProfile(token: string, restaurantId: string) {
-  return apiRequest<AssistantProfile>(`/restaurants/${restaurantId}/assistant/profile`, { token });
-}
-
-export function updateAssistantProfile(
-  token: string,
-  restaurantId: string,
-  body: AssistantProfileUpdate,
-) {
-  return apiRequest<AssistantProfile>(`/restaurants/${restaurantId}/assistant/profile`, {
-    method: 'PATCH',
-    token,
-    body,
-  });
-}
-
-export function listAssistantConversations(
-  token: string,
-  restaurantId: string,
-  limit = 30,
-  cursor?: string | null,
-) {
-  const params = new URLSearchParams({ limit: String(limit) });
-  if (cursor) params.set('cursor', cursor);
-  return apiRequest<CursorPage<AssistantConversation>>(
-    `/restaurants/${restaurantId}/assistant/conversations?${params}`,
-    { token },
-  );
-}
-
-export function createAssistantConversation(token: string, restaurantId: string, title?: string) {
-  return apiRequest<AssistantConversation>(`/restaurants/${restaurantId}/assistant/conversations`, {
-    method: 'POST',
-    token,
-    body: title ? { title } : {},
-  });
-}
-
-export function listAssistantMessages(
-  token: string,
-  restaurantId: string,
-  conversationId: string,
-  limit = 100,
-  cursor?: string | null,
-) {
-  const params = new URLSearchParams({ limit: String(limit) });
-  if (cursor) params.set('cursor', cursor);
-  return apiRequest<CursorPage<AssistantMessage>>(
-    `/restaurants/${restaurantId}/assistant/conversations/${conversationId}/messages?${params}`,
-    { token },
-  );
-}
-
-export async function loadAllAssistantMessages(
-  token: string,
-  restaurantId: string,
-  conversationId: string,
-) {
-  return fetchAllPages(
-    (cursor) => listAssistantMessages(token, restaurantId, conversationId, 100, cursor),
-    100,
-  );
-}
+const WORKFLOW_PHASES = new Set<WorkflowPhaseId>([
+  'context',
+  'planning',
+  'executing',
+  'evaluating',
+  'replanning',
+  'responding',
+]);
 
 function parseSseBlock(block: string): { event: string; data: string } | null {
-  const lines = block.split('\n').filter(Boolean);
-  let event = 'message';
-  let data = '';
+  if (!block.trim()) return null;
 
-  for (const line of lines) {
+  let event = 'message';
+  const dataLines: string[] = [];
+
+  for (const line of block.split('\n')) {
     if (line.startsWith('event:')) {
       event = line.slice(6).trim();
     } else if (line.startsWith('data:')) {
-      data += line.slice(5).trim();
+      dataLines.push(line.slice(5).trim());
     }
   }
 
-  if (!data) return null;
-  return { event, data };
+  if (dataLines.length === 0) return null;
+  return { event, data: dataLines.join('\n') };
 }
 
 export async function streamAssistantChat(
   token: string,
   restaurantId: string,
-  conversationId: string,
-  message: string,
+  body: AssistantChatRequest,
   handlers: AssistantStreamHandlers,
   signal?: AbortSignal,
-  options?: AssistantChatStreamOptions,
 ): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(
-      `${API_URL}/restaurants/${restaurantId}/assistant/conversations/${conversationId}/chat`,
-      {
-        method: 'POST',
-        headers: {
-          Accept: 'text/event-stream',
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          message,
-          profile_version: options?.profileVersion ?? 1,
-          profile_snapshot: options?.profileSnapshot,
-          attachments: options?.attachments ?? [],
-        }),
-        signal,
+    response = await fetch(`${API_URL}/restaurants/${restaurantId}/assistant/chat`, {
+      method: 'POST',
+      headers: {
+        Accept: 'text/event-stream',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
       },
-    );
+      body: JSON.stringify(body),
+      signal,
+    });
   } catch {
     throw new ApiError(
       'network_error',
@@ -303,14 +149,6 @@ export async function streamAssistantChat(
         continue;
       }
 
-      if (parsed.event === 'agent.phase') {
-        const phase = payload.phase;
-        if (typeof phase === 'string') {
-          handlers.onAgentPhase?.(phase);
-        }
-        continue;
-      }
-
       if (parsed.event === 'agent.status') {
         const status = payload.status;
         if (typeof status === 'string') {
@@ -319,99 +157,66 @@ export async function streamAssistantChat(
         continue;
       }
 
-      if (parsed.event === 'agent.thought') {
-        const text = payload.text;
-        if (typeof text === 'string' && text.trim()) {
-          handlers.onAgentThought?.(text, {
-            replace: payload.replace === true,
+      if (parsed.event === 'agent.phase') {
+        const phase = payload.phase;
+        const label = payload.label;
+        if (typeof phase === 'string' && typeof label === 'string' && WORKFLOW_PHASES.has(phase as WorkflowPhaseId)) {
+          handlers.onAgentPhase?.({ phase: phase as WorkflowPhaseId, label });
+        }
+        continue;
+      }
+
+      if (parsed.event === 'agent.plan' || parsed.event === 'agent.plan_update') {
+        const summary = payload.summary;
+        const steps = payload.steps;
+        if (typeof summary === 'string' && Array.isArray(steps)) {
+          handlers.onAgentPlan?.({
+            summary,
+            steps: steps as Array<{ id: string; goal: string; tool_hint?: string | null }>,
+            replan: parsed.event === 'agent.plan_update' || payload.replan === true,
           });
         }
         continue;
       }
 
-      if (parsed.event === 'agent.plan') {
-        handlers.onAgentPlan?.({
-          steps: payload.steps,
-          reason: typeof payload.reason === 'string' ? payload.reason : undefined,
+      if (parsed.event === 'agent.step') {
+        const stepId = payload.step_id;
+        const goal = payload.goal;
+        const status = payload.status;
+        const index = payload.index;
+        if (
+          typeof stepId === 'string' &&
+          typeof goal === 'string' &&
+          typeof status === 'string' &&
+          typeof index === 'number' &&
+          (status === 'pending' || status === 'active' || status === 'done')
+        ) {
+          handlers.onAgentStep?.({
+            step_id: stepId,
+            index,
+            goal,
+            tool_hint: typeof payload.tool_hint === 'string' ? payload.tool_hint : null,
+            status,
+          });
+        }
+        continue;
+      }
+
+      if (parsed.event === 'agent.evaluation') {
+        handlers.onAgentEvaluation?.({
+          ok: payload.ok === true,
+          should_replan: payload.should_replan === true,
+          issues: Array.isArray(payload.issues)
+            ? payload.issues.filter((item): item is string => typeof item === 'string')
+            : [],
         });
-        continue;
-      }
-
-      if (parsed.event === 'agent.plan_update') {
-        const decision = payload.decision;
-        if (decision === 'continue' || decision === 'replan' || decision === 'finish') {
-          handlers.onAgentPlanUpdate?.({
-            steps: payload.steps,
-            decision,
-            reason: typeof payload.reason === 'string' ? payload.reason : undefined,
-          });
-        }
-        continue;
-      }
-
-      if (parsed.event === 'agent.skills') {
-        const skillsRaw = payload.skills;
-        const activeRaw = payload.active;
-        const skills = Array.isArray(skillsRaw)
-          ? skillsRaw
-              .filter(
-                (item): item is { id: string; label: string } =>
-                  Boolean(item) &&
-                  typeof item === 'object' &&
-                  typeof (item as Record<string, unknown>).id === 'string' &&
-                  typeof (item as Record<string, unknown>).label === 'string',
-              )
-              .map((item) => ({ id: item.id, label: item.label }))
-          : [];
-        const active = Array.isArray(activeRaw)
-          ? activeRaw.filter((item): item is string => typeof item === 'string')
-          : [];
-        handlers.onAgentSkills?.({ skills, active });
-        continue;
-      }
-
-      if (parsed.event === 'tool.start') {
-        const tool = payload.tool;
-        if (typeof tool === 'string') {
-          handlers.onToolStart?.({
-            call_id: typeof payload.call_id === 'string' ? payload.call_id : undefined,
-            tool,
-            skill_id: typeof payload.skill_id === 'string' ? payload.skill_id : undefined,
-            args_summary:
-              payload.args_summary && typeof payload.args_summary === 'object'
-                ? (payload.args_summary as Record<string, unknown>)
-                : undefined,
-            effect: typeof payload.effect === 'string' ? payload.effect : undefined,
-          });
-        }
-        continue;
-      }
-
-      if (parsed.event === 'tool.result' || parsed.event === 'tool.error') {
-        const tool = payload.tool;
-        if (typeof tool === 'string') {
-          const resultPayload: AssistantToolResultPayload = {
-            call_id: typeof payload.call_id === 'string' ? payload.call_id : undefined,
-            tool,
-            ok: parsed.event === 'tool.result' && payload.ok !== false,
-            summary: typeof payload.summary === 'string' ? payload.summary : undefined,
-          };
-          if (parsed.event === 'tool.error' || payload.ok === false) {
-            handlers.onToolError?.(resultPayload);
-          } else {
-            handlers.onToolResult?.(resultPayload);
-          }
-        }
         continue;
       }
 
       if (parsed.event === 'message.complete') {
         handlers.onComplete({
-          conversation_id: String(payload.conversation_id ?? conversationId),
-          message_id: String(payload.message_id ?? ''),
+          conversation_id: String(payload.conversation_id ?? body.conversation_id ?? ''),
           content: String(payload.content ?? ''),
-          reasoning:
-            typeof payload.reasoning === 'string' ? payload.reasoning : undefined,
         });
         markFinished();
         break;
