@@ -173,11 +173,17 @@ Nuevo estado lógico **`optimizing`** — entre clarifying y preview; persistir 
 
 ### 6.3 `apply_full_import` — semántica
 
-1. Validar: sesión activa, `optimized_draft` o `draft_batches` mergeados, sin `open_questions` sin respuesta.
-2. Iterar batches en `batch_index` ascendente; por cada uno invocar lógica existente de `apply_batch.py`.
-3. Acumular `ref_map` entre batches (ya soportado en `apply_batch`).
-4. Marcar todos `applied_at`; status → `matching_images`.
-5. Límite interno: hasta **200 productos** por import (config `MENU_IMPORT_FULL_MAX_PRODUCTS`); si excede, error claro pidiendo dividir menú manualmente.
+**Menú completo en un solo batch:** extracción y optimización guardan **todo** el menú como
+un único batch (`single_batch_from_draft`, sin `split_draft_into_batches`). No hay tools
+por-sección (`apply_menu_batch` / `preview_import_batch` eliminados) para que el agente no
+pueda subir el menú en partes.
+
+1. Validar: sesión activa, borrador presente, sin `open_questions` sin respuesta.
+2. Aplicar el batch completo con la lógica de `apply_batch.py` (categorías → productos →
+   grupos/complementos → promos), acumulando `ref_map`.
+3. Marcar `applied_at`; status → `matching_images`.
+4. Límite interno: hasta **200 productos** por import (config `MENU_IMPORT_FULL_MAX_PRODUCTS`);
+   si excede, error claro pidiendo dividir menú manualmente.
 
 Una invocación = **1** tool iteration (loop interno).
 
