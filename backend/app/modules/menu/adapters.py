@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import delete, func, insert, select, tuple_, update
+from sqlalchemy import case, delete, func, insert, select, tuple_, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.pagination import (
@@ -150,7 +150,7 @@ def _load_menu_products(
     session: Session,
     restaurant_id: uuid.UUID,
     *,
-    published_only: bool,
+    public_menu_only: bool,
 ) -> list[Product]:
     stmt = (
         select(Product)
@@ -159,13 +159,14 @@ def _load_menu_products(
             selectinload(Product.categories),
             selectinload(Product.option_groups).selectinload(OptionGroup.items),
         )
-        .order_by(Product.is_active.desc(), Product.created_at, Product.id)
-    )
-    if published_only:
-        stmt = stmt.where(
-            Product.is_published.is_(True),
-            Product.approval_status == "approved",
+        .order_by(
+            case((Product.status == "active", 0), else_=1),
+            Product.created_at,
+            Product.id,
         )
+    )
+    if public_menu_only:
+        stmt = stmt.where(Product.status.in_(("active", "inactive")))
     return list(session.scalars(stmt))
 
 
@@ -309,9 +310,7 @@ class SqlAlchemyMenuRepository(MenuRepository):
 
     def get_product(self, id: uuid.UUID) -> ProductDTO | None:
         obj = self._session.get(Product, id)
-        if obj is None or not obj.is_active:
-            return None
-        return _product_to_dto(obj, self._session)
+        return _product_to_dto(obj, self._session) if obj else None
 
     def get_product_by_id(self, id: uuid.UUID) -> ProductDTO | None:
         obj = self._session.get(Product, id)
@@ -337,10 +336,7 @@ class SqlAlchemyMenuRepository(MenuRepository):
                 product_categories.c.product_id == Product.id,
             ).where(product_categories.c.category_id == category_id)
         if published_only:
-            stmt = stmt.where(
-                Product.is_published.is_(True),
-                Product.approval_status == "approved",
-            )
+            stmt = stmt.where(Product.status.in_(("active", "inactive")))
         if params.cursor:
             created_at, last_id = decode_keyset_cursor(params.cursor)
             stmt = stmt.where(tuple_(Product.created_at, Product.id) > (created_at, last_id))
@@ -359,10 +355,6 @@ class SqlAlchemyMenuRepository(MenuRepository):
         if obj is None:
             return None
         values = data.model_dump(exclude_unset=True)
-        if values.get("is_active") is True:
-            obj.deleted_at = None
-        elif values.get("is_active") is False:
-            obj.deleted_at = datetime.now(UTC)
         category_ids = values.pop("category_ids", None)
         for field, value in values.items():
             setattr(obj, field, value)
@@ -374,10 +366,9 @@ class SqlAlchemyMenuRepository(MenuRepository):
 
     def soft_delete_product(self, id: uuid.UUID) -> bool:
         obj = self._session.get(Product, id)
-        if obj is None or not obj.is_active:
+        if obj is None or obj.status == "draft":
             return False
-        obj.is_active = False
-        obj.deleted_at = datetime.now(UTC)
+        obj.status = "draft"
         self._session.flush()
         return True
 
@@ -448,7 +439,7 @@ class SqlAlchemyMenuRepository(MenuRepository):
         products = _load_menu_products(
             self._session,
             restaurant_id,
-            published_only=True,
+            public_menu_only=True,
         )
         return FullMenuDTO(
             restaurant_id=restaurant_id,
@@ -470,7 +461,7 @@ class SqlAlchemyMenuRepository(MenuRepository):
         products = _load_menu_products(
             self._session,
             restaurant_id,
-            published_only=False,
+            public_menu_only=False,
         )
         return FullMenuDTO(
             restaurant_id=restaurant_id,
@@ -485,7 +476,7 @@ class SqlAlchemyMenuRepository(MenuRepository):
             select(
                 product_categories.c.product_id,
                 product_categories.c.sort_index,
-                Product.is_active,
+                Product.status,
             )
             .join(Product, Product.id == product_categories.c.product_id)
             .where(product_categories.c.category_id == category_id)
@@ -507,28 +498,30 @@ class SqlAlchemyMenuRepository(MenuRepository):
         if unknown:
             raise ValueError("product_ids contains products not linked to category")
 
-        active_ids = {row.product_id for row in rows if row.is_active}
-        inactive_ids = linked_ids - active_ids
+        active_ids = {row.product_id for row in rows if row.status == "active"}
+        inactive_ids = {row.product_id for row in rows if row.status == "inactive"}
+        draft_ids = linked_ids - active_ids - inactive_ids
 
         if provided_set == linked_ids:
             final_order = provided
         elif provided_set == active_ids:
-            inactive_order = sorted(
-                inactive_ids,
+            tail_order = sorted(
+                inactive_ids | draft_ids,
                 key=lambda product_id: next(
                     row.sort_index
                     for row in rows
                     if row.product_id == product_id
                 ),
             )
-            final_order = provided + inactive_order
+            final_order = provided + tail_order
         else:
             missing = linked_ids - provided_set
             missing_active = sorted(active_ids - provided_set, key=str)
             missing_inactive = sorted(inactive_ids - provided_set, key=str)
+            missing_draft = sorted(draft_ids - provided_set, key=str)
             parts: list[str] = [
                 "product_ids must include every product linked to the category "
-                f"({len(active_ids)} active, {len(inactive_ids)} inactive), "
+                f"({len(active_ids)} active, {len(inactive_ids)} inactive, {len(draft_ids)} draft), "
                 "or only the active ones in the desired order."
             ]
             if missing_active:
@@ -538,11 +531,15 @@ class SqlAlchemyMenuRepository(MenuRepository):
                 )
             if missing_inactive:
                 parts.append(
-                    "Missing inactive product id(s) not shown by menu_read list_products: "
+                    "Missing inactive product id(s): "
                     + ", ".join(str(product_id) for product_id in missing_inactive)
-                    + ". Pass active ids in order only, or include inactive ids at the end."
                 )
-            if not missing_active and not missing_inactive and missing:
+            if missing_draft:
+                parts.append(
+                    "Missing draft product id(s): "
+                    + ", ".join(str(product_id) for product_id in missing_draft)
+                )
+            if not missing_active and not missing_inactive and not missing_draft and missing:
                 parts.append(
                     "Missing linked product id(s): "
                     + ", ".join(str(product_id) for product_id in sorted(missing, key=str))
