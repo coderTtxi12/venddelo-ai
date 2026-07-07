@@ -9,7 +9,7 @@ from typing import Any
 
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.core.pagination import PaginationParams
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.base import ToolResult
 from app.modules.assistant.skills.menu_read.search import match_score, normalize_text, tokenize
 from app.modules.assistant.skills.menu_write.bulk import (
@@ -29,8 +29,9 @@ _OPTION_LABEL_STRONG_THRESHOLD = 0.92
 
 _BULK_OPTION_ITEM_UPDATE_HINT = (
     "Ideal when updating more than one complement/add-on at once — use after menu_read "
-    f"list_products (option_groups[].items[]). Up to {BULK_DEFAULT_LIMIT} items per call. "
-    "Each row needs product_id (or product name), group_id, and item_id."
+    f"list_products (option_groups[].items[]) or bulk_get_products. Up to {BULK_DEFAULT_LIMIT} items per call. "
+    "Each row needs product_id (or product name) and item_id; group_id is optional and "
+    "resolved automatically from the product when omitted."
 )
 
 _BULK_OPTION_ITEM_VISIBILITY_HINT = (
@@ -38,6 +39,7 @@ _BULK_OPTION_ITEM_VISIBILITY_HINT = (
     "match_label + is_active — the server scans products and updates matches; do not "
     "hand-assemble item_ids. When using items[] instead, each row MUST include "
     f"expected_label matching the live complement label or the row is rejected. "
+    f"group_id is optional (resolved from product_id + item_id). "
     f"Up to {BULK_DEFAULT_LIMIT} per call."
 )
 
@@ -222,15 +224,49 @@ def _parse_nested_option_items(raw: Any) -> tuple[list[OptionItemCreate], str | 
     return parsed, None
 
 
-def _resolve_option_item_ids(
+def _find_option_item_on_product(
+    menu: MenuService,
+    ctx: AgentContext,
+    product_id: uuid.UUID,
+    item_id: uuid.UUID,
+) -> tuple[uuid.UUID | None, str | None]:
+    try:
+        product = menu.get_product(ctx.restaurant_id, product_id)
+    except NotFoundError:
+        return None, "Product not found"
+    for group in product.option_groups:
+        if any(entry.id == item_id for entry in group.items):
+            return group.id, None
+    return None, "Option item not found on this product"
+
+
+def _resolve_option_item_target(
+    menu: MenuService,
+    ctx: AgentContext,
+    product_id: uuid.UUID,
     item: dict[str, Any],
 ) -> tuple[uuid.UUID | None, uuid.UUID | None, str | None]:
-    group_id = _parse_uuid(item.get("group_id") or item.get("option_group_id"))
-    if group_id is None:
-        return None, None, "group_id is required"
     item_id = _parse_uuid(item.get("item_id") or item.get("option_item_id") or item.get("id"))
     if item_id is None:
-        return group_id, None, "item_id is required"
+        return None, None, "item_id is required"
+
+    explicit_group_id = _parse_uuid(item.get("group_id") or item.get("option_group_id"))
+    if explicit_group_id is not None:
+        try:
+            product = menu.get_product(ctx.restaurant_id, product_id)
+        except NotFoundError:
+            return None, item_id, "Product not found"
+        group = next((entry for entry in product.option_groups if entry.id == explicit_group_id), None)
+        if group is None:
+            return None, item_id, "Option group not found on this product"
+        if not any(entry.id == item_id for entry in group.items):
+            return None, item_id, "Option item not found in this group"
+        return explicit_group_id, item_id, None
+
+    group_id, err = _find_option_item_on_product(menu, ctx, product_id, item_id)
+    if err:
+        return None, item_id, err
+    assert group_id is not None
     return group_id, item_id, None
 
 
@@ -285,7 +321,7 @@ def _bulk_update_option_item_field(
         if resolve_err:
             results.append(BulkRowResult(id="?", ok=False, error=resolve_err))
             continue
-        group_id, item_id, id_err = _resolve_option_item_ids(item)
+        group_id, item_id, id_err = _resolve_option_item_target(menu, ctx, product_id, item)
         if id_err or group_id is None or item_id is None:
             results.append(
                 BulkRowResult(
@@ -366,7 +402,7 @@ def bulk_update_option_item_visibility(
         if resolve_err:
             results.append(BulkRowResult(id="?", ok=False, error=resolve_err))
             continue
-        group_id, item_id, id_err = _resolve_option_item_ids(item)
+        group_id, item_id, id_err = _resolve_option_item_target(menu, ctx, product_id, item)
         if id_err or group_id is None or item_id is None:
             results.append(
                 BulkRowResult(
@@ -591,9 +627,10 @@ def bulk_add_option_groups(
 
 def bulk_option_item_delete_tool_description(*, action: str) -> str:
     return (
-        f"{action} Hard-delete complement choices from ONE product — requires owner "
-        f"confirmation. Use after menu_read get_product. All rows share the same "
-        f"product_id (or name) and need group_id, item_id, and expected_label. "
+        f"{action} Hard-delete complement choices from ONE product. "
+        f"Use after menu_read get_product. All rows share the same "
+        f"product_id (or name) and need item_id and expected_label; group_id is "
+        f"optional and resolved from the product when omitted. "
         f"Up to {BULK_DEFAULT_LIMIT} per call. Prefer bulk_update_option_item_visibility "
         f"when the complement is only temporarily unavailable."
     )
@@ -640,14 +677,12 @@ def delete_option_item(
     invalidate: Callable[[AgentContext], None],
 ) -> ToolResult:
     product_id = _parse_uuid(args.get("product_id"))
-    group_id = _parse_uuid(args.get("group_id"))
-    item_id = _parse_uuid(args.get("item_id"))
     if product_id is None:
         return ToolResult(ok=False, summary="product_id is required")
-    if group_id is None:
-        return ToolResult(ok=False, summary="group_id is required")
-    if item_id is None:
-        return ToolResult(ok=False, summary="item_id is required")
+
+    group_id, item_id, id_err = _resolve_option_item_target(menu, ctx, product_id, args)
+    if id_err or group_id is None or item_id is None:
+        return ToolResult(ok=False, summary=id_err or "Missing item_id")
 
     expected_label, label_err = _parse_expected_label(args)
     if label_err:
@@ -691,7 +726,7 @@ def bulk_delete_option_items(
     assert product_id is not None
     results: list[BulkRowResult] = []
     for item in items:
-        group_id, item_id, id_err = _resolve_option_item_ids(item)
+        group_id, item_id, id_err = _resolve_option_item_target(menu, ctx, product_id, item)
         if id_err or group_id is None or item_id is None:
             results.append(
                 BulkRowResult(

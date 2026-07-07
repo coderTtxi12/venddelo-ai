@@ -9,7 +9,7 @@ from typing import Any
 from app.api.cache_helpers import invalidate_restaurant_menu_cache
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.core.pagination import PaginationParams
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext, commit_agent_mutation
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
 from app.modules.assistant.skills.menu_write.bulk import (
     BULK_DEFAULT_LIMIT,
@@ -30,6 +30,7 @@ from app.modules.assistant.skills.menu_write.option_item_bulk import (
     bulk_update_option_item_labels,
     bulk_update_option_item_prices,
     bulk_update_option_item_visibility,
+    _resolve_option_item_target,
 )
 from app.modules.assistant.skills.menu_write.category_bulk import (
     bulk_category_tool_description,
@@ -48,7 +49,6 @@ from app.modules.assistant.skills.menu_write.theme_tools import (
     apply_menu_theme,
     get_current_menu_theme,
     list_menu_themes,
-    recommend_menu_theme,
 )
 from app.modules.assistant.skills.menu_read.tools import (
     DEFAULT_DIGITAL_MENU_LIMITED_TIME_CATEGORY_NAME,
@@ -215,7 +215,7 @@ def _update_special_category(
     except ConflictError as exc:
         return ToolResult(ok=False, summary=str(exc) or "Conflict")
 
-    _invalidate_menu_cache(ctx)
+    _finalize_menu_mutation(ctx)
     return ToolResult(
         ok=True,
         summary="Updated special category",
@@ -241,9 +241,7 @@ def _product_payload(product: ProductDTO) -> dict[str, Any]:
         "description": product.description,
         "price_cents": product.price_cents,
         "currency": product.currency,
-        "is_published": product.is_published,
-        "is_active": product.is_active,
-        "approval_status": product.approval_status,
+        "status": product.status,
         "category_ids": [str(category_id) for category_id in product.category_ids],
     }
 
@@ -306,6 +304,11 @@ def _invalidate_menu_cache(ctx: AgentContext) -> None:
     invalidate_restaurant_menu_cache(ctx.uow, ctx.restaurant_id)
 
 
+def _finalize_menu_mutation(ctx: AgentContext) -> None:
+    _invalidate_menu_cache(ctx)
+    commit_agent_mutation(ctx)
+
+
 def _run_mutation(
     ctx: AgentContext,
     action: Callable[[], Any],
@@ -321,7 +324,7 @@ def _run_mutation(
         return ToolResult(ok=False, summary=str(exc) or "Validation error")
     except ConflictError as exc:
         return ToolResult(ok=False, summary=str(exc) or "Conflict")
-    _invalidate_menu_cache(ctx)
+    _finalize_menu_mutation(ctx)
     payload = data if data is not None else {}
     if result is not None and not payload:
         if isinstance(result, CategoryDTO):
@@ -415,7 +418,11 @@ class MenuWriteSkill:
                         },
                         "description": {"type": "string"},
                         "currency": {"type": "string"},
-                        "is_published": {"type": "boolean"},
+                        "status": {
+                            "type": "string",
+                            "enum": ["active", "inactive", "draft"],
+                            "default": "draft",
+                        },
                     },
                     "required": ["name", "price_cents", "category_ids"],
                 },
@@ -423,10 +430,12 @@ class MenuWriteSkill:
             ToolDefinition(
                 name="update_product",
                 description=(
-                    "Update one product by product_id or name. Set is_active=false to disable "
-                    "(never delete). price_cents is in cents (100 MXN = 10000). After the owner "
-                    "confirms a product name, pass that exact name — do not reuse a prior "
-                    "product_id from an earlier ambiguous match."
+                    "Update one product by product_id or name. Set status to control visibility: "
+                    "active = visible and orderable; inactive = visible as No disponible; "
+                    "draft = hidden from live menu (never delete products). "
+                    "price_cents is in cents (100 MXN = 10000). After the owner confirms a "
+                    "product name, pass that exact name — do not reuse a prior product_id from "
+                    "an earlier ambiguous match."
                 ),
                 effect="mutate",
                 input_schema={
@@ -455,11 +464,14 @@ class MenuWriteSkill:
                             "items": {"type": "string"},
                         },
                         "currency": {"type": "string"},
-                        "is_published": {"type": "boolean"},
-                        "is_active": {"type": "boolean"},
-                        "approval_status": {
+                        "status": {
                             "type": "string",
-                            "enum": ["draft", "pending", "approved", "rejected"],
+                            "enum": ["active", "inactive", "draft"],
+                            "description": (
+                                "active = En menú (visible y se puede pedir); "
+                                "inactive = visible como No disponible; "
+                                "draft = oculto del menú público."
+                            ),
                         },
                     },
                     "required": [],
@@ -863,7 +875,7 @@ class MenuWriteSkill:
                         "sort_index": {"type": "integer"},
                         "is_active": {"type": "boolean"},
                     },
-                    "required": ["product_id", "group_id", "item_id"],
+                    "required": ["product_id", "item_id"],
                 },
             ),
             ToolDefinition(
@@ -881,7 +893,7 @@ class MenuWriteSkill:
                         "expected_label": {"type": "string"},
                         "label": {"type": "string"},
                     },
-                    "required": ["product_id", "group_id", "item_id", "expected_label"],
+                    "required": ["product_id", "item_id", "expected_label"],
                 },
             ),
             ToolDefinition(
@@ -906,7 +918,7 @@ class MenuWriteSkill:
                                     "expected_label": {"type": "string"},
                                     "label": {"type": "string"},
                                 },
-                                "required": ["group_id", "item_id", "expected_label"],
+                                "required": ["item_id", "expected_label"],
                             },
                         },
                     },
@@ -946,7 +958,8 @@ class MenuWriteSkill:
                             "type": "array",
                             "description": (
                                 "Explicit rows from menu_read. Each row requires "
-                                "expected_label matching the live complement label."
+                                "expected_label matching the live complement label. "
+                                "group_id is optional when product_id and item_id are set."
                             ),
                             "items": {
                                 "type": "object",
@@ -962,7 +975,7 @@ class MenuWriteSkill:
                                     "is_active": {"type": "boolean"},
                                     "visible": {"type": "boolean"},
                                 },
-                                "required": ["group_id", "item_id", "expected_label"],
+                                "required": ["item_id", "expected_label"],
                             },
                         },
                     },
@@ -990,7 +1003,7 @@ class MenuWriteSkill:
                                     "new_label": {"type": "string"},
                                     "label": {"type": "string"},
                                 },
-                                "required": ["group_id", "item_id"],
+                                "required": ["item_id"],
                             },
                         }
                     },
@@ -1021,7 +1034,7 @@ class MenuWriteSkill:
                                     "item_id": {"type": "string"},
                                     "price_delta_cents": {"type": "integer"},
                                 },
-                                "required": ["group_id", "item_id", "price_delta_cents"],
+                                "required": ["item_id", "price_delta_cents"],
                             },
                         }
                     },
@@ -1201,26 +1214,6 @@ class MenuWriteSkill:
                 input_schema={"type": "object", "properties": {}, "required": []},
             ),
             ToolDefinition(
-                name="recommend_menu_theme",
-                description=(
-                    "Recommend top 3 digital menu themes using restaurant context, optional "
-                    "owner hints, or import discovery answers when an import session is active."
-                ),
-                effect="read",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "hints": {
-                            "type": "object",
-                            "description": (
-                                "Optional owner context (cuisine, vibe, colors) to rank themes."
-                            ),
-                        },
-                    },
-                    "required": [],
-                },
-            ),
-            ToolDefinition(
                 name="apply_menu_theme",
                 description=(
                     "Apply a digital menu theme to the restaurant (sets digital_menu_theme_id). "
@@ -1315,7 +1308,7 @@ class MenuWriteSkill:
                         description=_optional_str(args.get("description")),
                         price_cents=price_cents,
                         currency=str(args.get("currency") or "MXN"),
-                        is_published=bool(args.get("is_published", False)),
+                        status=str(args.get("status") or "draft"),
                         category_ids=category_ids,
                     ),
                 )
@@ -1335,16 +1328,18 @@ class MenuWriteSkill:
                 update_fields["name"] = _optional_str(args.get("new_name"))
             if "description" in args:
                 update_fields["description"] = _optional_str(args.get("description"))
-            if "price_cents" in args:
-                update_fields["price_cents"] = int(args["price_cents"])
+            if args.get("price_cents") is not None:
+                try:
+                    update_fields["price_cents"] = int(args["price_cents"])
+                except (TypeError, ValueError):
+                    return ToolResult(ok=False, summary="price_cents must be an integer")
             if "currency" in args:
                 update_fields["currency"] = str(args["currency"])
-            if "is_published" in args:
-                update_fields["is_published"] = bool(args["is_published"])
-            if "is_active" in args:
-                update_fields["is_active"] = bool(args["is_active"])
-            if "approval_status" in args:
-                update_fields["approval_status"] = str(args["approval_status"])
+            if args.get("status") is not None:
+                status = str(args["status"])
+                if status not in {"active", "inactive", "draft"}:
+                    return ToolResult(ok=False, summary="status must be active, inactive, or draft")
+                update_fields["status"] = status
             if "category_ids" in args:
                 try:
                     update_fields["category_ids"] = _parse_uuid_list(
@@ -1366,63 +1361,63 @@ class MenuWriteSkill:
 
         if tool_name == "bulk_update_product_names":
             return bulk_update_product_names(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_update_product_descriptions":
             return bulk_update_product_descriptions(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_update_product_prices":
             return bulk_update_product_prices(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_update_category_names":
             return bulk_update_category_names(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_update_category_descriptions":
             return bulk_update_category_descriptions(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_update_category_sort_indices":
             return bulk_update_category_sort_indices(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_update_category_visibility":
             return bulk_update_category_visibility(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_update_category_display_layout":
             return bulk_update_category_display_layout(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_update_option_item_visibility":
             return bulk_update_option_item_visibility(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_update_option_item_labels":
             return bulk_update_option_item_labels(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_update_option_item_prices":
             return bulk_update_option_item_prices(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_add_option_items":
             return bulk_add_option_items(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_add_option_groups":
             return bulk_add_option_groups(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "delete_option_item":
             return delete_option_item(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_delete_option_items":
             return bulk_delete_option_items(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
 
         if tool_name == "set_category_product_order":
@@ -1662,10 +1657,12 @@ class MenuWriteSkill:
         if tool_name == "update_option_item":
             try:
                 product_id = _parse_uuid(args.get("product_id"), "product_id")
-                group_id = _parse_uuid(args.get("group_id"), "group_id")
-                item_id = _parse_uuid(args.get("item_id"), "item_id")
             except ValidationError as exc:
                 return ToolResult(ok=False, summary=str(exc))
+
+            group_id, item_id, resolve_err = _resolve_option_item_target(service, ctx, product_id, args)
+            if resolve_err or group_id is None or item_id is None:
+                return ToolResult(ok=False, summary=resolve_err or "Missing item_id")
 
             update_fields: dict[str, Any] = {}
             if "label" in args:
@@ -1692,11 +1689,11 @@ class MenuWriteSkill:
 
         if tool_name == "assign_product_image":
             return assign_product_image(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "bulk_assign_product_images":
             return bulk_assign_product_images(
-                service, ctx, args, invalidate=_invalidate_menu_cache
+                service, ctx, args, invalidate=_finalize_menu_mutation
             )
         if tool_name == "match_product_photos":
             return match_product_photos(service, ctx, args)
@@ -1720,37 +1717,6 @@ class MenuWriteSkill:
                 data={"theme": current},
             )
 
-        if tool_name == "recommend_menu_theme":
-            hints = args.get("hints")
-            if hints is not None and not isinstance(hints, dict):
-                return ToolResult(ok=False, summary="hints must be an object")
-            from app.modules.assistant.skills.menu_import.session_repository import (
-                MenuImportSessionRepository,
-            )
-
-            import_session = MenuImportSessionRepository(
-                ctx.uow.session
-            ).get_active_for_restaurant(ctx.restaurant_id)
-            recommendations = recommend_menu_theme(
-                ctx,
-                session=import_session,
-                hints=hints if isinstance(hints, dict) else None,
-            )
-            return ToolResult(
-                ok=True,
-                summary=f"Recommended {len(recommendations)} theme(s)",
-                data={
-                    "recommendations": [
-                        {
-                            "theme_id": rec.theme_id,
-                            "label": rec.label,
-                            "reason_es": rec.reason_es,
-                        }
-                        for rec in recommendations
-                    ]
-                },
-            )
-
         if tool_name == "apply_menu_theme":
             theme_id = str(args.get("theme_id") or "").strip()
             if not theme_id:
@@ -1761,7 +1727,7 @@ class MenuWriteSkill:
                 return ToolResult(ok=False, summary=str(exc))
             except ValidationError as exc:
                 return ToolResult(ok=False, summary=str(exc))
-            _invalidate_menu_cache(ctx)
+            _finalize_menu_mutation(ctx)
             return ToolResult(
                 ok=True,
                 summary=f"Applied theme {result['label']!r}",

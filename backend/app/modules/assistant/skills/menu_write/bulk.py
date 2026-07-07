@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.base import ToolResult
 from app.modules.assistant.skills.product_resolve import resolve_product
 from app.modules.menu.schemas import ProductUpdate

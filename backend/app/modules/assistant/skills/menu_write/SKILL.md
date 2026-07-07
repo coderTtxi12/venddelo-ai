@@ -6,8 +6,9 @@ description: Create and update menu categories, products, options, digital menu 
 # menu_write
 
 Mutating access to the current restaurant menu. All writes are tenant-scoped. **Never delete**
-categories, products, or option groups — disable with `is_active=false` on `update_category`,
-`update_product`, or `update_option_group`. Complement choices may be **hard-deleted** only
+categories or option groups — disable with `is_active=false` on `update_category` or
+`update_option_group`. For products, set `status="inactive"` via `update_product` (or
+`status="draft"` to hide from the live menu). Complement choices may be **hard-deleted** only
 when the owner explicitly asks to remove them (`delete_option_item` /
 `bulk_delete_option_items`); prefer `is_active=false` when temporarily unavailable.
 
@@ -35,7 +36,8 @@ criteria, then read the live menu before previewing or mutating.
 ## Safety rules
 
 1. **Read before write** — inspect the current record with `menu_read` when IDs or names are unclear.
-2. **Never delete categories, products, or groups** — use `is_active=false`. To **remove a complement**
+2. **Never delete categories, products, or groups** — for categories/groups use `is_active=false`;
+   for products use `status="inactive"` (or `status="draft"` to hide). To **remove a complement**
    permanently, use `delete_option_item` or `bulk_delete_option_items` only after owner confirmation;
    each row needs `expected_label` from `menu_read`. For out-of-stock, use
    `bulk_update_option_item_visibility` instead.
@@ -81,7 +83,7 @@ Only after **explicit yes** on the recap → **`create_product`**.
 
 - **Photo:** offer `menu_media` `generate_product_image` if they want a picture.
 - **Complements:** offer `add_option_group` / `add_option_item` if they want extras or sizes.
-- **Publish:** new products can stay draft until they ask to publish — explain in plain language if they ask.
+- **Visibility:** new products default to `draft`; offer `status="active"` when they want it on the live menu — explain in plain language if they ask.
 
 ### Secretary rules
 
@@ -150,9 +152,8 @@ When the owner wants to **change how the public menu looks** — "cambia el tema
 
 1. **`get_current_menu_theme`** (optional) — show what they have now.
 2. **`list_menu_themes`** — show real theme labels from the catalog; never invent theme ids.
-3. **`recommend_menu_theme`** (optional) — when they describe vibe/cuisine but have not picked one.
-4. Owner picks a theme by **label** (you map to `theme_id` inside the tool).
-5. Short recap → **`apply_menu_theme`** after explicit confirmation.
+3. Owner picks a theme by **label** (you map to `theme_id` inside the tool).
+4. Short recap → **`apply_menu_theme`** after explicit confirmation.
 
 ### Rules
 
@@ -168,8 +169,8 @@ When the owner wants to **change how the public menu looks** — "cambia el tema
 |------|---------|
 | `create_category` | New category (`name`, optional `description`, `sort_index`) |
 | `update_category` | Rename, reorder, set `display_layout` (`vertical` \| `horizontal` \| `grid`), enable/disable regular categories (`category_id` UUID), or rename/enable/disable special aisles (`__dm_promotions__`, `__dm_limited_time__`) |
-| `create_product` | New product (`name`, `price_cents`, `category_ids`, optional `description`, `is_published`) |
-| `update_product` | Change one product by `product_id` **or** `name`/`product_name`; use `new_name` to rename; `price_cents` in cents (100 MXN = 10000) |
+| `create_product` | New product (`name`, `price_cents`, `category_ids`, optional `description`, optional `status` — default `draft`) |
+| `update_product` | Change one product by `product_id` **or** `name`/`product_name`; use `new_name` to rename; `price_cents` in cents (100 MXN = 10000); set `status` (`active` \| `inactive` \| `draft`) for visibility |
 | `bulk_update_product_names` | Rename up to 50 products (`items[]` with `new_name` + `product_id` or lookup name) |
 | `bulk_update_product_descriptions` | Rewrite up to 50 descriptions in one call (`items[]` with `description` + `product_id` or `name`) |
 | `bulk_update_product_prices` | Change up to 50 prices in one call (`items[]` with `price_cents` + `product_id` or `name`) |
@@ -184,17 +185,16 @@ When the owner wants to **change how the public menu looks** — "cambia el tema
 | `add_option_group` | Add size/extras group to a product |
 | `update_option_group` | Change group rules or disable with `is_active=false` |
 | `add_option_item` | Add one add-on choice to a group |
-| `update_option_item` | Change label/price or disable with `is_active=false` |
-| `bulk_update_option_item_visibility` | Show/hide complements. Prefer `match_label` + `is_active` for menu-wide changes (e.g. Sprite agotado); `items[]` requires `expected_label` per row |
-| `bulk_update_option_item_labels` | Rename up to 50 complement labels (`items[]` with `new_label` + ids) |
-| `bulk_update_option_item_prices` | Change up to 50 complement prices (`price_delta_cents` + ids) |
+| `update_option_item` | Change label/price or disable with `is_active=false` (`product_id` + `item_id`; `group_id` optional) |
+| `bulk_update_option_item_visibility` | Show/hide complements. Prefer `match_label` + `is_active` for menu-wide changes (e.g. Sprite agotado); `items[]` requires `expected_label` per row (`group_id` optional) |
+| `bulk_update_option_item_labels` | Rename up to 50 complement labels (`items[]` with `new_label` + `product_id` + `item_id`; `group_id` optional) |
+| `bulk_update_option_item_prices` | Change up to 50 complement prices (`price_delta_cents` + `product_id` + `item_id`; `group_id` optional) |
 | `bulk_add_option_items` | Add up to 50 complement choices to existing groups (`group_id` + `label`) |
 | `bulk_add_option_groups` | Create up to 50 complement groups across products (`title` + optional `items[]`) |
-| `delete_option_item` | Permanently remove one complement (`expected_label` + ids; owner must confirm) |
-| `bulk_delete_option_items` | Remove up to 50 complements from **one** product (`product_id`/name + `items[]` with `expected_label`) |
+| `delete_option_item` | Permanently remove one complement (`expected_label` + `product_id` + `item_id`; `group_id` optional) |
+| `bulk_delete_option_items` | Remove up to 50 complements from **one** product (`product_id`/name + `items[]` with `expected_label`; `group_id` optional per row) |
 | `list_menu_themes` | List active digital menu themes from the catalog |
 | `get_current_menu_theme` | Read the restaurant's current theme id and label |
-| `recommend_menu_theme` | Suggest top 3 themes (optional `hints` object with cuisine/vibe) |
 | `apply_menu_theme` | Set `digital_menu_theme_id` after owner confirms (`theme_id` from catalog) |
 | `assign_product_image` | Assign one uploaded photo (`storage_path`) to a product by id or name |
 | `bulk_assign_product_images` | Assign up to 50 uploaded photos (`items[]` with `storage_path` + product) |

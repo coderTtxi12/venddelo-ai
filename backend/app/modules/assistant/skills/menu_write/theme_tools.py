@@ -10,7 +10,7 @@ from app.core.exceptions import NotFoundError, ValidationError
 from app.core.llm.ports import ChatCompletionMessage, ChatCompletionRequest, LLMProviderPort
 from app.db.models.menu_import_session import MenuImportSession
 from app.infra.llm.factory import build_llm_provider
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.menu_import.session_schemas import MenuImportSessionStatus
 from app.modules.digital_menu_themes.repository import DigitalMenuThemeRecord
 from app.modules.restaurants.schemas import RestaurantUpdate

@@ -14,7 +14,7 @@ from app.core.storage import StorageError
 from app.core.vision.ports import VisionAnalysisRequest, VisionError, VisionPort
 from app.infra.storage.factory import build_storage
 from app.infra.vision.factory import build_vision_provider
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.base import ToolResult
 from app.modules.assistant.skills.menu_intelligence.image_loader import product_image_media_type
 from app.modules.assistant.skills.menu_write.bulk import (
