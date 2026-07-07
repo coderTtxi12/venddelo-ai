@@ -263,6 +263,74 @@ def test_apply_import_batch_publishes_products(session):
 
 
 @requires_db
+def test_apply_full_import_reconciles_existing_menu_without_duplicates(session):
+    from app.modules.assistant.skills.menu_import.draft_schema import ImportBatch
+    from app.modules.assistant.skills.menu_import.menu_reconcile import (
+        build_reconciliation_plan,
+    )
+
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant_id, conversation_id = _create_restaurant_and_conversation(session)
+    repo = MenuImportSessionRepository(session)
+    ctx = AgentContext(
+        restaurant_id=restaurant_id,
+        conversation_id=conversation_id,
+        uow=uow,
+        effective_skill_ids=["menu_import"],
+    )
+
+    # First import creates the menu.
+    first_session = repo.create(
+        restaurant_id=restaurant_id,
+        conversation_id=conversation_id,
+        status=MenuImportSessionStatus.PREVIEW_BATCH,
+    )
+    first_session.draft_batches = [_sample_batch_payload()]
+    repo.update(first_session)
+    assert apply_full_import(ctx, first_session, confirmed=True).ok is True
+
+    menu = MenuService(uow.menu)
+    products_before = menu.list_products(restaurant_id, PaginationParams(limit=50, cursor=None))
+    assert len(products_before.items) == 2
+
+    # Second import of the same menu (higher price) must update, not duplicate.
+    second_session = repo.create(
+        restaurant_id=restaurant_id,
+        conversation_id=conversation_id,
+        status=MenuImportSessionStatus.PREVIEW_BATCH,
+    )
+    reimport = _sample_batch_payload()
+    reimport["categories"][0]["products"][0]["price_mxn"] = 45
+    second_session.draft_batches = [reimport]
+    repo.update(second_session)
+
+    draft = ImportBatch.model_validate(reimport)
+    from app.modules.assistant.skills.menu_import.draft_schema import ImportDraft
+
+    plan = build_reconciliation_plan(
+        ImportDraft(categories=draft.categories, promotions=draft.promotions),
+        menu.get_full_menu(restaurant_id),
+    )
+    assert plan.reused_categories == 1
+    assert plan.updated_products == 2
+
+    result = apply_full_import(ctx, second_session, confirmed=True, reconciliation=plan)
+    assert result.ok is True
+
+    categories_after = menu.list_all_categories(
+        restaurant_id, PaginationParams(limit=50, cursor=None)
+    )
+    assert len(categories_after.items) == 1  # no duplicate category
+    products_after = menu.list_products(restaurant_id, PaginationParams(limit=50, cursor=None))
+    assert len(products_after.items) == 2  # no duplicate products
+    pastor = next(item for item in products_after.items if item.name == "Taco al Pastor")
+    assert pastor.price_cents == 4500  # updated price
+    # complements not duplicated on the already-configured product
+    assert len(pastor.option_groups) == 1
+
+
+@requires_db
 def test_apply_import_batch_rejects_unconfirmed(session):
     uow = SqlAlchemyUnitOfWork(lambda: session)
     uow.__enter__()
