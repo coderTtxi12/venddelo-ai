@@ -1,8 +1,7 @@
-"""Skill registry for the agent runtime.
+"""Skill registry for assistant tools.
 
 Collects tool executors discovered under ``skills/<id>/tools.py``. Behavioral guides
-live in each skill's ``SKILL.md`` and are loaded on demand via ``load_skill`` (see
-``skills/markdown.py``), not injected into the initial system prompt.
+live in each skill's ``SKILL.md`` (see ``skills/markdown.py``).
 
 Delete-effect tools are rejected at construction time, except complement delete tools
 (``delete_option_item``, ``bulk_delete_option_items``). ``execute`` re-checks
@@ -14,10 +13,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.base import SkillPort, ToolDefinition, ToolResult
-from app.modules.assistant.skills.markdown import load_skill_guide
-
 # Hard-delete is forbidden for assistant tools except complement removal on one product.
 _ALLOWED_DELETE_TOOLS: frozenset[str] = frozenset(
     {
@@ -64,16 +61,16 @@ class SkillRegistry:
                     entitled.append((skill_id, tool))
         return entitled
 
-    def system_prompt_sections(self, effective_skill_ids: list[str]) -> list[str]:
-        """Full ``SKILL.md`` bodies for on-demand loading (``load_skill`` tool)."""
-        sections: list[str] = []
-        for skill_id in effective_skill_ids:
-            if skill_id not in self._skills:
-                continue
-            guide = load_skill_guide(skill_id)
-            if guide:
-                sections.append(guide)
-        return sections
+    def resolve_tool(
+        self,
+        tool_name: str,
+        effective_skill_ids: list[str],
+    ) -> tuple[str, ToolDefinition] | None:
+        """Return ``(skill_id, tool)`` for an entitled tool name."""
+        for skill_id, tool in self.entitled_tools(effective_skill_ids):
+            if tool.name == tool_name:
+                return skill_id, tool
+        return None
 
     def execute(
         self,
