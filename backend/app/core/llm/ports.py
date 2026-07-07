@@ -17,6 +17,8 @@ ChatStreamEventName = Literal[
     "agent.thought",
     "agent.plan",
     "agent.plan_update",
+    "agent.step",
+    "agent.evaluation",
     "agent.skills",
     "tool.start",
     "tool.result",

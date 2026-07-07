@@ -10,6 +10,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def clear_langsmith_env_cache() -> None:
+    """Invalidate LangSmith's cached env lookups after mutating os.environ."""
+    try:
+        from langsmith.utils import get_env_var
+
+        get_env_var.cache_clear()
+    except Exception:
+        pass
+
+
 def configure_langsmith_env(settings: Settings) -> None:
     """Export LangSmith settings to os.environ for the langsmith SDK."""
     os.environ["LANGSMITH_TRACING"] = "true" if settings.langsmith_tracing else "false"
@@ -22,6 +32,8 @@ def configure_langsmith_env(settings: Settings) -> None:
 
     if settings.langsmith_endpoint:
         os.environ["LANGSMITH_ENDPOINT"] = settings.langsmith_endpoint
+
+    clear_langsmith_env_cache()
 
 
 def is_langsmith_tracing_enabled() -> bool:
