@@ -55,8 +55,7 @@ def test_menu_cache_excludes_draft_products_for_unpublished_restaurant(session):
             restaurant_id=restaurant.id,
             name="On Menu",
             price_cents=1200,
-            approval_status="approved",
-            is_published=True,
+            status="active",
             category_ids=[category.id],
         )
     )
@@ -65,12 +64,11 @@ def test_menu_cache_excludes_draft_products_for_unpublished_restaurant(session):
             restaurant_id=restaurant.id,
             name="Inactive",
             price_cents=900,
-            approval_status="approved",
-            is_published=True,
+            status="active",
             category_ids=[category.id],
         )
     )
-    menu_repo.update_product(inactive.id, ProductUpdate(is_active=False))
+    menu_repo.update_product(inactive.id, ProductUpdate(status="inactive"))
 
     menu_svc = MenuService(menu_repo)
     svc = MenuCacheService(cache, restaurants, menu_svc, ttl_seconds=300)

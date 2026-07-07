@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.core.exceptions import ConflictError, ValidationError
+from app.core.exceptions import ValidationError
 from app.core.pagination import CursorPage
 from app.modules.menu.repository import MenuRepository
 from app.modules.menu.schemas import (
@@ -33,9 +33,7 @@ def _product(**kwargs) -> ProductDTO:
         name="P",
         price_cents=1000,
         currency="USD",
-        approval_status="draft",
-        is_published=False,
-        is_active=True,
+        status="draft",
         created_at=now,
         updated_at=now,
         category_ids=[CAT_ID],
@@ -99,12 +97,8 @@ class FakeMenuRepo(MenuRepository):
         p = self.products.get(id)
         if p is None:
             return None
-        if data.is_published is not None:
-            p = p.model_copy(update={"is_published": data.is_published})
-        if data.approval_status is not None:
-            p = p.model_copy(update={"approval_status": data.approval_status})
-        if data.is_active is not None:
-            p = p.model_copy(update={"is_active": data.is_active})
+        if data.status is not None:
+            p = p.model_copy(update={"status": data.status})
         self.products[id] = p
         return p
 
@@ -191,23 +185,6 @@ def _seed_category(repo: FakeMenuRepo) -> None:
         created_at=now,
         updated_at=now,
     )
-
-
-def test_publish_requires_approved():
-    repo = FakeMenuRepo()
-    _seed_category(repo)
-    svc = MenuService(repo)
-    p = svc.create_product(
-        RESTAURANT_ID,
-        ProductCreate(
-            restaurant_id=RESTAURANT_ID,
-            name="P",
-            price_cents=100,
-            category_ids=[CAT_ID],
-        ),
-    )
-    with pytest.raises(ConflictError):
-        svc.publish(RESTAURANT_ID, p.id)
 
 
 def test_option_group_validates_single_max():

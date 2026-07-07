@@ -63,7 +63,7 @@ def test_check_constraint_rejects_bad_status(session):
             restaurant_id=r.id,
             name="X",
             price_cents=100,
-            approval_status="bogus",
+            status="bogus",
         )
     )
     with pytest.raises(IntegrityError):

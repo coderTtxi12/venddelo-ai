@@ -98,19 +98,16 @@ def test_full_menu_includes_inactive_published_products(session):
             restaurant_id=r.id,
             name="Unavailable",
             price_cents=1000,
-            approval_status="approved",
-            is_published=True,
+            status="inactive",
             category_ids=[cat.id],
         )
     )
-    repo.update_product(unavailable.id, ProductUpdate(is_active=False))
     repo.add_product(
         ProductCreate(
             restaurant_id=r.id,
             name="Available",
             price_cents=1000,
-            approval_status="approved",
-            is_published=True,
+            status="active",
             category_ids=[cat.id],
         )
     )
@@ -166,8 +163,7 @@ def test_full_menu_only_published_approved(session):
             restaurant_id=r.id,
             name="Live",
             price_cents=1000,
-            approval_status="approved",
-            is_published=True,
+            status="active",
             category_ids=[cat.id],
         )
     )
@@ -215,6 +211,7 @@ def test_set_category_product_order_active_only_when_inactive_linked(session):
             restaurant_id=r.id,
             name="Active",
             price_cents=1000,
+            status="active",
             category_ids=[cat.id],
         )
     )
@@ -223,10 +220,10 @@ def test_set_category_product_order_active_only_when_inactive_linked(session):
             restaurant_id=r.id,
             name="Inactive",
             price_cents=1000,
+            status="inactive",
             category_ids=[cat.id],
         )
     )
-    repo.update_product(inactive.id, ProductUpdate(is_active=False))
 
     repo.set_category_product_order(cat.id, [active.id])
 
@@ -333,8 +330,7 @@ def test_get_full_menu_bounded_query_count(session, engine):
                 restaurant_id=r.id,
                 name=f"Product {index}",
                 price_cents=1000 + index,
-                approval_status="approved",
-                is_published=True,
+                status="active",
                 category_ids=[cat.id],
             )
         )
