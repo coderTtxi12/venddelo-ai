@@ -1,7 +1,10 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
+
+ProductStatus = Literal["active", "inactive", "draft"]
 
 
 class CategoryCreate(BaseModel):
@@ -102,8 +105,7 @@ class ProductCreate(BaseModel):
     price_cents: int
     currency: str = "MXN"
     image_path: str | None = None
-    approval_status: str = "draft"
-    is_published: bool = False
+    status: ProductStatus = "draft"
     category_ids: list[uuid.UUID] = []
 
 
@@ -113,9 +115,7 @@ class ProductUpdate(BaseModel):
     price_cents: int | None = None
     currency: str | None = None
     image_path: str | None = None
-    approval_status: str | None = None
-    is_published: bool | None = None
-    is_active: bool | None = None
+    status: ProductStatus | None = None
     category_ids: list[uuid.UUID] | None = None
 
 
@@ -129,9 +129,7 @@ class ProductDTO(BaseModel):
     price_cents: int
     currency: str
     image_path: str | None = None
-    approval_status: str
-    is_published: bool
-    is_active: bool
+    status: ProductStatus
     created_at: datetime
     updated_at: datetime
     category_ids: list[uuid.UUID] = []

@@ -63,7 +63,7 @@ class Category(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
 
 
-class Product(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
+class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "products"
 
     restaurant_id: Mapped[uuid.UUID] = mapped_column(
@@ -76,8 +76,7 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     price_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="MXN")
     image_path: Mapped[str | None] = mapped_column(Text, nullable=True)
-    approval_status: Mapped[str] = mapped_column(String, nullable=False, server_default="draft")
-    is_published: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    status: Mapped[str] = mapped_column(String, nullable=False, server_default="draft")
 
     categories: Mapped[list["Category"]] = relationship(
         secondary=product_categories, back_populates="products"
@@ -90,11 +89,10 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            "approval_status IN ('draft','pending_review','approved','rejected')",
-            name="approval_status_allowed",
+            "status IN ('active','inactive','draft')",
+            name="status_allowed",
         ),
-        Index("ix_products_publish", "restaurant_id", "is_active", "is_published"),
-        Index("ix_products_review", "restaurant_id", "approval_status"),
+        Index("ix_products_status", "restaurant_id", "status"),
     )
 
 
