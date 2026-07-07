@@ -40,8 +40,7 @@ def test_cancel_order_requires_reason(client, engine):
                 restaurant_id=restaurant.id,
                 name="Taco",
                 price_cents=5000,
-                approval_status="approved",
-                is_published=True,
+                status="active",
                 category_ids=[cat.id],
             )
         )

@@ -57,8 +57,7 @@ def test_create_public_publishes_order_created_event(client, engine, monkeypatch
                 restaurant_id=restaurant.id,
                 name="Taco",
                 price_cents=5000,
-                approval_status="approved",
-                is_published=True,
+                status="active",
                 category_ids=[cat.id],
             )
         )

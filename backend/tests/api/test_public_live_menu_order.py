@@ -62,8 +62,7 @@ def test_public_live_menu_order_persists_all_details(client, engine):
                 name="BURGER & BONELESS",
                 price_cents=25900,
                 image_path="products/wild-rooster/burger.jpg",
-                approval_status="approved",
-                is_published=True,
+                status="active",
                 category_ids=[cat.id],
             )
         )
@@ -204,8 +203,7 @@ def test_public_live_menu_order_allowed_for_draft_restaurant(client, engine):
                 restaurant_id=restaurant.id,
                 name="Burger",
                 price_cents=10000,
-                approval_status="approved",
-                is_published=True,
+                status="active",
                 category_ids=[cat.id],
             )
         )
@@ -255,8 +253,7 @@ def test_public_live_menu_order_rejected_when_restaurant_suspended(client, engin
                 restaurant_id=restaurant.id,
                 name="Burger",
                 price_cents=10000,
-                approval_status="approved",
-                is_published=True,
+                status="active",
                 category_ids=[cat.id],
             )
         )
@@ -311,8 +308,7 @@ def test_public_live_menu_order_persists_line_and_order_discount_snapshots(clien
                 restaurant_id=restaurant.id,
                 name="BURGER & BONELESS",
                 price_cents=25900,
-                approval_status="approved",
-                is_published=True,
+                status="active",
                 category_ids=[cat.id],
             )
         )
@@ -403,8 +399,7 @@ def test_public_live_menu_delivery_cash_requires_denomination(client, engine):
                 restaurant_id=restaurant.id,
                 name="Burger",
                 price_cents=10000,
-                approval_status="approved",
-                is_published=True,
+                status="active",
                 category_ids=[cat.id],
             )
         )

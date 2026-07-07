@@ -56,9 +56,7 @@ def test_translate_menu_uses_cached_translation(session):
                 description="Rico",
                 price_cents=500,
                 currency="USD",
-                approval_status="approved",
-                is_published=True,
-                is_active=True,
+                status="active",
                 created_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
                 updated_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
             )
@@ -108,9 +106,7 @@ def test_translate_menu_falls_back_to_source_without_cache(session):
                 description="Rico",
                 price_cents=500,
                 currency="USD",
-                approval_status="approved",
-                is_published=True,
-                is_active=True,
+                status="active",
                 created_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
                 updated_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
             )
