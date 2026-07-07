@@ -11,6 +11,10 @@ def test_menu_import_skill_md_concierge_workflow():
     assert "Never during import" in text
     assert "generate_product_image" in text
     assert "Complement detection" in text
+    # Concierge must investigate the current menu and reconcile before applying.
+    assert "load_skill(menu_read)" in text
+    assert "Investigate" in text
+    assert "reconcile" in text
 
 
 def test_menu_import_skill_md_no_menu_media_in_workflow():
