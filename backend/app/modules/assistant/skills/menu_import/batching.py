@@ -9,6 +9,17 @@ from app.modules.assistant.skills.menu_import.draft_schema import (
 )
 
 
+def single_batch_from_draft(draft: ImportDraft) -> ImportBatch:
+    """Wrap the entire draft into one batch so the whole menu applies in one shot."""
+    return ImportBatch(
+        batch_index=0,
+        categories=draft.categories,
+        promotions=draft.promotions,
+        global_rules=draft.global_rules,
+        open_questions=draft.open_questions,
+    )
+
+
 def _product_count(categories: list[ImportCategory]) -> int:
     return sum(len(category.products) for category in categories)
 
