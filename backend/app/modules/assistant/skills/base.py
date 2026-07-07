@@ -4,7 +4,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 
 ToolEffect = Literal["read", "mutate", "delete"]
 
