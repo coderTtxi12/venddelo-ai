@@ -118,7 +118,6 @@ sections; `apply_full_import` materializes everything in a single call.
 | Tool | Effect | Purpose |
 |------|--------|---------|
 | `list_menu_themes` | read | Active themes from DB |
-| `recommend_menu_theme` | read | Top 3 LLM recommendations |
 | `apply_menu_theme` | mutate | Set `digital_menu_theme_id` |
 
 ### Photos (`menu_write` tools — after apply)

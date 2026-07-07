@@ -10,7 +10,7 @@ from typing import Any
 from app.api.cache_helpers import invalidate_restaurant_menu_cache
 from app.core.exceptions import ValidationError
 from app.db.models.menu_import_session import MenuImportSession
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext, commit_agent_mutation
 from app.modules.assistant.skills.menu_import.draft_schema import (
     ImportBatch,
     ImportCategory,
@@ -208,10 +208,8 @@ def _apply_products(
                 product_update = ProductUpdate(
                     description=product.description,
                     price_cents=mxn_to_cents(product.price_mxn),
-                    is_published=True,
+                    status="active" if product.is_available else "inactive",
                 )
-                if not product.is_available:
-                    product_update = product_update.model_copy(update={"is_active": False})
                 menu.update_product(ctx.restaurant_id, existing_id, product_update)
                 ref_map[product.ref] = existing_id
             else:
@@ -227,9 +225,9 @@ def _apply_products(
                     ),
                 )
                 ref_map[product.ref] = created.id
-                product_update = ProductUpdate(is_published=True)
-                if not product.is_available:
-                    product_update = ProductUpdate(is_published=True, is_active=False)
+                product_update = ProductUpdate(
+                    status="active" if product.is_available else "inactive",
+                )
                 menu.update_product(ctx.restaurant_id, created.id, product_update)
             count += 1
     return count
@@ -376,6 +374,7 @@ def apply_import_batch(
         return ApplyBatchResult(ok=False, summary=str(exc))
 
     invalidate_restaurant_menu_cache(ctx.uow, ctx.restaurant_id)
+    commit_agent_mutation(ctx)
 
     batch_entry["ref_map"] = {ref: str(value) for ref, value in ref_map.items()}
     batch_entry["applied_at"] = datetime.now(UTC).isoformat()

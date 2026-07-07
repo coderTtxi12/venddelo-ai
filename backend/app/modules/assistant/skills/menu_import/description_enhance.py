@@ -12,7 +12,7 @@ from app.core.exceptions import ValidationError
 from app.core.llm.ports import ChatCompletionMessage, ChatCompletionRequest, LLMProviderPort
 from app.db.models.menu_import_session import MenuImportSession
 from app.infra.llm.factory import build_llm_provider
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext, commit_agent_mutation
 from app.modules.assistant.skills.menu_write.bulk import bulk_update_product_descriptions
 from app.modules.assistant.skills.base import ToolResult
 from app.modules.menu.service import MenuService
@@ -183,6 +183,7 @@ def apply_description_enhancements(
 
     def _invalidate(agent_ctx: AgentContext) -> None:
         invalidate_restaurant_menu_cache(agent_ctx.uow, agent_ctx.restaurant_id)
+        commit_agent_mutation(agent_ctx)
 
     payload = {
         "items": [

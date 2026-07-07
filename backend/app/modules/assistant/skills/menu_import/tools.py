@@ -8,9 +8,8 @@ from typing import Any
 
 from app.core.exceptions import NotFoundError, ValidationError
 from app.db.models.menu_import_session import MenuImportSession
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.import_assets import validate_import_asset_path
-from app.modules.assistant.profile.menu_markdown import menu_markdown_for_persist
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
 from app.modules.assistant.skills.menu_import.apply_batch import apply_full_import
 from app.modules.assistant.skills.menu_import.batching import (
@@ -360,8 +359,7 @@ class MenuImportSkill:
             ToolDefinition(
                 name="update_menu_knowledge",
                 description=(
-                    "Append import notes to the restaurant menu_markdown knowledge block "
-                    "and mark the import session completed."
+                    "Finalize import notes for the session and mark the import session completed."
                 ),
                 effect="mutate",
                 input_schema={
@@ -725,27 +723,14 @@ class MenuImportSkill:
             notes_text = str(notes).strip() if notes is not None else None
             section = _build_import_notes(session, notes_text)
 
-            profile = ctx.uow.assistant_profiles.get(ctx.restaurant_id)
-            if profile is None:
-                return ToolResult(ok=False, summary="Assistant profile not found")
-
-            current = (profile.menu_markdown or "").strip()
-            updated = f"{current}\n\n{section}".strip() if current else section
-            updated_record = ctx.uow.assistant_profiles.update(
-                ctx.restaurant_id,
-                expected_version=profile.version,
-                menu_markdown=menu_markdown_for_persist(updated),
-            )
-            if updated_record is None:
-                return ToolResult(ok=False, summary="Profile version mismatch — refresh and retry")
-
             session.status = MenuImportSessionStatus.COMPLETED.value
             _repo(ctx).update(session)
             return ToolResult(
                 ok=True,
-                summary="Updated menu knowledge and completed import session",
+                summary="Completed import session with finalized notes",
                 data={
-                    "menu_markdown_length": len(updated),
+                    "notes": section,
+                    "notes_length": len(section),
                     **_session_summary(session),
                 },
             )
