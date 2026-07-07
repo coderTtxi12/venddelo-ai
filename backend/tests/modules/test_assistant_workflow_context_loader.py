@@ -85,13 +85,11 @@ def test_format_execution_findings_includes_full_executor_payload():
 
     findings = _format_execution_findings(execution)
 
-    assert findings.startswith("```json\n")
-    assert findings.endswith("\n```")
-    assert '"status": "success"' in findings
-    assert '"summary": "Se listaron categorías y productos."' in findings
+    assert "### Datos para responder" in findings
+    assert "Se listaron categorías y productos." in findings
+    assert "### Metadatos de ejecución" in findings
     assert '"step_id": "step_1"' in findings
     assert '"output_summary": "Listed 3 categories"' in findings
-    assert '"notes": [' in findings
     assert "requires_user_approval" not in findings
     assert "tools_used" not in findings
 
@@ -149,7 +147,7 @@ def test_responder_input_puts_formatted_findings_for_tool_runs():
 
     assert "## Findings" in payload
     assert "## Evaluation" in payload
-    assert "```json" in payload
-    assert '"summary": "Hay 3 categorías."' in payload
-    assert '"output_summary": "Listed 3 categories"' in payload
+    assert "### Datos para responder" in payload
+    assert "Hay 3 categorías." in payload
+    assert "### Metadatos de ejecución" in payload
     assert '"ok": true' in payload

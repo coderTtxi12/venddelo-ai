@@ -213,10 +213,6 @@ def replanner_input(
 
 
 def _format_execution_findings(execution: ExecutionRecord) -> str:
-    payload = execution.model_dump(
-        exclude={"tools_used", "requires_user_approval", "approval_reason"},
-        mode="json",
-    )
     has_content = bool(
         execution.summary.strip()
         or execution.executed_steps
@@ -226,7 +222,27 @@ def _format_execution_findings(execution: ExecutionRecord) -> str:
     if not has_content:
         return "El executor terminó sin hallazgos."
 
-    return "```json\n" + json.dumps(payload, ensure_ascii=False, indent=2) + "\n```"
+    parts: list[str] = []
+    if execution.summary.strip():
+        parts.append("### Datos para responder\n\n" + execution.summary.strip())
+
+    metadata = execution.model_dump(
+        exclude={"summary", "tools_used", "requires_user_approval", "approval_reason"},
+        mode="json",
+    )
+    has_metadata = bool(
+        metadata.get("executed_steps")
+        or metadata.get("notes")
+        or metadata.get("status") != "success"
+    )
+    if has_metadata:
+        parts.append(
+            "### Metadatos de ejecución\n\n```json\n"
+            + json.dumps(metadata, ensure_ascii=False, indent=2)
+            + "\n```"
+        )
+
+    return "\n\n".join(parts)
 
 
 def _format_evaluation_result(evaluation: WorkflowEvaluation) -> str:
