@@ -1,0 +1,82 @@
+"""Persist and load assistant conversation turns for workflow context."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+
+from app.core.config import Settings, get_settings
+from app.core.exceptions import ForbiddenError
+from app.db.uow import SqlAlchemyUnitOfWork
+from app.modules.assistant.repository import AssistantRepository
+from app.modules.assistant.schemas import AssistantChatHistoryMessage, AssistantMessageDTO
+
+
+def _title_from_message(message: str) -> str:
+    collapsed = " ".join(message.strip().split())
+    if not collapsed:
+        return "Nueva conversación"
+    if len(collapsed) <= 60:
+        return collapsed
+    return f"{collapsed[:57]}…"
+
+
+def ensure_conversation(
+    repo: AssistantRepository,
+    *,
+    restaurant_id: uuid.UUID,
+    conversation_id: uuid.UUID | None,
+    first_message: str,
+) -> uuid.UUID:
+    if conversation_id is not None:
+        conversation = repo.get_conversation(conversation_id)
+        if conversation is not None:
+            if conversation.restaurant_id != restaurant_id:
+                raise ForbiddenError("You do not own this conversation")
+            return conversation_id
+
+    created = repo.create_conversation(
+        restaurant_id=restaurant_id,
+        title=_title_from_message(first_message),
+    )
+    return created.id
+
+
+def load_recent_history(
+    repo: AssistantRepository,
+    conversation_id: uuid.UUID,
+    *,
+    settings: Settings | None = None,
+) -> list[AssistantChatHistoryMessage]:
+    resolved = settings or get_settings()
+    rows = repo.list_recent_messages_for_context(
+        conversation_id,
+        limit=resolved.assistant_llm_context_message_limit,
+    )
+    return [_history_message(row) for row in rows]
+
+
+def persist_turn(
+    repo: AssistantRepository,
+    *,
+    conversation_id: uuid.UUID,
+    user_message: str,
+    assistant_message: str,
+) -> None:
+    cleaned_user = user_message.strip()
+    cleaned_assistant = assistant_message.strip()
+    if not cleaned_user or not cleaned_assistant:
+        return
+
+    now = datetime.now(UTC)
+    repo.add_message(conversation_id=conversation_id, role="user", content=cleaned_user)
+    repo.add_message(conversation_id=conversation_id, role="assistant", content=cleaned_assistant)
+    repo.update_conversation(conversation_id, last_message_at=now)
+
+
+def _history_message(row: AssistantMessageDTO) -> AssistantChatHistoryMessage:
+    return AssistantChatHistoryMessage(role=row.role, content=row.content)
+
+
+def assistant_repository(uow: SqlAlchemyUnitOfWork) -> AssistantRepository:
+    return uow.assistant
