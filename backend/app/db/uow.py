@@ -12,9 +12,6 @@ from app.infra.redis.composite_idempotency import CompositeIdempotencyRepository
 from app.infra.redis.factory import build_cache
 from app.infra.repositories.idempotency import SqlAlchemyIdempotencyRepository
 from app.modules.assistant.adapters import SqlAlchemyAssistantRepository
-from app.modules.assistant.entitlements.adapters import SqlAlchemyEntitlementOverridesRepository
-from app.modules.assistant.profile.adapters import SqlAlchemyAssistantProfileRepository
-from app.modules.assistant.usage.adapters import SqlAlchemyAssistantUsageRepository
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
 from app.modules.assistant.skills.menu_import.session_repository import MenuImportSessionRepository
 from app.modules.digital_menu_themes.repository import DigitalMenuThemeRepository
@@ -61,12 +58,9 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.orders = SqlAlchemyOrderRepository(self.session)
         self.promotions = SqlAlchemyPromotionRepository(self.session)
         self.translations = SqlAlchemyTranslationRepository(self.session)
-        self.assistant = SqlAlchemyAssistantRepository(self.session)
-        self.assistant_profiles = SqlAlchemyAssistantProfileRepository(self.session)
-        self.assistant_entitlements = SqlAlchemyEntitlementOverridesRepository(self.session)
-        self.assistant_usage = SqlAlchemyAssistantUsageRepository(self.session)
         self.digital_menu_themes = DigitalMenuThemeRepository(self.session)
         self.menu_import_sessions = MenuImportSessionRepository(self.session)
+        self.assistant = SqlAlchemyAssistantRepository(self.session)
         self.idempotency = CompositeIdempotencyRepository(
             cache,
             db_idempotency,
