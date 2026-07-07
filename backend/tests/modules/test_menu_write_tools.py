@@ -1,14 +1,16 @@
 import uuid
 
+from sqlalchemy.orm import sessionmaker
+
 from app.db.uow import SqlAlchemyUnitOfWork
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.menu_read.tools import (
     DIGITAL_MENU_LIMITED_TIME_CATEGORY_ID,
     DIGITAL_MENU_PROMOTIONS_CATEGORY_ID,
 )
 from app.modules.assistant.skills.menu_write.option_item_bulk import option_item_label_matches
 from app.modules.assistant.skills.menu_write.tools import MenuWriteSkill
-from app.modules.menu.schemas import CategoryCreate, OptionGroupCreate, OptionItemCreate, ProductCreate
+from app.modules.menu.schemas import CategoryCreate, OptionGroupCreate, OptionItemCreate, ProductCreate, ProductUpdate
 from app.modules.restaurants.schemas import RestaurantCreate
 from tests.conftest import requires_db
 
@@ -258,11 +260,119 @@ def test_menu_write_disables_product_without_delete(session):
 
     result = skill.execute(
         "update_product",
-        {"product_id": str(product.id), "is_active": False},
+        {"product_id": str(product.id), "status": "inactive"},
         ctx,
     )
     assert result.ok is True
-    assert result.data["product"]["is_active"] is False
+    assert result.data["product"]["status"] == "inactive"
+
+
+@requires_db
+def test_menu_write_update_product_ignores_null_optional_fields(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Null Fields", subdomain="menu-write-null-fields")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="WINGS & FRIES",
+            price_cents=24400,
+            category_ids=[category.id],
+            status="active",
+        )
+    )
+    product = uow.menu.update_product(product.id, ProductUpdate(status="inactive"))
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "update_product",
+        {
+            "name": "Wings & Fries",
+            "status": "active",
+            "price_cents": None,
+            "description": None,
+            "new_name": None,
+        },
+        ctx,
+    )
+
+    assert result.ok is True
+    assert result.data["product"]["id"] == str(product.id)
+    assert result.data["product"]["status"] == "active"
+    assert result.data["product"]["price_cents"] == 24400
+
+
+@requires_db
+def test_menu_write_activates_wild_rooster_wings_and_fries_by_name(session, engine):
+    """Inactive WINGS & FRIES is resolved by name, activated, and persisted to the DB."""
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restaurant = uow.restaurants.add(
+            RestaurantCreate(name="Wild Rooster", subdomain="menu-write-wild-rooster")
+        )
+        category = uow.menu.add_category(
+            CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+        )
+        wings_fries = uow.menu.add_product(
+            ProductCreate(
+                restaurant_id=restaurant.id,
+                name="WINGS & FRIES",
+                description="Alitas crujientes con papas.",
+                price_cents=24400,
+                category_ids=[category.id],
+                status="active",
+            )
+        )
+        wings_fries = uow.menu.update_product(
+            wings_fries.id,
+            ProductUpdate(status="inactive"),
+        )
+        uow.menu.add_product(
+            ProductCreate(
+                restaurant_id=restaurant.id,
+                name="BONELESS & FRIES WITC SAUCE",
+                price_cents=22900,
+                category_ids=[category.id],
+                status="active",
+            )
+        )
+        restaurant_id = restaurant.id
+        product_id = wings_fries.id
+        uow.commit()
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        ctx = AgentContext(
+            restaurant_id=restaurant_id,
+            conversation_id=uuid.uuid4(),
+            uow=uow,
+            effective_skill_ids=["menu_write"],
+        )
+        result = MenuWriteSkill().execute(
+            "update_product",
+            {"name": "Wings & Fries", "status": "active"},
+            ctx,
+        )
+
+    assert result.ok is True
+    assert result.data["product"]["id"] == str(product_id)
+    assert result.data["product"]["name"] == "WINGS & FRIES"
+    assert result.data["product"]["status"] == "active"
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        reloaded = uow.menu.get_product_by_id(product_id)
+        assert reloaded is not None
+        assert reloaded.status == "active"
 
 
 @requires_db
@@ -696,6 +806,60 @@ def test_menu_write_bulk_updates_option_item_visibility(session):
     assert loaded_second is not None
     assert loaded_first.option_groups[0].items[0].is_active is False
     assert loaded_second.option_groups[0].items[0].is_active is False
+
+
+@requires_db
+def test_menu_write_bulk_updates_option_item_prices_without_group_id(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Price No Group", subdomain="menu-write-bulk-price-no-group")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Tacos", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Taco combo",
+            price_cents=1000,
+            category_ids=[category.id],
+        )
+    )
+    group = uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(title="Extras", items=[OptionItemCreate(label="Guacamole", price_delta_cents=500)]),
+    )
+    item_id = group.items[0].id
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_update_option_item_prices",
+        {
+            "items": [
+                {
+                    "product_id": str(product.id),
+                    "item_id": str(item_id),
+                    "price_delta_cents": 1500,
+                }
+            ]
+        },
+        ctx,
+    )
+
+    assert result.ok is True
+    assert result.data["updated"] == 1
+    assert result.data["failed"] == 0
+
+    loaded = uow.menu.get_product(product.id)
+    assert loaded is not None
+    assert loaded.option_groups[0].items[0].price_delta_cents == 1500
 
 
 @requires_db

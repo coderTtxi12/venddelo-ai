@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from app.core.vision.ports import VisionAnalysisResult
 from app.db.uow import SqlAlchemyUnitOfWork
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.menu_write.product_photo_prompt import (
     build_product_photo_match_prompt,
 )
