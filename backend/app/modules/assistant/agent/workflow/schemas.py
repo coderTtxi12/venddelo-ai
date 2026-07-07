@@ -14,10 +14,6 @@ class PlanStep(BaseModel):
     tool: str = Field(min_length=1, description="Tool name to call, e.g. list_products")
     action: str = Field(min_length=1, description="What this step should accomplish")
     reason: str = Field(min_length=1, description="Why this step is needed")
-    input: str = Field(
-        default="{}",
-        description="Suggested tool arguments as a JSON object string",
-    )
     expected_output: str = Field(
         default="",
         description="What a successful step should return",
@@ -99,7 +95,7 @@ class ExecutionRecord(BaseModel):
     )
     summary: str = Field(
         default="",
-        description="Concise overall summary of what was done and what data was found",
+        description="Built at the end of execution; data to answer the user request and plan goal",
     )
     executed_steps: list[ExecutedStep] = Field(default_factory=list)
     requires_user_approval: bool = Field(

@@ -13,7 +13,6 @@ PLAN_OUTPUT_SHAPE = """{
       "tool": "search_products",
       "action": "string",
       "reason": "string",
-      "input": "{}",
       "expected_output": "string"
     }
   ],
@@ -58,7 +57,10 @@ Important rules:
 - Keep the plan as short as possible while still being complete.
 - Use exact tool names from the list above (snake_case).
 - Write goal, action, reason, success_criteria, and stop_conditions in Spanish.
-- For each step, set input to a JSON object string with suggested tool arguments (use "{{}}" when none).
+- Do NOT specify tool arguments (no input/args fields). The Executor chooses arguments
+  from each tool's schema at runtime.
+- Prefer one step per distinct tool intent; the Executor may call the same tool multiple
+  times (pagination, retries) without extra plan steps.
 
 Return only valid JSON.
 
@@ -75,8 +77,14 @@ user-facing reply.
 Rules:
 - Follow the plan steps in order and call the tools — including mutate/write tools.
 - Never skip a planned tool call waiting for owner approval; execute immediately.
-- Use the suggested tool name on each step when present; pick the best matching tool otherwise.
-- After tools finish, return a structured JSON summary of findings (Spanish is fine).
+- Use the tool named on each step; pick the best matching tool if a step is ambiguous.
+- You choose all tool arguments from each tool's JSON schema (the plan does not provide them).
+- If a tool returns ok=false, empty data, or a miss, retry with different arguments or call
+  a related tool before moving on. The Agents SDK gives you multiple turns in this run — use
+  them to paginate (cursor), refine queries, or recover from errors without waiting for replan.
+- Build `summary` only at the end, after all tool calls, from the accumulated tool results.
+- `summary` must contain the data needed to answer the user request and the plan goal.
+  Use only facts from tools — never invent menu data.
 - Never invent prices, counts, or menu items — only report tool results.
 - When search_products or get_product returns rows in data.products (or a product on get_product),
   treat the lookup as successful — use that product id/name for later steps even if the catalog
@@ -138,7 +146,9 @@ Given a failed plan, execution notes, and evaluator issues, produce a REVISED pl
 Rules:
 - Keep steps minimal (1–4).
 - Fix the specific gaps noted by the evaluator.
-- Do not repeat failed steps verbatim unless the tool args should change.
+- Do not repeat failed steps verbatim; change the tool sequence or step goals — the Executor
+  chooses arguments, not the plan.
+- Do NOT specify tool arguments (no input/args fields).
 - Write goal, action, reason, success_criteria, and stop_conditions in Spanish.
 - Use exact tool names (snake_case) from the list below.
 
@@ -157,19 +167,17 @@ RESPONDER_INSTRUCTIONS = """You are the Responder for a restaurant assistant.
 
 Write the final message shown to the restaurant owner in Spanish.
 
-You receive conversation history, the user request, an optional plan summary, findings
-from execution, and evaluation results. Both findings and evaluation arrive as Markdown
-JSON blocks.
+You receive conversation history, the user request, plan summary, findings from execution,
+and evaluation results.
 
 Rules:
+- Focus on answering the user request.
 - Lead with the direct answer; stay concise unless listing menu items.
-- If there are no findings (greeting, thanks, small talk, or a clarifying turn),
+- If there are no relevant information in the findings (greeting, thanks, small talk, or a clarifying turn),
   reply naturally: greet back, offer help, or ask the clarifying question.
-- Use only facts present in the findings. Never invent products, prices, counts,
-  schedules, or outcomes.
 - Convert centavos to MXN pesos (e.g. $120.00 MXN); never mention centavos.
 - Be honest about what was completed and what failed.
-- No database or engineering terms (IDs, flags, field names, tool names).
+- No database or engineering terms (IDs, flags, field names, tool names) in the owner-facing reply.
 - Warm, professional tone. No filler phrases.
 
 Format:
