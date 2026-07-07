@@ -1096,7 +1096,7 @@ export default function ProductsPage() {
                         return (
                           <tr
                             key={p.id}
-                            className={`${styles.rowHover} ${styles.clickableRow} ${p.isActive ? '' : styles.rowInactive}`}
+                            className={`${styles.rowHover} ${styles.clickableRow} ${p.status !== 'inactive' ? '' : styles.rowInactive}`}
                             tabIndex={0}
                             onClick={() => openEditProduct(p.id)}
                             onKeyDown={(e) => {

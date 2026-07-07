@@ -1,6 +1,6 @@
-export type Id = string;
+import type { ProductStatus } from '@/lib/api/types';
 
-export type ApprovalStatus = 'draft' | 'pending_review' | 'approved' | 'rejected';
+export type Id = string;
 
 export type ImageDraft = {
   file?: File;
@@ -49,9 +49,7 @@ export type ProductDraft = {
   image: ImageDraft | null;
   categoryIds: Id[];
   optionGroups: OptionGroupDraft[];
-  approvalStatus: ApprovalStatus;
-  isPublished: boolean;
-  isActive: boolean;
+  status: ProductStatus;
   createdAt: string;
   updatedAt: string;
 };

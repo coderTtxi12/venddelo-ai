@@ -1,14 +1,10 @@
-import type { ApprovalStatus, ProductDraft } from '@/services/db/supplierCatalogTypes';
+import type { ProductStatus } from '@/lib/api/types';
+import type { ProductDraft } from '@/services/db/supplierCatalogTypes';
 
 export type ProductVisibilityState = 'live' | 'hidden' | 'inactive';
 
 type VisibilityFields = {
-  is_active?: boolean;
-  is_published?: boolean;
-  approval_status?: string;
-  isActive?: boolean;
-  isPublished?: boolean;
-  approvalStatus?: string;
+  status?: ProductStatus;
 };
 
 export const PRODUCT_VISIBILITY_OPTIONS: {
@@ -34,18 +30,19 @@ export const PRODUCT_VISIBILITY_OPTIONS: {
 ];
 
 export function isPublicMenuListed(product: VisibilityFields): boolean {
-  const published = product.is_published ?? product.isPublished ?? false;
-  const status = product.approval_status ?? product.approvalStatus ?? 'draft';
-  return published && status === 'approved';
+  return product.status !== 'draft';
 }
 
 export function getProductVisibilityState(product: VisibilityFields): ProductVisibilityState {
-  const active = product.is_active ?? product.isActive ?? false;
-  if (isPublicMenuListed(product)) {
-    return active ? 'live' : 'inactive';
+  switch (product.status) {
+    case 'active':
+      return 'live';
+    case 'inactive':
+      return 'inactive';
+    case 'draft':
+    default:
+      return 'hidden';
   }
-  if (!active) return 'inactive';
-  return 'hidden';
 }
 
 /** Listed on the public menu (En menú or Inactivo — not Draft). */
@@ -55,8 +52,7 @@ export function isPublicMenuDisplayed(product: VisibilityFields): boolean {
 
 /** Product is visible in the public menu and can be ordered. */
 export function isLiveMenuVisible(product: VisibilityFields): boolean {
-  const active = product.is_active ?? product.isActive ?? false;
-  return active && isPublicMenuListed(product);
+  return product.status === 'active';
 }
 
 export function productVisibilityMeta(product: VisibilityFields): {
@@ -76,17 +72,15 @@ export function productVisibilityMeta(product: VisibilityFields): {
 }
 
 export function visibilityUpdateForState(state: ProductVisibilityState): {
-  is_active: boolean;
-  is_published: boolean;
-  approval_status: ApprovalStatus;
+  status: ProductStatus;
 } {
   switch (state) {
     case 'live':
-      return { is_active: true, is_published: true, approval_status: 'approved' };
+      return { status: 'active' };
     case 'hidden':
-      return { is_active: true, is_published: false, approval_status: 'draft' };
+      return { status: 'draft' };
     case 'inactive':
-      return { is_active: false, is_published: true, approval_status: 'approved' };
+      return { status: 'inactive' };
   }
 }
 
@@ -97,9 +91,7 @@ export function applyVisibilityStateToDraft(
   const patch = visibilityUpdateForState(state);
   return {
     ...product,
-    isActive: patch.is_active,
-    isPublished: patch.is_published,
-    approvalStatus: patch.approval_status,
+    status: patch.status,
     updatedAt: new Date().toISOString(),
   };
 }

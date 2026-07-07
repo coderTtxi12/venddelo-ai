@@ -1,10 +1,5 @@
 import type { Category, OptionGroup, Product } from './types';
-import type {
-  ApprovalStatus,
-  CategoryDraft,
-  OptionGroupDraft,
-  ProductDraft,
-} from '@/services/db/supplierCatalogTypes';
+import type { CategoryDraft, OptionGroupDraft, ProductDraft } from '@/services/db/supplierCatalogTypes';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 
 function imageFromPath(path: string | null) {
@@ -56,9 +51,7 @@ export function mapProductToDraft(product: Product, discountUsd = 0): ProductDra
     optionGroups: [...product.option_groups]
       .sort((a, b) => a.sort_index - b.sort_index)
       .map(mapOptionGroupToDraft),
-    approvalStatus: product.approval_status as ApprovalStatus,
-    isPublished: product.is_published,
-    isActive: product.is_active,
+    status: product.status,
     createdAt: product.created_at,
     updatedAt: product.updated_at,
   };

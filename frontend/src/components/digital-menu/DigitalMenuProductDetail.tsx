@@ -181,7 +181,7 @@ export function DigitalMenuProductDetail({
   const displayGroups = displayOptionGroups(product);
   const activeGroups = activeOptionGroups(product);
   const canReorder = onReorderGroups != null && onReorderItems != null;
-  const isAvailable = product.is_active;
+  const isAvailable = product.status === 'active';
   const unitPrice =
     discount != null && discount.amountOff > 0
       ? discount.finalPrice

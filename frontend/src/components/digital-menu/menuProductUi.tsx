@@ -10,7 +10,7 @@ import styles from '../pages/DigitalMenuPage.module.css';
 export const PRODUCT_UNAVAILABLE_LABEL = 'No disponible';
 
 export function isProductAvailable(product: Product): boolean {
-  return product.is_active;
+  return product.status === 'active';
 }
 
 export function productsForCategory(products: Product[], categoryId: string): Product[] {
@@ -22,8 +22,8 @@ export function productsForCategory(products: Product[], categoryId: string): Pr
       if (sa !== sb) return sa - sb;
       return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     });
-  const available = sortByCategoryIndex(inCategory.filter((p) => p.is_active));
-  const unavailable = sortByCategoryIndex(inCategory.filter((p) => !p.is_active));
+  const available = sortByCategoryIndex(inCategory.filter((p) => p.status === 'active'));
+  const unavailable = sortByCategoryIndex(inCategory.filter((p) => p.status !== 'active'));
   return [...available, ...unavailable];
 }
 

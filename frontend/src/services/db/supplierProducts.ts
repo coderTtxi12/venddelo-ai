@@ -406,15 +406,11 @@ export async function saveSupplierProduct(
       price_cents: number;
       category_ids: string[];
       image_path?: string | null;
-      is_published: boolean;
-      approval_status: string;
     } = {
       name: payload.name,
       description,
       price_cents: priceCents,
       category_ids: payload.categoryIds,
-      is_published: true,
-      approval_status: 'approved',
     };
     if (imagePath !== undefined) {
       body.image_path = imagePath;

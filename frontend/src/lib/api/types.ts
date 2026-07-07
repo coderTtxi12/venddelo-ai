@@ -134,6 +134,8 @@ export type OptionItem = {
   is_active: boolean;
 };
 
+export type ProductStatus = 'active' | 'inactive' | 'draft';
+
 export type OptionGroup = {
   id: string;
   product_id: string;
@@ -155,9 +157,7 @@ export type Product = {
   price_cents: number;
   currency: string;
   image_path: string | null;
-  approval_status: string;
-  is_published: boolean;
-  is_active: boolean;
+  status: ProductStatus;
   created_at: string;
   updated_at: string;
   category_ids: string[];

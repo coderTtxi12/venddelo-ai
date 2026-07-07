@@ -1,6 +1,6 @@
 import { DEFAULT_CURRENCY } from '@/lib/currency';
 import { apiRequest } from './client';
-import type { Category, CategoryDisplayLayout, CursorPage, Product } from './types';
+import type { Category, CategoryDisplayLayout, CursorPage, Product, ProductStatus } from './types';
 
 export function listCategories(
   token: string,
@@ -99,8 +99,7 @@ export function createProduct(
     price_cents: number;
     currency?: string;
     image_path?: string | null;
-    approval_status?: string;
-    is_published?: boolean;
+    status?: ProductStatus;
     category_ids: string[];
   },
 ) {
@@ -110,8 +109,7 @@ export function createProduct(
     body: {
       restaurant_id: restaurantId,
       currency: DEFAULT_CURRENCY,
-      approval_status: 'approved',
-      is_published: true,
+      status: data.status ?? 'active',
       ...data,
     },
   });
@@ -127,9 +125,7 @@ export function updateProduct(
     price_cents?: number;
     currency?: string;
     image_path?: string | null;
-    approval_status?: string;
-    is_published?: boolean;
-    is_active?: boolean;
+    status?: ProductStatus;
     category_ids?: string[];
   },
 ) {

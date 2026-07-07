@@ -15,7 +15,6 @@ export {
 } from './panelAccess';
 export type { PageCursor } from './firestoreTypes';
 export type {
-  ApprovalStatus,
   CategoryDraft,
   Id,
   ImageDraft,

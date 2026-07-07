@@ -180,7 +180,7 @@ export default function MarketingPage() {
       ]);
       setPromotions(promoList);
       setCategories(categoryList.filter((c) => c.is_active));
-      setProducts(productList.filter((p) => p.is_active));
+      setProducts(productList.filter((p) => p.status === 'active'));
       refreshDrafts();
     } catch (err) {
       console.error(err);
