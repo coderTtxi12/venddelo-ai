@@ -18,9 +18,7 @@ def _dto(name: str, *, description: str = "") -> ProductDTO:
         description=description,
         price_cents=1000,
         currency="MXN",
-        is_published=True,
-        is_active=True,
-        approval_status="approved",
+        status="active",
         category_ids=[],
         category_sort_indices={},
         option_groups=[],
@@ -30,23 +28,14 @@ def _dto(name: str, *, description: str = "") -> ProductDTO:
     )
 
 
-def test_normalize_product_query_strips_confirmation_prefix():
-    assert normalize_product_query("este HAMBURGUESA") == "hamburguesa"
+def test_normalize_product_query_normalizes_text():
+    assert normalize_product_query("  HAMBURGUESA  ") == "hamburguesa"
 
 
 def test_resolve_prefers_exact_name_over_fuzzy_neighbor():
     hamburguesa = _dto("HAMBURGUESA")
     burger = _dto("BURGER & BONELESS")
     resolved = resolve_product_in_catalog("Hamburguesa", [burger, hamburguesa])
-    assert resolved.status == "found"
-    assert resolved.product is not None
-    assert resolved.product.name == "HAMBURGUESA"
-
-
-def test_resolve_confirmation_phrase_finds_hamburguesa_not_burger():
-    hamburguesa = _dto("HAMBURGUESA")
-    burger = _dto("BURGER & BONELESS")
-    resolved = resolve_product_in_catalog("este HAMBURGUESA", [burger, hamburguesa])
     assert resolved.status == "found"
     assert resolved.product is not None
     assert resolved.product.name == "HAMBURGUESA"
@@ -80,10 +69,40 @@ def test_score_product_does_not_use_description():
 
 def test_resolve_finds_inactive_product_by_exact_name():
     inactive = _dto("HAMBURGUESA")
-    inactive = inactive.model_copy(update={"is_active": False})
+    inactive = inactive.model_copy(update={"status": "inactive"})
     burger = _dto("BURGER & BONELESS")
     resolved = resolve_product_in_catalog("Hamburguesa", [burger, inactive])
     assert resolved.status == "found"
     assert resolved.product is not None
     assert resolved.product.name == "HAMBURGUESA"
-    assert resolved.product.is_active is False
+    assert resolved.product.status == "inactive"
+
+
+def test_resolve_active_only_still_finds_exact_inactive_name():
+    wings = _dto("WINGS & FRIES")
+    wings = wings.model_copy(update={"status": "inactive"})
+    boneless = _dto("BONELESS & FRIES WITC SAUCE")
+    resolved = resolve_product_in_catalog(
+        "Wings & Fries",
+        [boneless, wings],
+        active_only=True,
+    )
+    assert resolved.status == "found"
+    assert resolved.product is not None
+    assert resolved.product.name == "WINGS & FRIES"
+    assert resolved.matches == ((1.0, wings),)
+
+
+def test_resolve_active_only_fuzzy_skips_inactive_neighbors():
+    wings = _dto("WINGS & FRIES")
+    wings = wings.model_copy(update={"status": "inactive"})
+    boneless = _dto("BONELESS & FRIES WITC SAUCE")
+    resolved = resolve_product_in_catalog(
+        "wings and fries",
+        [wings, boneless],
+        active_only=True,
+    )
+    assert resolved.status == "found"
+    assert resolved.product is not None
+    assert resolved.product.name == "BONELESS & FRIES WITC SAUCE"
+    assert resolved.matches[0][0] < 1.0

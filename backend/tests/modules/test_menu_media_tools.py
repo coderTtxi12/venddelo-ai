@@ -4,7 +4,7 @@ from unittest.mock import patch
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.infra.image.stub_provider import StubImageProvider
 from app.infra.storage.memory_storage import MemoryStorageAdapter
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.menu_media.tools import MenuMediaSkill
 from app.modules.menu.schemas import CategoryCreate, ProductCreate
 from app.modules.restaurants.schemas import RestaurantCreate

@@ -1,7 +1,7 @@
 import uuid
 
 from app.db.uow import SqlAlchemyUnitOfWork
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.menu_read.tools import MenuReadSkill
 from app.modules.assistant.skills.promotions.tools import PromotionsSkill
 from app.modules.assistant.skills.registry import SkillRegistry
