@@ -1282,3 +1282,133 @@ def test_menu_read_bulk_get_products_reports_partial_misses(session):
     assert result.data["failed"] == 1
     assert result.data["products"][0]["name"] == "Taco al pastor"
     assert result.data["results"][1]["ok"] is False
+
+
+def _product_option_labels(product: dict) -> list[str]:
+    labels: list[str] = []
+    for group in product.get("option_groups") or []:
+        for item in group.get("items") or []:
+            label = item.get("label")
+            if isinstance(label, str):
+                labels.append(label)
+    return labels
+
+
+def _products_with_complement(products: list[dict], complement: str) -> list[dict]:
+    needle = complement.casefold()
+    return [
+        product
+        for product in products
+        if any(label.casefold() == needle for label in _product_option_labels(product))
+    ]
+
+
+@requires_db
+def test_menu_read_bulk_get_products_returns_real_sprite_complements_from_db(session):
+    """bulk_get_products loads full option_groups from DB (not a stub).
+
+    Workflow: after list_products surfaces candidate ids, bulk_get_products fetches
+    each product's real complements — e.g. which rows actually have Sprite.
+    """
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Sprite Bulk", subdomain="menu-read-sprite-bulk")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+    )
+
+    burger = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BURGER & BONELESS",
+            price_cents=10000,
+            category_ids=[category.id],
+        )
+    )
+    uow.menu.add_option_group(
+        burger.id,
+        OptionGroupCreate(
+            title="Elige tus complementos",
+            selection="multi",
+            items=[OptionItemCreate(label="Sprite", price_delta_cents=5000)],
+        ),
+    )
+
+    boneless = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BONELESS & FRIES WITC SAUCE",
+            price_cents=22900,
+            category_ids=[category.id],
+        )
+    )
+    uow.menu.add_option_group(
+        boneless.id,
+        OptionGroupCreate(
+            title="Bebidas",
+            selection="single",
+            items=[OptionItemCreate(label="Sprite", price_delta_cents=5000)],
+        ),
+    )
+
+    hamburguesa = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="HAMBURGUESA",
+            price_cents=5000,
+            category_ids=[category.id],
+        )
+    )
+    uow.menu.add_option_group(
+        hamburguesa.id,
+        OptionGroupCreate(
+            title="Guarniciones",
+            selection="single",
+            items=[OptionItemCreate(label="Papas a la francesa", price_delta_cents=3000)],
+        ),
+    )
+
+    for product in (burger, boneless, hamburguesa):
+        uow.menu.update_product(
+            restaurant.id,
+            product.id,
+            ProductUpdate(status="active"),
+        )
+
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+    skill = MenuReadSkill()
+
+    result = skill.execute(
+        "bulk_get_products",
+        {
+            "product_ids": [
+                str(burger.id),
+                str(boneless.id),
+                str(hamburguesa.id),
+            ]
+        },
+        ctx,
+    )
+
+    assert result.ok is True
+    assert result.data["found"] == 3
+
+    with_sprite = _products_with_complement(result.data["products"], "Sprite")
+    assert {p["name"] for p in with_sprite} == {
+        "BURGER & BONELESS",
+        "BONELESS & FRIES WITC SAUCE",
+    }
+    assert "HAMBURGUESA" not in {p["name"] for p in with_sprite}
+
+    burger_payload = next(p for p in result.data["products"] if p["name"] == "BURGER & BONELESS")
+    sprite_item = burger_payload["option_groups"][0]["items"][0]
+    assert sprite_item["label"] == "Sprite"
+    assert sprite_item["price_delta_cents"] == 5000
+    assert sprite_item["is_active"] is True
