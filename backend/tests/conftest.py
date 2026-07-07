@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 import app.db.models  # noqa: F401
 from app.db.base import Base
+from app.infra.llm.tracing import clear_langsmith_env_cache
 
 TEST_URL = os.getenv(
     "DATABASE_URL_TEST",
@@ -26,6 +27,14 @@ requires_db = pytest.mark.skipif(
     not _postgres_available(TEST_URL),
     reason="Postgres test database not available",
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_langsmith_tracing_state():
+    """LangSmith caches env vars; clear between tests that toggle LANGSMITH_TRACING."""
+    clear_langsmith_env_cache()
+    yield
+    clear_langsmith_env_cache()
 
 
 @pytest.fixture(scope="session")
