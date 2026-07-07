@@ -1,7 +1,6 @@
 import uuid
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
-from pydantic import BaseModel
 
 from app.api.cache_helpers import invalidate_restaurant_menu_cache
 from app.api.deps import pagination_params, require_owned_restaurant
@@ -33,10 +32,6 @@ router = APIRouter(tags=["menu"])
 
 def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> MenuService:
     return MenuService(uow.menu)
-
-
-class ApprovalBody(BaseModel):
-    status: str
 
 
 MAX_ASSET_BYTES = 2 * 1024 * 1024
@@ -209,36 +204,6 @@ def delete_product(
     service.delete_product(restaurant.id, product_id)
     invalidate_restaurant_menu_cache(uow, restaurant.id)
 
-
-@router.post(
-    "/restaurants/{restaurant_id}/products/{product_id}/approval",
-    response_model=ProductDTO,
-)
-def set_product_approval(
-    product_id: uuid.UUID,
-    body: ApprovalBody,
-    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
-    service: MenuService = Depends(_service),
-    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
-) -> ProductDTO:
-    dto = service.set_approval(restaurant.id, product_id, body.status)
-    invalidate_restaurant_menu_cache(uow, restaurant.id)
-    return dto
-
-
-@router.post(
-    "/restaurants/{restaurant_id}/products/{product_id}/publish",
-    response_model=ProductDTO,
-)
-def publish_product(
-    product_id: uuid.UUID,
-    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
-    service: MenuService = Depends(_service),
-    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
-) -> ProductDTO:
-    dto = service.publish(restaurant.id, product_id)
-    invalidate_restaurant_menu_cache(uow, restaurant.id)
-    return dto
 
 
 # Option groups

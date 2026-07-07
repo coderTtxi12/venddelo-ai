@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from app.core.exceptions import ConflictError, NotFoundError, ValidationError
+from app.core.exceptions import NotFoundError, ValidationError
 from app.core.pagination import CursorPage, PaginationParams
 from app.modules.menu.repository import MenuRepository
 from app.modules.menu.schemas import (
@@ -141,7 +141,9 @@ class MenuService:
         return dto
 
     def delete_product(self, restaurant_id: uuid.UUID, product_id: uuid.UUID) -> None:
-        self.get_product(restaurant_id, product_id)
+        prod = self._repo.get_product_by_id(product_id)
+        if prod is None or prod.restaurant_id != restaurant_id:
+            raise NotFoundError("Product not found")
         if not self._repo.soft_delete_product(product_id):
             raise NotFoundError("Product not found")
 
@@ -192,18 +194,6 @@ class MenuService:
         except ValueError as exc:
             raise ValidationError(str(exc)) from exc
 
-    def set_approval(
-        self, restaurant_id: uuid.UUID, product_id: uuid.UUID, status: str
-    ) -> ProductDTO:
-        if status not in {"draft", "pending", "approved", "rejected"}:
-            raise ValidationError("Invalid approval status")
-        return self.update_product(restaurant_id, product_id, ProductUpdate(approval_status=status))
-
-    def publish(self, restaurant_id: uuid.UUID, product_id: uuid.UUID) -> ProductDTO:
-        prod = self.get_product(restaurant_id, product_id)
-        if prod.approval_status != "approved":
-            raise ConflictError("Product must be approved before publishing")
-        return self.update_product(restaurant_id, product_id, ProductUpdate(is_published=True))
 
     # Option groups
     def add_option_group(
