@@ -95,21 +95,30 @@ def build_agent_runtime_section(effective_skill_ids: list[str] | None = None) ->
 
 When the owner wants to **import or digitize** their menu (PDF, DOCX, photos):
 
-1. **`load_skill(menu_import)`** + **`load_skill(menu_write)`** + **`load_skill(menu_best_practices)`**
-   if not already loaded this turn.
+1. **`load_skill(menu_import)`** + **`load_skill(menu_read)`** + **`load_skill(menu_write)`** +
+   **`load_skill(menu_best_practices)`** if not already loaded this turn.
 2. **`start_menu_import_session`** — one active session per restaurant.
-3. Concierge flow: upload sources → **`start_menu_extraction_batch`** → clarify `open_questions`
-   (one question per turn) → **`optimize_import_draft`** (order, layouts, complement rules:
-   required/optional, min/max, extra prices) → **`preview_full_import`** → owner confirms once →
+3. **Investigate first:** read the **current** menu (`list_categories` + `list_products`) so you
+   know what already exists, and read the uploaded document fully. **Plan** what to create vs
+   update before touching anything.
+4. Concierge flow: upload sources → **`start_menu_extraction_batch`** → clarify `open_questions`
+   (**only genuine ambiguities**, one question per turn) → **`optimize_import_draft`** (order,
+   layouts, complement rules: required/optional, min/max, extra prices) → **`preview_full_import`**
+   (shows the reconciliation plan: nuevas vs existentes) → owner confirms once →
    **`apply_full_import`** (`confirmed: true`) → **`apply_menu_theme`** →
    **`load_skill(promotions)`** → **`generate_promotion_banner`** for each `two_for_one` promo →
    ask for dish photos → **`match_product_photos`** → **`bulk_assign_product_images`** →
    **`update_menu_knowledge`**.
-4. Extraction and optimization run **synchronously** in this chat turn.
-5. **Never** use **`menu_media`** / **`generate_product_image`** / **`request_image_enhancement`**
-   during import — only owner-uploaded photos.
+5. Extraction and optimization run **synchronously** in this chat turn.
+6. **Infer, don't interrogate:** deduce complement rules, prices, and layouts from the document
+   and best practices. Ask the owner **only** what you truly cannot resolve.
+7. **Never** use **`menu_media`** / **`generate_product_image`** during import — only
+   owner-uploaded photos.
+8. Publish the **entire** menu with a single **`apply_full_import`** — never section by section.
+   It reconciles against the live menu by name: existing categories/products are **updated**
+   (never duplicated), new ones created.
 
-Never call `apply_full_import`, `apply_menu_batch`, or `bulk_assign_product_images`
+Never call `apply_full_import` or `bulk_assign_product_images`
 without explicit owner confirmation (`confirmed: true` where required).
 
 """
