@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -13,9 +12,16 @@ from app.modules.assistant.agent.context import AgentContext
 from app.modules.assistant.import_assets import validate_import_asset_path
 from app.modules.assistant.profile.menu_markdown import menu_markdown_for_persist
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
-from app.modules.assistant.skills.menu_import.apply_batch import apply_full_import, apply_import_batch
-from app.modules.assistant.skills.menu_import.batching import count_batch_products, split_draft_into_batches
+from app.modules.assistant.skills.menu_import.apply_batch import apply_full_import
+from app.modules.assistant.skills.menu_import.batching import (
+    count_batch_products,
+    single_batch_from_draft,
+)
 from app.modules.assistant.skills.menu_import.draft_merge import merge_draft_batches
+from app.modules.assistant.skills.menu_import.menu_reconcile import (
+    ReconciliationPlan,
+    build_reconciliation_plan,
+)
 from app.modules.assistant.skills.menu_import.optimization import optimize_draft
 from app.modules.assistant.skills.menu_import.preview_full import build_full_import_preview
 from app.modules.assistant.skills.menu_write.theme_tools import list_menu_themes, recommend_menu_theme
@@ -130,6 +136,12 @@ def _collect_global_rules(batches: list[dict[str, Any]]) -> list[str]:
     return rules
 
 
+def _current_reconciliation(ctx: AgentContext, draft: ImportDraft) -> ReconciliationPlan:
+    """Investigate the live menu and decide create-vs-update for every entity."""
+    current = MenuService(ctx.uow.menu).get_full_menu(ctx.restaurant_id)
+    return build_reconciliation_plan(draft, current)
+
+
 def _build_import_notes(session: MenuImportSession, notes: str | None) -> str:
     parts: list[str] = ["## Notas de importación", ""]
     if notes and notes.strip():
@@ -157,24 +169,6 @@ def _build_import_notes(session: MenuImportSession, notes: str | None) -> str:
         parts.append("")
 
     return "\n".join(parts).strip()
-
-
-def _accumulated_product_ids(session: MenuImportSession) -> dict[str, uuid.UUID]:
-    merged: dict[str, uuid.UUID] = {}
-    for batch in _batch_entries(session):
-        if not batch.get("applied_at"):
-            continue
-        raw_map = batch.get("ref_map") or {}
-        if not isinstance(raw_map, dict):
-            continue
-        for ref, value in raw_map.items():
-            if not str(ref).startswith("prod_"):
-                continue
-            try:
-                merged[str(ref)] = uuid.UUID(str(value))
-            except (TypeError, ValueError):
-                continue
-    return merged
 
 
 class MenuImportSkill:
@@ -247,9 +241,9 @@ class MenuImportSkill:
             ToolDefinition(
                 name="start_menu_extraction_batch",
                 description=(
-                    "Run OCR/vision extraction on all registered menu source files. "
-                    "Splits the merged draft into batches (max 15 products each) and stores them "
-                    "in the session. Runs synchronously in-process."
+                    "Run OCR/vision extraction on all registered menu source files and store "
+                    "the ENTIRE menu as one draft (categories, products, complements, promotions). "
+                    "Runs synchronously in-process."
                 ),
                 effect="mutate",
                 input_schema={"type": "object", "properties": {}, "required": []},
@@ -327,38 +321,6 @@ class MenuImportSkill:
                 },
             ),
             ToolDefinition(
-                name="preview_import_batch",
-                description=(
-                    "Preview one import batch as a markdown-friendly table for owner confirmation."
-                ),
-                effect="read",
-                input_schema={
-                    "type": "object",
-                    "properties": {"batch_index": {"type": "integer"}},
-                    "required": ["batch_index"],
-                },
-            ),
-            ToolDefinition(
-                name="apply_menu_batch",
-                description=(
-                    "Materialize categories, products, option groups, and promotions from one batch. "
-                    "Requires confirmed=true and all open_questions answered."
-                ),
-                effect="mutate",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "batch_index": {"type": "integer"},
-                        "confirmed": {
-                            "type": "boolean",
-                            "description": "Owner must confirm before applying.",
-                            "default": False,
-                        },
-                    },
-                    "required": ["batch_index"],
-                },
-            ),
-            ToolDefinition(
                 name="preview_description_enhancements",
                 description=(
                     "Generate LLM proposals for improved product descriptions (read-only preview)."
@@ -394,14 +356,6 @@ class MenuImportSkill:
                     },
                     "required": [],
                 },
-            ),
-            ToolDefinition(
-                name="request_image_enhancement",
-                description=(
-                    "List imported products without images, eligible for menu_media image generation."
-                ),
-                effect="read",
-                input_schema={"type": "object", "properties": {}, "required": []},
             ),
             ToolDefinition(
                 name="update_menu_knowledge",
@@ -539,19 +493,19 @@ class MenuImportSkill:
                     page_drafts.append(extract_from_text(payload.text, context))
 
             merged = merge_page_drafts(page_drafts) if page_drafts else ImportDraft()
-            batches = split_draft_into_batches(merged)
-            session.draft_batches = [batch.model_dump() for batch in batches]
+            batch = single_batch_from_draft(merged)
+            session.draft_batches = [batch.model_dump()]
             session.status = (
                 MenuImportSessionStatus.CLARIFYING.value
                 if merged.open_questions
                 else MenuImportSessionStatus.OPTIMIZING.value
             )
             _repo(ctx).update(session)
-            product_count = sum(count_batch_products(batch) for batch in batches)
+            product_count = count_batch_products(batch)
             return ToolResult(
                 ok=True,
                 summary=(
-                    f"Extracted {product_count} product(s) into {len(batches)} batch(es)"
+                    f"Extracted {product_count} product(s) as one full menu"
                 ),
                 data={
                     **_session_summary(session),
@@ -637,17 +591,17 @@ class MenuImportSkill:
             discovery["concierge_mode"] = True
             discovery["optimization_notes_es"] = opt.optimization_notes_es
             session.discovery_answers = discovery
-            optimized_batches = split_draft_into_batches(opt.draft)
-            session.draft_batches = [batch.model_dump() for batch in optimized_batches]
+            optimized_batch = single_batch_from_draft(opt.draft)
+            session.draft_batches = [optimized_batch.model_dump()]
             session.status = MenuImportSessionStatus.PREVIEW_BATCH.value
             _repo(ctx).update(session)
             return ToolResult(
                 ok=True,
-                summary="Optimized import draft for full preview",
+                summary="Optimized full menu draft for preview",
                 data={
                     "optimization_notes_es": opt.optimization_notes_es,
                     "recommended_theme_id": theme_id,
-                    "product_count": sum(count_batch_products(batch) for batch in optimized_batches),
+                    "product_count": count_batch_products(optimized_batch),
                     **_session_summary(session),
                 },
             )
@@ -663,90 +617,60 @@ class MenuImportSkill:
             if theme_id:
                 themes = {entry["id"]: entry.get("label", entry["id"]) for entry in list_menu_themes(ctx)}
                 theme_label = themes.get(theme_id, theme_id)
-            markdown = build_full_import_preview(
+            preview_markdown = build_full_import_preview(
                 merged,
                 optimization_notes_es=notes if isinstance(notes, list) else [],
                 recommended_theme_id=theme_id,
                 theme_label=theme_label,
             )
+            plan = _current_reconciliation(ctx, merged)
+            markdown = f"{plan.markdown}\n\n{preview_markdown}"
             return ToolResult(
                 ok=True,
                 summary="Full import preview ready",
                 data={
                     "markdown": markdown,
+                    "reconciliation": {
+                        "new_categories": plan.new_categories,
+                        "reused_categories": plan.reused_categories,
+                        "new_products": plan.new_products,
+                        "updated_products": plan.updated_products,
+                    },
                     "open_questions": [question.model_dump() for question in merged.open_questions],
                 },
             )
 
         if tool_name == "apply_full_import":
             confirmed = bool(args.get("confirmed", False))
-            result = apply_full_import(ctx, session, confirmed=confirmed)
+            reconciliation: ReconciliationPlan | None = None
+            if confirmed:
+                merged_draft = merge_draft_batches(
+                    [ImportBatch.model_validate(entry) for entry in _batch_entries(session)]
+                )
+                reconciliation = _current_reconciliation(ctx, merged_draft)
+            result = apply_full_import(
+                ctx, session, confirmed=confirmed, reconciliation=reconciliation
+            )
             if result.ok:
                 session.status = MenuImportSessionStatus.MATCHING_IMAGES.value
                 _repo(ctx).update(session)
-            return ToolResult(
-                ok=result.ok,
-                summary=result.summary,
-                data={
-                    "batches_applied": result.batches_applied,
-                    "categories": result.categories,
-                    "products": result.products,
-                    "option_groups": result.option_groups,
-                    "option_items": result.option_items,
-                    "promotions": result.promotions,
-                    **_session_summary(session),
-                },
-            )
-
-        if tool_name == "preview_import_batch":
-            batch_index = args.get("batch_index")
-            if batch_index is None:
-                return ToolResult(ok=False, summary="batch_index is required")
-            index = int(batch_index)
-            batches = _batch_entries(session)
-            if index < 0 or index >= len(batches):
-                return ToolResult(ok=False, summary=f"Batch index {index} not found")
-            batch = ImportBatch.model_validate(batches[index])
-            return ToolResult(
-                ok=True,
-                summary=f"Preview for batch {index}",
-                data={
-                    "batch_index": index,
-                    "markdown": _preview_batch_markdown(batch),
-                    "product_count": count_batch_products(batch),
-                    "open_questions": [q.model_dump() for q in batch.open_questions],
-                    "batch": batch.model_dump(),
-                },
-            )
-
-        if tool_name == "apply_menu_batch":
-            batch_index = args.get("batch_index")
-            if batch_index is None:
-                return ToolResult(ok=False, summary="batch_index is required")
-            confirmed = bool(args.get("confirmed", False))
-            result = apply_import_batch(ctx, session, int(batch_index), confirmed=confirmed)
-            if result.ok:
-                batches = _batch_entries(session)
-                pending = sum(1 for batch in batches if not batch.get("applied_at"))
-                session.status = (
-                    MenuImportSessionStatus.MATCHING_IMAGES.value
-                    if pending == 0
-                    else MenuImportSessionStatus.APPLYING.value
-                )
-                _repo(ctx).update(session)
-            return ToolResult(
-                ok=result.ok,
-                summary=result.summary,
-                data={
-                    "categories": result.categories,
-                    "products": result.products,
-                    "option_groups": result.option_groups,
-                    "option_items": result.option_items,
-                    "promotions": result.promotions,
-                    "ref_map": result.ref_map,
-                    **_session_summary(session),
-                },
-            )
+            data: dict[str, Any] = {
+                "batches_applied": result.batches_applied,
+                "categories": result.categories,
+                "products": result.products,
+                "option_groups": result.option_groups,
+                "option_items": result.option_items,
+                "promotions": result.promotions,
+                **_session_summary(session),
+            }
+            if reconciliation is not None:
+                data["reconciliation"] = {
+                    "new_categories": reconciliation.new_categories,
+                    "reused_categories": reconciliation.reused_categories,
+                    "new_products": reconciliation.new_products,
+                    "updated_products": reconciliation.updated_products,
+                }
+            return ToolResult(ok=result.ok, summary=result.summary, data=data)
 
         if tool_name == "preview_description_enhancements":
             enhancements = preview_description_enhancements(session, ctx)
@@ -795,44 +719,6 @@ class MenuImportSkill:
                 session.status = MenuImportSessionStatus.ENRICHING.value
                 _repo(ctx).update(session)
             return result
-
-        if tool_name == "request_image_enhancement":
-            ref_map = _accumulated_product_ids(session)
-            if not ref_map:
-                return ToolResult(
-                    ok=False,
-                    summary="Apply at least one batch before listing products for image enhancement",
-                )
-            menu = MenuService(ctx.uow.menu)
-            without_images: list[dict[str, str]] = []
-            for ref, product_id in ref_map.items():
-                product = menu.get_product_by_id(ctx.restaurant_id, product_id)
-                if not product.image_path:
-                    without_images.append(
-                        {
-                            "product_ref": ref,
-                            "product_id": str(product.id),
-                            "name": product.name,
-                        }
-                    )
-            session.enhance_images = True
-            session.status = MenuImportSessionStatus.ENRICHING.value
-            _repo(ctx).update(session)
-            return ToolResult(
-                ok=True,
-                summary=f"Found {len(without_images)} product(s) without images",
-                data={
-                    "products_without_images": without_images,
-                    "use_skill": "menu_media",
-                    "tools": [
-                        "menu_media__generate_product_image",
-                        "menu_write__match_product_photos",
-                        "menu_write__assign_product_image",
-                        "menu_write__bulk_assign_product_images",
-                    ],
-                    **_session_summary(session),
-                },
-            )
 
         if tool_name == "update_menu_knowledge":
             notes = args.get("notes")
