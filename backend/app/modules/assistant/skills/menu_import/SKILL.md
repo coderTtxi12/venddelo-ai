@@ -17,8 +17,18 @@ End-to-end **concierge menu import** for restaurant owners — one preview, one 
 
 Before any import tool, load:
 
-1. **`load_skill(menu_write)`** — how to map categories, complements, layouts, photos
-2. **`load_skill(menu_best_practices)`** — order, layouts, ticket optimization, complement UX
+1. **`load_skill(menu_read)`** — investigate the **current** menu (categories, products, complements) so you know what already exists
+2. **`load_skill(menu_write)`** — how to map categories, complements, layouts, photos
+3. **`load_skill(menu_best_practices)`** — order, layouts, ticket optimization, complement UX
+
+## Investigate → plan → apply
+
+Be the concierge: **investigate first, plan, then apply the whole menu in one shot.**
+
+1. **Investigate:** read the current menu (`get_full_menu` / `menu_read`) to see existing categories, products, and complements. Read the uploaded document(s) fully.
+2. **Plan:** decide what to **create** vs **update**. `preview_full_import` and `apply_full_import` reconcile the draft against the live menu **by name** — existing categories/products are updated (never duplicated), new ones are created, and complements on products that already have groups are left untouched.
+3. **Ask only what's necessary:** infer everything you can (complement rules, prices, layouts). Raise an `open_question` **only** for genuine ambiguities you cannot resolve from the document or context.
+4. **Apply once:** publish the entire menu with a single `apply_full_import`.
 
 ## Important rules
 
@@ -42,15 +52,15 @@ After `apply_full_import` succeeds:
 
 ## Workflow (concierge)
 
-1. **`load_skill(menu_write)`** + **`load_skill(menu_best_practices)`** + **`start_menu_import_session`**
+1. **`load_skill(menu_read)`** + **`load_skill(menu_write)`** + **`load_skill(menu_best_practices)`** + **`start_menu_import_session`** — then read the current menu to understand what already exists
 2. Owner uploads files → **`register_menu_source_file`** for each `storage_path` from chat attachments
 3. Optional context → **`save_discovery_answers`**
-4. **`start_menu_extraction_batch`** — OCR all sources → `draft_batches[]`
+4. **`start_menu_extraction_batch`** — OCR all sources → **one full-menu draft**
 5. If `open_questions` → **`save_clarification_answers`** — **one question per turn** until resolved
-6. **`optimize_import_draft`** — merge batches, set category order/layout, product order, descriptions,
+6. **`optimize_import_draft`** — optimize the whole menu: category order/layout, product order, descriptions,
    **complement groups** (required vs optional, min/max selections, extra prices), theme recommendation
-7. **`preview_full_import`** — show executive summary in Spanish (includes complement rules)
-8. Owner confirms once → **`apply_full_import`** (`confirmed: true`)
+7. **`preview_full_import`** — show executive summary in Spanish; includes the **reconciliation plan** (nuevas vs existentes) and complement rules
+8. Owner confirms once → **`apply_full_import`** (`confirmed: true`) — creates new + updates existing, no duplicates
 9. **`apply_menu_theme`** (theme from optimization)
 10. **`load_skill(promotions)`** → **`generate_promotion_banner`** for each NxM promo
 11. Ask owner for dish photos → **`menu_write`**: `match_product_photos` → confirm → `bulk_assign_product_images`
@@ -87,7 +97,7 @@ first, paid extras last.
 | Tool | Effect | Purpose |
 |------|--------|---------|
 | `register_menu_source_file` | mutate | Register uploaded PDF/DOCX/image path |
-| `start_menu_extraction_batch` | mutate | OCR all sources → `draft_batches[]` |
+| `start_menu_extraction_batch` | mutate | OCR all sources → one full-menu draft |
 | `get_extraction_status` | read | Batch progress + optional preview |
 | `save_clarification_answers` | mutate | Answer `open_questions` |
 
@@ -95,16 +105,13 @@ first, paid extras last.
 
 | Tool | Effect | Purpose |
 |------|--------|---------|
-| `optimize_import_draft` | mutate | Optimize layout, copy, complements, theme |
+| `optimize_import_draft` | mutate | Optimize layout, copy, complements, theme (whole menu) |
 | `preview_full_import` | read | Full menu executive preview (MXN) |
-| `apply_full_import` | mutate | Apply all batches (`confirmed: true`) |
+| `apply_full_import` | mutate | Apply the **entire** menu in one shot (`confirmed: true`) |
 
-### Legacy batch tools (avoid in concierge)
-
-| Tool | Effect | Purpose |
-|------|--------|---------|
-| `preview_import_batch` | read | Per-batch preview (legacy) |
-| `apply_menu_batch` | mutate | Single batch apply (legacy) |
+There are **no per-section apply tools** — the whole menu (categories, products, complements,
+promotions) is extracted, optimized, and published as **one** draft. Never split the menu into
+sections; `apply_full_import` materializes everything in a single call.
 
 ### Theme (`menu_write` tools)
 
