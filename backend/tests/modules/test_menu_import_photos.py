@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.db.uow import SqlAlchemyUnitOfWork
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.menu_import.apply_batch import apply_import_batch
 from app.modules.assistant.skills.menu_import.description_enhance import (
     apply_description_enhancements,

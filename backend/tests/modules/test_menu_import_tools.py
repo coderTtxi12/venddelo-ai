@@ -3,7 +3,7 @@ import uuid
 from app.db.models.assistant import AssistantConversation
 from app.db.models.restaurant import Restaurant
 from app.db.uow import SqlAlchemyUnitOfWork
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills import build_skill_registry
 from app.modules.assistant.skills.menu_import.tools import MenuImportSkill
 from tests.conftest import requires_db

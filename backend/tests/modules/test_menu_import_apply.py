@@ -5,7 +5,7 @@ from app.core.pagination import PaginationParams
 from app.db.models.assistant import AssistantConversation
 from app.db.models.restaurant import Restaurant
 from app.db.uow import SqlAlchemyUnitOfWork
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.menu_import.apply_batch import (
     ApplyBatchResult,
     ApplyFullResult,
@@ -248,7 +248,7 @@ def test_apply_import_batch_publishes_products(session):
     assert len(products.items) == 2
     pastor = next(item for item in products.items if item.name == "Taco al Pastor")
     assert pastor.price_cents == 3500
-    assert pastor.is_published is True
+    assert pastor.status == "active"
     assert pastor.option_groups
     assert pastor.option_groups[0].items[0].label == "Verde"
 
