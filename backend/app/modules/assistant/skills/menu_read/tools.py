@@ -6,7 +6,7 @@ from typing import Any
 
 from app.core.exceptions import NotFoundError
 from app.core.pagination import PaginationParams
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
 from app.modules.assistant.skills.menu_read.promotions import (
     is_catalog_discount,
@@ -14,6 +14,7 @@ from app.modules.assistant.skills.menu_read.promotions import (
     promotion_payload,
 )
 from app.modules.assistant.skills.menu_read.search import (
+    LONE_MATCH_THRESHOLD,
     STRONG_MATCH_THRESHOLD,
     SUGGESTION_THRESHOLD,
     match_score,
@@ -36,6 +37,7 @@ from app.modules.promotions.types import serialize_promotion_type
 
 DEFAULT_LIST_PRODUCTS_LIMIT = 20
 MAX_LIST_PRODUCTS_LIMIT = 50
+MAX_BULK_GET_PRODUCTS_LIMIT = 50
 MAX_SEARCH_RESULTS = 20
 MAX_SEARCH_SUGGESTIONS = 5
 DEFAULT_LIST_PROMOTIONS_LIMIT = 20
@@ -67,6 +69,179 @@ def _list_promotions_limit(args: dict[str, Any]) -> int:
     except (TypeError, ValueError):
         limit = DEFAULT_LIST_PROMOTIONS_LIMIT
     return max(1, min(limit, MAX_LIST_PROMOTIONS_LIMIT))
+
+
+def _parse_bulk_get_product_refs(args: dict[str, Any]) -> tuple[list[dict[str, str]], str | None]:
+    """Normalize bulk_get_products inputs into ordered lookup refs."""
+    refs: list[dict[str, str]] = []
+
+    product_ids_raw = args.get("product_ids")
+    if isinstance(product_ids_raw, list):
+        for product_id_raw in product_ids_raw:
+            product_id = str(product_id_raw or "").strip()
+            if product_id:
+                refs.append({"product_id": product_id})
+
+    names_raw = args.get("names")
+    if isinstance(names_raw, list):
+        for name_raw in names_raw:
+            name = str(name_raw or "").strip()
+            if name:
+                refs.append({"name": name})
+
+    items_raw = args.get("items")
+    if isinstance(items_raw, list):
+        for item in items_raw:
+            if not isinstance(item, dict):
+                continue
+            product_id = str(item.get("product_id") or "").strip()
+            name = str(item.get("name") or item.get("product_name") or "").strip()
+            if product_id:
+                refs.append({"product_id": product_id})
+            elif name:
+                refs.append({"name": name})
+
+    if not refs:
+        return [], "Provide product_ids, names, or items with at least one lookup"
+    if len(refs) > MAX_BULK_GET_PRODUCTS_LIMIT:
+        return (
+            [],
+            f"At most {MAX_BULK_GET_PRODUCTS_LIMIT} products per call (got {len(refs)})",
+        )
+    return refs, None
+
+
+def _bulk_get_products(
+    service: MenuService,
+    ctx: AgentContext,
+    refs: list[dict[str, str]],
+) -> ToolResult:
+    promo_service = PromotionService(ctx.uow.promotions)
+    timezone = _restaurant_timezone(ctx)
+    product_names, category_names = _promotion_name_maps(service, ctx.restaurant_id)
+
+    results: list[dict[str, Any]] = []
+    products: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+
+    for ref in refs:
+        input_label = ref.get("product_id") or ref.get("name") or "?"
+        product_id_raw = ref.get("product_id")
+        name_raw = ref.get("name")
+
+        if product_id_raw:
+            try:
+                product_id = uuid.UUID(str(product_id_raw))
+            except ValueError:
+                results.append(
+                    {
+                        "ok": False,
+                        "input": input_label,
+                        "error": "Invalid product_id",
+                    }
+                )
+                continue
+            try:
+                product = service.get_product_by_id(ctx.restaurant_id, product_id)
+            except NotFoundError:
+                if name_raw:
+                    resolved = resolve_product(service, ctx.restaurant_id, name_raw)
+                    ok, message, extra = _resolve_result_payload(resolved)
+                    if not ok:
+                        results.append(
+                            {
+                                "ok": False,
+                                "input": input_label,
+                                "error": message,
+                                **extra,
+                            }
+                        )
+                        continue
+                    assert resolved.product is not None
+                    product = resolved.product
+                else:
+                    results.append(
+                        {
+                            "ok": False,
+                            "input": input_label,
+                            "error": "Product not found",
+                        }
+                    )
+                    continue
+        elif name_raw:
+            resolved = resolve_product(service, ctx.restaurant_id, name_raw)
+            ok, message, extra = _resolve_result_payload(resolved)
+            if not ok:
+                results.append(
+                    {
+                        "ok": False,
+                        "input": input_label,
+                        "error": message,
+                        **extra,
+                    }
+                )
+                continue
+            assert resolved.product is not None
+            product = resolved.product
+        else:
+            results.append(
+                {
+                    "ok": False,
+                    "input": input_label,
+                    "error": "Provide product_id or name",
+                }
+            )
+            continue
+
+        product_key = str(product.id)
+        if product_key in seen_ids:
+            results.append(
+                {
+                    "ok": True,
+                    "input": input_label,
+                    "id": product_key,
+                    "name": product.name,
+                    "duplicate": True,
+                }
+            )
+            continue
+
+        seen_ids.add(product_key)
+        payload = _product_payload_with_promotions(
+            product,
+            promo_service=promo_service,
+            timezone=timezone,
+            product_names=product_names,
+            category_names=category_names,
+        )
+        products.append(payload)
+        results.append(
+            {
+                "ok": True,
+                "input": input_label,
+                "id": product_key,
+                "name": product.name,
+                "product": payload,
+            }
+        )
+
+    found = len(products)
+    failed = sum(1 for row in results if not row.get("ok"))
+    if found == 0:
+        return ToolResult(
+            ok=False,
+            summary=f"No products found ({failed} lookup(s) failed)",
+            data={"products": [], "results": results, "found": 0, "failed": failed},
+        )
+
+    summary = f"Found {found} product(s)"
+    if failed:
+        summary = f"{summary}; {failed} lookup(s) failed"
+    return ToolResult(
+        ok=True,
+        summary=summary,
+        data={"products": products, "results": results, "found": found, "failed": failed},
+    )
 
 
 def _restaurant_timezone(ctx: AgentContext) -> str:
@@ -236,6 +411,8 @@ def _score_catalog(
         return []
     resolved = resolve_product_in_catalog(cleaned, products, active_only=active_only)
     if resolved.status == "found" and resolved.product is not None:
+        if resolved.matches:
+            return list(resolved.matches)
         return [(1.0, resolved.product)]
     if resolved.status == "ambiguous":
         return list(resolved.matches)
@@ -578,20 +755,35 @@ def _list_categories_result(service: MenuService, ctx: AgentContext) -> ToolResu
     )
 
 
-def _live_menu_status(product: ProductDTO) -> str:
-    """Owner-facing live menu state derived from publish + active flags."""
-    on_live_menu = product.is_published and product.approval_status == "approved"
-    if not on_live_menu:
-        return "draft"
-    if product.is_active:
-        return "en_menu"
-    return "inactivo"
-
-
-def _live_menu_status_counts(products: list[ProductDTO]) -> dict[str, int]:
-    counts = {"en_menu": 0, "inactivo": 0, "draft": 0}
+def _status_counts(products: list[ProductDTO]) -> dict[str, int]:
+    counts = {"active": 0, "inactive": 0, "draft": 0}
     for product in products:
-        counts[_live_menu_status(product)] += 1
+        counts[product.status] += 1
+    return counts
+
+
+def _catalog_status_counts(
+    service: MenuService,
+    restaurant_id: uuid.UUID,
+    *,
+    category_id: uuid.UUID | None = None,
+    page_size: int = 100,
+) -> dict[str, int]:
+    """Count products across the full catalog (or one category), not just the current page."""
+    counts = {"total": 0, "active": 0, "inactive": 0, "draft": 0}
+    cursor: str | None = None
+    while True:
+        page = service.list_products_page(
+            restaurant_id,
+            PaginationParams(limit=page_size, cursor=cursor),
+            category_id=category_id,
+        )
+        for product in page.items:
+            counts["total"] += 1
+            counts[product.status] += 1
+        if not page.has_more:
+            break
+        cursor = page.next_cursor
     return counts
 
 
@@ -604,10 +796,7 @@ def _product_payload(product: ProductDTO) -> dict[str, Any]:
         "image_path": product.image_path,
         "price_cents": product.price_cents,
         "currency": product.currency,
-        "is_active": product.is_active,
-        "is_published": product.is_published,
-        "approval_status": product.approval_status,
-        "live_menu_status": _live_menu_status(product),
+        "status": product.status,
         "category_ids": [str(item) for item in product.category_ids],
         "category_sort_indices": dict(product.category_sort_indices),
         "has_options": bool(groups),
@@ -682,20 +871,20 @@ class MenuReadSkill:
                     "Omit category_id for all categories; set category_id to a regular category "
                     "UUID from list_categories (not virtual special aisle ids). Returns products[] "
                     "with: id, name, description, image_path (null if no photo), price_cents "
-                    "(always cents — 100 MXN = 10000), currency, is_active, is_published, "
-                    "approval_status, live_menu_status (en_menu | inactivo | draft — owner UI "
-                    "state; prefer this over interpreting flags), category_ids (UUIDs this product "
+                    "(always cents — 100 MXN = 10000), currency, status (active | inactive | draft), "
+                    "category_ids (UUIDs this product belongs to), "
                     "category_sort_indices (order within each category), has_options, "
                     "option_groups[] (complements/add-ons: id, title, required, selection "
                     "single|multi, min_selections, max_selections, sort_index, is_active, "
                     "selection_summary, items[] with id, label, price_delta_cents, sort_index, "
                     "is_active). Also returns "
                     f"{_PRODUCT_PROMOTIONS_DOC}, next_cursor, has_more, limit, counts "
-                    "(total, en_menu, inactivo, draft — owner UI states; use for totals), "
+                    "(catalog-wide total, active, inactive, draft — use counts for "
+                    "¿cuántos productos? even when limit is small), page_counts for the "
+                    "current page only, "
                     "and category_id when filtered. Paginate until has_more=false for a full catalog audit. "
-                    "live_menu_status mapping: en_menu = published+approved+active (orderable); "
-                    "inactivo = published+approved+inactive (visible as No disponible); "
-                    "draft = unpublished or not approved (hidden from live menu)."
+                    "status mapping: active = visible and orderable; inactive = visible as No disponible; "
+                    "draft = hidden from live menu."
                 ),
                 effect="read",
                 input_schema={
@@ -724,20 +913,14 @@ class MenuReadSkill:
                 description=(
                     "Search products by **name** (exact name wins over fuzzy neighbors; "
                     "descriptions are ignored so shared words like 'hamburguesa' in another "
-                    "product's copy do not hijack the match). Includes inactive products by "
-                    "default — check is_active on each hit. Set active_only=true to limit to "
-                    "En menú items only."
+                    "product's copy do not hijack the match). Searches the full owner catalog "
+                    "including inactive and draft items — check status on each hit."
                 ),
                 effect="read",
                 input_schema={
                     "type": "object",
                     "properties": {
                         "query": {"type": "string"},
-                        "active_only": {
-                            "type": "boolean",
-                            "description": "When true, ignore inactive products.",
-                            "default": False,
-                        },
                     },
                     "required": ["query"],
                 },
@@ -748,11 +931,9 @@ class MenuReadSkill:
                     "Get one product's full detail. Provide product_id (UUID) when known, "
                     "or name to resolve it by fuzzy match. Provide at least one. Returns "
                     "product with: id, name, description, image_path, price_cents (cents), "
-                    "currency, is_active, is_published, approval_status, live_menu_status "
-                    "(en_menu | inactivo | draft), category_ids, "
+                    "currency, status (active | inactive | draft), category_ids, "
                     "category_sort_indices, has_options, option_groups[] (full complement "
-                    f"detail), {_PRODUCT_PROMOTIONS_DOC}. Prefer live_menu_status for owner-facing "
-                    "visibility; raw flags remain for writes."
+                    f"detail), {_PRODUCT_PROMOTIONS_DOC}."
                 ),
                 effect="read",
                 input_schema={
@@ -765,6 +946,51 @@ class MenuReadSkill:
                         "name": {
                             "type": "string",
                             "description": "Product name to resolve by fuzzy match when no UUID.",
+                        },
+                    },
+                },
+            ),
+            ToolDefinition(
+                name="bulk_get_products",
+                description=(
+                    "Fetch up to 50 products in one call when you already know their UUIDs "
+                    "and/or names. Each hit returns the same full payload as get_product "
+                    f"({_PRODUCT_PROMOTIONS_DOC}). Per-item misses return errors in results[] "
+                    "without failing the whole call when at least one product is found."
+                ),
+                effect="read",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "product_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Product UUIDs to load (preferred when known).",
+                        },
+                        "names": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Product names to resolve by fuzzy match.",
+                        },
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "product_id": {
+                                        "type": "string",
+                                        "description": "Product UUID.",
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Product name when UUID is unknown.",
+                                    },
+                                },
+                            },
+                            "description": (
+                                "Ordered lookups with product_id and/or name per row. "
+                                "Use when mixing ids and names in one batch."
+                            ),
                         },
                     },
                 },
@@ -909,13 +1135,19 @@ class MenuReadSkill:
                 )
                 for product in page.items
             ]
-            status_counts = _live_menu_status_counts(page.items)
+            status_counts = _status_counts(page.items)
+            catalog_counts = _catalog_status_counts(
+                service,
+                ctx.restaurant_id,
+                category_id=category_id,
+            )
             data: dict[str, Any] = {
                 "products": products,
                 "next_cursor": page.next_cursor,
                 "has_more": page.has_more,
                 "limit": limit,
-                "counts": {
+                "counts": catalog_counts,
+                "page_counts": {
                     "total": len(page.items),
                     **status_counts,
                 },
@@ -927,26 +1159,22 @@ class MenuReadSkill:
                 ok=True,
                 summary=(
                     f"Listed {len(products)} products "
-                    f"({status_counts['en_menu']} en_menu, "
-                    f"{status_counts['inactivo']} inactivo, "
-                    f"{status_counts['draft']} draft, {scope}, has_more={page.has_more})"
+                    f"(catalog: {catalog_counts['total']} total, "
+                    f"{catalog_counts['active']} active, "
+                    f"{catalog_counts['inactive']} inactive, "
+                    f"{catalog_counts['draft']} draft, {scope}, has_more={page.has_more})"
                 ),
                 data=data,
             )
 
         if tool_name == "search_products":
             query = str(args.get("query", "")).strip()
-            active_only = bool(args.get("active_only", False))
-            catalog = (
-                iter_active_products(service, ctx.restaurant_id)
-                if active_only
-                else iter_catalog_products(service, ctx.restaurant_id)
-            )
+            catalog = iter_catalog_products(service, ctx.restaurant_id)
 
             if not query:
-                scored = [(1.0, product) for product in catalog if product.is_active or not active_only]
+                scored = [(1.0, product) for product in catalog]
             else:
-                scored = _score_catalog(query, catalog, active_only=active_only)
+                scored = _score_catalog(query, catalog)
 
             strong = [
                 _scored_payload(score, product)
@@ -958,6 +1186,14 @@ class MenuReadSkill:
                 for score, product in scored
                 if score < STRONG_MATCH_THRESHOLD
             ][:MAX_SEARCH_SUGGESTIONS]
+
+            if (
+                not strong
+                and len(suggestions) == 1
+                and suggestions[0].get("match_score", 0) >= LONE_MATCH_THRESHOLD
+            ):
+                strong = suggestions
+                suggestions = []
 
             if strong:
                 summary = f"Found {len(strong)} matching products"
@@ -1029,6 +1265,12 @@ class MenuReadSkill:
                 return _product_detail(resolved.product, match_score=1.0)
 
             return ToolResult(ok=False, summary="Provide product_id or name")
+
+        if tool_name == "bulk_get_products":
+            refs, err = _parse_bulk_get_product_refs(args)
+            if err:
+                return ToolResult(ok=False, summary=err)
+            return _bulk_get_products(service, ctx, refs)
 
         if tool_name == "list_promotions":
             promo_service = PromotionService(ctx.uow.promotions)

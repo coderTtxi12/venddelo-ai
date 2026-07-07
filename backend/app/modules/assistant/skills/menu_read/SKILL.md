@@ -60,6 +60,7 @@ Follow this workflow on every menu question:
 | "Productos de la categoría Tacos" | `list_categories` first if needed, then `list_products` + `category_id` |
 | "Busca tacos al pastor" / "¿tienes X?" | `search_products` + `query` |
 | "Detalle del producto {id}" / after search by id | `get_product` + `product_id` |
+| "Detalle de varios productos" / known UUID list | `bulk_get_products` + `product_ids` or `items` |
 | "¿Qué opciones/tamaños/extras tiene X?" / "¿es obligatorio elegir?" | `get_product` (read `option_groups` + `selection_summary`) |
 | "¿Cuántos productos (no) tienen promo?" | `list_products` (paginate; read `has_promotions` on each row) |
 | "¿Qué promociones tengo?" / "promos activas" | `list_promotions` (incl. product discounts by default; paginate with `cursor`) |
@@ -72,6 +73,7 @@ Follow this workflow on every menu question:
 2. **Text lookup:** `search_products` when the owner names or describes items.
 3. **Full catalog / counts:** `list_products` with pagination — never guess totals.
 4. **Single record:** `get_product` when you already have a UUID.
+5. **Several known products:** `bulk_get_products` with `product_ids` and/or `names` (max 50) instead of many `get_product` calls.
 
 ### Step 2b: Handle "Product Not Found" (typos + other languages)
 
@@ -121,7 +123,7 @@ from `price_cents`). Never dump raw tool JSON keys or snake_case field names in 
 | `cursor` | no | From previous `list_products` response |
 | `limit` | no | Page size (default 20, max 50) |
 
-**Returns:** `products[]` (check `live_menu_status` on each row: `en_menu`, `inactivo`, `draft`; each with `id`, `name`, `description`, `image_path`, `price_cents`, `currency`, `is_active`, `is_published`, `approval_status`, `live_menu_status`, `category_ids`, `category_sort_indices`, `has_options`, `option_groups[]` with full complement/add-on detail, **`promotions[]` / `has_promotions`** including `option_participation` when relevant), `next_cursor`, `has_more`, `limit`, `counts` (`total`, `en_menu`, `inactivo`, `draft` — owner UI states; use these for "¿cuántos productos?" not `is_active`), optional `category_id`
+**Returns:** `products[]` (check `status` on each row: `active`, `inactive`, `draft`; each with `id`, `name`, `description`, `image_path`, `price_cents`, `currency`, `status`, `category_ids`, `category_sort_indices`, `has_options`, `option_groups[]` with full complement/add-on detail, **`promotions[]` / `has_promotions`** including `option_participation` when relevant), `next_cursor`, `has_more`, `limit`, `counts` (`total`, `active`, `inactive`, `draft` — owner UI states; use these for "¿cuántos productos?"), optional `category_id`
 
 **Use when:** Full browse, "how many products", complements/photos audit, finding **inactive** items to re-enable, or all items in one category. Paginate until `has_more=false`.
 
@@ -130,7 +132,6 @@ from `price_cents`). Never dump raw tool JSON keys or snake_case field names in 
 | Arg | Required | Meaning |
 |-----|----------|---------|
 | `query` | yes | Fuzzy, accent-insensitive match on **product name** (descriptions ignored) |
-| `active_only` | no | When `true`, skip inactive products (default `false`) |
 
 **Returns:**
 
@@ -142,8 +143,8 @@ from `price_cents`). Never dump raw tool JSON keys or snake_case field names in 
 
 Matching tolerates typos and accents ("wins" → "WINGS & FRIES", "limon" → "Limón").
 **Exact name wins** over neighbors (e.g. query "Hamburguesa" matches product `HAMBURGUESA`,
-not `BURGER & BONELESS` even if its description mentions hamburguesa). Includes inactive
-products unless `active_only=true`.
+not `BURGER & BONELESS` even if its description mentions hamburguesa). Always searches the
+full owner catalog (active, inactive, draft). Check `status` on each hit.
 It does **not** cross languages — see Step 2b for the `list_products` fallback.
 
 **Use when:** Named item lookup ("pastor", "limonada"), not full catalog export.
@@ -168,6 +169,24 @@ Use `list_product_promotions` only when you have the product elsewhere and want 
 alone.
 
 **Use when:** Detail view, or confirming a single item from search/list.
+
+### `bulk_get_products`
+
+| Arg | Required | Meaning |
+|-----|----------|---------|
+| `product_ids` | one of | Array of product UUIDs (preferred when known). |
+| `names` | one of | Array of product names to resolve by fuzzy match. |
+| `items` | one of | Ordered array of `{ product_id?, name? }` when mixing ids and names. |
+
+Provide **at least one** lookup source. Max **50** products per call. Duplicates by id are
+skipped after the first hit.
+
+**Returns:** `products[]` (full payloads, same shape as `get_product`), plus `results[]`
+per input (`ok`, `input`, `product` or `error`), and `found` / `failed` counts.
+
+**Use when:** You need detail for several known products (e.g. after `search_products`
+returned multiple ids, or comparing a short list). Prefer this over N separate
+`get_product` calls.
 
 ### `list_promotions`
 
@@ -298,9 +317,7 @@ Each product includes (see `docs/live-menu-product-reference.en.md`):
 | `name`, `description` | Display text (`description` may be `null`) |
 | `image_path` | Storage object path (not a full URL); `null` if no photo |
 | `price_cents`, `currency` | **Base** unit price in cents. Format as `price_cents / 100` (e.g. `12000` → `$120.00 MXN`) |
-| `is_active` | Soft-delete flag. `false` = unavailable; live menu disables "Add to cart" |
-| `is_published`, `approval_status` | Publish workflow (used by writes). Prefer `live_menu_status` when talking to the owner |
-| `live_menu_status` | Owner UI state: `en_menu` (visible + orderable), `inactivo` (visible as No disponible), `draft` (hidden from live menu) |
+| `status` | Owner UI state: `active` (visible + orderable), `inactive` (visible as No disponible), `draft` (hidden from live menu) |
 | `category_ids` | Categories the product belongs to |
 | `category_sort_indices` | `{ category_id → sort_index }`; display order **within** each category (lower = first) |
 | `has_options` | `true` when the product has at least one option group |
@@ -376,7 +393,8 @@ Never invent values missing from tool results.
 
 1. **First, reuse** the products already in this turn's tool results — you usually have
    everything (including `id`). Just reformat; no new tool call needed.
-2. If you must re-fetch, call `get_product` **once per product**, preferring the `id`
+2. If you must re-fetch several products, call `bulk_get_products` with their `product_ids`
+   (or `names`) in one batch. For a single product, use `get_product` once, preferring the `id`
    from the earlier result: `{ "product_id": "<uuid>" }`.
 3. If you only have names, call `get_product` `{ "name": "BURGER & BONELESS" }` — it
    resolves by fuzzy match. Never pass a name into `product_id`.
@@ -472,6 +490,7 @@ Never invent values missing from tool results.
 | Paginate with `list_products` for large menus | Assume `search_products` returns the full catalog |
 | Scope every call to the current restaurant tenant | Reference other restaurants |
 | Say when data is partial (page 1 of N) | Claim you edited or disabled products |
+| Use `bulk_get_products` for several known UUIDs/names | Call `get_product` in a loop when ids are already known |
 | Use `get_product` for one known UUID | Call tools "just in case" when prior results already suffice |
 | Explain promos with `label` + `pricing_note` | Compute or assert a final cart total (checkout owns that) |
 | Use `effective_only` for "active now" questions | Treat `combo` as a real discount |

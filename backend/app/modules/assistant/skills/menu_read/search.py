@@ -16,6 +16,15 @@ from difflib import SequenceMatcher
 STRONG_MATCH_THRESHOLD = 0.7
 # Products between this and STRONG are returned as "did you mean" suggestions.
 SUGGESTION_THRESHOLD = 0.5
+# When there is exactly one near-miss and no strong hits, promote it to products.
+LONE_MATCH_THRESHOLD = 0.65
+
+# Common menu naming aliases (token-level). Intentionally small — cross-language
+# fallbacks still go through list_products (see SKILL.md).
+_TOKEN_ALIASES: dict[str, frozenset[str]] = {
+    "wings": frozenset({"wings", "boneless"}),
+    "boneless": frozenset({"boneless", "wings"}),
+}
 
 _SPLIT_CHARS = "&/,.-+_()[]{}|:;"
 
@@ -49,11 +58,17 @@ def _meaningful_tokens(tokens: list[str]) -> list[str]:
     return filtered or tokens
 
 
+def _alias_tokens(token: str) -> frozenset[str]:
+    return _TOKEN_ALIASES.get(token, frozenset({token}))
+
+
 def _token_similarity(a: str, b: str) -> float:
     if a == b:
         return 1.0
     if a in b or b in a:
         return 0.9
+    if _alias_tokens(a) & _alias_tokens(b):
+        return 0.92
     return SequenceMatcher(None, a, b).ratio()
 
 
