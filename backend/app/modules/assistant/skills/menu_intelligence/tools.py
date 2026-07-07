@@ -10,19 +10,16 @@ from app.core.storage import StorageError
 from app.core.vision.ports import VisionAnalysisRequest, VisionError
 from app.infra.storage.factory import build_storage
 from app.infra.vision.factory import build_vision_provider
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
 from app.modules.assistant.skills.menu_intelligence.catalog_hints import (
     existing_groups_payload,
-    gather_beverage_menu_hints,
-    gather_peer_complement_patterns,
 )
 from app.modules.assistant.skills.menu_intelligence.image_loader import (
     load_product_image_bytes,
     product_has_image_path,
 )
 from app.modules.assistant.skills.menu_intelligence.prompts import (
-    build_complement_suggestion_prompt,
     build_image_analysis_prompt,
 )
 from app.modules.assistant.skills.menu_media.product_context import gather_product_context
@@ -148,34 +145,6 @@ class MenuIntelligenceSkill:
                     "required": [],
                 },
             ),
-            ToolDefinition(
-                name="suggest_complements",
-                description=(
-                    "Suggest NEW complement option groups and items for ONE product. Combines "
-                    "vision photo analysis (when image_path exists), peer products in the same "
-                    "category, and beverage menu names for inspiration. All suggested items are "
-                    "new option_items for this product only — never shared IDs with other "
-                    "products. Read-only proposal; owner confirms then use menu_write "
-                    "add_option_group / add_option_item to apply."
-                ),
-                effect="read",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "product_id": {"type": "string"},
-                        "name": {"type": "string"},
-                        "product_name": {"type": "string"},
-                        "include_image_analysis": {
-                            "type": "boolean",
-                            "description": (
-                                "When true (default), analyze the product photo if image_path exists."
-                            ),
-                            "default": True,
-                        },
-                    },
-                    "required": [],
-                },
-            ),
         ]
 
     def execute(self, tool_name: str, args: dict[str, Any], ctx: AgentContext) -> ToolResult:
@@ -200,75 +169,6 @@ class MenuIntelligenceSkill:
                     "product_name": product.name,
                     "image_path": product.image_path,
                     "analysis": analysis,
-                },
-            )
-
-        if tool_name == "suggest_complements":
-            product, resolve_error = _resolve_product(service, ctx, args)
-            if resolve_error is not None:
-                return resolve_error
-            assert product is not None
-
-            include_image = bool(args.get("include_image_analysis", True))
-            image_analysis: dict[str, Any] | None = None
-            if include_image and product_has_image_path(product):
-                image_analysis, image_error = _run_image_analysis(ctx, service, product)
-                if image_error is not None:
-                    return image_error
-
-            context = _analysis_context(ctx, service, product)
-            peer_patterns = gather_peer_complement_patterns(service, ctx.restaurant_id, product)
-            beverage_hints = gather_beverage_menu_hints(service, ctx.restaurant_id)
-
-            try:
-                result = build_vision_provider().analyze_json(
-                    VisionAnalysisRequest(
-                        prompt=build_complement_suggestion_prompt(
-                            context,
-                            image_analysis=image_analysis,
-                            peer_patterns=peer_patterns,
-                            beverage_hints=beverage_hints,
-                        ),
-                        image_bytes=None,
-                    )
-                )
-            except VisionError as exc:
-                return ToolResult(
-                    ok=False,
-                    summary=f"Complement suggestion failed for {product.name!r}: {exc}",
-                    data={"product_id": str(product.id)},
-                )
-
-            suggested_groups = result.data.get("suggested_groups")
-            if not isinstance(suggested_groups, list):
-                return ToolResult(
-                    ok=False,
-                    summary="Vision model returned no suggested_groups array",
-                    data={"product_id": str(product.id), "raw": result.data},
-                )
-
-            group_count = len(suggested_groups)
-            item_count = sum(
-                len(group.get("items") or [])
-                for group in suggested_groups
-                if isinstance(group, dict)
-            )
-            return ToolResult(
-                ok=True,
-                summary=(
-                    f"Suggested {group_count} complement group(s) "
-                    f"({item_count} new items) for {product.name}"
-                ),
-                data={
-                    "product_id": str(product.id),
-                    "product_name": product.name,
-                    "image_path": product.image_path,
-                    "image_analysis": image_analysis,
-                    "peer_patterns_used": len(peer_patterns),
-                    "beverage_hints_used": len(beverage_hints),
-                    "suggested_groups": suggested_groups,
-                    "notes": result.data.get("notes"),
-                    "apply_with": "menu_write add_option_group / add_option_item after owner confirms",
                 },
             )
 

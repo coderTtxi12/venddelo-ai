@@ -1,32 +1,29 @@
 ---
 name: menu_intelligence
-description: Analyze product photos with vision and suggest NEW complement option groups/items (read-only proposals; apply with menu_write after owner confirms).
+description: Analyze product photos with vision AI (read-only) to surface visible components, add-on ideas, and beverage pairings.
 ---
 
 # menu_intelligence
 
-Vision + catalog intelligence for **complement (add-on) suggestions**.
+Vision intelligence for **product photo analysis**.
 
 ## When to use
 
-- Owner asks to **generate/suggest complements** for a product.
-- *"Qué complementos le pongo a la hamburguesa?"*
-- After the product has a photo (`image_path`) or even without one (uses menu text + peers).
+- Owner wants to understand what a product photo shows.
+- *"Qué se ve en la foto de la hamburguesa?"*
+- To surface add-on ideas or beverage pairings visible in the image before editing the menu.
 
 ## Important rules
 
-- **All complements are NEW `option_items` on the target product only.**
-- **Never** link or reuse option_item IDs from other products.
-- Beverage names from the menu are **inspiration for labels/prices**, not product links.
-- Tools are **read-only** — apply with **`menu_write`** after owner confirmation.
+- Tool is **read-only** — apply any menu change with **`menu_write`** after owner confirmation.
+- Be specific to what is visible in the image; never invent packaging text.
 
 ## Workflow
 
 1. **`menu_read`** — `get_product` (current `option_groups`, `image_path`).
-2. Optional **`load_skill(menu_best_practices)`** for complement UX rules.
-3. **`suggest_complements`** (or **`analyze_product_image`** first if owner only wants photo analysis).
-4. **Preview** groups/items with prices to the owner in Spanish.
-5. Owner confirms → **`menu_write`** `add_option_group` (+ `add_option_item` if adding to existing groups).
+2. **`analyze_product_image`** — vision analysis of the stored photo.
+3. **Preview** findings to the owner in Spanish.
+4. Owner confirms → **`menu_write`** to apply any changes.
 
 ## Tools
 
@@ -37,25 +34,3 @@ Vision analysis of the product photo in storage.
 **Returns:** `analysis` with `visible_components`, `visible_add_on_ideas`, `beverage_pairing_ideas`, etc.
 
 Requires `image_path` on the product.
-
-### `suggest_complements` (read)
-
-Full proposal combining:
-
-- Photo analysis (when `image_path` exists, `include_image_analysis=true`)
-- Existing groups on the product (avoid duplicates)
-- Peer products in the same categories (pattern inspiration)
-- Beverage category products (naming/price inspiration)
-
-**Returns:** `suggested_groups[]` with `title`, `selection`, `required`, `items[]` (`label`, `price_delta_cents`).
-
-## Apply example (after confirm)
-
-For each proposed group:
-
-```
-menu_write add_option_group
-  product_id, title, required, selection, items: [{label, price_delta_cents}, ...]
-```
-
-Do **not** mutate until the owner approves the preview.
