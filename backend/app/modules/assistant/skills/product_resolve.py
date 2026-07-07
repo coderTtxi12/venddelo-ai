@@ -16,23 +16,6 @@ from app.modules.assistant.skills.menu_read.search import (
 from app.modules.menu.schemas import ProductDTO
 from app.modules.menu.service import MenuService
 
-# Owner confirmations often prefix the product name — strip before matching.
-_QUERY_PREFIXES = (
-    "este ",
-    "esta ",
-    "ese ",
-    "esa ",
-    "el producto ",
-    "la producto ",
-    "producto ",
-    "si ",
-    "sí ",
-    "yes ",
-)
-
-# When multiple strong fuzzy matches are this close, require disambiguation.
-_AMBIGUITY_SCORE_GAP = 0.12
-
 ResolveStatus = Literal["found", "ambiguous", "not_found"]
 
 
@@ -46,23 +29,13 @@ class ProductResolveResult:
 
 
 def normalize_product_query(query: str) -> str:
-    """Strip filler prefixes and whitespace from an owner-provided product reference."""
-    text = str(query or "").strip()
-    normalized = normalize_text(text)
-    changed = True
-    while changed and normalized:
-        changed = False
-        for prefix in _QUERY_PREFIXES:
-            if normalized.startswith(prefix):
-                normalized = normalized[len(prefix) :].strip()
-                changed = True
-                break
-    return normalized
+    """Normalize an owner-provided product reference for comparison."""
+    return normalize_text(str(query or "").strip())
 
 
 def score_product(query: str, product: ProductDTO, *, active_only: bool = False) -> float:
     """Score how well ``query`` matches a product **by name** (description ignored)."""
-    if active_only and not product.is_active:
+    if active_only and product.status != "active":
         return 0.0
     normalized_query = normalize_product_query(query)
     if not normalized_query:
@@ -86,8 +59,6 @@ def resolve_product_in_catalog(
 
     exact: list[ProductDTO] = []
     for product in products:
-        if active_only and not product.is_active:
-            continue
         if normalize_text(product.name) == cleaned:
             exact.append(product)
 
@@ -121,18 +92,9 @@ def resolve_product_in_catalog(
             query=query,
         )
     if len(strong) > 1:
-        best_score = strong[0][0]
-        tied = [pair for pair in strong if best_score - pair[0] <= _AMBIGUITY_SCORE_GAP]
-        if len(tied) == 1:
-            return ProductResolveResult(
-                status="found",
-                product=tied[0][1],
-                matches=tuple(strong),
-                query=query,
-            )
         return ProductResolveResult(
             status="ambiguous",
-            matches=tuple(tied),
+            matches=tuple(strong),
             query=query,
         )
 
@@ -170,8 +132,12 @@ def iter_active_products(
     *,
     page_size: int = 100,
 ) -> list[ProductDTO]:
-    """Load active products only (legacy helper for promo/category scans)."""
-    return [product for product in iter_catalog_products(service, restaurant_id, page_size=page_size) if product.is_active]
+    """Load orderable products only."""
+    return [
+        product
+        for product in iter_catalog_products(service, restaurant_id, page_size=page_size)
+        if product.status == "active"
+    ]
 
 
 def resolve_product(

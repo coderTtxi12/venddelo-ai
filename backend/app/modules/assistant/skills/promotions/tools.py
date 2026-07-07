@@ -10,7 +10,7 @@ from typing import Any
 from app.api.cache_helpers import invalidate_restaurant_menu_cache
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.pagination import PaginationParams
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext, commit_agent_mutation
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
 from app.modules.assistant.skills.menu_read.promotions import (
     promotion_display_name,
@@ -307,6 +307,7 @@ def _run_mutation(
     except ValidationError as exc:
         return ToolResult(ok=False, summary=str(exc) or "Validation error")
     _invalidate_menu_cache(ctx)
+    commit_agent_mutation(ctx)
     return _promotion_result(promo, menu=menu, ctx=ctx, summary=summary, extra=extra)
 
 
@@ -817,6 +818,7 @@ class PromotionsSkill:
             )
             if result.ok:
                 _invalidate_menu_cache(ctx)
+                commit_agent_mutation(ctx)
             return result
 
         if tool_name == "disable_promotion":
@@ -832,6 +834,7 @@ class PromotionsSkill:
             except NotFoundError as exc:
                 return ToolResult(ok=False, summary=str(exc) or "Not found")
             _invalidate_menu_cache(ctx)
+            commit_agent_mutation(ctx)
             return ToolResult(
                 ok=True,
                 summary=f"Disabled promotion {display!r}",

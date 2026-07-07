@@ -9,7 +9,7 @@ from app.core.image.ports import ImageGenerationError, ImageGenerationRequest
 from app.core.storage import StorageError
 from app.infra.image.factory import build_image_provider
 from app.infra.storage.factory import build_storage
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.base import ToolResult
 from app.modules.assistant.skills.promotions.banner_prompt import (
     build_promotion_banner_prompt,

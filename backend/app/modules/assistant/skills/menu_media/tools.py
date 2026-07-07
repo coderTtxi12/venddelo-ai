@@ -11,7 +11,7 @@ from app.core.image.ports import ImageGenerationError, ImageGenerationRequest
 from app.core.storage import StorageError
 from app.infra.image.factory import build_image_provider
 from app.infra.storage.factory import build_storage
-from app.modules.assistant.agent.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext, commit_agent_mutation
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
 from app.modules.assistant.skills.menu_media.product_context import (
     gather_product_context,
@@ -130,6 +130,7 @@ def _generate_and_attach_image(
         return ToolResult(ok=False, summary=str(exc) or "Product not found")
 
     _invalidate_menu_cache(ctx)
+    commit_agent_mutation(ctx)
     return ToolResult(
         ok=True,
         summary=f"Generated appetizing image for {updated.name}",
