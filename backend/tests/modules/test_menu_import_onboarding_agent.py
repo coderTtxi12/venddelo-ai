@@ -17,7 +17,7 @@ def test_menu_import_internal_tool_names_match_skill():
     names = {tool.name for tool in skill.tool_definitions()}
     assert names == MENU_IMPORT_INTERNAL_TOOL_NAMES
     assert "analyze_import_vs_live" in names
-    assert len(names) == 14
+    assert len(names) == 11
 
 
 def test_executor_excludes_menu_import_tools():
@@ -37,6 +37,9 @@ def test_menu_import_handoff_agent_gets_granular_tools():
     registry = build_skill_registry()
     agent = build_menu_import_agent(settings=Settings(), registry=registry)
     assert agent.name == MENU_IMPORT_AGENT_NAME
+    from app.modules.assistant.skills.menu_import.response_schema import MenuImportUserResponse
+
+    assert agent.output_type is MenuImportUserResponse
     tools = build_menu_import_internal_tools(registry)
     names = {tool.name for tool in tools}
     assert names == MENU_IMPORT_INTERNAL_TOOL_NAMES

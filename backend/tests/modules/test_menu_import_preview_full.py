@@ -33,12 +33,7 @@ def test_build_full_import_preview_includes_layout_complements_and_theme():
             )
         ]
     )
-    md = build_full_import_preview(
-        draft,
-        optimization_notes_es=["Promociones primero"],
-        recommended_theme_id="original",
-        theme_label="Original",
-    )
+    md = build_full_import_preview(draft)
     assert "Alitas" in md
     assert "grid" in md
     assert "Boneless" in md
@@ -47,5 +42,3 @@ def test_build_full_import_preview_includes_layout_complements_and_theme():
     assert "min=1" in md
     assert "Grande" in md
     assert "$15" in md
-    assert "Promociones primero" in md
-    assert "Original" in md

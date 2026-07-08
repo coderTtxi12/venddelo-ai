@@ -16,9 +16,11 @@ def test_menu_import_skill_registered():
     names = {tool.name for tool in tools}
     assert "start_menu_import_session" in names
     assert "update_menu_knowledge" in names
-    assert len(names) == 14
+    assert len(names) == 11
     assert "analyze_import_vs_live" in names
-    assert "optimize_import_draft" in names
+    assert "optimize_import_draft" not in names
+    assert "preview_description_enhancements" not in names
+    assert "optimize_import_draft" not in names
     assert "preview_full_import" in names
     assert "apply_full_import" in names
     # Legacy per-section tools are removed so the whole menu applies in one shot.

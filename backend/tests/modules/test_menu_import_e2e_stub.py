@@ -14,7 +14,7 @@ from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills import build_skill_registry
 from app.modules.assistant.skills.menu_import.document_loader import MenuSourcePayload, VisionPage
-from app.modules.assistant.skills.menu_import.optimization import OptimizationResult
+from app.modules.assistant.skills.menu_import.session_schemas import MenuImportSessionStatus
 from app.modules.menu.service import MenuService
 from tests.conftest import requires_db
 
@@ -110,17 +110,12 @@ def _run(registry, tool_name: str, args: dict, ctx: AgentContext):
     return registry.execute("menu_import", tool_name, args, ctx)
 
 
-def _run_write(registry, tool_name: str, args: dict, ctx: AgentContext):
-    return registry.execute("menu_write", tool_name, args, ctx)
-
-
 @requires_db
 def test_menu_import_full_flow_stub(session):
     ctx, restaurant_id = _create_context(session)
     registry = build_skill_registry()
     stub_vision = StubVisionProvider()
     source_path = f"restaurants/{restaurant_id}/import/menu_source/menu.pdf"
-    photo_path = f"restaurants/{restaurant_id}/import/product_photo/pastor.jpg"
 
     with (
         patch(
@@ -128,24 +123,8 @@ def test_menu_import_full_flow_stub(session):
             return_value=stub_vision,
         ),
         patch(
-            "app.modules.assistant.skills.menu_write.product_photos.build_vision_provider",
-            return_value=stub_vision,
-        ),
-        patch(
             "app.modules.assistant.skills.menu_import.tools.load_menu_source_from_storage",
             side_effect=_fake_menu_source,
-        ),
-        patch(
-            "app.modules.assistant.skills.menu_import.tools.optimize_draft",
-            side_effect=lambda draft, context: OptimizationResult(
-                draft=draft,
-                optimization_notes_es=["Complementos ordenados"],
-                recommended_theme_id=None,
-            ),
-        ),
-        patch(
-            "app.modules.assistant.skills.menu_write.product_photos._load_image_bytes",
-            return_value=(b"fake-image", "image/jpeg"),
         ),
     ):
         start = _run(registry, "start_menu_import_session", {}, ctx)
@@ -187,12 +166,8 @@ def test_menu_import_full_flow_stub(session):
             ctx,
         )
         assert clarified.ok is True
-        assert clarified.data["status"] == MenuImportSessionStatus.OPTIMIZING.value
+        assert clarified.data["status"] == MenuImportSessionStatus.PREVIEW_BATCH.value
         assert clarified.data["unanswered_question_ids"] == []
-
-        optimized = _run(registry, "optimize_import_draft", {}, ctx)
-        assert optimized.ok is True
-        assert optimized.data["status"] == MenuImportSessionStatus.PREVIEW_BATCH.value
 
         preview = _run(registry, "preview_full_import", {}, ctx)
         assert preview.ok is True
@@ -206,47 +181,16 @@ def test_menu_import_full_flow_stub(session):
         )
         assert applied.ok is True
         assert applied.data["products"] == 1
-        assert applied.data["status"] == MenuImportSessionStatus.MATCHING_IMAGES.value
+        assert applied.data["status"] == MenuImportSessionStatus.ENRICHING.value
 
-        menu = MenuService(ctx.uow.menu)
-        products = menu.list_products(restaurant_id, PaginationParams(limit=10, cursor=None))
-        product_id = str(products.items[0].id)
-        stub_vision._photo_match = {
-            "product_id": product_id,
-            "confidence": 0.91,
-            "reason_es": "Taco al pastor visible",
-        }
-
-        matched = _run_write(
-            registry,
-            "match_product_photos",
-            {"image_paths": [photo_path]},
-            ctx,
-        )
-        assert matched.ok is True
-        assert len(matched.data["matched"]) == 1
-        assert matched.data["matched"][0]["product_id"] == product_id
-
-        assigned = _run_write(
-            registry,
-            "bulk_assign_product_images",
-            {
-                "items": [
-                    {"storage_path": photo_path, "product_id": product_id},
-                ]
-            },
-            ctx,
-        )
-        assert assigned.ok is True
-        assert assigned.data["updated"] == 1
+        closed = _run(registry, "update_menu_knowledge", {"notes": "Import OK"}, ctx)
+        assert closed.ok is True
+        assert closed.data["status"] == MenuImportSessionStatus.COMPLETED.value
 
     menu = MenuService(ctx.uow.menu)
     products = menu.list_products(restaurant_id, PaginationParams(limit=10, cursor=None))
     assert len(products.items) == 1
     assert products.items[0].name == "Taco al Pastor"
-    assert products.items[0].image_path == photo_path
 
     active = ctx.uow.menu_import_sessions.get_active_for_restaurant(restaurant_id)
-    assert active is not None
-    assert active.draft_batches[0]["applied_at"]
-    assert active.draft_batches[0]["ref_map"]["prod_pastor"] == str(products.items[0].id)
+    assert active is None
