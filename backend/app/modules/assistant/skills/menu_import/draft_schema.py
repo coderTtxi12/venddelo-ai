@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.modules.assistant.skills.menu_import.draft_normalize import normalize_import_draft_payload
 from app.modules.assistant.skills.menu_import.price_units import (
     _coerce_legacy_cents_field,
     mxn_to_cents,
@@ -21,7 +22,10 @@ class ImportOptionItem(BaseModel):
     def _normalize_price_delta(cls, data: Any) -> Any:
         if isinstance(data, dict):
             return _coerce_legacy_cents_field(
-                data, mxn_key="price_delta_mxn", cents_key="price_delta_cents"
+                data,
+                mxn_key="price_delta_mxn",
+                cents_key="price_delta_cents",
+                null_default=0,
             )
         return data
 
@@ -56,7 +60,12 @@ class ImportProduct(BaseModel):
     @classmethod
     def _normalize_price(cls, data: Any) -> Any:
         if isinstance(data, dict):
-            return _coerce_legacy_cents_field(data, mxn_key="price_mxn", cents_key="price_cents")
+            return _coerce_legacy_cents_field(
+                data,
+                mxn_key="price_mxn",
+                cents_key="price_cents",
+                null_default=0,
+            )
         return data
 
     @property
@@ -130,6 +139,11 @@ class ImportDraft(BaseModel):
     unmapped_text: list[str] = Field(default_factory=list)
     open_questions: list[OpenQuestion] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_llm_payload(cls, data: Any) -> Any:
+        return normalize_import_draft_payload(data)
+
 
 class ImportBatch(BaseModel):
     batch_index: int
@@ -137,3 +151,8 @@ class ImportBatch(BaseModel):
     promotions: list[ImportPromotion] = Field(default_factory=list)
     global_rules: list[str] = Field(default_factory=list)
     open_questions: list[OpenQuestion] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_llm_payload(cls, data: Any) -> Any:
+        return normalize_import_draft_payload(data)

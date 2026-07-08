@@ -28,6 +28,9 @@ Rules:
 - Transcribe literally; never invent categories, products, prices, or promotions.
 - **Prices in pesos ({currency}) as printed on the menu** — use `price_mxn` / `price_delta_mxn` /
   `amount_mxn` as whole pesos or decimals (e.g. $229 → 229, $85.50 → 85.5). **Never use centavos.**
+  If a price is missing or illegible, use `null` or omit it (defaults to 0) and add an open_question.
+- Optional text fields (`description`, `constraints_notes`, complement labels) may be `null` when absent.
+- Complement items without an extra charge use `price_delta_mxn: null` or `0`.
 - Assign stable refs: cat_1, prod_1, og_1, oi_1, promo_1 (unique within this extraction).
 - Ambiguous or illegible prices → add to unmapped_text and open_questions; do not guess.
 - Partially readable promo or complement rules → mandatory open_questions entry (question_es in Spanish).

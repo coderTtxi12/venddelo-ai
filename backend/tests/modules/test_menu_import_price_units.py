@@ -21,3 +21,11 @@ def test_import_product_legacy_price_cents_field():
     )
     assert product.price_mxn == 85
     assert product.price_cents == 8500
+
+
+def test_import_product_null_price_mxn_defaults_to_zero():
+    product = ImportProduct.model_validate(
+        {"ref": "prod_1", "name": "Combo sin precio", "price_mxn": None, "currency": "MXN"}
+    )
+    assert product.price_mxn == 0
+    assert product.price_cents == 0
