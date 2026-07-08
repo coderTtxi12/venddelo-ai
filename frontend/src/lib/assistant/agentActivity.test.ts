@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  applyAgentThought,
+  applyToolResult,
+  applyToolStart,
+  applyWorkflowPhaseToActivity,
+  clearAgentActivityForResponse,
   extractReasoningFieldText,
   hasVisibleAgentActivity,
   INITIAL_AGENT_ACTIVITY,
@@ -10,6 +15,76 @@ import {
   STREAMING_AGENT_ACTIVITY,
   updateToolStepResult,
 } from './agentActivity';
+
+test('applyAgentThought streams router reason deltas', () => {
+  const first = applyAgentThought(INITIAL_AGENT_ACTIVITY, {
+    delta: 'El usuario',
+    source: 'router',
+  });
+  const second = applyAgentThought(first, {
+    delta: ' pregunta por categorías.',
+    source: 'router',
+  });
+  assert.equal(second.planReason, 'El usuario pregunta por categorías.');
+});
+
+test('applyAgentThought only accepts router source', () => {
+  assert.deepEqual(
+    applyAgentThought(INITIAL_AGENT_ACTIVITY, {
+      delta: 'ignorado',
+      source: 'reasoning',
+    }),
+    INITIAL_AGENT_ACTIVITY,
+  );
+});
+
+test('applyAgentThought sets final router reason text', () => {
+  const withReason = applyAgentThought(INITIAL_AGENT_ACTIVITY, {
+    text: 'El usuario pregunta por categorías del menú live.',
+    source: 'router',
+  });
+  assert.equal(
+    withReason.planReason,
+    'El usuario pregunta por categorías del menú live.',
+  );
+});
+
+test('applyWorkflowPhaseToActivity maps workflow phases', () => {
+  const next = applyWorkflowPhaseToActivity(INITIAL_AGENT_ACTIVITY, 'executing');
+  assert.equal(next.phase, 'execute');
+  assert.equal(next.status, 'processing');
+});
+
+test('applyToolStart appends a running tool step', () => {
+  const next = applyToolStart(INITIAL_AGENT_ACTIVITY, {
+    tool: 'list_categories',
+    call_id: 'call-1',
+    effect: 'read',
+  });
+  assert.equal(next.tools.length, 1);
+  assert.equal(next.tools[0]?.status, 'running');
+  assert.equal(next.tools[0]?.tool, 'list_categories');
+});
+
+test('clearAgentActivityForResponse resets activity', () => {
+  const active = applyToolStart(STREAMING_AGENT_ACTIVITY, { tool: 'search_products' });
+  assert.deepEqual(clearAgentActivityForResponse(active), INITIAL_AGENT_ACTIVITY);
+});
+
+test('applyToolResult marks matching tool done', () => {
+  const started = applyToolStart(INITIAL_AGENT_ACTIVITY, {
+    tool: 'search_products',
+    call_id: 'call-1',
+  });
+  const next = applyToolResult(started, {
+    tool: 'search_products',
+    call_id: 'call-1',
+    ok: true,
+    summary: '3 productos',
+  });
+  assert.equal(next.tools[0]?.status, 'done');
+  assert.equal(next.tools[0]?.summary, '3 productos');
+});
 
 test('extractReasoningFieldText keeps only envelope reasoning', () => {
   assert.equal(
