@@ -6,7 +6,7 @@ from agents import Agent
 
 from app.core.config import Settings
 from app.modules.assistant.agent.run_context import AssistantRunContext
-from app.modules.assistant.agent.tools import build_registry_function_tools
+from app.modules.assistant.agent.tools import build_executor_function_tools
 from app.modules.assistant.agent.workflow.prompts import (
     EVALUATOR_INSTRUCTIONS,
     EXECUTOR_INSTRUCTIONS,
@@ -41,7 +41,7 @@ def build_executor_agent(
     return Agent[AssistantRunContext](
         name="Executor",
         instructions=EXECUTOR_INSTRUCTIONS,
-        tools=build_registry_function_tools(registry, effective_skill_ids),
+        tools=build_executor_function_tools(registry, effective_skill_ids, settings=settings),
         model=settings.openai_model,
         output_type=ExecutionRecord,
     )

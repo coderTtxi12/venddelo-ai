@@ -7,10 +7,13 @@ from typing import Any
 
 from agents import FunctionTool, RunContextWrapper
 
+from app.core.config import Settings
 from app.modules.assistant.agent.run_context import AssistantRunContext
 from app.modules.assistant.agent.tool_schema import coerce_tool_args, normalize_tool_json_schema
 from app.modules.assistant.skills.base import SkillPort, ToolDefinition
 from app.modules.assistant.skills.registry import SkillRegistry
+
+MENU_IMPORT_ONBOARDING_TOOL_NAME = "run_menu_import_onboarding"
 
 
 def _encode_tool_result(payload: dict[str, Any]) -> str:
@@ -26,15 +29,54 @@ def build_skill_function_tools(skill: SkillPort) -> list[FunctionTool]:
 def build_registry_function_tools(
     registry: SkillRegistry,
     effective_skill_ids: list[str],
+    *,
+    expose_menu_import_granular: bool = True,
 ) -> list[FunctionTool]:
     """Wrap entitled registry tools for the executor agent."""
     tools: list[FunctionTool] = []
     seen: set[str] = set()
+    hide_menu_import = (
+        "menu_import" in effective_skill_ids and not expose_menu_import_granular
+    )
     for skill_id, tool_def in registry.entitled_tools(effective_skill_ids):
+        if hide_menu_import and skill_id == "menu_import":
+            continue
         if tool_def.name in seen:
             continue
         seen.add(tool_def.name)
         tools.append(_build_registry_tool(registry, skill_id, tool_def))
+    return tools
+
+
+def build_menu_import_internal_tools(registry: SkillRegistry) -> list[FunctionTool]:
+    """All granular menu_import tools for the onboarding sub-agent."""
+    return build_registry_function_tools(
+        registry,
+        ["menu_import"],
+        expose_menu_import_granular=True,
+    )
+
+
+def build_executor_function_tools(
+    registry: SkillRegistry,
+    effective_skill_ids: list[str],
+    *,
+    settings: Settings,
+) -> list[FunctionTool]:
+    """Executor tools: registry skills plus menu import onboarding agent-as-tool."""
+    from app.modules.assistant.skills.menu_import.onboarding_agent import (
+        build_menu_import_onboarding_tool,
+    )
+
+    tools = build_registry_function_tools(
+        registry,
+        effective_skill_ids,
+        expose_menu_import_granular=False,
+    )
+    if "menu_import" in effective_skill_ids:
+        tools.append(
+            build_menu_import_onboarding_tool(settings=settings, registry=registry)
+        )
     return tools
 
 
