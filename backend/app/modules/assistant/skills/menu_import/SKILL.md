@@ -1,6 +1,6 @@
 ---
 name: menu_import
-description: Concierge digital menu onboarding — upload documents, OCR extract, clarify rules, optimize structure, apply full menu, match photos, NxM promo banners.
+description: Concierge digital menu onboarding — upload documents, OCR extract, clarify rules, apply full menu as-is, NxM promo banners.
 ---
 
 # menu_import
@@ -11,7 +11,7 @@ End-to-end **concierge menu import** for restaurant owners — one preview, one 
 
 - Owner wants to **import / digitize** their printed or PDF menu.
 - First-time setup of categories, products, complements, and promotions.
-- Owner uploads PDF, DOCX, or menu photos via chat attachments.
+- Owner uploads PDF, DOCX, or menu photos via chat attachments (`menu_source` only).
 
 ## Main workflow entry (agent-as-tool)
 
@@ -28,8 +28,7 @@ Granular `menu_import` tools are **internal** to that sub-agent, not exposed on 
 Before any import tool, load:
 
 1. **`load_skill(menu_read)`** — investigate the **current** menu (categories, products, complements) so you know what already exists
-2. **`load_skill(menu_write)`** — how to map categories, complements, layouts, photos
-3. **`load_skill(menu_best_practices)`** — order, layouts, ticket optimization, complement UX
+2. **`load_skill(menu_write)`** — how to map categories, complements, layouts (not product photos)
 
 ## Investigate → plan → apply
 
@@ -38,21 +37,27 @@ Be the concierge: **investigate first, plan, then apply the whole menu in one sh
 1. **Investigate:** `analyze_import_vs_live` caches the live menu snapshot in Postgres and reconciles the OCR draft — do not re-scan the live menu every turn.
 2. **Plan:** decide what to **create** vs **update**. `preview_full_import` and `apply_full_import` reconcile the draft against the live menu **by name** — existing categories/products are updated (never duplicated), new ones are created, and complements on products that already have groups are left untouched unless the owner clarifies.
 3. **Ask only what's necessary:** infer everything you can (complement rules, prices, layouts). Raise an `open_question` **only** for genuine ambiguities you cannot resolve from the document or context.
-4. **Ask in one batch:** when there are `open_questions`, present **all** questions in a single message (especially complement assignments). Do not ask one question per turn.
-5. **Apply once:** publish the entire menu with a single `apply_full_import`.
+4. **Ask in one batch:** when there are `open_questions`, return them in the structured JSON field `questions` (2–4 short `suggested_answers` per item, `allow_other: true`). Do not embed questions in `message`.
+5. **Apply as-is:** publish menu copy exactly as extracted (plus owner clarification answers).
+   Layout (`vertical` / `grid` / `horizontal`) and sort order are applied automatically at
+   preview/apply to improve average ticket and sales.
+6. **Apply once:** publish the entire menu with a single `apply_full_import`.
 
 ## Important rules
 
 - **Never apply mutations** until the owner confirms a preview (`confirmed: true` on apply tools).
 - **Prices in chat and previews are MXN pesos**. On apply, converted to **centavos** in Postgres.
-- Extraction and optimization run **synchronously in-process** during the chat turn.
+- Extraction runs **synchronously in-process** during the chat turn.
 - Finish with **`update_menu_knowledge`** to persist confirmed rules in `menu_markdown`.
 
 ## Never during import
 
 - **`menu_media`** / **`generate_product_image`** — do not generate AI food photos
 - **`request_image_enhancement`** — do not offer AI photo generation for dishes
-- Do not propose "¿generamos fotos con IA?" for platillos
+- **`match_product_photos`** / **`bulk_assign_product_images`** — do not match or assign dish photos
+- Do not ask the owner to upload product photos or assign images to products
+- Do not optimize layout/copy or enhance descriptions with LLM
+- Layout and ordering are applied automatically at preview/apply (see **Merchandising** below)
 
 ## Always after apply for NxM promos
 
@@ -70,18 +75,14 @@ After `apply_full_import` succeeds:
 4. **`start_menu_extraction_batch`** — OCR all sources → **one full-menu draft**
 5. **`analyze_import_vs_live`** — cache live menu + reconciliation; merge complement questions
 6. If `open_questions` → ask **all questions in one message** → **`save_clarification_answers`** with every answer at once
-7. **`optimize_import_draft`** — optimize the whole menu: category order/layout, product order, descriptions,
-   **complement groups** (required vs optional, min/max selections, extra prices), theme recommendation
-8. **`preview_full_import`** — show executive summary in Spanish; includes the **reconciliation plan** (nuevas vs existentes) and complement rules
-9. Owner confirms once → **`apply_full_import`** (`confirmed: true`) — creates new + updates existing, no duplicates
-10. **`apply_menu_theme`** (theme from optimization)
-11. **`load_skill(promotions)`** → **`generate_promotion_banner`** for each NxM promo
-12. Ask owner for dish photos → **`menu_write`**: `match_product_photos` → confirm → `bulk_assign_product_images`
-13. **`update_menu_knowledge`** — append import notes; session **completed**
+7. **`preview_full_import`** — show executive summary in Spanish (as extracted); includes the **reconciliation plan** (nuevas vs existentes) and complement rules
+8. Owner confirms once → **`apply_full_import`** (`confirmed: true`) — creates new + updates existing, no duplicates
+9. **`load_skill(promotions)`** → **`generate_promotion_banner`** for each NxM promo (if any)
+10. **`update_menu_knowledge`** — append import notes; session **completed**
 
 ## Complement detection
 
-During extraction and optimization, infer from menu text:
+During extraction, infer from menu text:
 
 | Menu signal | Group settings |
 |-------------|----------------|
@@ -91,9 +92,19 @@ During extraction and optimization, infer from menu text:
 | Free optional sides | optional, single, min=0, max=1 |
 | Unclear required vs optional | `open_questions` — ask owner |
 
-`optimize_import_draft` applies LLM rules plus **keyword heuristics** (`complement_heuristics`)
-as a safety net. Set `price_delta_mxn` when menu shows extra charge. Order groups: size/required
-first, paid extras last.
+Set `price_delta_mxn` when menu shows extra charge.
+
+## Merchandising (automatic at preview / apply)
+
+Without rewriting copy, the import pipeline sets:
+
+| Decision | Rule |
+|----------|------|
+| `display_layout` (new categories only) | `vertical` — many items (default); `grid` — few items or drinks/desserts; `horizontal` — promos/combos/popular carousels |
+| Category order | Promos/combos → mains → sides → desserts → drinks (ticket-focused) |
+| Product order | Promos/combos first, then premium price anchoring (higher price earlier) |
+| Complement group order | Required (size/drink) → optional → paid extras last (upsell) |
+| Complement item order | Premium/large sizes first; paid extras by higher `price_delta_mxn` first |
 
 ## Tools
 
@@ -115,31 +126,16 @@ first, paid extras last.
 | `analyze_import_vs_live` | mutate | Cache live menu snapshot + reconciliation; complement questions |
 | `save_clarification_answers` | mutate | Answer all `open_questions` in one call |
 
-### Concierge optimize & apply
+### Preview & apply
 
 | Tool | Effect | Purpose |
 |------|--------|---------|
-| `optimize_import_draft` | mutate | Optimize layout, copy, complements, theme (whole menu) |
-| `preview_full_import` | read | Full menu executive preview (MXN) |
+| `preview_full_import` | read | Full menu executive preview as extracted (MXN) |
 | `apply_full_import` | mutate | Apply the **entire** menu in one shot (`confirmed: true`) |
 
 There are **no per-section apply tools** — the whole menu (categories, products, complements,
-promotions) is extracted, optimized, and published as **one** draft. Never split the menu into
+promotions) is extracted and published as **one** draft. Never split the menu into
 sections; `apply_full_import` materializes everything in a single call.
-
-### Theme (`menu_write` tools)
-
-| Tool | Effect | Purpose |
-|------|--------|---------|
-| `list_menu_themes` | read | Active themes from DB |
-| `apply_menu_theme` | mutate | Set `digital_menu_theme_id` |
-
-### Photos (`menu_write` tools — after apply)
-
-| Tool | Effect | Purpose |
-|------|--------|---------|
-| `match_product_photos` | read | Vision match uploaded paths to products |
-| `bulk_assign_product_images` | mutate | Many photos → products |
 
 ### Close
 
@@ -153,10 +149,9 @@ sections; `apply_full_import` materializes everything in a single call.
 - Show **`preview_full_import`** before apply (precios en **pesos MXN**).
 - Show complement groups as obligatorio/opcional with min/max in preview.
 - Ask explicitly before `apply_full_import` with `confirmed: true`.
-- For uncertain photos, show candidates and ask the owner to choose.
 
 ## Integrations
 
-- **Upload API:** `POST .../assistant/import/assets?kind=menu_source|product_photo`
-- **menu_write:** theme, photos, post-import edits
+- **Upload API:** `POST .../assistant/import/assets?kind=menu_source`
+- **menu_write:** post-import edits (not photos during import)
 - **promotions:** NxM banner generation after apply

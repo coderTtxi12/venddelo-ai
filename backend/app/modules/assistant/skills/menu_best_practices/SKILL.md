@@ -147,7 +147,7 @@ oculta automáticamente según las promos vigentes.
 Usa `display_layout` cuando ayude:
 
 - **`list`** — default; muchos items con texto más largo
-- **`grid`** — bebidas, postres, items visuales
+- **`grid`** — bebidas, postres, pocos items visuales pero importante resaltarlos
 - **`horizontal`** — carrusel destacado
 
 Ejemplo: categoría Bebidas en **`grid`** mejora el escaneo visual.
