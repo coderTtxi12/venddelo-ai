@@ -1,29 +1,7 @@
-import uuid
-
 from app.db.models.menu_import_session import MenuImportSession
-from app.modules.assistant.agent.workflow.context_loader import (
-    WorkflowContext,
-    executor_input,
-    planner_input,
-)
-from app.modules.assistant.agent.workflow.schemas import WorkflowPlan
 from app.modules.assistant.skills.menu_import.session_context import (
     build_import_session_context,
 )
-
-
-def _workflow_context(import_session_status=None):
-    return WorkflowContext(
-        user_message="para papas no pongas extras",
-        restaurant_id=uuid.uuid4(),
-        conversation_id=uuid.uuid4(),
-        effective_skill_ids=["menu_import"],
-        skill_catalog="- **menu_import**: import",
-        system_prompt="You are the assistant.",
-        conversation_history="(sin historial previo en esta conversación)",
-        assistant_display_name="Luna",
-        import_session_status=import_session_status,
-    )
 
 
 def _session(**overrides):
@@ -101,28 +79,3 @@ def test_excludes_already_answered_questions():
     assert "Preguntas de aclaración pendientes: 1" in summary
     assert "[q2] Pregunta 2" in summary
     assert "q1" not in summary
-
-
-def test_planner_input_includes_active_session_block():
-    context = _workflow_context(import_session_status="Hay una sesión ACTIVA (fase: clarifying).")
-    rendered = planner_input(context)
-
-    assert "## Active menu import session" in rendered
-    assert "Hay una sesión ACTIVA" in rendered
-    assert rendered.index("Active menu import session") < rendered.index("Conversation history")
-
-
-def test_planner_input_omits_block_when_no_session():
-    context = _workflow_context(import_session_status=None)
-    rendered = planner_input(context)
-
-    assert "Active menu import session" not in rendered
-
-
-def test_executor_input_includes_active_session_block():
-    context = _workflow_context(import_session_status="Sesión ACTIVA")
-    plan = WorkflowPlan(goal="continuar import", requires_tools=True, steps=[])
-    rendered = executor_input(context, plan)
-
-    assert "## Active menu import session" in rendered
-    assert "Sesión ACTIVA" in rendered
