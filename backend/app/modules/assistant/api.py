@@ -14,6 +14,9 @@ from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.modules.assistant.agent.service import AssistantAgentService
 from app.modules.assistant.import_assets import upload_import_asset
 from app.modules.assistant.schemas import AssistantChatRequest, ImportAssetUploadDTO
+from app.modules.assistant.skills.menu_import.session_context import (
+    cancel_active_import_for_restaurant,
+)
 from app.modules.restaurants.schemas import RestaurantDTO
 
 router = APIRouter(tags=["assistant"])
@@ -42,6 +45,17 @@ def upload_assistant_import_asset(
         content,
         file.content_type or "application/octet-stream",
     )
+
+
+@router.post("/restaurants/{restaurant_id}/assistant/conversations/reset")
+def reset_assistant_conversation(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> dict[str, bool]:
+    """Start a fresh chat + menu-import context (cancels any active import for this restaurant)."""
+    cancel_active_import_for_restaurant(uow, restaurant_id=restaurant.id)
+    uow.commit()
+    return {"ok": True}
 
 
 @router.post("/restaurants/{restaurant_id}/assistant/chat")
