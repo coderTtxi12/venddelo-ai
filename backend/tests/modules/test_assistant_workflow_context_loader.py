@@ -1,6 +1,7 @@
 from app.modules.assistant.agent.workflow.context_loader import (
     _format_evaluation_result,
     _format_execution_findings,
+    menu_import_input,
     resolve_runtime_skill_ids,
     responder_input,
     router_input,
@@ -145,3 +146,30 @@ def test_router_input_includes_menu_import_signals():
     assert "## Menu import capability" in payload
     assert "archivo(s) de menú" in payload
     assert "## Active menu import session" in payload
+
+
+def test_menu_import_input_uses_menu_import_conversation_history():
+    context = type(
+        "Ctx",
+        (),
+        {
+            "conversation_history": "(sin historial previo en esta conversación)",
+            "menu_import_conversation_history": (
+                "Usuario: agrega esos productos\n\nAsistente: Vista previa lista."
+            ),
+            "user_message": "continua",
+            "import_session_context": "Hay una **sesión de importación de menú ACTIVA** (fase: preview_batch).",
+            "menu_source_attachment_count": 0,
+        },
+    )()
+    route = WorkflowRouteDecision(
+        route="menu_import",
+        goal="Continuar importación",
+        reason="Sesión activa en preview.",
+    )
+
+    payload = menu_import_input(context, route)
+
+    assert "Vista previa lista." in payload
+    assert "(sin historial previo en esta conversación)" not in payload
+    assert "## Import session" in payload
