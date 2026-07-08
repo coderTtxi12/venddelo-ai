@@ -35,6 +35,17 @@ export function createAttachmentsFromFileList(files: FileList | File[]): ChatAtt
   return Array.from(files).map(createAttachmentFromFile);
 }
 
+export function cloneAttachmentsForMessage(attachments: ChatAttachment[]): ChatAttachment[] {
+  return attachments.map((attachment) => {
+    const { file, ...rest } = attachment;
+    let previewUrl = rest.previewUrl;
+    if (file && attachment.kind === 'image') {
+      previewUrl = URL.createObjectURL(file);
+    }
+    return { ...rest, previewUrl };
+  });
+}
+
 export function revokeAttachmentPreview(attachment: ChatAttachment): void {
   if (attachment.previewUrl) {
     URL.revokeObjectURL(attachment.previewUrl);
