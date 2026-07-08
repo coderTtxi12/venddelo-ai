@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import require_owned_restaurant
@@ -12,7 +12,8 @@ from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.core.llm.ports import ChatStreamEvent
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.modules.assistant.agent.service import AssistantAgentService
-from app.modules.assistant.schemas import AssistantChatRequest
+from app.modules.assistant.import_assets import upload_import_asset
+from app.modules.assistant.schemas import AssistantChatRequest, ImportAssetUploadDTO
 from app.modules.restaurants.schemas import RestaurantDTO
 
 router = APIRouter(tags=["assistant"])
@@ -20,6 +21,27 @@ router = APIRouter(tags=["assistant"])
 
 def _agent_service() -> AssistantAgentService:
     return AssistantAgentService()
+
+
+@router.post(
+    "/restaurants/{restaurant_id}/assistant/import/assets",
+    response_model=ImportAssetUploadDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+def upload_assistant_import_asset(
+    kind: str = Query(...),
+    file: UploadFile = File(...),
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+) -> ImportAssetUploadDTO:
+    """Upload a menu document or product photo for assistant import workflows."""
+    content = file.file.read()
+    return upload_import_asset(
+        restaurant.id,
+        kind,
+        file.filename or "upload",
+        content,
+        file.content_type or "application/octet-stream",
+    )
 
 
 @router.post("/restaurants/{restaurant_id}/assistant/chat")
@@ -42,6 +64,7 @@ async def assistant_chat(
                 restaurant_id=restaurant.id,
                 message=body.message,
                 conversation_id=body.conversation_id,
+                attachments=body.attachments,
             ):
                 yield service.format_sse(event)
         except ValueError as exc:

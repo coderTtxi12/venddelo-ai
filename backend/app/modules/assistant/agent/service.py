@@ -11,6 +11,7 @@ from app.core.llm.ports import ChatStreamEvent
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.agent.tracing import ensure_assistant_agent_tracing
 from app.modules.assistant.agent.workflow.orchestrator import WorkflowOrchestrator
+from app.modules.assistant.schemas import ChatAttachmentRef
 from app.modules.assistant.skills.discovery import discover_skill_executors
 from app.modules.assistant.skills.registry import SkillRegistry
 
@@ -71,6 +72,7 @@ class AssistantAgentService:
         restaurant_id: uuid.UUID,
         message: str,
         conversation_id: uuid.UUID | None = None,
+        attachments: list[ChatAttachmentRef] | None = None,
     ) -> AssistantChatResult:
         self._require_openai_api_key()
         self._prepare_runtime()
@@ -80,6 +82,7 @@ class AssistantAgentService:
             restaurant_id=restaurant_id,
             message=message,
             conversation_id=conversation_id,
+            attachments=attachments or [],
         )
         return AssistantChatResult(
             conversation_id=resolved_conversation_id,
@@ -93,6 +96,7 @@ class AssistantAgentService:
         restaurant_id: uuid.UUID,
         message: str,
         conversation_id: uuid.UUID | None = None,
+        attachments: list[ChatAttachmentRef] | None = None,
     ) -> AsyncIterator[ChatStreamEvent]:
         self._require_openai_api_key()
         self._prepare_runtime()
@@ -102,6 +106,7 @@ class AssistantAgentService:
             restaurant_id=restaurant_id,
             message=message,
             conversation_id=conversation_id,
+            attachments=attachments or [],
         ):
             yield event
 

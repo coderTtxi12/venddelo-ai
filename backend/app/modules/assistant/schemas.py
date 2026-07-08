@@ -71,10 +71,16 @@ class AssistantConversationChatRequest(BaseModel):
 
 
 class AssistantChatRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=8000)
+    message: str = Field(min_length=0, max_length=8000)
     conversation_id: uuid.UUID | None = None
     history: list[AssistantChatHistoryMessage] = Field(default_factory=list, max_length=40)
     attachments: list[ChatAttachmentRef] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode="after")
+    def require_message_or_attachments(self) -> AssistantChatRequest:
+        if not self.message.strip() and not self.attachments:
+            raise ValueError("message or attachments required")
+        return self
 
 
 class AssistantChatCompletePayload(BaseModel):

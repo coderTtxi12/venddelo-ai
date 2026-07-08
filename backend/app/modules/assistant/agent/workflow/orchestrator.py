@@ -34,6 +34,7 @@ from app.modules.assistant.agent.workflow.context_loader import (
     responder_input,
 )
 from app.modules.assistant.conversation_store import assistant_repository, persist_turn
+from app.modules.assistant.schemas import ChatAttachmentRef
 from app.modules.assistant.agent.workflow.schemas import (
     ExecutionRecord,
     WorkflowEvaluation,
@@ -88,6 +89,7 @@ class WorkflowOrchestrator:
         restaurant_id: uuid.UUID,
         message: str,
         conversation_id: uuid.UUID | None = None,
+        attachments: list[ChatAttachmentRef] | None = None,
     ) -> tuple[uuid.UUID, str]:
         content_parts: list[str] = []
         resolved_id: uuid.UUID | None = conversation_id
@@ -97,6 +99,7 @@ class WorkflowOrchestrator:
             restaurant_id=restaurant_id,
             message=message,
             conversation_id=conversation_id,
+            attachments=attachments or [],
         ):
             if event.event == "content.delta":
                 delta = event.data.get("delta")
@@ -121,6 +124,7 @@ class WorkflowOrchestrator:
         restaurant_id: uuid.UUID,
         message: str,
         conversation_id: uuid.UUID | None = None,
+        attachments: list[ChatAttachmentRef] | None = None,
     ) -> AsyncIterator[ChatStreamEvent]:
         yield ChatStreamEvent(event="agent.status", data={"status": "processing"})
         yield phase_event("context")
@@ -130,6 +134,7 @@ class WorkflowOrchestrator:
             restaurant_id=restaurant_id,
             conversation_id=conversation_id,
             user_message=message,
+            attachments=attachments or [],
             settings=self._settings,
             rollout_skill_ids=self._rollout_skill_ids,
         )

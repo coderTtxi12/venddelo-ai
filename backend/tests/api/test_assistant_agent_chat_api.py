@@ -64,7 +64,7 @@ def test_assistant_chat_streams_agent_reply(client, engine):
 
 
 @requires_db
-def test_assistant_chat_requires_message(client, engine):
+def test_assistant_chat_requires_message_or_attachments(client, engine):
     restaurant = _seed_restaurant(client, engine, "assistant-agent-empty")
 
     response = client.post(
@@ -74,3 +74,31 @@ def test_assistant_chat_requires_message(client, engine):
     )
 
     assert response.status_code == 422
+
+
+@requires_db
+def test_assistant_chat_accepts_attachments_only_payload(client, engine):
+    restaurant = _seed_restaurant(client, engine, "assistant-agent-attachments")
+
+    with patch(
+        "app.modules.assistant.api.AssistantAgentService.stream_chat",
+        side_effect=_fake_stream_chat,
+    ):
+        response = client.post(
+            f"/api/v1/restaurants/{restaurant.id}/assistant/chat",
+            json={
+                "message": "",
+                "attachments": [
+                    {
+                        "storage_path": f"restaurants/{restaurant.id}/import/menu_source/menu.pdf",
+                        "original_name": "menu.pdf",
+                        "mime_type": "application/pdf",
+                        "kind": "menu_source",
+                        "size_bytes": 128,
+                    }
+                ],
+            },
+            headers={**AUTH, "Accept": "text/event-stream"},
+        )
+
+    assert response.status_code == 200
