@@ -119,7 +119,7 @@ export default function Sidebar() {
             <BrainOutlinedIcon sx={{ fontSize: isCollapsed ? 22 : 18 }} />
           </span>
           <span className={styles.addButtonLabel}>
-            {isChatOpen ? 'Asistente' : '+ Agregar'}
+            {isChatOpen ? 'Asistente' : 'Mexy AI'}
           </span>
         </button>
       </div>
