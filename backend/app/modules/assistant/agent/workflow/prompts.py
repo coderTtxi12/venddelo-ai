@@ -5,6 +5,7 @@ from app.modules.assistant.agent.workflow.tool_catalog import build_executor_too
 PLAN_OUTPUT_SHAPE = """{
   "goal": "string",
   "requires_tools": true,
+  "route": "standard | menu_import",
   "risk_level": "low | medium | high",
   "missing_information": [],
   "steps": [
@@ -48,18 +49,18 @@ Available tools for the Executor Agent (compact index; executor has full schemas
 
 {EXECUTOR_TOOL_CATALOG}
 
-Menu import continuation (HIGHEST PRIORITY):
-- If the input contains an "## Active menu import session" section, the user's message is almost
-  certainly continuing that import — answering the pending clarification questions, confirming the
-  preview, or adding files. In that case produce EXACTLY ONE step using the tool
-  `run_menu_import_onboarding` with requires_tools=true. The step action must instruct the executor
-  to forward the user's full message (and their answers to the pending questions) to the onboarding
-  concierge so it can resume the existing session.
-- While an import session is active, do NOT use standalone menu tools (list_categories,
-  list_products, get_product, create_product, create_category, add_option_group, etc.). The
-  onboarding concierge owns the entire import flow and already has the OCR draft in Postgres.
-- Do NOT put the pending questions into missing_information when a session is active — the concierge
-  handles them; just route to `run_menu_import_onboarding`.
+Menu import routing (HIGHEST PRIORITY when applicable):
+- Set `"route": "menu_import"` and `"requires_tools": true` with **empty `steps`** when ANY of:
+  - The input contains an "## Active menu import session" section (continuation turn).
+  - The user attached menu source files (PDF/image/DOCX) to import.
+  - The user explicitly wants to import/upload a menu from files.
+- The dedicated Menu Import agent owns the full flow (OCR, live-menu investigation, questions,
+  optimize, preview, apply). Do NOT plan executor steps for import tools.
+- While an import session is active or route is menu_import, do NOT use standalone menu tools
+  (list_categories, list_products, create_product, etc.) in the standard executor plan.
+- Do NOT put pending import questions into missing_information — the import agent handles them.
+
+For all other requests use `"route": "standard"` and plan executor steps as usual.
 
 Important rules:
 - If critical information is missing, set requires_tools=false, leave steps empty, and list
@@ -105,10 +106,6 @@ Rules:
   treat the lookup as successful — use that product id/name for later steps even if the catalog
   name differs from the owner's wording (fuzzy match). Do not fail a step because the returned
   name is not a character-for-character copy of the query.
-- For `run_menu_import_onboarding`: forward the FULL user message verbatim as `request` (including
-  their answers to the pending clarification questions listed in the "Active menu import session"
-  section). The onboarding concierge maps the answers to the open questions and resumes the existing
-  import session — it does NOT re-run OCR. Do not call standalone menu tools during an import flow.
 - Use status=partial_success when some steps succeeded but others failed or were skipped.
 - Use status=failed when no useful result was produced.
 
