@@ -61,7 +61,7 @@ def build_executor_function_tools(
     *,
     settings: Settings | None = None,
 ) -> list[FunctionTool]:
-    """Executor tools from entitled skills (menu_import uses planner handoff, not here)."""
+    """Executor tools from entitled skills (menu_import is not part of the assistant workflow)."""
     del settings
     entitled = [skill_id for skill_id in effective_skill_ids if skill_id != "menu_import"]
     return build_registry_function_tools(

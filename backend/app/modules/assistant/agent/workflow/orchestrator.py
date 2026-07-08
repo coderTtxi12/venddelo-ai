@@ -20,7 +20,6 @@ from app.modules.assistant.agent.tracing import assistant_tracing_active
 from app.modules.assistant.agent.workflow.agents import (
     build_evaluator_agent,
     build_executor_agent,
-    build_menu_import_handoff_agent,
     build_planner_agent,
     build_replanner_agent,
     build_responder_agent,
@@ -30,7 +29,6 @@ from app.modules.assistant.agent.workflow.context_loader import (
     evaluator_input,
     executor_input,
     load_workflow_runtime,
-    menu_import_input,
     planner_input,
     replanner_input,
     responder_input,
@@ -55,7 +53,6 @@ from app.modules.assistant.skills.registry import SkillRegistry
 
 MAX_REPLAN_ATTEMPTS = 2
 EXECUTOR_MAX_TURNS = 12
-MENU_IMPORT_MAX_TURNS = 24
 
 
 class WorkflowOrchestrator:
@@ -214,48 +211,6 @@ class WorkflowOrchestrator:
                 return
 
             yield plan_event(plan)
-
-            if plan.is_menu_import_handoff and "menu_import" in workflow_context.effective_skill_ids:
-                menu_import_agent = build_menu_import_handoff_agent(
-                    settings=self._settings,
-                    registry=registry,
-                )
-                yield phase_event("menu_import")
-                execution = await self._run_menu_import_agent(
-                    menu_import_agent,
-                    workflow_context,
-                    run_context,
-                )
-                evaluation = WorkflowEvaluation(ok=True, issues=[])
-
-                yield phase_event("responding")
-                async for event in self._stream_responder(
-                    responder,
-                    workflow_context,
-                    plan,
-                    execution,
-                    evaluation,
-                    run_context,
-                    content_parts,
-                ):
-                    yield event
-
-                final_output = "".join(content_parts).strip()
-                yield ChatStreamEvent(
-                    event="message.complete",
-                    data={
-                        "conversation_id": str(resolved_conversation_id),
-                        "content": final_output,
-                    },
-                )
-                if final_output:
-                    persist_turn(
-                        assistant_repository(uow),
-                        conversation_id=resolved_conversation_id,
-                        user_message=workflow_context.user_message,
-                        assistant_message=final_output,
-                    )
-                return
 
             for step_event in step_events(plan):
                 yield step_event
@@ -427,46 +382,6 @@ class WorkflowOrchestrator:
             execution.summary = "El executor terminó sin resumen textual."
         execution.tools_used = tools_used
         return clear_execution_approval_gates(execution)
-
-    async def _run_menu_import_agent(
-        self,
-        agent: Agent[AssistantRunContext],
-        workflow_context: WorkflowContext,
-        run_context: AssistantRunContext,
-    ) -> ExecutionRecord:
-        async def execute() -> object:
-            return await Runner.run(
-                agent,
-                menu_import_input(workflow_context),
-                context=run_context,
-                max_turns=MENU_IMPORT_MAX_TURNS,
-            )
-
-        trace_ctx = (
-            trace("menu_import", run_type="chain")
-            if assistant_tracing_active(self._settings)
-            else nullcontext()
-        )
-        with trace_ctx:
-            result = await execute()
-
-        tools_used: list[str] = []
-        for item in getattr(result, "new_items", []) or []:
-            if isinstance(item, ToolCallItem):
-                raw = item.raw_item
-                name = getattr(raw, "name", None)
-                if isinstance(name, str) and name:
-                    tools_used.append(name)
-
-        summary = (getattr(result, "final_output", None) or "").strip()
-        if not summary:
-            summary = "El agente de importación terminó sin resumen textual."
-
-        return ExecutionRecord(
-            status="success",
-            summary=summary,
-            tools_used=tools_used,
-        )
 
     async def _stream_responder(
         self,

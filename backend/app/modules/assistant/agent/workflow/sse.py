@@ -8,7 +8,6 @@ from app.modules.assistant.agent.workflow.schemas import WorkflowEvaluation, Wor
 PHASE_LABELS: dict[str, str] = {
     "context": "Preparando contexto",
     "planning": "Planificando",
-    "menu_import": "Importando menú",
     "executing": "Ejecutando plan",
     "evaluating": "Evaluando resultados",
     "replanning": "Ajustando plan",
