@@ -149,14 +149,22 @@ def try_apply_clarification_from_user_message(
     *,
     uow: SqlAlchemyUnitOfWork,
     restaurant_id: uuid.UUID,
+    conversation_id: uuid.UUID,
     user_message: str,
 ) -> bool:
     raw_answers = parse_clarification_answers_from_message(user_message)
     if not raw_answers:
         return False
 
-    repo = MenuImportSessionRepository(uow.session)
-    session = repo.get_active_for_restaurant(restaurant_id)
+    from app.modules.assistant.skills.menu_import.session_context import (
+        get_active_import_for_conversation,
+    )
+
+    session = get_active_import_for_conversation(
+        uow,
+        restaurant_id=restaurant_id,
+        conversation_id=conversation_id,
+    )
     if session is None:
         return False
 
@@ -169,7 +177,7 @@ def try_apply_clarification_from_user_message(
         return False
 
     apply_clarification_answers(session, resolved)
-    repo.update(session)
+    MenuImportSessionRepository(uow.session).update(session)
     uow.commit()
     return True
 

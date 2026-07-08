@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
+from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.skills.menu_import.batching import count_batch_products
 from app.modules.assistant.skills.menu_import.draft_schema import ImportBatch
 from app.modules.assistant.skills.menu_import.session_schemas import is_active_status
@@ -41,6 +43,31 @@ def _product_total(draft_batches: list[Any] | None) -> int:
         except Exception:
             continue
     return total
+
+
+def get_active_import_for_conversation(
+    uow: SqlAlchemyUnitOfWork,
+    *,
+    restaurant_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+) -> Any | None:
+    """Return the active import session only when it belongs to this chat conversation."""
+    active = uow.menu_import_sessions.get_active_for_restaurant(restaurant_id)
+    if active is None or active.conversation_id != conversation_id:
+        return None
+    return active
+
+
+def cancel_active_import_for_restaurant(
+    uow: SqlAlchemyUnitOfWork,
+    *,
+    restaurant_id: uuid.UUID,
+) -> bool:
+    active = uow.menu_import_sessions.get_active_for_restaurant(restaurant_id)
+    if active is None:
+        return False
+    uow.menu_import_sessions.cancel_active(restaurant_id)
+    return True
 
 
 def build_import_session_context(session: Any | None) -> str | None:

@@ -53,8 +53,10 @@ from app.modules.assistant.skills.menu_import.clarification import (
 )
 from app.modules.assistant.skills.menu_import.onboarding_agent import build_menu_import_agent
 from app.modules.assistant.skills.menu_import.response_schema import MenuImportUserResponse
-from app.modules.assistant.skills.menu_import.session_context import build_import_session_context
-from app.modules.assistant.skills.menu_import.session_repository import MenuImportSessionRepository
+from app.modules.assistant.skills.menu_import.session_context import (
+    build_import_session_context,
+    get_active_import_for_conversation,
+)
 from app.modules.assistant.skills.registry import SkillRegistry
 
 MAX_EXECUTOR_RETRIES = 2
@@ -202,10 +204,13 @@ class WorkflowOrchestrator:
                 if try_apply_clarification_from_user_message(
                     uow=uow,
                     restaurant_id=restaurant_id,
+                    conversation_id=resolved_conversation_id,
                     user_message=workflow_context.user_message,
                 ):
-                    active_import = MenuImportSessionRepository(uow.session).get_active_for_restaurant(
-                        restaurant_id
+                    active_import = get_active_import_for_conversation(
+                        uow,
+                        restaurant_id=restaurant_id,
+                        conversation_id=resolved_conversation_id,
                     )
                     menu_import_context = replace(
                         workflow_context,
@@ -243,8 +248,10 @@ class WorkflowOrchestrator:
                     if menu_import_response_box
                     else MenuImportUserResponse(message="".join(content_parts).strip())
                 )
-                active_session = MenuImportSessionRepository(uow.session).get_active_for_restaurant(
-                    restaurant_id
+                active_session = get_active_import_for_conversation(
+                    uow,
+                    restaurant_id=restaurant_id,
+                    conversation_id=resolved_conversation_id,
                 )
                 response = hydrate_menu_import_response(response, active_session)
                 final_output = response.message.strip() or "".join(content_parts).strip()
@@ -510,8 +517,10 @@ class WorkflowOrchestrator:
                 yield mapped
 
             response = streamed.final_output_as(MenuImportUserResponse, raise_if_incorrect_type=True)
-            active_session = MenuImportSessionRepository(uow.session).get_active_for_restaurant(
-                restaurant_id
+            active_session = get_active_import_for_conversation(
+                uow,
+                restaurant_id=restaurant_id,
+                conversation_id=workflow_context.conversation_id,
             )
             response = hydrate_menu_import_response(response, active_session)
             response_box.append(response)
