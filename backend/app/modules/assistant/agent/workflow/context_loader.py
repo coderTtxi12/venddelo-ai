@@ -11,6 +11,7 @@ from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.agent.prompt_composer import compose_system_prompt
 from app.modules.assistant.agent.workflow.schemas import ExecutionRecord, WorkflowEvaluation, WorkflowPlan
 from app.modules.assistant.context.compressor import compress_history_for_llm
+from app.modules.assistant.chat_attachments import format_user_message_with_attachments
 from app.modules.assistant.conversation_store import (
     assistant_repository,
     ensure_conversation,
@@ -21,9 +22,10 @@ from app.modules.assistant.entitlements.catalog import DEFAULT_GRANTED_SKILL_IDS
 from app.modules.assistant.entitlements.resolver import resolve_entitlements
 from app.modules.assistant.profile.adapters import SqlAlchemyAssistantProfileRepository
 from app.modules.assistant.profile.service import AssistantProfileService
-from app.modules.assistant.schemas import AssistantChatHistoryMessage
+from app.modules.assistant.schemas import AssistantChatHistoryMessage, ChatAttachmentRef
 from app.modules.assistant.skills.discovery import discover_skill_executors
 from app.modules.assistant.skills.markdown import load_skill_metadata
+from app.modules.assistant.skills.menu_import.session_context import build_import_session_context
 from app.modules.assistant.skills.registry import SkillRegistry
 
 
@@ -37,6 +39,7 @@ class WorkflowContext:
     system_prompt: str
     conversation_history: str
     assistant_display_name: str
+    import_session_status: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,13 +104,12 @@ def load_workflow_runtime(
     restaurant_id: uuid.UUID,
     conversation_id: uuid.UUID | None,
     user_message: str,
+    attachments: list[ChatAttachmentRef] | None = None,
     settings: Settings | None = None,
     rollout_skill_ids: tuple[str, ...] | None = None,
 ) -> WorkflowRuntimeBundle:
     resolved_settings = settings or get_settings()
-    cleaned = user_message.strip()
-    if not cleaned:
-        raise ValueError("message is required")
+    cleaned = format_user_message_with_attachments(user_message, attachments or [])
 
     repo = assistant_repository(uow)
     resolved_conversation_id = ensure_conversation(
@@ -152,6 +154,9 @@ def load_workflow_runtime(
         )
         history = compressed.history
 
+    active_import_session = uow.menu_import_sessions.get_active_for_restaurant(restaurant_id)
+    import_session_status = build_import_session_context(active_import_session)
+
     context = WorkflowContext(
         user_message=cleaned,
         restaurant_id=restaurant_id,
@@ -161,6 +166,7 @@ def load_workflow_runtime(
         system_prompt=system_prompt,
         conversation_history=_format_history(history),
         assistant_display_name=profile.display_name.strip(),
+        import_session_status=import_session_status,
     )
     return WorkflowRuntimeBundle(
         context=context,
@@ -169,8 +175,15 @@ def load_workflow_runtime(
     )
 
 
+def _import_session_block(context: WorkflowContext) -> str:
+    if not context.import_session_status:
+        return ""
+    return f"## Active menu import session\n\n{context.import_session_status}\n\n"
+
+
 def planner_input(context: WorkflowContext) -> str:
     return (
+        f"{_import_session_block(context)}"
         f"## Conversation history\n\n{context.conversation_history}\n\n"
         f"## User request\n\n{context.user_message}"
     )
@@ -178,6 +191,7 @@ def planner_input(context: WorkflowContext) -> str:
 
 def executor_input(context: WorkflowContext, plan: WorkflowPlan) -> str:
     return (
+        f"{_import_session_block(context)}"
         f"## Conversation history\n\n{context.conversation_history}\n\n"
         f"## User request\n\n{context.user_message}\n\n"
         f"## Plan to execute\n\n{plan.model_dump_json(indent=2)}"
