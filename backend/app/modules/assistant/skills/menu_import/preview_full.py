@@ -14,13 +14,13 @@ def _format_option_group(group) -> str:
     return f"{group.title} ({req}, {sel}, min={group.min_selections}, max={group.max_selections})"
 
 
-def build_full_import_preview(
-    draft: ImportDraft,
-    *,
-    optimization_notes_es: list[str] | None = None,
-    recommended_theme_id: str | None = None,
-    theme_label: str | None = None,
-) -> str:
+def _layout_label(layout: str) -> str:
+    if layout == "vertical":
+        return "list"
+    return layout
+
+
+def build_full_import_preview(draft: ImportDraft) -> str:
     batch = ImportBatch(batch_index=0, categories=draft.categories, promotions=draft.promotions)
     product_count = count_batch_products(batch)
     complement_groups = sum(
@@ -33,19 +33,13 @@ def build_full_import_preview(
         f"**Grupos de complementos:** {complement_groups}",
         f"**Promociones:** {len(draft.promotions)}",
         "",
-        "### Categorías (orden optimizado)",
+        "### Categorías",
     ]
     for index, category in enumerate(
         sorted(draft.categories, key=lambda c: (c.sort_order, c.name)), start=1
     ):
-        layout = category.display_layout or "vertical"
+        layout = _layout_label(category.display_layout or "vertical")
         lines.append(f"{index}. **{category.name}** — layout `{layout}`")
-    if optimization_notes_es:
-        lines.extend(["", "### Optimizaciones", ""])
-        lines.extend(f"- {note}" for note in optimization_notes_es)
-    if recommended_theme_id:
-        label = theme_label or recommended_theme_id
-        lines.extend(["", f"**Tema visual:** {label} (`{recommended_theme_id}`)"])
     lines.extend(["", "### Productos", "", "| Categoría | Producto | Precio |", "| --- | --- | --- |"])
     for category in sorted(draft.categories, key=lambda c: (c.sort_order, c.name)):
         for product in sorted(category.products, key=lambda p: (p.sort_order, p.name)):

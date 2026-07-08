@@ -19,12 +19,17 @@ from app.modules.assistant.skills.menu_import.draft_schema import (
     ImportPromotion,
 )
 from app.modules.assistant.skills.menu_import.menu_reconcile import ReconciliationPlan
+from app.modules.assistant.skills.menu_import.merchandising import (
+    apply_import_merchandising,
+    new_category_refs,
+)
 from app.modules.assistant.skills.menu_import.price_units import mxn_to_cents
 from app.modules.assistant.skills.menu_import.session_repository import MenuImportSessionRepository
 from app.core.config import get_settings
 from app.modules.assistant.skills.menu_import.batching import count_batch_products
 from app.modules.menu.schemas import (
     CategoryCreate,
+    CategoryProductOrderUpdate,
     CategoryUpdate,
     OptionGroupCreate,
     OptionItemCreate,
@@ -303,6 +308,37 @@ def _apply_single_option_group(
     return group_count, item_count
 
 
+def _new_category_refs(
+    categories: list[ImportCategory],
+    reconciliation: ReconciliationPlan | None,
+) -> frozenset[str]:
+    return new_category_refs(categories, reconciliation)
+
+
+def _apply_product_order(
+    menu: MenuService,
+    ctx: AgentContext,
+    categories: list[ImportCategory],
+    ref_map: dict[str, uuid.UUID],
+) -> None:
+    for category in categories:
+        category_id = ref_map.get(category.ref)
+        if category_id is None:
+            continue
+        ordered_ids: list[uuid.UUID] = []
+        for product in sorted(category.products, key=lambda p: (p.sort_order, p.name)):
+            product_id = ref_map.get(product.ref)
+            if product_id is not None:
+                ordered_ids.append(product_id)
+        if not ordered_ids:
+            continue
+        menu.set_category_product_order(
+            ctx.restaurant_id,
+            category_id,
+            CategoryProductOrderUpdate(product_ids=ordered_ids),
+        )
+
+
 def _apply_promotions(
     promo_service: PromotionService,
     ctx: AgentContext,
@@ -352,6 +388,11 @@ def apply_import_batch(
             ),
         )
 
+    batch = apply_import_merchandising(
+        batch,
+        new_category_refs=_new_category_refs(batch.categories, reconciliation),
+    )
+
     menu = MenuService(ctx.uow.menu)
     promo_service = PromotionService(ctx.uow.promotions)
     ref_map = _accumulated_ref_map(draft_batches)
@@ -363,6 +404,7 @@ def apply_import_batch(
         products_created = _apply_products(
             menu, ctx, batch.categories, ref_map, reconciliation
         )
+        _apply_product_order(menu, ctx, batch.categories, ref_map)
         groups_created, items_created = _apply_option_groups(
             menu, ctx, batch.categories, ref_map, reconciliation
         )
