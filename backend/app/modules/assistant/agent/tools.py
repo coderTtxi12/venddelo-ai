@@ -13,8 +13,6 @@ from app.modules.assistant.agent.tool_schema import coerce_tool_args, normalize_
 from app.modules.assistant.skills.base import SkillPort, ToolDefinition
 from app.modules.assistant.skills.registry import SkillRegistry
 
-MENU_IMPORT_ONBOARDING_TOOL_NAME = "run_menu_import_onboarding"
-
 
 def _encode_tool_result(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False, default=str)
@@ -49,7 +47,7 @@ def build_registry_function_tools(
 
 
 def build_menu_import_internal_tools(registry: SkillRegistry) -> list[FunctionTool]:
-    """All granular menu_import tools for the onboarding sub-agent."""
+    """All granular menu_import tools for the dedicated import agent."""
     return build_registry_function_tools(
         registry,
         ["menu_import"],
@@ -61,23 +59,16 @@ def build_executor_function_tools(
     registry: SkillRegistry,
     effective_skill_ids: list[str],
     *,
-    settings: Settings,
+    settings: Settings | None = None,
 ) -> list[FunctionTool]:
-    """Executor tools: registry skills plus menu import onboarding agent-as-tool."""
-    from app.modules.assistant.skills.menu_import.onboarding_agent import (
-        build_menu_import_onboarding_tool,
-    )
-
-    tools = build_registry_function_tools(
+    """Executor tools from entitled skills (menu_import uses planner handoff, not here)."""
+    del settings
+    entitled = [skill_id for skill_id in effective_skill_ids if skill_id != "menu_import"]
+    return build_registry_function_tools(
         registry,
-        effective_skill_ids,
+        entitled,
         expose_menu_import_granular=False,
     )
-    if "menu_import" in effective_skill_ids:
-        tools.append(
-            build_menu_import_onboarding_tool(settings=settings, registry=registry)
-        )
-    return tools
 
 
 def _build_registry_tool(

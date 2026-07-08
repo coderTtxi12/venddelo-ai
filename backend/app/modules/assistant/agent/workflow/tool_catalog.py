@@ -7,9 +7,6 @@ from typing import Any
 
 from app.modules.assistant.skills.base import ToolDefinition
 from app.modules.assistant.skills.discovery import discover_skill_executors
-from app.modules.assistant.skills.menu_import.onboarding_agent import (
-    menu_import_onboarding_tool_definition,
-)
 
 TOOL_GROUPS: list[tuple[str, list[str]]] = [
     (
@@ -94,12 +91,6 @@ TOOL_GROUPS: list[tuple[str, list[str]]] = [
             "disable_promotion",
         ],
     ),
-    (
-        "Menu import onboarding",
-        [
-            "run_menu_import_onboarding",
-        ],
-    ),
 ]
 
 COMPACT_DESCRIPTION_MAX_LEN = 110
@@ -176,14 +167,6 @@ TOOL_RETURNS_HINTS: dict[str, str] = {
     "set_promotion_targets": "promotion (targets updated).",
     "generate_promotion_banner": "banner (image_path or asset reference).",
     "disable_promotion": "promotion (is_active=false).",
-    # Menu import onboarding (agent-as-tool on main executor)
-    "run_menu_import_onboarding": (
-        "onboarding phase, open_questions[], preview markdown, apply summary — full concierge "
-        "import via internal menu_import tools and Postgres session memory."
-    ),
-    "analyze_import_vs_live": (
-        "live_menu_snapshot, reconciliation, open_questions[] — caches Postgres memory."
-    ),
 }
 
 
@@ -192,8 +175,6 @@ def _collect_tool_definitions() -> dict[str, ToolDefinition]:
     for skill in discover_skill_executors():
         for tool_def in skill.tool_definitions():
             tools.setdefault(tool_def.name, tool_def)
-    onboarding = menu_import_onboarding_tool_definition()
-    tools.setdefault(onboarding.name, onboarding)
     return tools
 
 
