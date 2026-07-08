@@ -379,3 +379,30 @@ export async function streamAssistantChat(
     // Stream may already be closed.
   }
 }
+
+export async function resetAssistantConversation(
+  token: string,
+  restaurantId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_URL}/restaurants/${restaurantId}/assistant/conversations/reset`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    let errorMessage = response.statusText;
+    try {
+      const parsed = text ? JSON.parse(text) : null;
+      errorMessage = parsed?.error?.message ?? errorMessage;
+    } catch {
+      if (text) errorMessage = text;
+    }
+    throw new ApiError('assistant_reset_error', errorMessage, response.status);
+  }
+}

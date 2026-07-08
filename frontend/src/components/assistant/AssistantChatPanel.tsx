@@ -15,7 +15,7 @@ import { useAssistantChat } from '@/contexts/AssistantChatContext';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useChatPanelResize } from '@/hooks/useChatPanelResize';
-import { streamAssistantChat } from '@/lib/api/assistant';
+import { resetAssistantConversation, streamAssistantChat } from '@/lib/api/assistant';
 import type { MenuImportQuizPayload, MenuImportQuizQuestion } from '@/lib/api/assistant';
 import { isFetchAbortError } from '@/lib/api/assistantStream';
 import {
@@ -481,7 +481,7 @@ export default function AssistantChatPanel() {
     }
   };
 
-  const handleNewConversation = () => {
+  const handleNewConversation = useCallback(() => {
     if (isBusy) return;
     streamAbortRef.current?.abort();
     messages.forEach((message) => {
@@ -499,7 +499,23 @@ export default function AssistantChatPanel() {
     setAgentActivity(INITIAL_AGENT_ACTIVITY);
     setMessages([WELCOME_MESSAGE]);
     textareaRef.current?.focus();
-  };
+
+    if (accessToken && restaurantId) {
+      void resetAssistantConversation(accessToken, restaurantId).catch((error) => {
+        const message =
+          error instanceof ApiError
+            ? error.message
+            : 'No se pudo reiniciar la sesión de importación de menú.';
+        setAttachError(message);
+      });
+    }
+  }, [
+    accessToken,
+    clearPendingAttachments,
+    isBusy,
+    messages,
+    restaurantId,
+  ]);
 
   const canSend =
     !isBusy && (draft.trim().length > 0 || pendingAttachments.length > 0);
