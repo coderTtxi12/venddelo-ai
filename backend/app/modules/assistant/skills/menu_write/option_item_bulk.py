@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
-from app.core.pagination import PaginationParams
 from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.base import ToolResult
 from app.modules.assistant.skills.menu_read.search import match_score, normalize_text, tokenize
@@ -24,7 +23,6 @@ from app.modules.assistant.skills.menu_write.bulk import (
 from app.modules.menu.schemas import OptionGroupCreate, OptionItemCreate, OptionItemUpdate
 from app.modules.menu.service import MenuService
 
-_PRODUCT_SCAN_PAGE_SIZE = 200
 _OPTION_LABEL_STRONG_THRESHOLD = 0.92
 
 _BULK_OPTION_ITEM_UPDATE_HINT = (
@@ -36,8 +34,9 @@ _BULK_OPTION_ITEM_UPDATE_HINT = (
 
 _BULK_OPTION_ITEM_VISIBILITY_HINT = (
     "For one complement name across the whole menu (e.g. Sprite out of stock), pass "
-    "match_label + is_active — the server scans products and updates matches; do not "
-    "hand-assemble item_ids. When using items[] instead, each row MUST include "
+    "match_label + is_active — the server scans the preview menu and updates complements "
+    "whose label matches (case/accent-insensitive). Returns ok with updated=0 when every "
+    "match is already in the target state. When using items[] instead, each row MUST include "
     f"expected_label matching the live complement label or the row is rejected. "
     f"group_id is optional (resolved from product_id + item_id). "
     f"Up to {BULK_DEFAULT_LIMIT} per call."
@@ -105,28 +104,49 @@ class _OptionItemRef:
     is_active: bool
 
 
+@dataclass(frozen=True, slots=True)
+class _LabelScanResult:
+    label_matches: tuple[_OptionItemRef, ...]
+    to_update: tuple[_OptionItemRef, ...]
+
+
 def _iter_option_item_refs(menu: MenuService, ctx: AgentContext) -> Iterator[_OptionItemRef]:
-    cursor: str | None = None
-    while True:
-        page = menu.list_products_page(
-            ctx.restaurant_id,
-            PaginationParams(limit=_PRODUCT_SCAN_PAGE_SIZE, cursor=cursor),
-        )
-        for product in page.items:
-            for group in product.option_groups:
-                for item in group.items:
-                    yield _OptionItemRef(
-                        product_id=product.id,
-                        product_name=product.name,
-                        group_id=group.id,
-                        group_title=group.title,
-                        item_id=item.id,
-                        item_label=item.label,
-                        is_active=item.is_active,
-                    )
-        if not page.has_more:
-            break
-        cursor = page.next_cursor
+    """Scan all owner-visible products with complements (preview menu, eager-loaded)."""
+    preview = menu.get_preview_menu(ctx.restaurant_id)
+    for product in preview.products:
+        for group in product.option_groups:
+            for item in group.items:
+                yield _OptionItemRef(
+                    product_id=product.id,
+                    product_name=product.name,
+                    group_id=group.id,
+                    group_title=group.title,
+                    item_id=item.id,
+                    item_label=item.label,
+                    is_active=item.is_active,
+                )
+
+
+def _scan_option_items_by_label(
+    menu: MenuService,
+    ctx: AgentContext,
+    *,
+    match_label: str,
+    target_active: bool,
+) -> _LabelScanResult:
+    label_matches: list[_OptionItemRef] = []
+    to_update: list[_OptionItemRef] = []
+    for ref in _iter_option_item_refs(menu, ctx):
+        if not option_item_label_matches(match_label, ref.item_label):
+            continue
+        label_matches.append(ref)
+        if ref.is_active != target_active:
+            to_update.append(ref)
+    capped = to_update[:BULK_DEFAULT_LIMIT]
+    return _LabelScanResult(
+        label_matches=tuple(label_matches),
+        to_update=tuple(capped),
+    )
 
 
 def _collect_option_items_by_label(
@@ -136,14 +156,14 @@ def _collect_option_items_by_label(
     match_label: str,
     target_active: bool,
 ) -> list[_OptionItemRef]:
-    matches: list[_OptionItemRef] = []
-    for ref in _iter_option_item_refs(menu, ctx):
-        if not option_item_label_matches(match_label, ref.item_label):
-            continue
-        if ref.is_active == target_active:
-            continue
-        matches.append(ref)
-    return matches[:BULK_DEFAULT_LIMIT]
+    return list(
+        _scan_option_items_by_label(
+            menu,
+            ctx,
+            match_label=match_label,
+            target_active=target_active,
+        ).to_update
+    )
 
 
 def _parse_visibility_value(item: dict[str, Any]) -> tuple[bool | None, str | None]:
@@ -365,19 +385,48 @@ def bulk_update_option_item_visibility(
         if visibility_err:
             return ToolResult(ok=False, summary=visibility_err)
         assert visibility is not None
-        matches = _collect_option_items_by_label(
+        scan = _scan_option_items_by_label(
             menu,
             ctx,
             match_label=match_label,
             target_active=visibility,
         )
-        if not matches:
+        state_label = "active" if visibility else "inactive"
+        if not scan.label_matches:
             return ToolResult(
                 ok=False,
-                summary=f"No active complements matching {match_label!r} were found to update",
+                summary=f"No complements matching {match_label!r} were found in the menu",
+                data={
+                    "label_match_count": 0,
+                    "target_is_active": visibility,
+                },
+            )
+        if not scan.to_update:
+            return ToolResult(
+                ok=True,
+                summary=(
+                    f"All {len(scan.label_matches)} complement(s) matching {match_label!r} "
+                    f"are already {state_label}"
+                ),
+                data={
+                    "updated": 0,
+                    "failed": 0,
+                    "already_in_state": len(scan.label_matches),
+                    "target_is_active": visibility,
+                    "matches": [
+                        {
+                            "product_name": ref.product_name,
+                            "group_title": ref.group_title,
+                            "item_label": ref.item_label,
+                            "is_active": ref.is_active,
+                        }
+                        for ref in scan.label_matches
+                    ],
+                    "results": [],
+                },
             )
         results: list[BulkRowResult] = []
-        for ref in matches:
+        for ref in scan.to_update:
             results.append(
                 _apply_option_item_update(
                     menu,

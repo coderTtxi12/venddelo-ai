@@ -932,6 +932,140 @@ def test_menu_write_bulk_visibility_by_match_label(session):
 
 
 @requires_db
+def test_menu_write_bulk_visibility_activate_already_active_is_idempotent(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Label Active", subdomain="menu-write-bulk-label-active")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Bebidas", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BURGER & BONELESS",
+            price_cents=10000,
+            category_ids=[category.id],
+        )
+    )
+    uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(title="Extras", items=[OptionItemCreate(label="Sprite")]),
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_update_option_item_visibility",
+        {"match_label": "sprite", "is_active": True},
+        ctx,
+    )
+
+    assert result.ok is True
+    assert result.data["updated"] == 0
+    assert result.data["already_in_state"] == 1
+    assert "already active" in result.summary
+
+
+@requires_db
+def test_menu_write_bulk_visibility_activate_after_deactivate(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Label Reactivate", subdomain="menu-write-bulk-reactivate")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Bebidas", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BONELESS & FRIES",
+            price_cents=10000,
+            category_ids=[category.id],
+        )
+    )
+    uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(title="Extras", items=[OptionItemCreate(label="Sprite")]),
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    off = skill.execute(
+        "bulk_update_option_item_visibility",
+        {"match_label": "sprite", "is_active": False},
+        ctx,
+    )
+    assert off.ok is True
+    assert off.data["updated"] == 1
+
+    on = skill.execute(
+        "bulk_update_option_item_visibility",
+        {"match_label": "sprite", "is_active": True},
+        ctx,
+    )
+    assert on.ok is True
+    assert on.data["updated"] == 1
+
+    loaded = uow.menu.get_product(product.id)
+    assert loaded is not None
+    assert loaded.option_groups[0].items[0].is_active is True
+
+
+@requires_db
+def test_menu_write_bulk_visibility_no_label_match(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Label Miss", subdomain="menu-write-bulk-label-miss")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Combos", sort_index=1)
+    )
+    product = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Combo",
+            price_cents=10000,
+            category_ids=[category.id],
+        )
+    )
+    uow.menu.add_option_group(
+        product.id,
+        OptionGroupCreate(title="Extras", items=[OptionItemCreate(label="Cebolla")]),
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_update_option_item_visibility",
+        {"match_label": "sprite", "is_active": True},
+        ctx,
+    )
+
+    assert result.ok is False
+    assert result.data["label_match_count"] == 0
+    assert "were found in the menu" in result.summary
+
+
+@requires_db
 def test_menu_write_bulk_visibility_rejects_expected_label_mismatch(session):
     uow = SqlAlchemyUnitOfWork(lambda: session)
     uow.__enter__()
