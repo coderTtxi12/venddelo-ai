@@ -189,6 +189,15 @@ def planner_input(context: WorkflowContext) -> str:
     )
 
 
+def menu_import_input(context: WorkflowContext) -> str:
+    return (
+        f"{_import_session_block(context)}"
+        f"## Conversation history\n\n{context.conversation_history}\n\n"
+        f"## User request\n\n{context.user_message}\n\n"
+        "Investiga con las tools antes de preguntar. No repitas OCR si la sesión ya tiene borrador."
+    )
+
+
 def executor_input(context: WorkflowContext, plan: WorkflowPlan) -> str:
     return (
         f"{_import_session_block(context)}"

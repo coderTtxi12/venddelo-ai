@@ -14,6 +14,7 @@ from app.modules.assistant.agent.workflow.prompts import (
     REPLANNER_INSTRUCTIONS,
     RESPONDER_INSTRUCTIONS,
 )
+from app.modules.assistant.skills.menu_import.onboarding_agent import build_menu_import_agent
 from app.modules.assistant.agent.workflow.schemas import (
     ExecutionRecord,
     WorkflowEvaluation,
@@ -74,3 +75,11 @@ def build_responder_agent(*, settings: Settings) -> Agent[AssistantRunContext]:
         tools=[],
         model=settings.openai_model,
     )
+
+
+def build_menu_import_handoff_agent(
+    *,
+    settings: Settings,
+    registry: SkillRegistry,
+) -> Agent[AssistantRunContext]:
+    return build_menu_import_agent(settings=settings, registry=registry)
