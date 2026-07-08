@@ -26,6 +26,7 @@ type ChatAgentActivityProps = {
   showProcessingDots?: boolean;
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
+  compact?: boolean;
 };
 
 function ToolIcon({ status }: { status: AgentToolStepStatus }) {
@@ -70,18 +71,27 @@ export default function ChatAgentActivity({
   showProcessingDots = false,
   collapsed = false,
   onToggleCollapsed,
+  compact = false,
 }: ChatAgentActivityProps) {
   const phaseLabel = labelForAgentPhase(activity.phase);
-  const hasThoughts = activity.thoughts.length > 0;
-  const hasPlan = activity.planSteps.length > 0;
+  const hasThoughts = !compact && activity.thoughts.length > 0;
+  const hasPlan = !compact && activity.planSteps.length > 0;
   const hasTools = activity.tools.length > 0;
-  const hasSkills = activity.loadedSkills.length > 0;
-  const hasReflection = activity.latestReflection !== null;
+  const hasPlanReason = Boolean(activity.planReason?.trim());
+  const hasSkills = !compact && activity.loadedSkills.length > 0;
+  const hasReflection = !compact && activity.latestReflection !== null;
+  const showCompactReflection =
+    compact && activity.latestReflection !== null && activity.latestReflection.decision === 'replan';
   const isProcessing = activity.status === 'processing' || showProcessingDots;
   const latestThought = hasThoughts ? activity.thoughts[activity.thoughts.length - 1] : null;
-  const canCollapse = Boolean(onToggleCollapsed) && !isProcessing;
+  const canCollapse = Boolean(onToggleCollapsed) && !isProcessing && !compact;
+  const visibleTools = compact ? activity.tools.slice(-3) : activity.tools;
 
   if (!hasVisibleAgentActivity(activity) && !showProcessingDots) {
+    return null;
+  }
+
+  if (compact && !phaseLabel && !hasTools && !hasPlanReason && !showCompactReflection && !showProcessingDots) {
     return null;
   }
 
@@ -90,7 +100,9 @@ export default function ChatAgentActivity({
 
   return (
     <div
-      className={`${styles.activity} ${collapsed ? styles.activity_collapsed : ''}`}
+      className={`${styles.activity} ${collapsed ? styles.activity_collapsed : ''} ${
+        compact ? styles.activity_compact : ''
+      }`}
       role="status"
       aria-live="polite"
       aria-label="Actividad del asistente"
@@ -99,7 +111,7 @@ export default function ChatAgentActivity({
         <div className={styles.headerMain}>
           {phaseLabel ? (
             <div className={styles.phaseRow}>
-              {activity.phase === 'planning' ||
+              {activity.phase === 'routing' ||
               activity.phase === 'plan' ||
               activity.phase === 'execute' ? (
                 <RouteOutlinedIcon sx={{ fontSize: 14 }} aria-hidden className={styles.phaseIcon} />
@@ -111,6 +123,9 @@ export default function ChatAgentActivity({
                 <span className={styles.phasePulse} aria-hidden />
               ) : null}
             </div>
+          ) : null}
+          {compact && hasPlanReason ? (
+            <p className={styles.planReasonCompact}>{activity.planReason}</p>
           ) : null}
           {canCollapse ? (
             <p className={styles.summaryLine}>{summary}</p>
@@ -215,12 +230,14 @@ export default function ChatAgentActivity({
 
           {hasTools ? (
             <section className={styles.toolsSection} aria-label="Acciones en curso">
-              <div className={styles.sectionHeading}>
-                <SearchOutlinedIcon sx={{ fontSize: 13 }} aria-hidden />
-                <span>Ejecutando</span>
-              </div>
+              {!compact ? (
+                <div className={styles.sectionHeading}>
+                  <SearchOutlinedIcon sx={{ fontSize: 13 }} aria-hidden />
+                  <span>Ejecutando</span>
+                </div>
+              ) : null}
               <ul className={styles.toolList}>
-                {activity.tools.map((step) => {
+                {visibleTools.map((step) => {
                   const argsHint = formatArgsSummary(step.argsSummary);
                   const effectLabel = labelForToolEffect(step.effect);
                   return (
@@ -236,7 +253,7 @@ export default function ChatAgentActivity({
                           <span className={styles.toolLabel}>
                             {labelForTool(step.tool, step.status)}
                           </span>
-                          {effectLabel ? (
+                          {!compact && effectLabel ? (
                             <span
                               className={`${styles.effectBadge} ${
                                 step.effect === 'mutate' ? styles.effectBadge_mutate : ''
@@ -247,7 +264,7 @@ export default function ChatAgentActivity({
                           ) : null}
                         </span>
                         {argsHint ? <span className={styles.toolArgs}>{argsHint}</span> : null}
-                        {step.summary && step.status !== 'running' ? (
+                        {!compact && step.summary && step.status !== 'running' ? (
                           <span className={styles.toolSummary}>{step.summary}</span>
                         ) : null}
                       </span>
@@ -255,6 +272,18 @@ export default function ChatAgentActivity({
                   );
                 })}
               </ul>
+            </section>
+          ) : null}
+
+          {showCompactReflection ? (
+            <section className={styles.reflectionSection} aria-label="Reevaluación del asistente">
+              <div className={styles.sectionHeading}>
+                <PsychologyOutlinedIcon sx={{ fontSize: 13 }} aria-hidden />
+                <span>{labelForPlanDecision(activity.latestReflection!.decision)}</span>
+              </div>
+              {activity.latestReflection?.reason ? (
+                <p className={styles.reflectionReason}>{activity.latestReflection.reason}</p>
+              ) : null}
             </section>
           ) : null}
 

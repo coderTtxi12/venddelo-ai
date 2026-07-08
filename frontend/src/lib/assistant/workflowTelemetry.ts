@@ -1,9 +1,8 @@
 export const WORKFLOW_PHASES = [
   { id: 'context', label: 'Contexto' },
-  { id: 'planning', label: 'Plan' },
+  { id: 'routing', label: 'Analizar' },
   { id: 'executing', label: 'Ejecutar' },
   { id: 'evaluating', label: 'Evaluar' },
-  { id: 'replanning', label: 'Ajustar' },
   { id: 'responding', label: 'Responder' },
 ] as const;
 

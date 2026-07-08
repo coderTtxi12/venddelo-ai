@@ -15,10 +15,9 @@ import styles from './AssistantWorkflowTelemetry.module.css';
 
 const PHASE_LABELS: Record<WorkflowPhaseId, string> = {
   context: 'Preparando contexto',
-  planning: 'Planificando',
-  executing: 'Ejecutando plan',
+  routing: 'Analizando solicitud',
+  executing: 'Investigando y ejecutando',
   evaluating: 'Evaluando resultados',
-  replanning: 'Ajustando plan',
   responding: 'Redactando respuesta',
 };
 
@@ -81,14 +80,8 @@ export default function AssistantWorkflowTelemetry({
   const showPlan = Boolean(telemetry.planSummary && telemetry.steps.length > 0);
   const showEvaluation =
     telemetry.evaluation !== null && telemetry.activePhase === 'evaluating';
-  const showReplanPhase =
-    telemetry.planReplan ||
-    telemetry.activePhase === 'replanning' ||
-    telemetry.completedPhases.includes('replanning');
 
-  const visiblePhases = WORKFLOW_PHASES.filter(
-    (phase) => phase.id !== 'replanning' || showReplanPhase,
-  );
+  const visiblePhases = WORKFLOW_PHASES;
 
   if (!telemetry.activePhase && !showPlan) {
     return null;

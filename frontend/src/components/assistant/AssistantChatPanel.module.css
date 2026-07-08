@@ -262,6 +262,14 @@
   text-align: left;
 }
 
+.messageBodyUserImage {
+  padding: 0.5rem;
+}
+
+.messageBodyUserImage .userText {
+  padding: 0.1rem 0.35rem 0;
+}
+
 .assistantText {
   width: 100%;
   min-width: 0;

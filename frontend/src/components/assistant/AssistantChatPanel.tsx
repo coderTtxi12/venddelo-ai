@@ -6,13 +6,17 @@ import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
 import ChatAttachmentList from '@/components/assistant/ChatAttachmentList';
+import ChatAgentActivity from '@/components/assistant/ChatAgentActivity';
 import ChatMarkdown from '@/components/assistant/ChatMarkdown';
-import AssistantWorkflowTelemetry from '@/components/assistant/AssistantWorkflowTelemetry';
+import MenuImportQuiz, {
+  type MenuImportQuizAnswers,
+} from '@/components/assistant/MenuImportQuiz';
 import { useAssistantChat } from '@/contexts/AssistantChatContext';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useChatPanelResize } from '@/hooks/useChatPanelResize';
 import { streamAssistantChat } from '@/lib/api/assistant';
+import type { MenuImportQuizPayload, MenuImportQuizQuestion } from '@/lib/api/assistant';
 import { isFetchAbortError } from '@/lib/api/assistantStream';
 import {
   CHAT_ATTACHMENT_ACCEPT,
@@ -22,19 +26,23 @@ import {
   type ChatAttachmentRef,
 } from '@/lib/api/assistantImport';
 import {
+  cloneAttachmentsForMessage,
   createAttachmentsFromFileList,
   revokeAttachmentPreviews,
   type ChatAttachment,
 } from '@/lib/assistant/chatAttachments';
 import {
-  INITIAL_WORKFLOW_TELEMETRY,
-  applyWorkflowEvaluation,
-  applyWorkflowPhase,
-  applyWorkflowPlan,
-  applyWorkflowStep,
-  markWorkflowStreaming,
-  type WorkflowTelemetryState,
-} from '@/lib/assistant/workflowTelemetry';
+  INITIAL_AGENT_ACTIVITY,
+  STREAMING_AGENT_ACTIVITY,
+  applyAgentThought,
+  applyToolResult,
+  applyToolStart,
+  applyWorkflowEvaluationToActivity,
+  applyWorkflowPhaseToActivity,
+  clearAgentActivityForResponse,
+  hasVisibleAgentActivity,
+  type AgentActivityState,
+} from '@/lib/assistant/agentActivity';
 import {
   MAX_CHAT_PANEL_WIDTH,
   MIN_CHAT_PANEL_WIDTH,
@@ -50,7 +58,19 @@ type ChatMessage = {
   role: ChatRole;
   content: string;
   attachments?: ChatAttachment[];
+  menuImportQuiz?: MenuImportQuizPayload & { submitted?: boolean };
 };
+
+function formatMenuImportQuizAnswers(
+  questions: MenuImportQuizQuestion[],
+  answers: MenuImportQuizAnswers,
+): string {
+  const lines = questions.map((question) => {
+    const answer = answers[question.id];
+    return `- ${question.id}: ${answer?.label.trim() ?? ''}`;
+  });
+  return `Respuestas de aclaración del menú:\n${lines.join('\n')}`;
+}
 
 const WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome',
@@ -85,9 +105,7 @@ export default function AssistantChatPanel() {
   const [isBusy, setIsBusy] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [agentProcessing, setAgentProcessing] = useState(false);
-  const [workflowTelemetry, setWorkflowTelemetry] = useState<WorkflowTelemetryState>(
-    INITIAL_WORKFLOW_TELEMETRY,
-  );
+  const [agentActivity, setAgentActivity] = useState<AgentActivityState>(INITIAL_AGENT_ACTIVITY);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -231,10 +249,7 @@ export default function AssistantChatPanel() {
         }
       }
 
-      const messageAttachments = attachmentsToSend.map((attachment) => {
-        const { file: _file, ...rest } = attachment;
-        return rest;
-      });
+      const messageAttachments = cloneAttachmentsForMessage(attachmentsToSend);
 
       const userMessage: ChatMessage = {
         id: createId(),
@@ -250,7 +265,7 @@ export default function AssistantChatPanel() {
 
       setStreamingMessageId(assistantMessageId);
       setAgentProcessing(true);
-      setWorkflowTelemetry(INITIAL_WORKFLOW_TELEMETRY);
+      setAgentActivity(STREAMING_AGENT_ACTIVITY);
       setDraft('');
       setAttachError(null);
       clearPendingAttachments();
@@ -296,7 +311,7 @@ export default function AssistantChatPanel() {
         setStreamingMessageId(null);
         setIsBusy(false);
         setAgentProcessing(false);
-        setWorkflowTelemetry(INITIAL_WORKFLOW_TELEMETRY);
+        setAgentActivity(INITIAL_AGENT_ACTIVITY);
       };
 
       try {
@@ -312,7 +327,7 @@ export default function AssistantChatPanel() {
             onDelta: (delta) => {
               streamedContent += delta;
               setAgentProcessing(false);
-              setWorkflowTelemetry((current) => markWorkflowStreaming(current));
+              setAgentActivity((current) => clearAgentActivityForResponse(current));
               if (pendingFrame === null) {
                 pendingFrame = requestAnimationFrame(flushStreamedContent);
               }
@@ -320,34 +335,35 @@ export default function AssistantChatPanel() {
             onAgentStatus: (status) => {
               if (status === 'processing') {
                 setAgentProcessing(true);
+                setAgentActivity((current) => ({ ...current, status: 'processing' }));
               }
             },
             onAgentPhase: ({ phase }) => {
               setAgentProcessing(true);
-              setWorkflowTelemetry((current) => applyWorkflowPhase(current, phase));
+              setAgentActivity((current) => applyWorkflowPhaseToActivity(current, phase));
             },
-            onAgentPlan: (payload) => {
+            onAgentThought: (payload) => {
               setAgentProcessing(true);
-              setWorkflowTelemetry((current) => applyWorkflowPlan(current, payload));
+              setAgentActivity((current) => applyAgentThought(current, payload));
             },
-            onAgentStep: (payload) => {
-              setWorkflowTelemetry((current) =>
-                applyWorkflowStep(current, {
-                  step_id: payload.step_id,
-                  status: payload.status,
-                  goal: payload.goal,
-                  tool_hint: payload.tool_hint,
-                }),
+            onMenuImportQuiz: (payload) => {
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.id === assistantMessageId
+                    ? { ...message, menuImportQuiz: payload }
+                    : message,
+                ),
               );
             },
             onAgentEvaluation: (payload) => {
-              setWorkflowTelemetry((current) =>
-                applyWorkflowEvaluation(current, {
-                  ok: payload.ok,
-                  shouldReplan: payload.should_replan,
-                  issues: payload.issues,
-                }),
-              );
+              setAgentActivity((current) => applyWorkflowEvaluationToActivity(current, payload));
+            },
+            onToolStart: (payload) => {
+              setAgentProcessing(true);
+              setAgentActivity((current) => applyToolStart(current, payload));
+            },
+            onToolResult: (payload) => {
+              setAgentActivity((current) => applyToolResult(current, payload));
             },
             onComplete: (payload) => {
               cancelPendingFrame();
@@ -358,7 +374,11 @@ export default function AssistantChatPanel() {
               setMessages((prev) =>
                 prev.map((message) =>
                   message.id === assistantMessageId
-                    ? { ...message, content: finalContent }
+                    ? {
+                        ...message,
+                        content: finalContent,
+                        menuImportQuiz: payload.menu_import ?? message.menuImportQuiz,
+                      }
                     : message,
                 ),
               );
@@ -427,6 +447,28 @@ export default function AssistantChatPanel() {
     [accessToken, clearPendingAttachments, conversationId, pendingAttachments, restaurantId],
   );
 
+  const handleMenuImportQuizSubmit = useCallback(
+    (messageId: string, answers: MenuImportQuizAnswers) => {
+      const target = messages.find((message) => message.id === messageId);
+      const quiz = target?.menuImportQuiz;
+      if (!quiz || quiz.submitted) return;
+
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === messageId && message.menuImportQuiz
+            ? {
+                ...message,
+                menuImportQuiz: { ...message.menuImportQuiz, submitted: true },
+              }
+            : message,
+        ),
+      );
+
+      void sendMessage(formatMenuImportQuizAnswers(quiz.questions, answers));
+    },
+    [messages, sendMessage],
+  );
+
   const handleSubmit = () => {
     if (isBusy || sendInFlightRef.current) return;
     void sendMessage(draft, pendingAttachments);
@@ -442,6 +484,11 @@ export default function AssistantChatPanel() {
   const handleNewConversation = () => {
     if (isBusy) return;
     streamAbortRef.current?.abort();
+    messages.forEach((message) => {
+      if (message.attachments?.length) {
+        revokeAttachmentPreviews(message.attachments);
+      }
+    });
     setConversationId(null);
     setDraft('');
     clearPendingAttachments();
@@ -449,7 +496,7 @@ export default function AssistantChatPanel() {
     setIsDragging(false);
     setStreamingMessageId(null);
     setAgentProcessing(false);
-    setWorkflowTelemetry(INITIAL_WORKFLOW_TELEMETRY);
+    setAgentActivity(INITIAL_AGENT_ACTIVITY);
     setMessages([WELCOME_MESSAGE]);
     textareaRef.current?.focus();
   };
@@ -557,19 +604,24 @@ export default function AssistantChatPanel() {
         {messages.map((message) => {
           const isUser = message.role === 'user';
           const isStreaming = streamingMessageId === message.id;
-          const showWorkflowTelemetry =
+          const showAgentActivity =
             isStreaming &&
-            (agentProcessing ||
-              workflowTelemetry.activePhase !== null ||
-              workflowTelemetry.steps.length > 0);
+            (agentProcessing || hasVisibleAgentActivity(agentActivity) || !message.content);
 
-          if (!isUser && !message.content && !isStreaming) {
+          if (!isUser && !message.content && !message.menuImportQuiz && !isStreaming) {
             return null;
           }
 
           if (isUser && !message.content && !message.attachments?.length) {
             return null;
           }
+
+          const hasUserAttachments = Boolean(isUser && message.attachments?.length);
+          const isUserImageOnly =
+            hasUserAttachments &&
+            !message.content &&
+            message.attachments!.length === 1 &&
+            message.attachments![0].kind === 'image';
 
           return (
             <div
@@ -578,7 +630,7 @@ export default function AssistantChatPanel() {
             >
               {!isUser ? (
                 <div
-                  className={`${styles.messageAvatar} ${showWorkflowTelemetry && !message.content ? styles.messageAvatarAwaiting : ''}`}
+                  className={`${styles.messageAvatar} ${showAgentActivity && !message.content ? styles.messageAvatarAwaiting : ''}`}
                   aria-hidden
                 >
                   <BrainOutlinedIcon fontSize="inherit" />
@@ -588,7 +640,13 @@ export default function AssistantChatPanel() {
                 className={`${styles.messageContent} ${isUser ? styles.messageContentUser : styles.messageContentAssistant}`}
               >
                 <div
-                  className={`${styles.messageBody} ${isUser ? styles.messageBodyUser : styles.messageBodyAssistant}`}
+                  className={`${styles.messageBody} ${isUser ? styles.messageBodyUser : styles.messageBodyAssistant} ${
+                    hasUserAttachments && !message.content ? styles.messageBodyAttachmentsOnly : ''
+                  } ${
+                    hasUserAttachments && message.attachments!.length === 2
+                      ? styles.messageBodyAttachmentPair
+                      : ''
+                  } ${isUserImageOnly ? styles.messageBodyUserImage : ''}`}
                 >
                   {isUser ? (
                     <>
@@ -597,16 +655,18 @@ export default function AssistantChatPanel() {
                         <ChatAttachmentList
                           attachments={message.attachments}
                           variant="message"
+                          tone="userBubble"
                           compact={!message.content}
                         />
                       ) : null}
                     </>
                   ) : (
                     <div className={styles.assistantText}>
-                      {showWorkflowTelemetry ? (
-                        <AssistantWorkflowTelemetry
-                          telemetry={workflowTelemetry}
-                          showPhaseRail={!workflowTelemetry.isStreamingResponse}
+                      {showAgentActivity ? (
+                        <ChatAgentActivity
+                          activity={agentActivity}
+                          showProcessingDots={agentProcessing && !message.content}
+                          compact
                         />
                       ) : null}
                       {message.content ? (
@@ -618,6 +678,16 @@ export default function AssistantChatPanel() {
                         ) : (
                           <ChatMarkdown content={message.content} />
                         )
+                      ) : null}
+                      {message.menuImportQuiz?.questions.length ? (
+                        <MenuImportQuiz
+                          questions={message.menuImportQuiz.questions}
+                          submitted={message.menuImportQuiz.submitted}
+                          disabled={isBusy || isStreaming}
+                          onSubmit={(answers) =>
+                            handleMenuImportQuizSubmit(message.id, answers)
+                          }
+                        />
                       ) : null}
                     </div>
                   )}

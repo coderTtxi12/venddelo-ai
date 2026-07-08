@@ -14,6 +14,23 @@ export type AssistantChatRequest = {
 export type AssistantStreamCompletePayload = {
   conversation_id: string;
   content: string;
+  menu_import?: MenuImportQuizPayload | null;
+};
+
+export type MenuImportQuizOption = {
+  id: string;
+  label: string;
+};
+
+export type MenuImportQuizQuestion = {
+  id: string;
+  question: string;
+  suggested_answers: MenuImportQuizOption[];
+  allow_other?: boolean;
+};
+
+export type MenuImportQuizPayload = {
+  questions: MenuImportQuizQuestion[];
 };
 
 export type AssistantStreamErrorPayload = {
@@ -44,14 +61,74 @@ export type AssistantStreamHandlers = {
     should_replan: boolean;
     issues: string[];
   }) => void;
+  onToolStart?: (payload: {
+    tool: string;
+    call_id?: string;
+    args_summary?: Record<string, unknown>;
+    effect?: string;
+  }) => void;
+  onToolResult?: (payload: {
+    tool: string;
+    call_id?: string;
+    ok: boolean;
+    summary?: string;
+  }) => void;
+  onAgentThought?: (payload: {
+    text?: string;
+    delta?: string;
+    source?: string;
+  }) => void;
+  onMenuImportQuiz?: (payload: MenuImportQuizPayload) => void;
 };
+
+function parseMenuImportQuizPayload(raw: unknown): MenuImportQuizPayload | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const questions = (raw as { questions?: unknown }).questions;
+  if (!Array.isArray(questions) || questions.length === 0) return null;
+
+  const parsedQuestions: MenuImportQuizQuestion[] = [];
+  for (const item of questions) {
+    if (!item || typeof item !== 'object') continue;
+    const record = item as Record<string, unknown>;
+    const id = record.id;
+    const question = record.question;
+    const suggested = record.suggested_answers;
+    if (typeof id !== 'string' || typeof question !== 'string' || !Array.isArray(suggested)) {
+      continue;
+    }
+    const suggestedAnswers: MenuImportQuizOption[] = [];
+    for (const option of suggested) {
+      if (!option || typeof option !== 'object') continue;
+      const optionRecord = option as Record<string, unknown>;
+      if (typeof optionRecord.id !== 'string' || typeof optionRecord.label !== 'string') {
+        continue;
+      }
+      suggestedAnswers.push({ id: optionRecord.id, label: optionRecord.label });
+    }
+    if (suggestedAnswers.length === 0) continue;
+    parsedQuestions.push({
+      id,
+      question,
+      suggested_answers: suggestedAnswers,
+      allow_other: record.allow_other !== false,
+    });
+  }
+
+  if (parsedQuestions.length === 0) return null;
+  return { questions: parsedQuestions };
+}
+
+function parseMenuImportQuizEvent(payload: Record<string, unknown>): MenuImportQuizPayload | null {
+  const direct = parseMenuImportQuizPayload({ questions: payload.questions });
+  if (direct) return direct;
+  return parseMenuImportQuizPayload(payload.menu_import);
+}
 
 const WORKFLOW_PHASES = new Set<WorkflowPhaseId>([
   'context',
-  'planning',
+  'routing',
   'executing',
   'evaluating',
-  'replanning',
   'responding',
 ]);
 
@@ -228,10 +305,58 @@ export async function streamAssistantChat(
         continue;
       }
 
+      if (parsed.event === 'tool.start') {
+        const tool = payload.tool;
+        if (typeof tool === 'string') {
+          handlers.onToolStart?.({
+            tool,
+            call_id: typeof payload.call_id === 'string' ? payload.call_id : undefined,
+            args_summary:
+              payload.args_summary && typeof payload.args_summary === 'object'
+                ? (payload.args_summary as Record<string, unknown>)
+                : undefined,
+            effect: typeof payload.effect === 'string' ? payload.effect : undefined,
+          });
+        }
+        continue;
+      }
+
+      if (parsed.event === 'tool.result') {
+        const tool = payload.tool;
+        if (typeof tool === 'string') {
+          handlers.onToolResult?.({
+            tool,
+            call_id: typeof payload.call_id === 'string' ? payload.call_id : undefined,
+            ok: payload.ok !== false,
+            summary: typeof payload.summary === 'string' ? payload.summary : undefined,
+          });
+        }
+        continue;
+      }
+
+      if (parsed.event === 'agent.thought') {
+        handlers.onAgentThought?.({
+          text: typeof payload.text === 'string' ? payload.text : undefined,
+          delta: typeof payload.delta === 'string' ? payload.delta : undefined,
+          source: typeof payload.source === 'string' ? payload.source : undefined,
+        });
+        continue;
+      }
+
+      if (parsed.event === 'menu_import.quiz') {
+        const quiz = parseMenuImportQuizEvent(payload);
+        if (quiz) {
+          handlers.onMenuImportQuiz?.(quiz);
+        }
+        continue;
+      }
+
       if (parsed.event === 'message.complete') {
+        const quiz = parseMenuImportQuizEvent(payload);
         handlers.onComplete({
           conversation_id: String(payload.conversation_id ?? body.conversation_id ?? ''),
           content: String(payload.content ?? ''),
+          menu_import: quiz,
         });
         markFinished();
         break;

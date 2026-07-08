@@ -1,7 +1,7 @@
 export type AgentActivityPhase =
   | 'analyzing'
   | 'explore'
-  | 'planning'
+  | 'routing'
   | 'plan'
   | 'preview'
   | 'confirm'
@@ -69,6 +69,16 @@ export const INITIAL_AGENT_ACTIVITY: AgentActivityState = {
   tools: [],
 };
 
+export const MAX_VISIBLE_TOOL_STEPS = 3;
+
+const WORKFLOW_PHASE_MAP: Record<string, AgentActivityPhase> = {
+  context: 'analyzing',
+  routing: 'routing',
+  executing: 'execute',
+  evaluating: 'analyzing',
+  responding: 'confirm',
+};
+
 /** Shown immediately when a turn starts, before the first SSE event arrives. */
 export const STREAMING_AGENT_ACTIVITY: AgentActivityState = {
   phase: 'analyzing',
@@ -84,11 +94,11 @@ export const STREAMING_AGENT_ACTIVITY: AgentActivityState = {
 const PHASE_LABELS: Record<string, string> = {
   analyzing: 'Analizando tu mensaje',
   explore: 'Consultando tu menú',
-  planning: 'Cargando guías y contexto',
+  routing: 'Analizando tu solicitud',
   plan: 'Planificando pasos',
   preview: 'Preparando vista previa',
-  confirm: 'Esperando confirmación',
-  execute: 'Aplicando cambios',
+  confirm: 'Preparando respuesta',
+  execute: 'Consultando tu menú',
 };
 
 const DECISION_LABELS: Record<AgentPlanDecision, string> = {
@@ -181,6 +191,7 @@ export function hasVisibleAgentActivity(activity: AgentActivityState): boolean {
   return (
     activity.phase !== null ||
     activity.status === 'processing' ||
+    Boolean(activity.planReason?.trim()) ||
     activity.thoughts.length > 0 ||
     activity.planSteps.length > 0 ||
     activity.tools.length > 0 ||
@@ -219,23 +230,126 @@ export function extractReasoningFieldText(text: string): string {
 
 export function summarizeAgentActivity(activity: AgentActivityState): string {
   const parts: string[] = [];
+  if (activity.tools.some((step) => step.status === 'running')) {
+    parts.push('En curso');
+  }
   if (activity.tools.length > 0) {
     parts.push(
       `${activity.tools.length} acción${activity.tools.length === 1 ? '' : 'es'}`,
     );
   }
-  if (activity.loadedSkills.length > 0) {
-    parts.push(
-      `${activity.loadedSkills.length} guía${activity.loadedSkills.length === 1 ? '' : 's'}`,
-    );
-  }
   if (activity.planSteps.length > 0) {
     parts.push(`${activity.planSteps.length} pasos`);
   }
-  if (activity.thoughts.length > 0 && parts.length === 0) {
-    parts.push(`${activity.thoughts.length} paso${activity.thoughts.length === 1 ? '' : 's'}`);
-  }
   return parts.join(' · ') || 'Actividad del asistente';
+}
+
+export function applyWorkflowPhaseToActivity(
+  state: AgentActivityState,
+  phase: string,
+): AgentActivityState {
+  const mapped = WORKFLOW_PHASE_MAP[phase] ?? phase;
+  return {
+    ...state,
+    phase: mapped,
+    status: phase === 'responding' ? null : 'processing',
+    planReason: phase === 'executing' ? null : state.planReason,
+  };
+}
+
+export function applyAgentThought(
+  state: AgentActivityState,
+  payload: { text?: string; delta?: string; source?: string },
+): AgentActivityState {
+  if (payload.source !== 'router') {
+    return state;
+  }
+
+  if (payload.delta) {
+    return {
+      ...state,
+      phase: 'routing',
+      status: 'processing',
+      planReason: (state.planReason ?? '') + payload.delta,
+    };
+  }
+
+  const text = payload.text?.trim();
+  if (!text) return state;
+
+  return {
+    ...state,
+    phase: 'routing',
+    status: 'processing',
+    planReason: text,
+  };
+}
+
+export function applyToolStart(
+  state: AgentActivityState,
+  payload: {
+    tool: string;
+    call_id?: string;
+    args_summary?: Record<string, unknown>;
+    effect?: string;
+  },
+): AgentActivityState {
+  const nextStep: AgentToolStep = {
+    id: createToolStepId(payload.tool),
+    callId: payload.call_id,
+    tool: payload.tool,
+    effect: payload.effect,
+    argsSummary: payload.args_summary,
+    status: 'running',
+  };
+  const tools = [...state.tools, nextStep].slice(-MAX_VISIBLE_TOOL_STEPS);
+  return {
+    ...state,
+    phase: 'execute',
+    status: 'processing',
+    planReason: null,
+    tools,
+  };
+}
+
+export function applyToolResult(
+  state: AgentActivityState,
+  payload: {
+    tool: string;
+    call_id?: string;
+    ok: boolean;
+    summary?: string;
+  },
+): AgentActivityState {
+  return {
+    ...state,
+    tools: updateToolStepResult(state.tools, payload),
+  };
+}
+
+export function applyWorkflowEvaluationToActivity(
+  state: AgentActivityState,
+  payload: { ok: boolean; should_replan: boolean; issues: string[] },
+): AgentActivityState {
+  if (payload.ok) {
+    return {
+      ...state,
+      phase: 'confirm',
+      latestReflection: { decision: 'finish' },
+    };
+  }
+  return {
+    ...state,
+    phase: 'plan',
+    latestReflection: {
+      decision: payload.should_replan ? 'replan' : 'finish',
+      reason: payload.issues[0],
+    },
+  };
+}
+
+export function clearAgentActivityForResponse(_state: AgentActivityState): AgentActivityState {
+  return INITIAL_AGENT_ACTIVITY;
 }
 
 export function updateToolStepResult(
