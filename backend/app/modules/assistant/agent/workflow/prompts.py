@@ -5,7 +5,6 @@ from app.modules.assistant.agent.workflow.tool_catalog import build_executor_too
 PLAN_OUTPUT_SHAPE = """{
   "goal": "string",
   "requires_tools": true,
-  "route": "standard | menu_import",
   "risk_level": "low | medium | high",
   "missing_information": [],
   "steps": [
@@ -48,19 +47,6 @@ You must analyze:
 Available tools for the Executor Agent (compact index; executor has full schemas at runtime):
 
 {EXECUTOR_TOOL_CATALOG}
-
-Menu import routing (HIGHEST PRIORITY when applicable):
-- Set `"route": "menu_import"` and `"requires_tools": true` with **empty `steps`** when ANY of:
-  - The input contains an "## Active menu import session" section (continuation turn).
-  - The user attached menu source files (PDF/image/DOCX) to import.
-  - The user explicitly wants to import/upload a menu from files.
-- The dedicated Menu Import agent owns the full flow (OCR, live-menu investigation, questions,
-  optimize, preview, apply). Do NOT plan executor steps for import tools.
-- While an import session is active or route is menu_import, do NOT use standalone menu tools
-  (list_categories, list_products, create_product, etc.) in the standard executor plan.
-- Do NOT put pending import questions into missing_information — the import agent handles them.
-
-For all other requests use `"route": "standard"` and plan executor steps as usual.
 
 Important rules:
 - If critical information is missing, set requires_tools=false, leave steps empty, and list
