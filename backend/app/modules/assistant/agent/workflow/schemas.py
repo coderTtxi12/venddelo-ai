@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 RiskLevel = Literal["low", "medium", "high"]
+WorkflowRoute = Literal["standard", "menu_import"]
 
 
 class PlanStep(BaseModel):
@@ -39,6 +40,13 @@ class WorkflowPlan(BaseModel):
         description="Why approval is needed, when requires_approval is true",
     )
     risk_level: RiskLevel = Field(default="low")
+    route: WorkflowRoute = Field(
+        default="standard",
+        description=(
+            "standard = executor runs plan steps; menu_import = hand off to the "
+            "dedicated menu import agent after planning"
+        ),
+    )
     missing_information: list[str] = Field(
         default_factory=list,
         description="Critical gaps that must be resolved before execution",
@@ -58,7 +66,13 @@ class WorkflowPlan(BaseModel):
 
     @property
     def is_direct(self) -> bool:
+        if self.is_menu_import_handoff:
+            return False
         return not self.requires_tools or not self.steps
+
+    @property
+    def is_menu_import_handoff(self) -> bool:
+        return self.route == "menu_import" and self.requires_tools
 
 
 class WorkflowEvaluation(BaseModel):
