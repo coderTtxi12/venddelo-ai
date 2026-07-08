@@ -23,6 +23,7 @@ ChatStreamEventName = Literal[
     "tool.start",
     "tool.result",
     "tool.error",
+    "menu_import.quiz",
 ]
 
 

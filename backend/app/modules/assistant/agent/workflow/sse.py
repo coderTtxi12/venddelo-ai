@@ -1,16 +1,16 @@
-"""SSE payloads for explicit workflow phases."""
+"""SSE payloads for workflow phases."""
 
 from __future__ import annotations
 
 from app.core.llm.ports import ChatStreamEvent
-from app.modules.assistant.agent.workflow.schemas import WorkflowEvaluation, WorkflowPlan
+from app.modules.assistant.agent.workflow.schemas import WorkflowEvaluation
+from app.modules.assistant.skills.menu_import.response_schema import MenuImportQuizQuestion
 
 PHASE_LABELS: dict[str, str] = {
     "context": "Preparando contexto",
-    "planning": "Planificando",
-    "executing": "Ejecutando plan",
+    "routing": "Analizando solicitud",
+    "executing": "Investigando y ejecutando",
     "evaluating": "Evaluando resultados",
-    "replanning": "Ajustando plan",
     "responding": "Redactando respuesta",
 }
 
@@ -25,55 +25,6 @@ def phase_event(phase: str) -> ChatStreamEvent:
     )
 
 
-def plan_event(plan: WorkflowPlan, *, replan: bool = False) -> ChatStreamEvent:
-    return ChatStreamEvent(
-        event="agent.plan_update" if replan else "agent.plan",
-        data={
-            "goal": plan.goal,
-            "summary": plan.goal,
-            "requires_tools": plan.requires_tools,
-            "risk_level": plan.risk_level,
-            "missing_information": plan.missing_information,
-            "success_criteria": plan.success_criteria,
-            "stop_conditions": plan.stop_conditions,
-            "steps": [
-                {
-                    **step.model_dump(),
-                    "id": step.step_id,
-                    "goal": step.action,
-                    "tool_hint": step.tool,
-                }
-                for step in plan.steps
-            ],
-            "replan": replan,
-        },
-    )
-
-
-def step_events(plan: WorkflowPlan, *, active_index: int | None = None, done_through: int = -1):
-    """Yield per-step status events for the plan checklist UI."""
-    for index, step in enumerate(plan.steps):
-        if index <= done_through:
-            status = "done"
-        elif active_index is not None and index == active_index:
-            status = "active"
-        else:
-            status = "pending"
-        yield ChatStreamEvent(
-            event="agent.step",
-            data={
-                "step_id": step.step_id,
-                "id": step.step_id,
-                "index": index,
-                "action": step.action,
-                "goal": step.action,
-                "tool": step.tool,
-                "tool_hint": step.tool,
-                "status": status,
-            },
-        )
-
-
 def evaluation_event(evaluation: WorkflowEvaluation) -> ChatStreamEvent:
     return ChatStreamEvent(
         event="agent.evaluation",
@@ -82,4 +33,57 @@ def evaluation_event(evaluation: WorkflowEvaluation) -> ChatStreamEvent:
             "should_replan": evaluation.should_replan,
             "issues": evaluation.issues,
         },
+    )
+
+
+def tool_start_event(
+    tool: str,
+    *,
+    call_id: str | None = None,
+    args_summary: dict[str, object] | None = None,
+    effect: str | None = None,
+) -> ChatStreamEvent:
+    data: dict[str, object] = {"tool": tool}
+    if call_id:
+        data["call_id"] = call_id
+    if args_summary:
+        data["args_summary"] = args_summary
+    if effect:
+        data["effect"] = effect
+    return ChatStreamEvent(event="tool.start", data=data)
+
+
+def tool_result_event(
+    tool: str,
+    *,
+    call_id: str | None = None,
+    ok: bool = True,
+    summary: str | None = None,
+) -> ChatStreamEvent:
+    data: dict[str, object] = {"tool": tool, "ok": ok}
+    if call_id:
+        data["call_id"] = call_id
+    if summary:
+        data["summary"] = summary
+    return ChatStreamEvent(event="tool.result", data=data)
+
+
+def agent_thought_event(
+    *,
+    text: str | None = None,
+    delta: str | None = None,
+    source: str = "router",
+) -> ChatStreamEvent:
+    data: dict[str, object] = {"source": source}
+    if text:
+        data["text"] = text
+    if delta:
+        data["delta"] = delta
+    return ChatStreamEvent(event="agent.thought", data=data)
+
+
+def menu_import_quiz_event(questions: list[MenuImportQuizQuestion]) -> ChatStreamEvent:
+    return ChatStreamEvent(
+        event="menu_import.quiz",
+        data={"questions": [question.model_dump() for question in questions]},
     )
