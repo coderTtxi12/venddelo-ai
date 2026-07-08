@@ -3,15 +3,14 @@ from app.modules.assistant.agent.workflow.context_loader import (
     _format_execution_findings,
     resolve_runtime_skill_ids,
     responder_input,
+    router_input,
 )
 from app.modules.assistant.agent.workflow.schemas import (
     ExecutedStep,
     ExecutionRecord,
-    PlanStep,
     WorkflowEvaluation,
-    WorkflowPlan,
+    WorkflowRouteDecision,
     clear_execution_approval_gates,
-    clear_plan_approval_gates,
 )
 
 
@@ -33,26 +32,7 @@ def test_resolve_runtime_skill_ids_honors_rollout_cap():
     assert effective == ["menu_read"]
 
 
-def test_clear_plan_and_execution_approval_gates():
-    plan = WorkflowPlan(
-        goal="Activar producto",
-        requires_approval=True,
-        approval_reason="Cambio de precio",
-        steps=[
-            PlanStep(
-                step_id="step_1",
-                tool="update_product",
-                action="Activar",
-                reason="Pedido del dueño",
-                requires_approval_before_execution=True,
-            )
-        ],
-    )
-    cleared_plan = clear_plan_approval_gates(plan)
-    assert cleared_plan.requires_approval is False
-    assert cleared_plan.approval_reason is None
-    assert cleared_plan.steps[0].requires_approval_before_execution is False
-
+def test_clear_execution_approval_gates():
     execution = ExecutionRecord(
         requires_user_approval=True,
         approval_reason="Esperando confirmación",
@@ -68,12 +48,12 @@ def test_format_execution_findings_includes_full_executor_payload():
         summary="Se listaron categorías y productos.",
         executed_steps=[
             ExecutedStep(
-                step_id="step_1",
+                step_id="lookup_1",
                 tool="list_categories",
                 output_summary="Listed 3 categories",
             ),
             ExecutedStep(
-                step_id="step_2",
+                step_id="lookup_2",
                 tool="list_products",
                 output_summary="Listed 15 products (catalog: 15 total)",
             ),
@@ -88,7 +68,7 @@ def test_format_execution_findings_includes_full_executor_payload():
     assert "### Datos para responder" in findings
     assert "Se listaron categorías y productos." in findings
     assert "### Metadatos de ejecución" in findings
-    assert '"step_id": "step_1"' in findings
+    assert '"step_id": "lookup_1"' in findings
     assert '"output_summary": "Listed 3 categories"' in findings
     assert "requires_user_approval" not in findings
     assert "tools_used" not in findings
@@ -120,22 +100,16 @@ def test_responder_input_puts_formatted_findings_for_tool_runs():
             "user_message": "¿Qué categorías tengo?",
         },
     )()
-    plan = WorkflowPlan(
+    route = WorkflowRouteDecision(
+        route="executor",
         goal="Listar categorías",
-        steps=[
-            PlanStep(
-                step_id="step_1",
-                tool="list_categories",
-                action="Listar categorías",
-                reason="El usuario preguntó por categorías",
-            )
-        ],
+        reason="Necesita datos del menú.",
     )
     execution = ExecutionRecord(
         summary="Hay 3 categorías.",
         executed_steps=[
             ExecutedStep(
-                step_id="step_1",
+                step_id="lookup_1",
                 tool="list_categories",
                 output_summary="Listed 3 categories",
             )
@@ -143,7 +117,7 @@ def test_responder_input_puts_formatted_findings_for_tool_runs():
     )
     evaluation = WorkflowEvaluation(ok=True, issues=[])
 
-    payload = responder_input(context, plan, execution, evaluation)
+    payload = responder_input(context, route, execution, evaluation)
 
     assert "## Findings" in payload
     assert "## Evaluation" in payload
@@ -151,3 +125,23 @@ def test_responder_input_puts_formatted_findings_for_tool_runs():
     assert "Hay 3 categorías." in payload
     assert "### Metadatos de ejecución" in payload
     assert '"ok": true' in payload
+
+
+def test_router_input_includes_menu_import_signals():
+    context = type(
+        "Ctx",
+        (),
+        {
+            "conversation_history": "(sin historial previo en esta conversación)",
+            "user_message": "Importa mi menú\n\n## Chat attachments\n\n- **menu.pdf**",
+            "menu_import_enabled": True,
+            "menu_source_attachment_count": 1,
+            "import_session_context": "Hay una **sesión de importación de menú ACTIVA** (fase: clarifying).",
+        },
+    )()
+
+    payload = router_input(context)
+
+    assert "## Menu import capability" in payload
+    assert "archivo(s) de menú" in payload
+    assert "## Active menu import session" in payload
