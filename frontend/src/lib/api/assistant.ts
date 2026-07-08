@@ -1,4 +1,6 @@
 import { ApiError } from './types';
+import { isFetchAbortError } from './assistantStream';
+import type { ChatAttachmentRef } from './assistantImport';
 import type { StepStatus, WorkflowPhaseId } from '@/lib/assistant/workflowTelemetry';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api/v1';
@@ -6,6 +8,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api/v1
 export type AssistantChatRequest = {
   message: string;
   conversation_id?: string | null;
+  attachments?: ChatAttachmentRef[];
 };
 
 export type AssistantStreamCompletePayload = {
@@ -89,7 +92,10 @@ export async function streamAssistantChat(
       body: JSON.stringify(body),
       signal,
     });
-  } catch {
+  } catch (error) {
+    if (signal?.aborted || isFetchAbortError(error)) {
+      return;
+    }
     throw new ApiError(
       'network_error',
       `No se pudo conectar con el backend (${API_URL}). Verifica que esté en marcha.`,
@@ -123,7 +129,16 @@ export async function streamAssistantChat(
   };
 
   while (!finished) {
-    const { done, value } = await reader.read();
+    let done: boolean;
+    let value: Uint8Array | undefined;
+    try {
+      ({ done, value } = await reader.read());
+    } catch (error) {
+      if (signal?.aborted || isFetchAbortError(error)) {
+        return;
+      }
+      throw error;
+    }
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });

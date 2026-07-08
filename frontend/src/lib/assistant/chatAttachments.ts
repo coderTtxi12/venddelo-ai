@@ -5,6 +5,7 @@ export type ChatAttachment = {
   mimeType: string;
   kind: 'image' | 'document';
   previewUrl: string | null;
+  file?: File;
 };
 
 function createAttachmentId(): string {
@@ -26,6 +27,7 @@ export function createAttachmentFromFile(file: File): ChatAttachment {
     mimeType: file.type || 'application/octet-stream',
     kind,
     previewUrl: kind === 'image' ? URL.createObjectURL(file) : null,
+    file,
   };
 }
 

@@ -1,9 +1,11 @@
 'use client';
 
 import AddCommentOutlinedIcon from '@mui/icons-material/AddCommentOutlined';
+import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
+import ChatAttachmentList from '@/components/assistant/ChatAttachmentList';
 import ChatMarkdown from '@/components/assistant/ChatMarkdown';
 import AssistantWorkflowTelemetry from '@/components/assistant/AssistantWorkflowTelemetry';
 import { useAssistantChat } from '@/contexts/AssistantChatContext';
@@ -11,6 +13,19 @@ import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useChatPanelResize } from '@/hooks/useChatPanelResize';
 import { streamAssistantChat } from '@/lib/api/assistant';
+import { isFetchAbortError } from '@/lib/api/assistantStream';
+import {
+  CHAT_ATTACHMENT_ACCEPT,
+  inferChatAttachmentKind,
+  MAX_CHAT_ATTACHMENTS,
+  uploadImportAsset,
+  type ChatAttachmentRef,
+} from '@/lib/api/assistantImport';
+import {
+  createAttachmentsFromFileList,
+  revokeAttachmentPreviews,
+  type ChatAttachment,
+} from '@/lib/assistant/chatAttachments';
 import {
   INITIAL_WORKFLOW_TELEMETRY,
   applyWorkflowEvaluation,
@@ -34,18 +49,19 @@ type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
+  attachments?: ChatAttachment[];
 };
 
 const WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome',
   role: 'assistant',
   content:
-    '¡Hola! Soy el asistente de tu restaurante. Por ahora puedo consultar tu menú: categorías, productos y promociones. ¿Qué te gustaría revisar?',
+    '¡Hola! Soy el asistente de tu restaurante. Puedo consultar tu menú, ayudarte a importar un menú completo (PDF, Word o fotos) y más. Adjunta archivos con el clip o escribe tu pregunta.',
 };
 
 const SUGGESTIONS = [
   '¿Qué categorías tengo?',
-  'Buscar un producto por nombre',
+  'Quiero importar mi menú',
   '¿Qué promociones están activas?',
 ];
 
@@ -63,6 +79,9 @@ export default function AssistantChatPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [agentProcessing, setAgentProcessing] = useState(false);
@@ -72,6 +91,8 @@ export default function AssistantChatPanel() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingAttachmentsRef = useRef<ChatAttachment[]>([]);
   const sendInFlightRef = useRef(false);
   const streamAbortRef = useRef<AbortController | null>(null);
 
@@ -91,9 +112,51 @@ export default function AssistantChatPanel() {
   }, [messages, streamingMessageId, scrollToBottom]);
 
   useEffect(() => {
+    pendingAttachmentsRef.current = pendingAttachments;
+  }, [pendingAttachments]);
+
+  useEffect(() => {
     return () => {
       streamAbortRef.current?.abort();
+      revokeAttachmentPreviews(pendingAttachmentsRef.current);
     };
+  }, []);
+
+  const addPendingFiles = useCallback((files: FileList | File[]) => {
+    const incoming = Array.from(files);
+    if (incoming.length === 0) return;
+
+    setAttachError(null);
+    setPendingAttachments((current) => {
+      const remaining = MAX_CHAT_ATTACHMENTS - current.length;
+      if (remaining <= 0) {
+        setAttachError(`Máximo ${MAX_CHAT_ATTACHMENTS} archivos por mensaje.`);
+        return current;
+      }
+      const accepted = incoming.slice(0, remaining);
+      if (accepted.length < incoming.length) {
+        setAttachError(`Solo se agregaron ${accepted.length} archivo(s); máximo ${MAX_CHAT_ATTACHMENTS}.`);
+      }
+      return [...current, ...createAttachmentsFromFileList(accepted)];
+    });
+  }, []);
+
+  const removePendingAttachment = useCallback((id: string) => {
+    setPendingAttachments((current) => {
+      const target = current.find((item) => item.id === id);
+      if (target) {
+        revokeAttachmentPreviews([target]);
+      }
+      return current.filter((item) => item.id !== id);
+    });
+    setAttachError(null);
+  }, []);
+
+  const clearPendingAttachments = useCallback(() => {
+    setPendingAttachments((current) => {
+      revokeAttachmentPreviews(current);
+      return [];
+    });
   }, []);
 
   const resizeTextarea = useCallback(() => {
@@ -108,11 +171,21 @@ export default function AssistantChatPanel() {
   }, [draft, resizeTextarea]);
 
   const sendMessage = useCallback(
-    async (rawText: string) => {
+    async (rawText: string, attachmentsToSend: ChatAttachment[] = pendingAttachments) => {
       const text = rawText.trim();
-      if (!text || isBusy || sendInFlightRef.current) return;
+      const hasAttachments = attachmentsToSend.length > 0;
+      if ((!text && !hasAttachments) || sendInFlightRef.current) return;
+
+      sendInFlightRef.current = true;
+      setIsBusy(true);
+
+      const releaseSendLock = () => {
+        sendInFlightRef.current = false;
+        setIsBusy(false);
+      };
 
       if (!accessToken || !restaurantId) {
+        releaseSendLock();
         setMessages((prev) => [
           ...prev,
           {
@@ -125,10 +198,49 @@ export default function AssistantChatPanel() {
         return;
       }
 
+      let uploadedAttachments: ChatAttachmentRef[] = [];
+      if (hasAttachments) {
+        try {
+          uploadedAttachments = await Promise.all(
+            attachmentsToSend.map(async (attachment) => {
+              const file = attachment.file;
+              if (!file) {
+                throw new Error(`Falta el archivo ${attachment.name}`);
+              }
+              const kind = inferChatAttachmentKind(file);
+              const uploaded = await uploadImportAsset(accessToken, restaurantId, file, kind);
+              return {
+                storage_path: uploaded.path,
+                original_name: uploaded.original_name,
+                mime_type: uploaded.mime_type,
+                kind: uploaded.kind,
+                size_bytes: uploaded.size_bytes,
+              };
+            }),
+          );
+        } catch (error) {
+          releaseSendLock();
+          const message =
+            error instanceof ApiError
+              ? error.message
+              : error instanceof Error && error.message
+                ? error.message
+                : 'No se pudieron subir los archivos adjuntos.';
+          setAttachError(message);
+          return;
+        }
+      }
+
+      const messageAttachments = attachmentsToSend.map((attachment) => {
+        const { file: _file, ...rest } = attachment;
+        return rest;
+      });
+
       const userMessage: ChatMessage = {
         id: createId(),
         role: 'user',
         content: text,
+        attachments: messageAttachments.length > 0 ? messageAttachments : undefined,
       };
       const assistantMessageId = createId();
 
@@ -136,12 +248,12 @@ export default function AssistantChatPanel() {
       const abortController = new AbortController();
       streamAbortRef.current = abortController;
 
-      sendInFlightRef.current = true;
-      setIsBusy(true);
       setStreamingMessageId(assistantMessageId);
       setAgentProcessing(true);
       setWorkflowTelemetry(INITIAL_WORKFLOW_TELEMETRY);
       setDraft('');
+      setAttachError(null);
+      clearPendingAttachments();
       setMessages((prev) => {
         const withoutWelcome =
           prev.length === 1 && prev[0]?.id === 'welcome'
@@ -194,6 +306,7 @@ export default function AssistantChatPanel() {
           {
             message: text,
             conversation_id: conversationId,
+            attachments: uploadedAttachments,
           },
           {
             onDelta: (delta) => {
@@ -291,6 +404,12 @@ export default function AssistantChatPanel() {
         }
       } catch (error) {
         cancelPendingFrame();
+        if (isFetchAbortError(error) || abortController.signal.aborted) {
+          if (streamAbortRef.current === abortController) {
+            finishStream();
+          }
+          return;
+        }
         const message =
           error instanceof ApiError
             ? error.message
@@ -305,12 +424,12 @@ export default function AssistantChatPanel() {
         finishStream();
       }
     },
-    [accessToken, conversationId, isBusy, restaurantId],
+    [accessToken, clearPendingAttachments, conversationId, pendingAttachments, restaurantId],
   );
 
   const handleSubmit = () => {
     if (isBusy || sendInFlightRef.current) return;
-    void sendMessage(draft);
+    void sendMessage(draft, pendingAttachments);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -325,6 +444,9 @@ export default function AssistantChatPanel() {
     streamAbortRef.current?.abort();
     setConversationId(null);
     setDraft('');
+    clearPendingAttachments();
+    setAttachError(null);
+    setIsDragging(false);
     setStreamingMessageId(null);
     setAgentProcessing(false);
     setWorkflowTelemetry(INITIAL_WORKFLOW_TELEMETRY);
@@ -332,7 +454,34 @@ export default function AssistantChatPanel() {
     textareaRef.current?.focus();
   };
 
-  const canSend = !isBusy && draft.trim().length > 0;
+  const canSend =
+    !isBusy && (draft.trim().length > 0 || pendingAttachments.length > 0);
+
+  const handleDragEnter = (event: React.DragEvent) => {
+    event.preventDefault();
+    if (isBusy) return;
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent) => {
+    event.preventDefault();
+    if (event.currentTarget === event.target) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+  };
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    setIsDragging(false);
+    if (isBusy) return;
+    if (event.dataTransfer.files?.length) {
+      addPendingFiles(event.dataTransfer.files);
+    }
+  };
 
   return (
     <aside
@@ -344,7 +493,19 @@ export default function AssistantChatPanel() {
       }
       aria-hidden={!isOpen}
       aria-label="Asistente de Venddelo"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
+      {isOpen && isDragging ? (
+        <div className={styles.dropOverlay} aria-hidden>
+          <div className={styles.dropOverlayCard}>
+            <p className={styles.dropOverlayTitle}>Suelta tus archivos aquí</p>
+            <p className={styles.dropOverlayHint}>PDF, Word o imágenes de tu menú</p>
+          </div>
+        </div>
+      ) : null}
       {isOpen ? (
         <button
           type="button"
@@ -367,11 +528,10 @@ export default function AssistantChatPanel() {
           </div>
           <div className={styles.titleBlock}>
             <h2 className={styles.title}>Asistente</h2>
-            <p className={styles.subtitle}>Consulta tu menú con IA</p>
+            <p className={styles.subtitle}>Menú, importación y más</p>
           </div>
         </div>
         <div className={styles.headerActions}>
-          <span className={styles.modeBadge}>Solo lectura</span>
           <button
             type="button"
             className={styles.iconButton}
@@ -407,6 +567,10 @@ export default function AssistantChatPanel() {
             return null;
           }
 
+          if (isUser && !message.content && !message.attachments?.length) {
+            return null;
+          }
+
           return (
             <div
               key={message.id}
@@ -427,7 +591,16 @@ export default function AssistantChatPanel() {
                   className={`${styles.messageBody} ${isUser ? styles.messageBodyUser : styles.messageBodyAssistant}`}
                 >
                   {isUser ? (
-                    <p className={styles.userText}>{message.content}</p>
+                    <>
+                      {message.content ? <p className={styles.userText}>{message.content}</p> : null}
+                      {message.attachments && message.attachments.length > 0 ? (
+                        <ChatAttachmentList
+                          attachments={message.attachments}
+                          variant="message"
+                          compact={!message.content}
+                        />
+                      ) : null}
+                    </>
                   ) : (
                     <div className={styles.assistantText}>
                       {showWorkflowTelemetry ? (
@@ -474,7 +647,41 @@ export default function AssistantChatPanel() {
           ))}
         </div>
 
+        {pendingAttachments.length > 0 ? (
+          <ChatAttachmentList
+            attachments={pendingAttachments}
+            variant="pending"
+            onRemove={removePendingAttachment}
+          />
+        ) : null}
+
+        {attachError ? <p className={styles.attachError}>{attachError}</p> : null}
+
         <div className={styles.inputRow}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className={styles.hiddenFileInput}
+            accept={CHAT_ATTACHMENT_ACCEPT}
+            multiple
+            disabled={isBusy}
+            onChange={(event) => {
+              if (event.target.files) {
+                addPendingFiles(event.target.files);
+              }
+              event.target.value = '';
+            }}
+          />
+          <button
+            type="button"
+            className={styles.attachButton}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isBusy || pendingAttachments.length >= MAX_CHAT_ATTACHMENTS}
+            aria-label="Adjuntar imagen o documento"
+            title="Adjuntar menú (PDF, Word o foto)"
+          >
+            <AttachFileOutlinedIcon sx={{ fontSize: 18 }} />
+          </button>
           <label htmlFor="assistant-chat-input" className={styles.srOnly}>
             Mensaje para el asistente
           </label>
@@ -483,7 +690,7 @@ export default function AssistantChatPanel() {
             id="assistant-chat-input"
             className={styles.textarea}
             rows={1}
-            placeholder="Pregunta sobre categorías, productos o promociones…"
+            placeholder="Escribe o adjunta tu menú (PDF, Word, fotos)…"
             value={draft}
             disabled={isBusy}
             onChange={(event) => setDraft(event.target.value)}
@@ -500,7 +707,9 @@ export default function AssistantChatPanel() {
           </button>
         </div>
 
-        <p className={styles.hint}>Enter para enviar · Shift+Enter para nueva línea</p>
+        <p className={styles.hint}>
+          Enter para enviar · Shift+Enter para nueva línea · Clip o arrastra archivos
+        </p>
       </div>
     </aside>
   );
