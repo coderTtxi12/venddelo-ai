@@ -95,3 +95,39 @@ def build_reconciliation_plan(draft: ImportDraft, current: FullMenuDTO) -> Recon
         updated_products=updated_products,
         markdown="\n".join(lines),
     )
+
+
+def reconciliation_plan_to_dict(plan: ReconciliationPlan) -> dict[str, object]:
+    return {
+        "category_matches": dict(plan.category_matches),
+        "product_matches": dict(plan.product_matches),
+        "products_with_existing_groups": sorted(plan.products_with_existing_groups),
+        "new_categories": plan.new_categories,
+        "reused_categories": plan.reused_categories,
+        "new_products": plan.new_products,
+        "updated_products": plan.updated_products,
+        "markdown": plan.markdown,
+    }
+
+
+def reconciliation_plan_from_dict(payload: dict[str, object]) -> ReconciliationPlan | None:
+    if not payload:
+        return None
+    with_groups_raw = payload.get("products_with_existing_groups")
+    with_groups: frozenset[str] = frozenset()
+    if isinstance(with_groups_raw, list):
+        with_groups = frozenset(str(item) for item in with_groups_raw)
+    category_matches = payload.get("category_matches")
+    product_matches = payload.get("product_matches")
+    if not isinstance(category_matches, dict) or not isinstance(product_matches, dict):
+        return None
+    return ReconciliationPlan(
+        category_matches={str(k): str(v) for k, v in category_matches.items()},
+        product_matches={str(k): str(v) for k, v in product_matches.items()},
+        products_with_existing_groups=with_groups,
+        new_categories=int(payload.get("new_categories") or 0),
+        reused_categories=int(payload.get("reused_categories") or 0),
+        new_products=int(payload.get("new_products") or 0),
+        updated_products=int(payload.get("updated_products") or 0),
+        markdown=str(payload.get("markdown") or ""),
+    )
