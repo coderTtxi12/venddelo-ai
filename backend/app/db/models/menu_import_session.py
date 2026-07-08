@@ -71,6 +71,16 @@ class MenuImportSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         server_default="[]",
     )
+    live_menu_snapshot: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default="{}",
+    )
+    reconciliation_snapshot: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default="{}",
+    )
 
     __table_args__ = (
         Index(
