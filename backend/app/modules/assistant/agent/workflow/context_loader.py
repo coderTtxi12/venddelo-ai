@@ -25,8 +25,9 @@ from app.modules.assistant.profile.service import AssistantProfileService
 from app.modules.assistant.schemas import AssistantChatHistoryMessage, ChatAttachmentRef
 from app.modules.assistant.skills.discovery import discover_skill_executors
 from app.modules.assistant.skills.markdown import load_skill_metadata
-from app.modules.assistant.skills.menu_import.session_context import build_import_session_context
 from app.modules.assistant.skills.registry import SkillRegistry
+
+WORKFLOW_EXCLUDED_SKILL_IDS = frozenset({"menu_import"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,7 +40,6 @@ class WorkflowContext:
     system_prompt: str
     conversation_history: str
     assistant_display_name: str
-    import_session_status: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +134,11 @@ def load_workflow_runtime(
         ).effective_skill_ids,
         rollout_skill_ids=rollout_skill_ids,
     )
+    effective_skill_ids = [
+        skill_id
+        for skill_id in effective_skill_ids
+        if skill_id not in WORKFLOW_EXCLUDED_SKILL_IDS
+    ]
     if not effective_skill_ids:
         raise ValueError("No assistant skills are enabled for this restaurant")
 
@@ -154,9 +159,6 @@ def load_workflow_runtime(
         )
         history = compressed.history
 
-    active_import_session = uow.menu_import_sessions.get_active_for_restaurant(restaurant_id)
-    import_session_status = build_import_session_context(active_import_session)
-
     context = WorkflowContext(
         user_message=cleaned,
         restaurant_id=restaurant_id,
@@ -166,7 +168,6 @@ def load_workflow_runtime(
         system_prompt=system_prompt,
         conversation_history=_format_history(history),
         assistant_display_name=profile.display_name.strip(),
-        import_session_status=import_session_status,
     )
     return WorkflowRuntimeBundle(
         context=context,
@@ -175,32 +176,15 @@ def load_workflow_runtime(
     )
 
 
-def _import_session_block(context: WorkflowContext) -> str:
-    if not context.import_session_status:
-        return ""
-    return f"## Active menu import session\n\n{context.import_session_status}\n\n"
-
-
 def planner_input(context: WorkflowContext) -> str:
     return (
-        f"{_import_session_block(context)}"
         f"## Conversation history\n\n{context.conversation_history}\n\n"
         f"## User request\n\n{context.user_message}"
     )
 
 
-def menu_import_input(context: WorkflowContext) -> str:
-    return (
-        f"{_import_session_block(context)}"
-        f"## Conversation history\n\n{context.conversation_history}\n\n"
-        f"## User request\n\n{context.user_message}\n\n"
-        "Investiga con las tools antes de preguntar. No repitas OCR si la sesión ya tiene borrador."
-    )
-
-
 def executor_input(context: WorkflowContext, plan: WorkflowPlan) -> str:
     return (
-        f"{_import_session_block(context)}"
         f"## Conversation history\n\n{context.conversation_history}\n\n"
         f"## User request\n\n{context.user_message}\n\n"
         f"## Plan to execute\n\n{plan.model_dump_json(indent=2)}"
