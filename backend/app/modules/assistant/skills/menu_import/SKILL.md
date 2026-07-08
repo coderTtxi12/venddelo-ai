@@ -13,6 +13,16 @@ End-to-end **concierge menu import** for restaurant owners — one preview, one 
 - First-time setup of categories, products, complements, and promotions.
 - Owner uploads PDF, DOCX, or menu photos via chat attachments.
 
+## Main workflow entry (agent-as-tool)
+
+The **main assistant executor** calls a single tool:
+
+- **`run_menu_import_onboarding`** — sub-agent with all internal `menu_import` tools, Postgres
+  session memory (`live_menu_snapshot`, `reconciliation_snapshot`), batch questions, and
+  one-shot `apply_full_import`.
+
+Granular `menu_import` tools are **internal** to that sub-agent, not exposed on the main executor.
+
 ## Required skills at start
 
 Before any import tool, load:
@@ -25,10 +35,11 @@ Before any import tool, load:
 
 Be the concierge: **investigate first, plan, then apply the whole menu in one shot.**
 
-1. **Investigate:** read the current menu (`get_full_menu` / `menu_read`) to see existing categories, products, and complements. Read the uploaded document(s) fully.
-2. **Plan:** decide what to **create** vs **update**. `preview_full_import` and `apply_full_import` reconcile the draft against the live menu **by name** — existing categories/products are updated (never duplicated), new ones are created, and complements on products that already have groups are left untouched.
+1. **Investigate:** `analyze_import_vs_live` caches the live menu snapshot in Postgres and reconciles the OCR draft — do not re-scan the live menu every turn.
+2. **Plan:** decide what to **create** vs **update**. `preview_full_import` and `apply_full_import` reconcile the draft against the live menu **by name** — existing categories/products are updated (never duplicated), new ones are created, and complements on products that already have groups are left untouched unless the owner clarifies.
 3. **Ask only what's necessary:** infer everything you can (complement rules, prices, layouts). Raise an `open_question` **only** for genuine ambiguities you cannot resolve from the document or context.
-4. **Apply once:** publish the entire menu with a single `apply_full_import`.
+4. **Ask in one batch:** when there are `open_questions`, present **all** questions in a single message (especially complement assignments). Do not ask one question per turn.
+5. **Apply once:** publish the entire menu with a single `apply_full_import`.
 
 ## Important rules
 
@@ -52,19 +63,21 @@ After `apply_full_import` succeeds:
 
 ## Workflow (concierge)
 
-1. **`load_skill(menu_read)`** + **`load_skill(menu_write)`** + **`load_skill(menu_best_practices)`** + **`start_menu_import_session`** — then read the current menu to understand what already exists
+1. **`run_menu_import_onboarding`** (main executor) or internal sub-flow:
+   - **`start_menu_import_session`** — concierge mode; session persists in Postgres
 2. Owner uploads files → **`register_menu_source_file`** for each `storage_path` from chat attachments
 3. Optional context → **`save_discovery_answers`**
 4. **`start_menu_extraction_batch`** — OCR all sources → **one full-menu draft**
-5. If `open_questions` → **`save_clarification_answers`** — **one question per turn** until resolved
-6. **`optimize_import_draft`** — optimize the whole menu: category order/layout, product order, descriptions,
+5. **`analyze_import_vs_live`** — cache live menu + reconciliation; merge complement questions
+6. If `open_questions` → ask **all questions in one message** → **`save_clarification_answers`** with every answer at once
+7. **`optimize_import_draft`** — optimize the whole menu: category order/layout, product order, descriptions,
    **complement groups** (required vs optional, min/max selections, extra prices), theme recommendation
-7. **`preview_full_import`** — show executive summary in Spanish; includes the **reconciliation plan** (nuevas vs existentes) and complement rules
-8. Owner confirms once → **`apply_full_import`** (`confirmed: true`) — creates new + updates existing, no duplicates
-9. **`apply_menu_theme`** (theme from optimization)
-10. **`load_skill(promotions)`** → **`generate_promotion_banner`** for each NxM promo
-11. Ask owner for dish photos → **`menu_write`**: `match_product_photos` → confirm → `bulk_assign_product_images`
-12. **`update_menu_knowledge`** — append import notes; session **completed**
+8. **`preview_full_import`** — show executive summary in Spanish; includes the **reconciliation plan** (nuevas vs existentes) and complement rules
+9. Owner confirms once → **`apply_full_import`** (`confirmed: true`) — creates new + updates existing, no duplicates
+10. **`apply_menu_theme`** (theme from optimization)
+11. **`load_skill(promotions)`** → **`generate_promotion_banner`** for each NxM promo
+12. Ask owner for dish photos → **`menu_write`**: `match_product_photos` → confirm → `bulk_assign_product_images`
+13. **`update_menu_knowledge`** — append import notes; session **completed**
 
 ## Complement detection
 
@@ -99,7 +112,8 @@ first, paid extras last.
 | `register_menu_source_file` | mutate | Register uploaded PDF/DOCX/image path |
 | `start_menu_extraction_batch` | mutate | OCR all sources → one full-menu draft |
 | `get_extraction_status` | read | Batch progress + optional preview |
-| `save_clarification_answers` | mutate | Answer `open_questions` |
+| `analyze_import_vs_live` | mutate | Cache live menu snapshot + reconciliation; complement questions |
+| `save_clarification_answers` | mutate | Answer all `open_questions` in one call |
 
 ### Concierge optimize & apply
 

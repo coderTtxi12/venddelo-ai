@@ -15,6 +15,9 @@ def test_menu_import_skill_md_concierge_workflow():
     assert "load_skill(menu_read)" in text
     assert "Investigate" in text
     assert "reconcile" in text
+    assert "run_menu_import_onboarding" in text
+    assert "analyze_import_vs_live" in text
+    assert "one message" in text or "one batch" in text or "de jalón" in text.lower()
 
 
 def test_menu_import_skill_md_no_menu_media_in_workflow():
