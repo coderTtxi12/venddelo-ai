@@ -2,20 +2,50 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
 from agents import FunctionTool, RunContextWrapper
 
 from app.core.config import Settings
+from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.agent.run_context import AssistantRunContext
 from app.modules.assistant.agent.tool_schema import coerce_tool_args, normalize_tool_json_schema
-from app.modules.assistant.skills.base import SkillPort, ToolDefinition
+from app.modules.assistant.skills.base import SkillPort, ToolDefinition, ToolResult
+from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.registry import SkillRegistry
 
 
 def _encode_tool_result(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False, default=str)
+
+
+def _execute_tool_isolated(
+    registry: SkillRegistry,
+    skill_id: str,
+    tool_name: str,
+    parsed_args: dict[str, Any],
+    agent_ctx: AgentContext,
+) -> ToolResult:
+    """Run a sync tool on its own DB session so the event loop stays responsive."""
+    uow = SqlAlchemyUnitOfWork()
+    uow.__enter__()
+    try:
+        isolated_ctx = AgentContext(
+            restaurant_id=agent_ctx.restaurant_id,
+            conversation_id=agent_ctx.conversation_id,
+            uow=uow,
+            effective_skill_ids=list(agent_ctx.effective_skill_ids),
+        )
+        result = registry.execute(skill_id, tool_name, parsed_args, isolated_ctx)
+        uow.commit()
+        return result
+    except Exception:
+        uow.rollback()
+        raise
+    finally:
+        uow.__exit__(None, None, None)
 
 
 def build_skill_function_tools(skill: SkillPort) -> list[FunctionTool]:
@@ -97,7 +127,9 @@ def _build_registry_tool(
                 {"ok": False, "summary": f"Skill mismatch for {tool_name!r}: expected {skill_id!r}"}
             )
 
-        result = run_ctx.registry.execute(
+        result = await asyncio.to_thread(
+            _execute_tool_isolated,
+            run_ctx.registry,
             skill_id,
             tool_name,
             parsed_args,
