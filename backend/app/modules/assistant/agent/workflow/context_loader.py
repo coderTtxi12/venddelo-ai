@@ -9,12 +9,16 @@ from dataclasses import dataclass
 from app.core.config import Settings, get_settings
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.agent.prompt_composer import compose_system_prompt
-from app.modules.assistant.agent.workflow.schemas import ExecutionRecord, WorkflowEvaluation, WorkflowPlan
+from app.modules.assistant.agent.workflow.schemas import (
+    ExecutionRecord,
+    WorkflowEvaluation,
+    WorkflowRouteDecision,
+)
 from app.modules.assistant.context.compressor import compress_history_for_llm
 from app.modules.assistant.chat_attachments import format_user_message_with_attachments
 from app.modules.assistant.conversation_store import (
     assistant_repository,
-    ensure_conversation,
+    ensure_conversation_committed,
     load_recent_history,
 )
 from app.modules.assistant.entitlements.adapters import SqlAlchemyRestaurantEntitlementsRepository
@@ -25,6 +29,11 @@ from app.modules.assistant.profile.service import AssistantProfileService
 from app.modules.assistant.schemas import AssistantChatHistoryMessage, ChatAttachmentRef
 from app.modules.assistant.skills.discovery import discover_skill_executors
 from app.modules.assistant.skills.markdown import load_skill_metadata
+from app.modules.assistant.skills.menu_import.session_context import build_import_session_context
+from app.modules.assistant.skills.menu_import.session_handoff import (
+    menu_source_attachments,
+    replace_import_session_if_needed,
+)
 from app.modules.assistant.skills.registry import SkillRegistry
 
 WORKFLOW_EXCLUDED_SKILL_IDS = frozenset({"menu_import"})
@@ -40,12 +49,16 @@ class WorkflowContext:
     system_prompt: str
     conversation_history: str
     assistant_display_name: str
+    menu_import_enabled: bool = False
+    menu_source_attachment_count: int = 0
+    import_session_context: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class WorkflowRuntimeBundle:
     context: WorkflowContext
     registry: SkillRegistry
+    menu_import_registry: SkillRegistry | None
     conversation_id: uuid.UUID
 
 
@@ -98,6 +111,13 @@ def _format_history(messages: list[AssistantChatHistoryMessage]) -> str:
     return "\n\n".join(lines)
 
 
+def build_menu_import_registry() -> SkillRegistry | None:
+    executors = [skill for skill in discover_skill_executors() if skill.id == "menu_import"]
+    if not executors:
+        return None
+    return SkillRegistry(executors)
+
+
 def load_workflow_runtime(
     *,
     uow: SqlAlchemyUnitOfWork,
@@ -112,8 +132,7 @@ def load_workflow_runtime(
     cleaned = format_user_message_with_attachments(user_message, attachments or [])
 
     repo = assistant_repository(uow)
-    resolved_conversation_id = ensure_conversation(
-        repo,
+    resolved_conversation_id = ensure_conversation_committed(
         restaurant_id=restaurant_id,
         conversation_id=conversation_id,
         first_message=cleaned,
@@ -134,6 +153,20 @@ def load_workflow_runtime(
         ).effective_skill_ids,
         rollout_skill_ids=rollout_skill_ids,
     )
+    menu_import_enabled = "menu_import" in effective_skill_ids
+    menu_import_registry = build_menu_import_registry() if menu_import_enabled else None
+    menu_sources = menu_source_attachments(attachments or [])
+
+    replace_import_session_if_needed(
+        restaurant_id=restaurant_id,
+        attachments=attachments or [],
+    )
+
+    import_session_context: str | None = None
+    if menu_import_enabled:
+        active_import = uow.menu_import_sessions.get_active_for_restaurant(restaurant_id)
+        import_session_context = build_import_session_context(active_import)
+
     effective_skill_ids = [
         skill_id
         for skill_id in effective_skill_ids
@@ -168,54 +201,84 @@ def load_workflow_runtime(
         system_prompt=system_prompt,
         conversation_history=_format_history(history),
         assistant_display_name=profile.display_name.strip(),
+        menu_import_enabled=menu_import_enabled,
+        menu_source_attachment_count=len(menu_sources),
+        import_session_context=import_session_context,
     )
     return WorkflowRuntimeBundle(
         context=context,
         registry=registry,
+        menu_import_registry=menu_import_registry,
         conversation_id=resolved_conversation_id,
     )
 
 
-def planner_input(context: WorkflowContext) -> str:
-    return (
-        f"## Conversation history\n\n{context.conversation_history}\n\n"
-        f"## User request\n\n{context.user_message}"
-    )
+def router_input(context: WorkflowContext) -> str:
+    parts = [
+        f"## Conversation history\n\n{context.conversation_history}",
+        f"## User request\n\n{context.user_message}",
+    ]
+    if context.menu_import_enabled:
+        parts.append("## Menu import capability\n\nDisponible para este restaurante.")
+        if context.menu_source_attachment_count:
+            parts.append(
+                f"El usuario adjuntó **{context.menu_source_attachment_count}** archivo(s) "
+                "de menú (`menu_source`) en este mensaje."
+            )
+    if context.import_session_context:
+        parts.append(f"## Active menu import session\n\n{context.import_session_context}")
+    return "\n\n".join(parts)
 
 
-def executor_input(context: WorkflowContext, plan: WorkflowPlan) -> str:
-    return (
-        f"## Conversation history\n\n{context.conversation_history}\n\n"
-        f"## User request\n\n{context.user_message}\n\n"
-        f"## Plan to execute\n\n{plan.model_dump_json(indent=2)}"
-    )
+def menu_import_input(context: WorkflowContext, route: WorkflowRouteDecision) -> str:
+    parts = [
+        f"## Conversation history\n\n{context.conversation_history}",
+        f"## User request\n\n{context.user_message}",
+        f"## User goal\n\n{route.goal}",
+    ]
+    if context.import_session_context:
+        parts.append(f"## Import session\n\n{context.import_session_context}")
+    if context.menu_source_attachment_count:
+        parts.append(
+            "Registra en esta sesión **solo** los archivos `menu_source` listados en "
+            "## User request de este turno."
+        )
+    return "\n\n".join(parts)
+
+
+def executor_input(
+    context: WorkflowContext,
+    route: WorkflowRouteDecision,
+    *,
+    previous_execution: ExecutionRecord | None = None,
+    evaluation: WorkflowEvaluation | None = None,
+) -> str:
+    parts = [
+        f"## Conversation history\n\n{context.conversation_history}",
+        f"## User request\n\n{context.user_message}",
+        f"## User goal\n\n{route.goal}",
+    ]
+    if previous_execution is not None and evaluation is not None:
+        parts.extend(
+            [
+                f"## Previous attempt\n\n{previous_execution.model_dump_json(indent=2)}",
+                f"## Evaluator feedback (retry with a different approach)\n\n"
+                f"{evaluation.model_dump_json(indent=2)}",
+            ]
+        )
+    return "\n\n".join(parts) + "\n"
 
 
 def evaluator_input(
     context: WorkflowContext,
-    plan: WorkflowPlan,
+    route: WorkflowRouteDecision,
     execution: ExecutionRecord,
 ) -> str:
     return (
         f"## Conversation history\n\n{context.conversation_history}\n\n"
         f"## User request\n\n{context.user_message}\n\n"
-        f"## Plan\n\n{plan.model_dump_json(indent=2)}\n\n"
+        f"## User goal\n\n{route.goal}\n\n"
         f"## Execution result\n\n{execution.model_dump_json(indent=2)}"
-    )
-
-
-def replanner_input(
-    context: WorkflowContext,
-    plan: WorkflowPlan,
-    execution: ExecutionRecord,
-    evaluation: WorkflowEvaluation,
-) -> str:
-    return (
-        f"## Conversation history\n\n{context.conversation_history}\n\n"
-        f"## User request\n\n{context.user_message}\n\n"
-        f"## Previous plan\n\n{plan.model_dump_json(indent=2)}\n\n"
-        f"## Execution result\n\n{execution.model_dump_json(indent=2)}\n\n"
-        f"## Evaluator issues\n\n{evaluation.model_dump_json(indent=2)}"
     )
 
 
@@ -259,20 +322,21 @@ def _format_evaluation_result(evaluation: WorkflowEvaluation) -> str:
 
 def responder_input(
     context: WorkflowContext,
-    plan: WorkflowPlan,
+    route: WorkflowRouteDecision,
     execution: ExecutionRecord,
     evaluation: WorkflowEvaluation,
 ) -> str:
-    if plan.is_direct:
+    if route.is_direct:
         return (
             f"## Conversation history\n\n{context.conversation_history}\n\n"
             f"## User request\n\n{context.user_message}\n\n"
+            f"## User goal\n\n{route.goal}\n\n"
             "## Findings\n\n(Sin investigación de datos: responde de forma conversacional.)"
         )
     return (
         f"## Conversation history\n\n{context.conversation_history}\n\n"
         f"## User request\n\n{context.user_message}\n\n"
-        f"## Plan summary\n\n{plan.goal}\n\n"
+        f"## User goal\n\n{route.goal}\n\n"
         f"## Findings\n\n{_format_execution_findings(execution)}\n\n"
         f"## Evaluation\n\n{_format_evaluation_result(evaluation)}"
     )
