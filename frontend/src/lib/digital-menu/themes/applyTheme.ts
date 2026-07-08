@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { DigitalMenuTheme, DigitalMenuThemeCssVars } from './types';
 import { resolveAddSuccessTokens } from './deriveAddSuccess';
+import { resolveUnavailableTokens } from './deriveUnavailable';
 
 const BORDER_RADIUS_MAP = {
   sharp: '8px',
@@ -13,6 +14,7 @@ const BORDER_RADIUS_MAP = {
 export function digitalMenuThemeToCssVars(theme: DigitalMenuTheme): DigitalMenuThemeCssVars {
   const { colors, typography, style } = theme;
   const { addSuccess, addSuccessText } = resolveAddSuccessTokens(theme);
+  const unavailable = resolveUnavailableTokens(theme);
 
   return {
     '--dm-primary': colors.primary,
@@ -41,6 +43,12 @@ export function digitalMenuThemeToCssVars(theme: DigitalMenuTheme): DigitalMenuT
     '--dm-product-thumb-bg': colors.productThumbBg,
     '--dm-add-success': addSuccess,
     '--dm-add-success-text': addSuccessText,
+    '--dm-unavailable-notice-bg': unavailable.noticeBg,
+    '--dm-unavailable-notice-border': unavailable.noticeBorder,
+    '--dm-unavailable-badge-bg': unavailable.badgeBg,
+    '--dm-unavailable-badge-text': unavailable.badgeText,
+    '--dm-unavailable-badge-border': unavailable.badgeBorder,
+    '--dm-unavailable-sold-out-bg': unavailable.soldOutBg,
     '--dm-font-heading': typography.headingFont,
     '--dm-font-body': typography.bodyFont,
     '--dm-font-heading-weight': String(typography.headingWeight),

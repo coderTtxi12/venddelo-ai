@@ -860,9 +860,16 @@
   align-items: center;
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--dm-unavailable-badge-bg, #f1f5f9);
-  color: var(--dm-unavailable-badge-text, #64748b);
-  border: 1px solid var(--dm-unavailable-badge-border, #e2e8f0);
+  background: var(
+    --dm-unavailable-badge-bg,
+    color-mix(in srgb, var(--dm-text-secondary, #94a3b8) 18%, var(--dm-surface, #fff))
+  );
+  color: var(--dm-unavailable-badge-text, var(--dm-text-muted, #64748b));
+  border: 1px solid
+    var(
+      --dm-unavailable-badge-border,
+      color-mix(in srgb, var(--dm-border, #e2e8f0) 68%, var(--dm-text-muted, #64748b) 32%)
+    );
   font-size: 0.62rem;
   font-weight: 700;
   line-height: 1.2;
