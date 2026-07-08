@@ -14,8 +14,8 @@ from app.modules.assistant.agent.workflow.schemas import (
     WorkflowEvaluation,
     WorkflowRouteDecision,
 )
-from app.modules.assistant.context.compressor import compress_history_for_llm
 from app.modules.assistant.chat_attachments import format_user_message_with_attachments
+from app.modules.assistant.context.compressor import compress_history_for_llm
 from app.modules.assistant.conversation_store import (
     assistant_repository,
     ensure_conversation_committed,
@@ -29,7 +29,10 @@ from app.modules.assistant.profile.service import AssistantProfileService
 from app.modules.assistant.schemas import AssistantChatHistoryMessage, ChatAttachmentRef
 from app.modules.assistant.skills.discovery import discover_skill_executors
 from app.modules.assistant.skills.markdown import load_skill_metadata
-from app.modules.assistant.skills.menu_import.session_context import build_import_session_context
+from app.modules.assistant.skills.menu_import.session_context import (
+    build_import_session_context,
+    get_active_import_for_conversation,
+)
 from app.modules.assistant.skills.menu_import.session_handoff import (
     menu_source_attachments,
     replace_import_session_if_needed,
@@ -37,6 +40,7 @@ from app.modules.assistant.skills.menu_import.session_handoff import (
 from app.modules.assistant.skills.registry import SkillRegistry
 
 WORKFLOW_EXCLUDED_SKILL_IDS = frozenset({"menu_import"})
+EMPTY_CONVERSATION_HISTORY = "(sin historial previo en esta conversación)"
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +53,7 @@ class WorkflowContext:
     system_prompt: str
     conversation_history: str
     assistant_display_name: str
+    menu_import_conversation_history: str = EMPTY_CONVERSATION_HISTORY
     menu_import_enabled: bool = False
     menu_source_attachment_count: int = 0
     import_session_context: str | None = None
@@ -131,7 +136,6 @@ def load_workflow_runtime(
     resolved_settings = settings or get_settings()
     cleaned = format_user_message_with_attachments(user_message, attachments or [])
 
-    repo = assistant_repository(uow)
     resolved_conversation_id = ensure_conversation_committed(
         restaurant_id=restaurant_id,
         conversation_id=conversation_id,
@@ -164,7 +168,11 @@ def load_workflow_runtime(
 
     import_session_context: str | None = None
     if menu_import_enabled:
-        active_import = uow.menu_import_sessions.get_active_for_restaurant(restaurant_id)
+        active_import = get_active_import_for_conversation(
+            uow,
+            restaurant_id=restaurant_id,
+            conversation_id=resolved_conversation_id,
+        )
         import_session_context = build_import_session_context(active_import)
 
     effective_skill_ids = [
@@ -180,17 +188,25 @@ def load_workflow_runtime(
     )
     system_prompt = compose_system_prompt(profile, effective_skill_ids=effective_skill_ids)
 
-    history = load_recent_history(repo, resolved_conversation_id, settings=resolved_settings)
-    if resolved_settings.assistant_context_compression_enabled:
-        compressed = compress_history_for_llm(
-            history,
-            system_prompt=system_prompt,
-            user_message=cleaned,
-            max_context_tokens=resolved_settings.assistant_context_max_tokens,
-            threshold_ratio=resolved_settings.assistant_context_compression_threshold_ratio,
-            recent_window_turns=resolved_settings.assistant_context_recent_window_turns,
+    menu_import_conversation_history = EMPTY_CONVERSATION_HISTORY
+    if menu_import_enabled:
+        repo = assistant_repository(uow)
+        import_history = load_recent_history(
+            repo,
+            resolved_conversation_id,
+            settings=resolved_settings,
         )
-        history = compressed.history
+        if resolved_settings.assistant_context_compression_enabled:
+            compressed = compress_history_for_llm(
+                import_history,
+                system_prompt=system_prompt,
+                user_message=cleaned,
+                max_context_tokens=resolved_settings.assistant_context_max_tokens,
+                threshold_ratio=resolved_settings.assistant_context_compression_threshold_ratio,
+                recent_window_turns=resolved_settings.assistant_context_recent_window_turns,
+            )
+            import_history = compressed.history
+        menu_import_conversation_history = _format_history(import_history)
 
     context = WorkflowContext(
         user_message=cleaned,
@@ -199,8 +215,9 @@ def load_workflow_runtime(
         effective_skill_ids=effective_skill_ids,
         skill_catalog=build_skill_catalog(registry, effective_skill_ids),
         system_prompt=system_prompt,
-        conversation_history=_format_history(history),
+        conversation_history=EMPTY_CONVERSATION_HISTORY,
         assistant_display_name=profile.display_name.strip(),
+        menu_import_conversation_history=menu_import_conversation_history,
         menu_import_enabled=menu_import_enabled,
         menu_source_attachment_count=len(menu_sources),
         import_session_context=import_session_context,
@@ -232,7 +249,7 @@ def router_input(context: WorkflowContext) -> str:
 
 def menu_import_input(context: WorkflowContext, route: WorkflowRouteDecision) -> str:
     parts = [
-        f"## Conversation history\n\n{context.conversation_history}",
+        f"## Conversation history\n\n{context.menu_import_conversation_history}",
         f"## User request\n\n{context.user_message}",
         f"## User goal\n\n{route.goal}",
     ]
