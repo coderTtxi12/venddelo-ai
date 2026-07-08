@@ -1,58 +1,71 @@
-"""Explicit planner → executor → evaluator → replanner workflow orchestration."""
+"""Router → executor → evaluator → responder workflow orchestration."""
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import nullcontext
+from dataclasses import replace
 
 from agents import Agent, Runner
-from agents.items import ToolCallItem
-from agents.stream_events import RawResponsesStreamEvent, RunItemStreamEvent
 from langsmith import trace
-from openai.types.responses.response_text_delta_event import ResponseTextDeltaEvent
 
 from app.core.config import Settings
 from app.core.llm.ports import ChatStreamEvent
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.agent.run_context import AssistantRunContext
 from app.modules.assistant.agent.tracing import assistant_tracing_active
+from app.modules.assistant.agent.workflow.tracing_async import async_langsmith_root_trace
 from app.modules.assistant.agent.workflow.agents import (
     build_evaluator_agent,
     build_executor_agent,
-    build_planner_agent,
-    build_replanner_agent,
     build_responder_agent,
+    build_router_agent,
 )
 from app.modules.assistant.agent.workflow.context_loader import (
     WorkflowContext,
     evaluator_input,
     executor_input,
     load_workflow_runtime,
-    planner_input,
-    replanner_input,
+    menu_import_input,
     responder_input,
+    router_input,
 )
-from app.modules.assistant.conversation_store import assistant_repository, persist_turn
+from app.modules.assistant.conversation_store import schedule_persist_turn
 from app.modules.assistant.schemas import ChatAttachmentRef
 from app.modules.assistant.agent.workflow.schemas import (
     ExecutionRecord,
     WorkflowEvaluation,
-    WorkflowPlan,
+    WorkflowRouteDecision,
+    adjust_evaluation_for_execution,
     clear_execution_approval_gates,
-    clear_plan_approval_gates,
 )
-from app.modules.assistant.agent.workflow.sse import (
-    evaluation_event,
-    phase_event,
-    plan_event,
-    step_events,
+from app.modules.assistant.agent.workflow.sse import agent_thought_event, evaluation_event, menu_import_quiz_event, phase_event
+from app.modules.assistant.agent.workflow.stream_mapping import (
+    RouterReasonStreamParser,
+    map_agent_stream_event,
+    map_router_stream_event,
 )
 from app.modules.assistant.skills.context import AgentContext
+from app.modules.assistant.skills.menu_import.clarification import (
+    hydrate_menu_import_response,
+    try_apply_clarification_from_user_message,
+)
+from app.modules.assistant.skills.menu_import.onboarding_agent import build_menu_import_agent
+from app.modules.assistant.skills.menu_import.response_schema import MenuImportUserResponse
+from app.modules.assistant.skills.menu_import.session_context import build_import_session_context
+from app.modules.assistant.skills.menu_import.session_repository import MenuImportSessionRepository
 from app.modules.assistant.skills.registry import SkillRegistry
 
-MAX_REPLAN_ATTEMPTS = 2
+MAX_EXECUTOR_RETRIES = 2
 EXECUTOR_MAX_TURNS = 12
+MENU_IMPORT_MAX_TURNS = 16
+
+
+def _workflow_trace(name: str, *, settings: Settings):
+    if assistant_tracing_active(settings):
+        return trace(name, run_type="chain")
+    return nullcontext()
 
 
 class WorkflowOrchestrator:
@@ -140,6 +153,7 @@ class WorkflowOrchestrator:
         )
         workflow_context = runtime.context
         registry = runtime.registry
+        menu_import_registry = runtime.menu_import_registry
         resolved_conversation_id = runtime.conversation_id
         run_context = self._build_run_context(
             uow=uow,
@@ -154,38 +168,109 @@ class WorkflowOrchestrator:
             "conversation_id": str(resolved_conversation_id),
             "model": self._settings.openai_model,
             "skills": ",".join(workflow_context.effective_skill_ids),
-            "workflow": "explicit_planner",
+            "workflow": "router_executor",
         }
 
         content_parts: list[str] = []
 
         async def emit() -> AsyncIterator[ChatStreamEvent]:
-            planner = build_planner_agent(settings=self._settings)
+            router = build_router_agent(settings=self._settings)
             executor = build_executor_agent(
                 settings=self._settings,
                 registry=registry,
                 effective_skill_ids=workflow_context.effective_skill_ids,
             )
             evaluator = build_evaluator_agent(settings=self._settings)
-            replanner = build_replanner_agent(settings=self._settings)
             responder = build_responder_agent(settings=self._settings)
 
-            yield phase_event("planning")
-            plan = await self._run_planner(
-                planner,
-                planner_input(workflow_context),
+            yield phase_event("routing")
+            route_box: list[WorkflowRouteDecision] = []
+            async for event in self._stream_router(
+                router,
+                router_input(workflow_context),
                 run_context,
-            )
+                route_box,
+            ):
+                yield event
+            route = route_box[0]
 
             execution = ExecutionRecord()
             evaluation = WorkflowEvaluation(ok=True, issues=[])
 
-            if plan.is_direct:
+            if route.is_menu_import and workflow_context.menu_import_enabled and menu_import_registry:
+                menu_import_context = workflow_context
+                if try_apply_clarification_from_user_message(
+                    uow=uow,
+                    restaurant_id=restaurant_id,
+                    user_message=workflow_context.user_message,
+                ):
+                    active_import = MenuImportSessionRepository(uow.session).get_active_for_restaurant(
+                        restaurant_id
+                    )
+                    menu_import_context = replace(
+                        workflow_context,
+                        import_session_context=build_import_session_context(active_import),
+                    )
+                yield ChatStreamEvent(
+                    event="agent.phase",
+                    data={"phase": "executing", "label": "Importando menú"},
+                )
+                menu_import_response_box: list[MenuImportUserResponse] = []
+                async for event in self._stream_menu_import(
+                    build_menu_import_agent(
+                        settings=self._settings,
+                        registry=menu_import_registry,
+                    ),
+                    menu_import_context,
+                    route,
+                    self._build_run_context(
+                        uow=uow,
+                        restaurant_id=restaurant_id,
+                        conversation_id=resolved_conversation_id,
+                        registry=menu_import_registry,
+                        effective_skill_ids=["menu_import"],
+                    ),
+                    menu_import_registry,
+                    content_parts,
+                    menu_import_response_box,
+                    restaurant_id=restaurant_id,
+                    uow=uow,
+                ):
+                    yield event
+
+                response = (
+                    menu_import_response_box[0]
+                    if menu_import_response_box
+                    else MenuImportUserResponse(message="".join(content_parts).strip())
+                )
+                active_session = MenuImportSessionRepository(uow.session).get_active_for_restaurant(
+                    restaurant_id
+                )
+                response = hydrate_menu_import_response(response, active_session)
+                final_output = response.message.strip() or "".join(content_parts).strip()
+                complete_data: dict[str, object] = {
+                    "conversation_id": str(resolved_conversation_id),
+                    "content": final_output,
+                }
+                if response.questions:
+                    complete_data["menu_import"] = {
+                        "questions": [question.model_dump() for question in response.questions],
+                    }
+                yield ChatStreamEvent(event="message.complete", data=complete_data)
+                if final_output:
+                    schedule_persist_turn(
+                        conversation_id=resolved_conversation_id,
+                        user_message=workflow_context.user_message,
+                        assistant_message=final_output,
+                    )
+                return
+
+            if route.is_direct:
                 yield phase_event("responding")
                 async for event in self._stream_responder(
                     responder,
                     workflow_context,
-                    plan,
+                    route,
                     execution,
                     evaluation,
                     run_context,
@@ -202,63 +287,51 @@ class WorkflowOrchestrator:
                     },
                 )
                 if final_output:
-                    persist_turn(
-                        assistant_repository(uow),
+                    schedule_persist_turn(
                         conversation_id=resolved_conversation_id,
                         user_message=workflow_context.user_message,
                         assistant_message=final_output,
                     )
                 return
 
-            yield plan_event(plan)
-
-            for step_event in step_events(plan):
-                yield step_event
-
             evaluation = WorkflowEvaluation(ok=False, should_replan=True, issues=["not started"])
 
-            for replan_attempt in range(MAX_REPLAN_ATTEMPTS + 1):
+            for attempt in range(MAX_EXECUTOR_RETRIES + 1):
                 yield phase_event("executing")
-                for step_event in step_events(plan, active_index=0):
-                    yield step_event
-                execution = await self._run_executor(
+                execution_box: list[ExecutionRecord] = []
+                async for event in self._stream_executor(
                     executor,
                     workflow_context,
-                    plan,
+                    route,
                     run_context,
-                )
+                    registry,
+                    previous_execution=execution if attempt > 0 else None,
+                    evaluation=evaluation if attempt > 0 else None,
+                    execution_box=execution_box,
+                ):
+                    yield event
+                execution = execution_box[0]
 
-                for step_event in step_events(plan, done_through=len(plan.steps) - 1):
-                    yield step_event
                 yield phase_event("evaluating")
                 evaluation = await self._run_evaluator(
                     evaluator,
-                    evaluator_input(workflow_context, plan, execution),
+                    evaluator_input(workflow_context, route, execution),
                     run_context,
                 )
+                evaluation = adjust_evaluation_for_execution(evaluation, execution)
                 yield evaluation_event(evaluation)
 
                 if evaluation.ok:
                     break
 
-                if not evaluation.should_replan or replan_attempt >= MAX_REPLAN_ATTEMPTS:
+                if not evaluation.should_replan or attempt >= MAX_EXECUTOR_RETRIES:
                     break
-
-                yield phase_event("replanning")
-                plan = await self._run_replanner(
-                    replanner,
-                    replanner_input(workflow_context, plan, execution, evaluation),
-                    run_context,
-                )
-                yield plan_event(plan, replan=True)
-                for step_event in step_events(plan):
-                    yield step_event
 
             yield phase_event("responding")
             async for event in self._stream_responder(
                 responder,
                 workflow_context,
-                plan,
+                route,
                 execution,
                 evaluation,
                 run_context,
@@ -276,39 +349,53 @@ class WorkflowOrchestrator:
             )
 
             if final_output:
-                persist_turn(
-                    assistant_repository(uow),
+                schedule_persist_turn(
                     conversation_id=resolved_conversation_id,
                     user_message=workflow_context.user_message,
                     assistant_message=final_output,
                 )
 
-        if assistant_tracing_active(self._settings):
-            with trace(
-                "assistant_chat",
-                run_type="chain",
-                metadata=trace_metadata,
-                inputs={"message": workflow_context.user_message},
-                exceptions_to_handle=(GeneratorExit,),
-            ) as run:
-                try:
-                    async for event in emit():
-                        yield event
-                finally:
-                    run.end(outputs={"content": "".join(content_parts), "content_length": len(content_parts)})
-        else:
+        async with async_langsmith_root_trace(
+            "assistant_chat",
+            settings=self._settings,
+            metadata=trace_metadata,
+            inputs={"message": workflow_context.user_message},
+            get_outputs=lambda: {
+                "content": "".join(content_parts),
+                "content_length": len(content_parts),
+            },
+        ):
             async for event in emit():
                 yield event
 
-    async def _run_planner(
+    async def _stream_router(
         self,
         agent: Agent[AssistantRunContext],
         agent_input: str,
         run_context: AssistantRunContext,
-    ) -> WorkflowPlan:
-        result = await self._run_agent(agent, agent_input, run_context, trace_name="planner", max_turns=1)
-        plan = result.final_output_as(WorkflowPlan, raise_if_incorrect_type=True)
-        return clear_plan_approval_gates(plan)
+        route_box: list[WorkflowRouteDecision],
+    ) -> AsyncIterator[ChatStreamEvent]:
+        streamed = Runner.run_streamed(
+            agent,
+            agent_input,
+            context=run_context,
+            max_turns=1,
+        )
+
+        trace_ctx = _workflow_trace("router", settings=self._settings)
+        reason_parser = RouterReasonStreamParser()
+
+        with trace_ctx:
+            async for event in streamed.stream_events():
+                mapped = map_router_stream_event(event, reason_parser=reason_parser)
+                if mapped is not None:
+                    yield mapped
+
+            route = streamed.final_output_as(WorkflowRouteDecision, raise_if_incorrect_type=True)
+            route_box.append(route)
+            final_reason = route.reason.strip()
+            if final_reason and final_reason != reason_parser.emitted_reason:
+                yield agent_thought_event(text=final_reason, source="router")
 
     async def _run_evaluator(
         self,
@@ -318,16 +405,6 @@ class WorkflowOrchestrator:
     ) -> WorkflowEvaluation:
         result = await self._run_agent(agent, agent_input, run_context, trace_name="evaluator", max_turns=1)
         return result.final_output_as(WorkflowEvaluation, raise_if_incorrect_type=True)
-
-    async def _run_replanner(
-        self,
-        agent: Agent[AssistantRunContext],
-        agent_input: str,
-        run_context: AssistantRunContext,
-    ) -> WorkflowPlan:
-        result = await self._run_agent(agent, agent_input, run_context, trace_name="replanner", max_turns=1)
-        plan = result.final_output_as(WorkflowPlan, raise_if_incorrect_type=True)
-        return clear_plan_approval_gates(plan)
 
     async def _run_agent(
         self,
@@ -346,48 +423,115 @@ class WorkflowOrchestrator:
                 max_turns=max_turns,
             )
 
-        trace_ctx = trace(trace_name, run_type="chain") if assistant_tracing_active(self._settings) else nullcontext()
+        trace_ctx = _workflow_trace(trace_name, settings=self._settings)
         with trace_ctx:
             return await execute()
 
-    async def _run_executor(
+    async def _stream_executor(
         self,
         agent: Agent[AssistantRunContext],
         workflow_context: WorkflowContext,
-        plan: WorkflowPlan,
+        route: WorkflowRouteDecision,
         run_context: AssistantRunContext,
-    ) -> ExecutionRecord:
-        async def execute() -> object:
-            return await Runner.run(
-                agent,
-                executor_input(workflow_context, plan),
-                context=run_context,
-                max_turns=EXECUTOR_MAX_TURNS,
-            )
-
-        trace_ctx = trace("executor", run_type="chain") if assistant_tracing_active(self._settings) else nullcontext()
-        with trace_ctx:
-            result = await execute()
+        registry: SkillRegistry,
+        *,
+        previous_execution: ExecutionRecord | None = None,
+        evaluation: WorkflowEvaluation | None = None,
+        execution_box: list[ExecutionRecord],
+    ) -> AsyncIterator[ChatStreamEvent]:
+        streamed = Runner.run_streamed(
+            agent,
+            executor_input(
+                workflow_context,
+                route,
+                previous_execution=previous_execution,
+                evaluation=evaluation,
+            ),
+            context=run_context,
+            max_turns=EXECUTOR_MAX_TURNS,
+        )
 
         tools_used: list[str] = []
-        for item in getattr(result, "new_items", []) or []:
-            if isinstance(item, ToolCallItem):
-                raw = item.raw_item
-                name = getattr(raw, "name", None)
-                if isinstance(name, str) and name:
-                    tools_used.append(name)
+        trace_ctx = _workflow_trace("executor", settings=self._settings)
 
-        execution = result.final_output_as(ExecutionRecord, raise_if_incorrect_type=True)
-        if not execution.summary.strip():
-            execution.summary = "El executor terminó sin resumen textual."
-        execution.tools_used = tools_used
-        return clear_execution_approval_gates(execution)
+        with trace_ctx:
+            async for event in streamed.stream_events():
+                mapped = map_agent_stream_event(
+                    event,
+                    registry=registry,
+                    effective_skill_ids=workflow_context.effective_skill_ids,
+                    include_text_deltas=False,
+                )
+                if mapped is not None:
+                    if mapped.event == "tool.start" and isinstance(mapped.data.get("tool"), str):
+                        tools_used.append(mapped.data["tool"])
+                    yield mapped
+
+            result = streamed
+            execution = result.final_output_as(ExecutionRecord, raise_if_incorrect_type=True)
+            if not execution.summary.strip():
+                execution.summary = "El executor terminó sin resumen textual."
+            if not execution.tools_used:
+                execution.tools_used = tools_used
+            execution_box.append(clear_execution_approval_gates(execution))
+
+    async def _stream_menu_import(
+        self,
+        agent: Agent[AssistantRunContext],
+        workflow_context: WorkflowContext,
+        route: WorkflowRouteDecision,
+        run_context: AssistantRunContext,
+        registry: SkillRegistry,
+        content_parts: list[str],
+        response_box: list[MenuImportUserResponse],
+        *,
+        restaurant_id: uuid.UUID,
+        uow: SqlAlchemyUnitOfWork,
+    ) -> AsyncIterator[ChatStreamEvent]:
+        streamed = Runner.run_streamed(
+            agent,
+            menu_import_input(workflow_context, route),
+            context=run_context,
+            max_turns=MENU_IMPORT_MAX_TURNS,
+        )
+
+        trace_ctx = _workflow_trace("menu_import", settings=self._settings)
+
+        with trace_ctx:
+            async for event in streamed.stream_events():
+                mapped = map_agent_stream_event(
+                    event,
+                    registry=registry,
+                    effective_skill_ids=["menu_import"],
+                    include_text_deltas=False,
+                )
+                if mapped is None:
+                    continue
+                yield mapped
+
+            response = streamed.final_output_as(MenuImportUserResponse, raise_if_incorrect_type=True)
+            active_session = MenuImportSessionRepository(uow.session).get_active_for_restaurant(
+                restaurant_id
+            )
+            response = hydrate_menu_import_response(response, active_session)
+            response_box.append(response)
+
+            if response.message:
+                content_parts.clear()
+                content_parts.append(response.message)
+                yield ChatStreamEvent(
+                    event="content.delta",
+                    data={"delta": response.message},
+                )
+
+            if response.questions:
+                yield menu_import_quiz_event(response.questions)
 
     async def _stream_responder(
         self,
         agent: Agent[AssistantRunContext],
         workflow_context: WorkflowContext,
-        plan: WorkflowPlan,
+        route: WorkflowRouteDecision,
         execution: ExecutionRecord,
         evaluation: WorkflowEvaluation,
         run_context: AssistantRunContext,
@@ -395,7 +539,7 @@ class WorkflowOrchestrator:
     ) -> AsyncIterator[ChatStreamEvent]:
         responder_input_text = responder_input(
             workflow_context,
-            plan,
+            route,
             execution,
             evaluation,
         )
@@ -407,18 +551,20 @@ class WorkflowOrchestrator:
             max_turns=1,
         )
 
-        trace_ctx = trace("responder", run_type="chain") if assistant_tracing_active(self._settings) else nullcontext()
+        trace_ctx = _workflow_trace("responder", settings=self._settings)
 
         with trace_ctx:
             async for event in streamed.stream_events():
-                if isinstance(event, RawResponsesStreamEvent) and isinstance(
-                    event.data, ResponseTextDeltaEvent
-                ):
-                    delta = event.data.delta
-                    if delta:
-                        content_parts.append(delta)
-                        yield ChatStreamEvent(event="content.delta", data={"delta": delta})
+                mapped = map_agent_stream_event(
+                    event,
+                    registry=run_context.registry,
+                    effective_skill_ids=run_context.agent_ctx.effective_skill_ids,
+                    include_text_deltas=True,
+                )
+                if mapped is None:
                     continue
-
-                if isinstance(event, RunItemStreamEvent) and event.name == "tool_called":
-                    yield ChatStreamEvent(event="agent.status", data={"status": "processing"})
+                if mapped.event == "content.delta":
+                    delta = mapped.data.get("delta")
+                    if isinstance(delta, str) and delta:
+                        content_parts.append(delta)
+                yield mapped
