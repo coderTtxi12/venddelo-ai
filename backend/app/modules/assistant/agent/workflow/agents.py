@@ -10,25 +10,24 @@ from app.modules.assistant.agent.tools import build_executor_function_tools
 from app.modules.assistant.agent.workflow.prompts import (
     EVALUATOR_INSTRUCTIONS,
     EXECUTOR_INSTRUCTIONS,
-    PLANNER_INSTRUCTIONS,
-    REPLANNER_INSTRUCTIONS,
     RESPONDER_INSTRUCTIONS,
+    ROUTER_INSTRUCTIONS,
 )
 from app.modules.assistant.agent.workflow.schemas import (
     ExecutionRecord,
     WorkflowEvaluation,
-    WorkflowPlan,
+    WorkflowRouteDecision,
 )
 from app.modules.assistant.skills.registry import SkillRegistry
 
 
-def build_planner_agent(*, settings: Settings) -> Agent[AssistantRunContext]:
+def build_router_agent(*, settings: Settings) -> Agent[AssistantRunContext]:
     return Agent[AssistantRunContext](
-        name="Planner",
-        instructions=PLANNER_INSTRUCTIONS,
+        name="Router",
+        instructions=ROUTER_INSTRUCTIONS,
         tools=[],
         model=settings.openai_model,
-        output_type=WorkflowPlan,
+        output_type=WorkflowRouteDecision,
     )
 
 
@@ -54,16 +53,6 @@ def build_evaluator_agent(*, settings: Settings) -> Agent[AssistantRunContext]:
         tools=[],
         model=settings.openai_model,
         output_type=WorkflowEvaluation,
-    )
-
-
-def build_replanner_agent(*, settings: Settings) -> Agent[AssistantRunContext]:
-    return Agent[AssistantRunContext](
-        name="Replanner",
-        instructions=REPLANNER_INSTRUCTIONS,
-        tools=[],
-        model=settings.openai_model,
-        output_type=WorkflowPlan,
     )
 
 

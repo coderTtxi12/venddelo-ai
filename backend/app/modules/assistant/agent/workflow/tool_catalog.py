@@ -1,4 +1,4 @@
-"""Executor tool catalog for planner/replanner prompts."""
+"""Executor tool catalog for workflow prompts."""
 
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ TOOL_GROUPS: list[tuple[str, list[str]]] = [
 COMPACT_DESCRIPTION_MAX_LEN = 110
 COMPACT_OPTIONAL_ARG_LIMIT = 3
 
-# One-line output hints for the planner compact catalog (Args + Returns).
+# One-line output hints for the compact tool catalog (Args + Returns).
 TOOL_RETURNS_HINTS: dict[str, str] = {
     # Read menu
     "list_categories": (
@@ -329,7 +329,7 @@ def _build_catalog(*, compact: bool) -> str:
 
 
 def build_executor_tool_catalog(*, compact: bool = True) -> str:
-    """Build the planner/replanner tool index (compact by default)."""
+    """Build the executor tool index (compact by default)."""
     return _build_catalog(compact=compact)
 
 
