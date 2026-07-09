@@ -8,14 +8,18 @@ import { ServiceZoneMapDrawer } from '@/components/onboarding/ServiceZoneMapDraw
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
 import { useAuth } from '@/hooks/useAuth';
 import {
+  addMyDeliveryProviderAdminInvite,
   getMyDeliveryProvider,
+  listMyDeliveryProviderAdminInvites,
   listMyDeliveryProviderPaymentMethods,
   listMyDeliveryProviderSchedules,
+  removeMyDeliveryProviderAdminInvite,
   setMyDeliveryProviderPaymentMethods,
   setMyDeliveryProviderSchedules,
   updateMyDeliveryProvider,
 } from '@/lib/api/deliveryProviders';
 import { ApiError } from '@/lib/api/types';
+import type { DeliveryProviderAdminInvite } from '@/lib/api/types';
 import { prepareImageForUpload } from '@/lib/image/convertToWebp';
 import { createDefaultOnboardingData } from '@/lib/onboarding/defaults';
 import type { OnboardingData } from '@/lib/onboarding/types';
@@ -69,6 +73,14 @@ export default function SettingsPage() {
   const [paymentsSaving, setPaymentsSaving] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [memberRole, setMemberRole] = useState<string | null>(null);
+  const [adminInvites, setAdminInvites] = useState<DeliveryProviderAdminInvite[]>([]);
+  const [adminInvitesLoading, setAdminInvitesLoading] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminSaving, setAdminSaving] = useState(false);
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
+  const [removingInviteId, setRemovingInviteId] = useState<string | null>(null);
 
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
@@ -93,6 +105,7 @@ export default function SettingsPage() {
         setForm(profile);
         setInitialForm(profile);
         setSlug(response.provider?.slug ?? null);
+        setMemberRole(response.member_role ?? null);
       } catch (err) {
         console.error(err);
         if (!cancelled) {
@@ -108,6 +121,37 @@ export default function SettingsPage() {
       cancelled = true;
     };
   }, [accessToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAdminInvites() {
+      if (!accessToken || memberRole !== 'owner') {
+        setAdminInvites([]);
+        return;
+      }
+
+      setAdminInvitesLoading(true);
+      setAdminError(null);
+
+      try {
+        const invites = await listMyDeliveryProviderAdminInvites(accessToken);
+        if (!cancelled) setAdminInvites(invites);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) {
+          setAdminError('No se pudieron cargar los administradores.');
+        }
+      } finally {
+        if (!cancelled) setAdminInvitesLoading(false);
+      }
+    }
+
+    void loadAdminInvites();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, memberRole]);
 
   useEffect(() => {
     let cancelled = false;
@@ -286,6 +330,67 @@ export default function SettingsPage() {
       }
     } finally {
       setPaymentsSaving(false);
+    }
+  };
+
+  const handleAddAdmin = async () => {
+    if (!accessToken) {
+      setAdminError('No hay sesión activa. Inicia sesión de nuevo.');
+      return;
+    }
+
+    const trimmed = adminEmail.trim();
+    if (!trimmed) {
+      setAdminError('Escribe un correo electrónico.');
+      return;
+    }
+
+    setAdminSaving(true);
+    setAdminError(null);
+    setAdminSuccess(null);
+
+    try {
+      const created = await addMyDeliveryProviderAdminInvite(accessToken, trimmed);
+      setAdminInvites((current) => [...current, created]);
+      setAdminEmail('');
+      setAdminSuccess('Administrador agregado. Podrá entrar cuando inicie sesión con ese correo.');
+      window.setTimeout(() => setAdminSuccess(null), 4000);
+    } catch (err) {
+      console.error(err);
+      if (err instanceof ApiError) {
+        setAdminError(err.message);
+      } else {
+        setAdminError('No se pudo agregar el administrador.');
+      }
+    } finally {
+      setAdminSaving(false);
+    }
+  };
+
+  const handleRemoveAdmin = async (inviteId: string) => {
+    if (!accessToken) {
+      setAdminError('No hay sesión activa. Inicia sesión de nuevo.');
+      return;
+    }
+
+    setRemovingInviteId(inviteId);
+    setAdminError(null);
+    setAdminSuccess(null);
+
+    try {
+      await removeMyDeliveryProviderAdminInvite(accessToken, inviteId);
+      setAdminInvites((current) => current.filter((invite) => invite.id !== inviteId));
+      setAdminSuccess('Administrador eliminado.');
+      window.setTimeout(() => setAdminSuccess(null), 4000);
+    } catch (err) {
+      console.error(err);
+      if (err instanceof ApiError) {
+        setAdminError(err.message);
+      } else {
+        setAdminError('No se pudo eliminar el administrador.');
+      }
+    } finally {
+      setRemovingInviteId(null);
     }
   };
 
@@ -482,6 +587,77 @@ export default function SettingsPage() {
               />
             </div>
           </section>
+
+          {memberRole === 'owner' ? (
+            <section className={styles.panel} aria-labelledby="settings-admins">
+              <h2 id="settings-admins" className={styles.panelTitle}>
+                Administradores
+              </h2>
+              <p className={styles.panelHint}>
+                Agrega correos de personas que podrán administrar este perfil de delivery. No
+                necesitan tener cuenta previa: al iniciar sesión con Google usando ese correo,
+                entrarán directo al panel.
+              </p>
+              {adminError ? (
+                <div className={styles.errorBanner} role="alert">
+                  {adminError}
+                </div>
+              ) : null}
+              {adminSuccess ? (
+                <div className={styles.successBanner} role="status">
+                  {adminSuccess}
+                </div>
+              ) : null}
+              <div className={styles.adminAddRow}>
+                <input
+                  className={styles.input}
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  placeholder="correo@empresa.com"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleAddAdmin();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  disabled={adminSaving || adminInvitesLoading}
+                  onClick={() => void handleAddAdmin()}
+                >
+                  {adminSaving ? 'Agregando…' : 'Agregar'}
+                </button>
+              </div>
+              {adminInvitesLoading ? (
+                <p className={styles.loading} role="status">
+                  Cargando administradores…
+                </p>
+              ) : adminInvites.length === 0 ? (
+                <p className={styles.empty}>Aún no hay administradores invitados.</p>
+              ) : (
+                <ul className={styles.adminList}>
+                  {adminInvites.map((invite) => (
+                    <li key={invite.id} className={styles.adminListItem}>
+                      <span className={styles.adminEmail}>{invite.email}</span>
+                      <button
+                        type="button"
+                        className={styles.removeBtn}
+                        disabled={removingInviteId === invite.id}
+                        onClick={() => void handleRemoveAdmin(invite.id)}
+                      >
+                        {removingInviteId === invite.id ? 'Quitando…' : 'Quitar'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : null}
 
           <section className={styles.panel} aria-labelledby="settings-payments">
             <h2 id="settings-payments" className={styles.panelTitle}>
