@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models.delivery import (
     DeliveryProvider,
+    DeliveryProviderAdminInvite,
     DeliveryProviderMember,
     DeliveryProviderPaymentMethod,
     DeliveryProviderPricingConfig,
@@ -35,6 +36,7 @@ from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
     DeliveryPartnershipRestaurantDTO,
+    DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
     DeliveryProviderPricingConfigDTO,
     DeliveryProviderPaymentMethodCreate,
@@ -824,3 +826,74 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
                 delivery_enabled=restaurant.delivery_enabled,
             ),
         )
+
+    def list_admin_invites(
+        self, provider_id: uuid.UUID
+    ) -> Sequence[DeliveryProviderAdminInviteDTO]:
+        rows = self._session.scalars(
+            select(DeliveryProviderAdminInvite)
+            .where(DeliveryProviderAdminInvite.delivery_provider_id == provider_id)
+            .order_by(DeliveryProviderAdminInvite.created_at.asc())
+        ).all()
+        return [DeliveryProviderAdminInviteDTO.model_validate(row) for row in rows]
+
+    def add_admin_invite(
+        self, provider_id: uuid.UUID, email: str
+    ) -> DeliveryProviderAdminInviteDTO:
+        invite = DeliveryProviderAdminInvite(
+            delivery_provider_id=provider_id,
+            email=email,
+        )
+        self._session.add(invite)
+        self._session.flush()
+        return DeliveryProviderAdminInviteDTO.model_validate(invite)
+
+    def remove_admin_invite(self, provider_id: uuid.UUID, invite_id: uuid.UUID) -> None:
+        invite = self._session.scalar(
+            select(DeliveryProviderAdminInvite).where(
+                DeliveryProviderAdminInvite.id == invite_id,
+                DeliveryProviderAdminInvite.delivery_provider_id == provider_id,
+            )
+        )
+        if invite is None:
+            from app.core.exceptions import NotFoundError
+
+            raise NotFoundError("Invitación no encontrada")
+        self._session.delete(invite)
+
+    def claim_admin_invites(self, user_id: uuid.UUID, email: str) -> bool:
+        normalized = email.strip().lower()
+        if not normalized:
+            return False
+
+        invites = self._session.scalars(
+            select(DeliveryProviderAdminInvite)
+            .where(DeliveryProviderAdminInvite.email == normalized)
+            .order_by(DeliveryProviderAdminInvite.created_at.asc())
+        ).all()
+        if not invites:
+            return False
+
+        claimed = False
+        for invite in invites:
+            existing = self._session.scalar(
+                select(DeliveryProviderMember.id).where(
+                    DeliveryProviderMember.delivery_provider_id == invite.delivery_provider_id,
+                    DeliveryProviderMember.user_id == user_id,
+                )
+            )
+            if existing is None:
+                self._session.add(
+                    DeliveryProviderMember(
+                        delivery_provider_id=invite.delivery_provider_id,
+                        user_id=user_id,
+                        member_role="admin",
+                        is_active=True,
+                    )
+                )
+                claimed = True
+            self._session.delete(invite)
+
+        if claimed:
+            self._session.flush()
+        return claimed
