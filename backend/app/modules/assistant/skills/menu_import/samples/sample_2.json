@@ -1,0 +1,261 @@
+{
+  "categories": [
+    {
+      "ref": "cat_alitas",
+      "name": "Alitas",
+      "description": null,
+      "sort_order": 0,
+      "products": [
+        {
+          "ref": "prod_alitas",
+          "name": "Alitas",
+          "description": "Incluye guarnición de zanahoria o pepino y aderezo ranch.",
+          "price_mxn": 125,
+          "currency": "MXN",
+          "is_available": true,
+          "catalog_discount": null,
+          "option_groups": [
+            {
+              "ref": "og_alitas_cantidad",
+              "title": "Cantidad",
+              "selection": "single",
+              "required": true,
+              "min_selections": 1,
+              "max_selections": 1,
+              "sort_order": 0,
+              "items": [
+                { "ref": "oi_alitas_8", "label": "8 piezas", "price_delta_mxn": 0, "sort_order": 0 },
+                { "ref": "oi_alitas_12", "label": "12 piezas", "price_delta_mxn": 50, "sort_order": 1 },
+                { "ref": "oi_alitas_16", "label": "16 piezas", "price_delta_mxn": 90, "sort_order": 2 },
+                { "ref": "oi_alitas_24", "label": "24 piezas", "price_delta_mxn": 160, "sort_order": 3 },
+                { "ref": "oi_alitas_1kg", "label": "1 kg", "price_delta_mxn": 120, "sort_order": 4 }
+              ]
+            },
+            {
+              "ref": "og_alitas_sabores",
+              "title": "Sabores",
+              "selection": "multi",
+              "required": true,
+              "min_selections": 1,
+              "max_selections": 3,
+              "sort_order": 1,
+              "items": [
+                { "ref": "oi_sabor_pica", "label": "Pica Gula", "price_delta_mxn": 0, "sort_order": 0 },
+                { "ref": "oi_sabor_chiltepin", "label": "Chiltepin", "price_delta_mxn": 0, "sort_order": 1 },
+                { "ref": "oi_sabor_pina", "label": "Piña habanero", "price_delta_mxn": 0, "sort_order": 2 },
+                { "ref": "oi_sabor_mango", "label": "Mango habanero", "price_delta_mxn": 0, "sort_order": 3 },
+                { "ref": "oi_sabor_buffalo", "label": "Buffalo", "price_delta_mxn": 0, "sort_order": 4 },
+                { "ref": "oi_sabor_tamarindo", "label": "Tamarindo", "price_delta_mxn": 0, "sort_order": 5 },
+                { "ref": "oi_sabor_bbq", "label": "BBQ", "price_delta_mxn": 0, "sort_order": 6 },
+                { "ref": "oi_sabor_parmesano", "label": "Parmesano", "price_delta_mxn": 0, "sort_order": 7 }
+              ]
+            },
+            {
+              "ref": "og_alitas_extras",
+              "title": "Extras",
+              "selection": "multi",
+              "required": false,
+              "min_selections": 0,
+              "max_selections": null,
+              "sort_order": 2,
+              "items": [
+                { "ref": "oi_extra_sabor", "label": "Sabor extra", "price_delta_mxn": 20, "sort_order": 0 },
+                { "ref": "oi_extra_ranch", "label": "Aderezo ranch extra", "price_delta_mxn": 20, "sort_order": 1 }
+              ]
+            }
+          ],
+          "constraints_notes": "Elige cantidad y hasta 3 sabores."
+        },
+        {
+          "ref": "prod_boneless",
+          "name": "Boneless",
+          "description": "Incluye guarnición de zanahoria o pepino y aderezo ranch.",
+          "price_mxn": 179,
+          "currency": "MXN",
+          "is_available": true,
+          "catalog_discount": null,
+          "option_groups": [
+            {
+              "ref": "og_boneless_cantidad",
+              "title": "Cantidad",
+              "selection": "single",
+              "required": true,
+              "min_selections": 1,
+              "max_selections": 1,
+              "sort_order": 0,
+              "items": [
+                { "ref": "oi_boneless_300", "label": "300 gr", "price_delta_mxn": 0, "sort_order": 0 },
+                { "ref": "oi_boneless_500", "label": "500 gr", "price_delta_mxn": 70, "sort_order": 1 }
+              ]
+            },
+            {
+              "ref": "og_boneless_sabores",
+              "title": "Sabores",
+              "selection": "single",
+              "required": true,
+              "min_selections": 1,
+              "max_selections": 1,
+              "sort_order": 1,
+              "items": [
+                { "ref": "oi_sabor_pica", "label": "Pica Gula", "price_delta_mxn": 0, "sort_order": 0 },
+                { "ref": "oi_sabor_chiltepin", "label": "Chiltepin", "price_delta_mxn": 0, "sort_order": 1 },
+                { "ref": "oi_sabor_pina", "label": "Piña habanero", "price_delta_mxn": 0, "sort_order": 2 },
+                { "ref": "oi_sabor_mango", "label": "Mango habanero", "price_delta_mxn": 0, "sort_order": 3 },
+                { "ref": "oi_sabor_buffalo", "label": "Buffalo", "price_delta_mxn": 0, "sort_order": 4 },
+                { "ref": "oi_sabor_tamarindo", "label": "Tamarindo", "price_delta_mxn": 0, "sort_order": 5 },
+                { "ref": "oi_sabor_bbq", "label": "BBQ", "price_delta_mxn": 0, "sort_order": 6 },
+                { "ref": "oi_sabor_parmesano", "label": "Parmesano", "price_delta_mxn": 0, "sort_order": 7 }
+              ]
+            },
+            {
+              "ref": "og_boneless_extras",
+              "title": "Extras",
+              "selection": "multi",
+              "required": false,
+              "min_selections": 0,
+              "max_selections": null,
+              "sort_order": 2,
+              "items": [
+                { "ref": "oi_extra_sabor", "label": "Sabor extra", "price_delta_mxn": 20, "sort_order": 0 },
+                { "ref": "oi_extra_ranch", "label": "Aderezo ranch extra", "price_delta_mxn": 20, "sort_order": 1 }
+              ]
+            }
+          ],
+          "constraints_notes": "Elige cantidad y 1 sabor."
+        }
+      ]
+    },
+    {
+      "ref": "cat_plancha",
+      "name": "A la plancha",
+      "description": null,
+      "sort_order": 1,
+      "products": [
+        {
+          "ref": "prod_gula_tacos",
+          "name": "Gula tacos",
+          "description": "Roast beef, arrachera, chorizo argentino, chorizo campestre o chistorra. Incluye guacamole, cebolla asada y chile toreado.",
+          "price_mxn": 50,
+          "currency": "MXN",
+          "is_available": true,
+          "catalog_discount": null,
+          "option_groups": [],
+          "constraints_notes": null
+        },
+        {
+          "ref": "prod_gula_taco_combinado",
+          "name": "Gula taco combinado",
+          "description": "Elige 2 carnes. Incluye guacamole, cebolla asada y chile toreado.",
+          "price_mxn": 60,
+          "currency": "MXN",
+          "is_available": true,
+          "catalog_discount": null,
+          "option_groups": [],
+          "constraints_notes": null
+        },
+        {
+          "ref": "prod_burrito_pechugon",
+          "name": "Burrito pechugón",
+          "description": "Pechuga con sazón de la casa, chile morrón, guacamole, frijoles, arroz y mix de quesos.",
+          "price_mxn": 129,
+          "currency": "MXN",
+          "is_available": true,
+          "catalog_discount": null,
+          "option_groups": [],
+          "constraints_notes": null
+        },
+        {
+          "ref": "prod_burrito_arrachera",
+          "name": "Burrito de arrachera",
+          "description": "Arrachera, cebolla asada con sazón de la casa, guacamole, frijoles, arroz y mix de quesos.",
+          "price_mxn": 149,
+          "currency": "MXN",
+          "is_available": true,
+          "catalog_discount": null,
+          "option_groups": [],
+          "constraints_notes": null
+        },
+        {
+          "ref": "prod_papa_ranch",
+          "name": "Papa Ranch",
+          "description": "Papa al horno con especias de la casa, gravy, tocino crujiente, mix de quesos y carne a elegir.",
+          "price_mxn": 149,
+          "currency": "MXN",
+          "is_available": true,
+          "catalog_discount": null,
+          "option_groups": [],
+          "constraints_notes": null
+        },
+        {
+          "ref": "prod_burrada",
+          "name": "Burrada",
+          "description": "Chuleta ahumada, salchicha ahumada, tocino ahumado, guacamole, frijoles, arroz, mix de quesos y carne a elegir.",
+          "price_mxn": 165,
+          "currency": "MXN",
+          "is_available": true,
+          "catalog_discount": null,
+          "option_groups": [],
+          "constraints_notes": null
+        }
+      ]
+    },
+    {
+      "ref": "cat_postres",
+      "name": "Postres",
+      "description": null,
+      "sort_order": 2,
+      "products": [
+        {
+          "ref": "prod_bolas_helado",
+          "name": "Bolas de helado",
+          "description": null,
+          "price_mxn": 50,
+          "currency": "MXN",
+          "is_available": true,
+          "catalog_discount": null,
+          "option_groups": [],
+          "constraints_notes": null
+        },
+        {
+          "ref": "prod_pan_elote",
+          "name": "Pan de elote",
+          "description": null,
+          "price_mxn": 65,
+          "currency": "MXN",
+          "is_available": true,
+          "catalog_discount": null,
+          "option_groups": [],
+          "constraints_notes": null
+        },
+        {
+          "ref": "prod_churros",
+          "name": "Churros",
+          "description": "Elige topping: lechera, cajeta o chocolate.",
+          "price_mxn": 70,
+          "currency": "MXN",
+          "is_available": true,
+          "catalog_discount": null,
+          "option_groups": [],
+          "constraints_notes": null
+        },
+        {
+          "ref": "prod_gula_cookies",
+          "name": "Gula cookies",
+          "description": null,
+          "price_mxn": 70,
+          "currency": "MXN",
+          "is_available": true,
+          "catalog_discount": null,
+          "option_groups": [],
+          "constraints_notes": null
+        }
+      ]
+    }
+  ],
+  "promotions": [],
+  "global_rules": [
+    "Todas las alitas y boneless incluyen guarnición de zanahoria o pepino y aderezo ranch."
+  ],
+  "unmapped_text": [],
+  "open_questions": []
+}
