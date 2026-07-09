@@ -16,24 +16,13 @@ from app.modules.assistant.skills.menu_import.batching import (
     count_batch_products,
     single_batch_from_draft,
 )
+from app.modules.assistant.skills.menu_import.draft_enrich import enrich_import_draft
 from app.modules.assistant.skills.menu_import.draft_merge import merge_draft_batches
 from app.modules.assistant.skills.menu_import.clarification import apply_clarification_answers
-from app.modules.assistant.skills.menu_import.complement_questions import (
-    build_complement_questions,
-    merge_open_questions,
-)
-from app.modules.assistant.skills.menu_import.live_menu_cache import capture_live_menu_snapshot
 from app.modules.assistant.skills.menu_import.menu_reconcile import (
     ReconciliationPlan,
     build_reconciliation_plan,
-    reconciliation_plan_from_dict,
-    reconciliation_plan_to_dict,
 )
-from app.modules.assistant.skills.menu_import.merchandising import (
-    apply_import_merchandising_draft,
-    new_category_refs,
-)
-from app.modules.assistant.skills.menu_import.preview_full import build_full_import_preview
 from app.modules.assistant.skills.menu_import.document_loader import load_menu_source_from_storage
 from app.modules.assistant.skills.menu_import.draft_schema import ImportBatch, ImportDraft
 from app.modules.assistant.skills.menu_import.extraction import (
@@ -54,9 +43,7 @@ MENU_IMPORT_INTERNAL_TOOL_NAMES: frozenset[str] = frozenset(
         "register_menu_source_file",
         "start_menu_extraction_batch",
         "get_extraction_status",
-        "analyze_import_vs_live",
         "save_clarification_answers",
-        "preview_full_import",
         "apply_full_import",
         "update_menu_knowledge",
     }
@@ -297,29 +284,6 @@ class MenuImportSkill:
                 },
             ),
             ToolDefinition(
-                name="analyze_import_vs_live",
-                description=(
-                    "Compare the OCR import draft against the restaurant live menu. "
-                    "Caches live_menu_snapshot and reconciliation_snapshot in Postgres "
-                    "so later turns do not re-scan the live menu. Merges complement "
-                    "clarification questions into open_questions for batch asking."
-                ),
-                effect="mutate",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "force_refresh": {
-                            "type": "boolean",
-                            "description": (
-                                "Set true to refresh the live menu snapshot even if one exists."
-                            ),
-                            "default": False,
-                        },
-                    },
-                    "required": [],
-                },
-            ),
-            ToolDefinition(
                 name="save_clarification_answers",
                 description=(
                     "Save owner answers to open_questions from extraction. "
@@ -336,15 +300,6 @@ class MenuImportSkill:
                     },
                     "required": ["answers"],
                 },
-            ),
-            ToolDefinition(
-                name="preview_full_import",
-                description=(
-                    "Executive markdown preview of the full menu as extracted (prices in MXN), "
-                    "including complement groups with required/optional and min/max."
-                ),
-                effect="read",
-                input_schema={"type": "object", "properties": {}, "required": []},
             ),
             ToolDefinition(
                 name="apply_full_import",
@@ -505,6 +460,7 @@ class MenuImportSkill:
                 entry["extracted_at"] = datetime.now(UTC).isoformat()
 
             merged = merge_page_drafts(page_drafts) if page_drafts else ImportDraft()
+            merged = enrich_import_draft(merged)
             batch = single_batch_from_draft(merged)
             session.draft_batches = [batch.model_dump()]
             session.source_files = source_files
@@ -560,56 +516,6 @@ class MenuImportSkill:
                 data=payload,
             )
 
-        if tool_name == "analyze_import_vs_live":
-            batches = _batch_entries(session)
-            if not batches:
-                return ToolResult(ok=False, summary="Run extraction before analyzing vs live menu")
-
-            force_refresh = bool(args.get("force_refresh", False))
-            live_snapshot = dict(session.live_menu_snapshot or {})
-            if force_refresh or not live_snapshot.get("captured_at"):
-                live_snapshot = capture_live_menu_snapshot(ctx)
-                session.live_menu_snapshot = live_snapshot
-
-            merged = merge_draft_batches(
-                [ImportBatch.model_validate(entry) for entry in batches]
-            )
-            plan = _current_reconciliation(ctx, merged)
-            session.reconciliation_snapshot = reconciliation_plan_to_dict(plan)
-
-            merged = merge_open_questions(merged, build_complement_questions(merged, plan))
-            optimized_batch = single_batch_from_draft(merged)
-            session.draft_batches = [optimized_batch.model_dump()]
-            session.status = (
-                MenuImportSessionStatus.CLARIFYING.value
-                if merged.open_questions
-                else MenuImportSessionStatus.PREVIEW_BATCH.value
-            )
-            _repo(ctx).update(session)
-
-            unanswered = [question.model_dump() for question in merged.open_questions]
-            return ToolResult(
-                ok=True,
-                summary=(
-                    f"Analyzed import vs live menu; {len(unanswered)} open question(s)"
-                    if unanswered
-                    else "Analyzed import vs live menu; no open questions"
-                ),
-                data={
-                    **_session_summary(session),
-                    "live_menu_counts": (live_snapshot.get("counts") or {}),
-                    "reconciliation": {
-                        "new_categories": plan.new_categories,
-                        "reused_categories": plan.reused_categories,
-                        "new_products": plan.new_products,
-                        "updated_products": plan.updated_products,
-                        "products_with_existing_groups": sorted(plan.products_with_existing_groups),
-                    },
-                    "open_questions": unanswered,
-                    "reconciliation_markdown": plan.markdown,
-                },
-            )
-
         if tool_name == "save_clarification_answers":
             answers = args.get("answers")
             if not isinstance(answers, dict) or not answers:
@@ -620,34 +526,6 @@ class MenuImportSkill:
                 ok=True,
                 summary="Saved clarification answers",
                 data={**_session_summary(session), "unanswered_question_ids": unanswered},
-            )
-
-        if tool_name == "preview_full_import":
-            merged = merge_draft_batches(
-                [ImportBatch.model_validate(entry) for entry in _batch_entries(session)]
-            )
-            plan = _current_reconciliation(ctx, merged)
-            merchandised = apply_import_merchandising_draft(
-                merged,
-                new_category_refs=new_category_refs(merged.categories, plan),
-            )
-            preview_markdown = build_full_import_preview(merchandised)
-            cached = reconciliation_plan_from_dict(session.reconciliation_snapshot or {})
-            plan_markdown = cached.markdown if cached is not None and cached.markdown else plan.markdown
-            markdown = f"{plan_markdown}\n\n{preview_markdown}"
-            return ToolResult(
-                ok=True,
-                summary="Full import preview ready",
-                data={
-                    "markdown": markdown,
-                    "reconciliation": {
-                        "new_categories": plan.new_categories,
-                        "reused_categories": plan.reused_categories,
-                        "new_products": plan.new_products,
-                        "updated_products": plan.updated_products,
-                    },
-                    "open_questions": [question.model_dump() for question in merged.open_questions],
-                },
             )
 
         if tool_name == "apply_full_import":
