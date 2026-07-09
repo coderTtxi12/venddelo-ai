@@ -4,7 +4,8 @@ from pathlib import Path
 def test_menu_import_skill_md_concierge_workflow():
     text = Path("app/modules/assistant/skills/menu_import/SKILL.md").read_text()
     assert "load_skill(menu_write)" in text
-    assert "preview_full_import" in text
+    assert "preview_full_import" not in text
+    assert "apply_full_import" in text
     assert "apply_full_import" in text
     assert "optimize_import_draft" not in text
     assert "Never during import" in text
@@ -15,7 +16,7 @@ def test_menu_import_skill_md_concierge_workflow():
     assert "Investigate" in text
     assert "reconcile" in text
     assert "run_menu_import_onboarding" in text
-    assert "analyze_import_vs_live" in text
+    assert "analyze_import_vs_live" not in text
     assert "one message" in text or "one batch" in text or "de jalón" in text.lower()
 
 

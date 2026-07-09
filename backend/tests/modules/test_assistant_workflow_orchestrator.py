@@ -282,6 +282,10 @@ def test_workflow_orchestrator_menu_import_handoff_skips_executor():
         goal="Importar menú completo desde PDF",
         reason="El usuario subió un menú y quiere publicarlo completo.",
     )
+    execution = ExecutionRecord(
+        status="success",
+        summary="OCR completado; sesión en fase de recolección.",
+    )
 
     async def fake_run(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
         raise AssertionError("Evaluator/Responder should not run for menu_import handoff")
@@ -290,7 +294,9 @@ def test_workflow_orchestrator_menu_import_handoff_skips_executor():
         name = getattr(agent, "name", "")
         if name == "Router":
             return FakeStreamedResult(final_output=route)
-        if name == "MenuImport":
+        if name == "MenuImportExecutor":
+            return FakeStreamedResult(final_output=execution)
+        if name == "MenuImportResponder":
             return FakeStreamedResult(
                 final_output=MenuImportUserResponse(
                     message="Empezaré a importar tu menú.",
@@ -316,7 +322,7 @@ def test_workflow_orchestrator_menu_import_handoff_skips_executor():
         events = asyncio.run(_collect(orchestrator, message="Importa este menú"))
 
     phases = [event.data["phase"] for event in events if event.event == "agent.phase"]
-    assert phases == ["context", "routing", "executing"]
+    assert phases == ["context", "routing", "executing", "responding"]
     phase_labels = [
         event.data.get("label")
         for event in events
@@ -370,12 +376,19 @@ def test_workflow_orchestrator_menu_import_emits_quiz_event():
             ),
         ],
     )
+    execution = ExecutionRecord(
+        status="success",
+        summary="OCR listo; hay open_questions pendientes sobre complementos.",
+        notes=["q_complement_tacos: salsa extra en tacos al pastor"],
+    )
 
     def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
         name = getattr(agent, "name", "")
         if name == "Router":
             return FakeStreamedResult(final_output=route)
-        if name == "MenuImport":
+        if name == "MenuImportExecutor":
+            return FakeStreamedResult(final_output=execution)
+        if name == "MenuImportResponder":
             return FakeStreamedResult(final_output=import_response)
         raise AssertionError(f"Unexpected streamed agent run: {name!r}")
 

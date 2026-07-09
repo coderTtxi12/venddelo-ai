@@ -1,10 +1,14 @@
 from app.core.config import Settings
 from app.modules.assistant.agent.tools import build_executor_function_tools, build_menu_import_internal_tools
+from app.modules.assistant.agent.workflow.schemas import ExecutionRecord
 from app.modules.assistant.skills import build_skill_registry
 from app.modules.assistant.skills.menu_import.onboarding_agent import (
-    MENU_IMPORT_AGENT_NAME,
-    build_menu_import_agent,
+    MENU_IMPORT_EXECUTOR_NAME,
+    MENU_IMPORT_RESPONDER_NAME,
+    build_menu_import_executor_agent,
+    build_menu_import_responder_agent,
 )
+from app.modules.assistant.skills.menu_import.response_schema import MenuImportUserResponse
 from app.modules.assistant.skills.menu_import.tools import (
     MENU_IMPORT_INTERNAL_TOOL_NAMES,
     MenuImportSkill,
@@ -16,8 +20,8 @@ def test_menu_import_internal_tool_names_match_skill():
     skill = MenuImportSkill()
     names = {tool.name for tool in skill.tool_definitions()}
     assert names == MENU_IMPORT_INTERNAL_TOOL_NAMES
-    assert "analyze_import_vs_live" in names
-    assert len(names) == 11
+    assert "analyze_import_vs_live" not in names
+    assert len(names) == 9
 
 
 def test_executor_excludes_menu_import_tools():
@@ -33,16 +37,21 @@ def test_executor_excludes_menu_import_tools():
     assert "list_products" in names
 
 
-def test_menu_import_handoff_agent_gets_granular_tools():
+def test_menu_import_executor_has_granular_tools():
     registry = build_skill_registry()
-    agent = build_menu_import_agent(settings=Settings(), registry=registry)
-    assert agent.name == MENU_IMPORT_AGENT_NAME
-    from app.modules.assistant.skills.menu_import.response_schema import MenuImportUserResponse
-
-    assert agent.output_type is MenuImportUserResponse
+    agent = build_menu_import_executor_agent(settings=Settings(), registry=registry)
+    assert agent.name == MENU_IMPORT_EXECUTOR_NAME
+    assert agent.output_type is ExecutionRecord
     tools = build_menu_import_internal_tools(registry)
     names = {tool.name for tool in tools}
     assert names == MENU_IMPORT_INTERNAL_TOOL_NAMES
+
+
+def test_menu_import_responder_has_no_tools():
+    agent = build_menu_import_responder_agent(settings=Settings())
+    assert agent.name == MENU_IMPORT_RESPONDER_NAME
+    assert agent.output_type is MenuImportUserResponse
+    assert agent.tools == []
 
 
 def test_pending_source_files_skips_already_extracted():

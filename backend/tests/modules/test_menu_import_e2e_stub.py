@@ -169,10 +169,6 @@ def test_menu_import_full_flow_stub(session):
         assert clarified.data["status"] == MenuImportSessionStatus.PREVIEW_BATCH.value
         assert clarified.data["unanswered_question_ids"] == []
 
-        preview = _run(registry, "preview_full_import", {}, ctx)
-        assert preview.ok is True
-        assert "Taco al Pastor" in preview.data["markdown"]
-
         applied = _run(
             registry,
             "apply_full_import",
