@@ -5,7 +5,7 @@ import json
 import re
 import uuid
 
-from app.core.exceptions import ConflictError, NotFoundError, ValidationError
+from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.core.storage import StoragePort
 from app.modules.delivery_providers.availability import resolve_service_status
 from app.modules.delivery_providers.pricing import (
@@ -15,6 +15,8 @@ from app.modules.delivery_providers.pricing import (
 )
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
+    DeliveryProviderAdminInviteCreate,
+    DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
     DeliveryProviderMeResponse,
     DeliveryProviderOnboardingSubmit,
@@ -35,6 +37,7 @@ from app.modules.delivery_providers.schemas import (
 )
 
 PAYMENT_METHOD_KEYS: frozenset[str] = frozenset({"cash", "transfer", "card_terminal"})
+_ADMIN_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class DeliveryProviderService:
@@ -42,8 +45,11 @@ class DeliveryProviderService:
         self._repo = repo
         self._storage = storage
 
-    def get_me(self, user_id: uuid.UUID) -> DeliveryProviderMeResponse:
+    def get_me(self, user_id: uuid.UUID, email: str | None = None) -> DeliveryProviderMeResponse:
         found = self._repo.get_for_user(user_id)
+        if found is None and email:
+            self._repo.claim_admin_invites(user_id, email)
+            found = self._repo.get_for_user(user_id)
         if found is None:
             return DeliveryProviderMeResponse(provider=None, member_role=None, primary_zone=None)
         provider, member_role = found
@@ -53,6 +59,24 @@ class DeliveryProviderService:
             member_role=member_role,
             primary_zone=primary_zone,
         )
+
+    def list_admin_invites(self, user_id: uuid.UUID) -> list[DeliveryProviderAdminInviteDTO]:
+        provider_id = self._require_owner_provider_id(user_id)
+        return list(self._repo.list_admin_invites(provider_id))
+
+    def add_admin_invite(
+        self, user_id: uuid.UUID, data: DeliveryProviderAdminInviteCreate
+    ) -> DeliveryProviderAdminInviteDTO:
+        provider_id = self._require_owner_provider_id(user_id)
+        normalized = self._normalize_admin_email(data.email)
+        existing = [row for row in self._repo.list_admin_invites(provider_id) if row.email == normalized]
+        if existing:
+            raise ConflictError("Ese correo ya está en la lista de administradores")
+        return self._repo.add_admin_invite(provider_id, normalized)
+
+    def remove_admin_invite(self, user_id: uuid.UUID, invite_id: uuid.UUID) -> None:
+        provider_id = self._require_owner_provider_id(user_id)
+        self._repo.remove_admin_invite(provider_id, invite_id)
 
     def update_profile(
         self, user_id: uuid.UUID, data: DeliveryProviderProfileUpdate
@@ -348,6 +372,21 @@ class DeliveryProviderService:
             raise NotFoundError("No tienes un proveedor de delivery registrado")
         provider, _member_role = found
         return provider
+
+    def _require_owner_provider_id(self, user_id: uuid.UUID) -> uuid.UUID:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, member_role = found
+        if member_role != "owner":
+            raise ForbiddenError("Solo el propietario puede administrar invitaciones")
+        return provider.id
+
+    def _normalize_admin_email(self, email: str) -> str:
+        normalized = email.strip().lower()
+        if not _ADMIN_EMAIL_RE.match(normalized):
+            raise ValidationError("Correo electrónico inválido")
+        return normalized
 
     def _load_pricing_config(self, provider_id: uuid.UUID) -> DeliveryProviderPricingConfigDTO:
         config = self._repo.get_pricing_config(provider_id)
