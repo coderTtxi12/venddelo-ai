@@ -11,7 +11,8 @@ def _format_price_mxn(mxn: float, currency: str = "MXN") -> str:
 def _format_option_group(group) -> str:
     req = "obligatorio" if group.required else "opcional"
     sel = "multi" if group.selection == "multi" else "single"
-    return f"{group.title} ({req}, {sel}, min={group.min_selections}, max={group.max_selections})"
+    max_label = group.max_selections if group.max_selections is not None else "sin límite"
+    return f"{group.title} ({req}, {sel}, min={group.min_selections}, max={max_label})"
 
 
 def _layout_label(layout: str) -> str:
@@ -43,9 +44,17 @@ def build_full_import_preview(draft: ImportDraft) -> str:
     lines.extend(["", "### Productos", "", "| Categoría | Producto | Precio |", "| --- | --- | --- |"])
     for category in sorted(draft.categories, key=lambda c: (c.sort_order, c.name)):
         for product in sorted(category.products, key=lambda p: (p.sort_order, p.name)):
+            price_cell = _format_price_mxn(product.price_mxn, product.currency)
+            if product.has_catalog_discount and product.catalog_discount is not None:
+                discount = product.catalog_discount
+                badge = discount.label or (
+                    f"-{discount.percent:g}%"
+                    if discount.type == "percent" and discount.percent is not None
+                    else f"-{_format_price_mxn(discount.amount_mxn or 0)}"
+                )
+                price_cell = f"{price_cell} ({badge})"
             lines.append(
-                f"| {category.name} | {product.name} | "
-                f"{_format_price_mxn(product.price_mxn, product.currency)} |"
+                f"| {category.name} | {product.name} | {price_cell} |"
             )
     products_with_complements = [
         (category.name, product)
@@ -70,7 +79,18 @@ def build_full_import_preview(draft: ImportDraft) -> str:
     if draft.promotions:
         lines.extend(["### Promociones", ""])
         for promo in draft.promotions:
-            lines.append(f"- **{promo.name}** ({promo.type})")
+            label = f" · {promo.label}" if promo.label else ""
+            lines.append(f"- **{promo.name}** ({promo.type}{label})")
+            if promo.is_nxm and promo.participating_complements:
+                lines.append(
+                    f"  - Complementos participantes: "
+                    f"{', '.join(item.label for item in promo.participating_complements)}"
+                )
+            if promo.is_nxm and promo.excluded_complements:
+                lines.append(
+                    f"  - Complementos excluidos: "
+                    f"{', '.join(item.label for item in promo.excluded_complements)}"
+                )
     if draft.open_questions:
         lines.extend(["", "### Pendiente de aclarar", ""])
         for question in draft.open_questions:

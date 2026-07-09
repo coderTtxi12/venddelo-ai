@@ -37,6 +37,7 @@ from app.modules.menu.schemas import (
     ProductUpdate,
 )
 from app.modules.menu.service import MenuService
+from app.modules.promotions.pricing import CATALOG_DISCOUNT_PREFIX
 from app.modules.promotions.schemas import PromotionBundle, PromotionCreate, PromotionScheduleInput
 from app.modules.promotions.service import PromotionService
 
@@ -148,6 +149,48 @@ def _build_promotion_create(
         category_ids=_resolve_refs(promo.target_category_refs, ref_map),
         option_item_ids=_resolve_refs(promo.eligible_option_item_refs, ref_map),
     )
+
+
+def _option_group_max_selections(group: ImportOptionGroup) -> int | None:
+    if group.selection == "single":
+        return 1
+    return group.max_selections
+
+
+def _apply_catalog_discounts(
+    promo_service: PromotionService,
+    ctx: AgentContext,
+    categories: list[ImportCategory],
+    ref_map: dict[str, uuid.UUID],
+) -> int:
+    count = 0
+    for category in categories:
+        for product in category.products:
+            discount = product.catalog_discount
+            if discount is None:
+                continue
+            product_id = ref_map.get(product.ref)
+            if product_id is None:
+                continue
+            promo_service.create(
+                ctx.restaurant_id,
+                PromotionCreate(
+                    restaurant_id=ctx.restaurant_id,
+                    name=f"{CATALOG_DISCOUNT_PREFIX} {product.name}",
+                    image_path=_promotion_placeholder_image(ctx.restaurant_id),
+                    type=discount.type,
+                    scope="product",
+                    percent=int(discount.percent) if discount.type == "percent" and discount.percent is not None else None,
+                    amount_cents=(
+                        mxn_to_cents(discount.amount_mxn)
+                        if discount.type == "amount" and discount.amount_mxn is not None
+                        else None
+                    ),
+                    product_ids=[product_id],
+                ),
+            )
+            count += 1
+    return count
 
 
 def _apply_categories(
@@ -295,7 +338,7 @@ def _apply_single_option_group(
             required=group.required,
             selection=group.selection,
             min_selections=group.min_selections,
-            max_selections=group.max_selections,
+            max_selections=_option_group_max_selections(group),
             sort_index=group.sort_order,
             items=items,
         ),
@@ -411,6 +454,10 @@ def apply_import_batch(
         promotions_created = _apply_promotions(
             promo_service, ctx, batch.promotions, ref_map
         )
+        catalog_discounts_created = _apply_catalog_discounts(
+            promo_service, ctx, batch.categories, ref_map
+        )
+        promotions_created += catalog_discounts_created
     except ValidationError as exc:
         ctx.uow.rollback()
         return ApplyBatchResult(ok=False, summary=str(exc))
