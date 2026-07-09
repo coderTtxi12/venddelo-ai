@@ -222,6 +222,11 @@ def load_workflow_runtime(
         menu_source_attachment_count=len(menu_sources),
         import_session_context=import_session_context,
     )
+
+    # Commit profile/entitlements/conversation setup before the long-lived SSE stream.
+    # Otherwise a second chat request can block on the uncommitted PK insert.
+    uow.commit()
+
     return WorkflowRuntimeBundle(
         context=context,
         registry=registry,
