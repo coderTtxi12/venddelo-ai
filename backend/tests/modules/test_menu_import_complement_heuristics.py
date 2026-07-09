@@ -73,4 +73,4 @@ def test_apply_complement_heuristics_marks_extras_as_optional_multi():
     assert group.required is False
     assert group.selection == "multi"
     assert group.min_selections == 0
-    assert group.max_selections == 3
+    assert group.max_selections is None

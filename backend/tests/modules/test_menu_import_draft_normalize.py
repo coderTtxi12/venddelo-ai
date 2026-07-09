@@ -107,3 +107,31 @@ def test_normalize_coerces_price_strings(raw, expected):
     }
     draft = ImportDraft.model_validate(normalize_import_draft_payload(payload))
     assert draft.categories[0].products[0].price_mxn == expected
+
+
+def test_normalize_preserves_null_max_selections():
+    payload = {
+        "categories": [
+            {
+                "ref": "cat_1",
+                "name": "Tacos",
+                "products": [
+                    {
+                        "ref": "prod_1",
+                        "name": "Pastor",
+                        "option_groups": [
+                            {
+                                "ref": "og_1",
+                                "title": "Extras",
+                                "selection": "multi",
+                                "max_selections": None,
+                                "items": [{"ref": "oi_1", "label": "Queso"}],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    draft = ImportDraft.model_validate(normalize_import_draft_payload(payload))
+    assert draft.categories[0].products[0].option_groups[0].max_selections is None

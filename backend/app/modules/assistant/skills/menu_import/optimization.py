@@ -63,8 +63,9 @@ def _merge_option_group(base: ImportOptionGroup, override: dict[str, Any]) -> Im
         updates["selection"] = selection
     if override.get("min_selections") is not None:
         updates["min_selections"] = int(override["min_selections"])
-    if override.get("max_selections") is not None:
-        updates["max_selections"] = int(override["max_selections"])
+    if "max_selections" in override:
+        raw_max = override["max_selections"]
+        updates["max_selections"] = int(raw_max) if raw_max is not None else None
     return base.model_copy(update=updates)
 
 

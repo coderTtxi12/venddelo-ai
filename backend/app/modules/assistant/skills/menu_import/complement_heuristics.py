@@ -43,26 +43,31 @@ def _infer_group_rules(group: ImportOptionGroup) -> ImportOptionGroup:
         )
 
     if any(keyword in title for keyword in _EXTRA_KEYWORDS):
-        max_sel = min(item_count, 5) if item_count else 5
         return group.model_copy(
             update={
                 "required": False,
                 "selection": "multi",
                 "min_selections": 0,
-                "max_selections": max_sel,
+                "max_selections": None,
             }
         )
 
     if group.required:
+        max_sel = group.max_selections if group.max_selections is not None else 1
         return group.model_copy(
             update={
                 "selection": "single",
                 "min_selections": max(group.min_selections, 1),
-                "max_selections": max(group.max_selections, 1),
+                "max_selections": max(max_sel, 1),
             }
         )
 
-    if group.selection == "multi" and group.max_selections <= 1 and item_count > 1:
+    if (
+        group.selection == "multi"
+        and group.max_selections is not None
+        and group.max_selections <= 1
+        and item_count > 1
+    ):
         return group.model_copy(update={"max_selections": min(item_count, 5)})
 
     return group

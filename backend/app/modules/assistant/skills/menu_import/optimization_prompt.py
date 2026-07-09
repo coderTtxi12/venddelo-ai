@@ -26,7 +26,7 @@ Rules:
 - "Elige tamaño", "Tamaño", "Size" → required=true, selection=single, min_selections=1, max_selections=1
 - "Elige salsa", mandatory wording → required=true, single, min=1, max=1
 - "Extras", "Agrega", "Adicionales", "+$" items → required=false, selection=multi, min_selections=0,
-  max_selections=5 (or count of items if fewer)
+  max_selections=null (sin límite) or a printed cap when visible
 - Optional sides / "Sin costo" choices → required=false, single, min=0, max=1
 - When menu says "incluye" or base price covers one choice → required=true for that group
 - Set price_delta_mxn on items when menu shows "+$X" or extra charge
