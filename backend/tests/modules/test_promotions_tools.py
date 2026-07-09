@@ -16,8 +16,8 @@ def test_promotions_skill_registered():
     names = {tool.name for tool in tools}
     assert names == {
         "create_promotion",
-        "update_promotion",
-        "set_promotion_targets",
+        "update_nxm_promotion",
+        "update_nxm_promotion_complements",
         "disable_promotion",
         "generate_promotion_banner",
     }
@@ -110,23 +110,29 @@ def test_create_promotion_requires_targets_for_bundle(session):
     )
     assert result.ok is False
     assert "at least one product or category" in result.summary
-
-
 @requires_db
-def test_set_promotion_targets_by_category_name(session):
+def test_update_nxm_promotion_adds_product_without_removing_existing(session):
     uow = SqlAlchemyUnitOfWork(lambda: session)
     uow.__enter__()
     restaurant = uow.restaurants.add(
-        RestaurantCreate(name="Promo Category", subdomain="promo-write-category")
+        RestaurantCreate(name="NxM Add", subdomain="nxm-tool-add")
     )
     category = uow.menu.create_category(
-        CategoryCreate(restaurant_id=restaurant.id, name="Burgers", sort_index=0)
+        CategoryCreate(restaurant_id=restaurant.id, name="Alitas", sort_index=0)
     )
-    uow.menu.add_product(
+    wings = uow.menu.add_product(
         ProductCreate(
             restaurant_id=restaurant.id,
-            name="HAMBURGUESA",
-            price_cents=5000,
+            name="WINGS & FRIES",
+            price_cents=24400,
+            category_ids=[category.id],
+        )
+    )
+    boneless = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="BONELESS",
+            price_cents=22900,
             category_ids=[category.id],
         )
     )
@@ -141,11 +147,11 @@ def test_set_promotion_targets_by_category_name(session):
     created = skill.execute(
         "create_promotion",
         {
-            "name": "Combo Burgers",
-            "type": "combo",
-            "scope": "category",
-            "category_names": ["Burgers"],
-            "image_path": "restaurants/combo.png",
+            "name": "2×1 Alitas",
+            "type": "bundle",
+            "scope": "product",
+            "product_names": ["WINGS & FRIES"],
+            "image_path": "restaurants/promo.png",
         },
         ctx,
     )
@@ -153,15 +159,100 @@ def test_set_promotion_targets_by_category_name(session):
     promo_id = created.data["promotion"]["id"]
 
     updated = skill.execute(
-        "set_promotion_targets",
+        "update_nxm_promotion",
         {
             "promotion_id": promo_id,
-            "category_names": ["Burgers"],
+            "add_product_names": ["BONELESS"],
         },
         ctx,
     )
-    assert updated.ok is True
-    assert updated.data["promotion"]["categories"][0]["name"] == "Burgers"
+    assert updated.ok is True, updated.summary
+    product_ids = {row["id"] for row in updated.data["promotion"]["products"]}
+    assert str(wings.id) in product_ids
+    assert str(boneless.id) in product_ids
+
+
+@requires_db
+def test_update_nxm_promotion_complements_disable_and_enable(session):
+    from app.modules.menu.schemas import OptionGroupCreate, OptionItemCreate
+
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="NxM Complements", subdomain="nxm-tool-complements")
+    )
+    category = uow.menu.create_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Burgers", sort_index=0)
+    )
+    burger = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="HAMBURGUESA",
+            price_cents=5000,
+            category_ids=[category.id],
+        )
+    )
+    group = uow.menu.add_option_group(
+        burger.id,
+        OptionGroupCreate(
+            title="Extras",
+            items=[
+                OptionItemCreate(label="Queso"),
+                OptionItemCreate(label="Tocino"),
+            ],
+        ),
+    )
+    queso = group.items[0]
+    tocino = group.items[1]
+
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["promotions"],
+    )
+    skill = PromotionsSkill()
+
+    created = skill.execute(
+        "create_promotion",
+        {
+            "name": "2×1 Burgers",
+            "type": "bundle",
+            "scope": "product",
+            "product_names": ["HAMBURGUESA"],
+            "image_path": "restaurants/promo.png",
+        },
+        ctx,
+    )
+    assert created.ok is True
+    promo_id = created.data["promotion"]["id"]
+
+    disabled = skill.execute(
+        "update_nxm_promotion_complements",
+        {
+            "promotion_id": promo_id,
+            "disable_option_item_labels": ["Tocino"],
+        },
+        ctx,
+    )
+    assert disabled.ok is True, disabled.summary
+    disabled_ids = {str(item_id) for item_id in disabled.data["promotion"].get("option_item_ids", [])}
+    assert str(queso.id) in disabled_ids
+    assert str(queso.id) in disabled_ids
+    assert str(tocino.id) not in disabled_ids
+
+    enabled = skill.execute(
+        "update_nxm_promotion_complements",
+        {
+            "promotion_id": promo_id,
+            "enable_option_item_labels": ["Tocino"],
+        },
+        ctx,
+    )
+    assert enabled.ok is True, enabled.summary
+    enabled_ids = enabled.data["promotion"].get("option_item_ids", [])
+    assert str(queso.id) in enabled_ids
+    assert str(tocino.id) in enabled_ids
 
 
 @requires_db
