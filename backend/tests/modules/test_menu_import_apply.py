@@ -9,11 +9,10 @@ from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.menu_import.apply_batch import (
     ApplyBatchResult,
     ApplyFullResult,
-    _unanswered_question_ids,
     apply_full_import,
     apply_import_batch,
 )
-from app.modules.assistant.skills.menu_import.draft_schema import ImportBatch, OpenQuestion
+from app.modules.assistant.skills.menu_import.draft_schema import ImportBatch
 from app.modules.assistant.skills.menu_import.session_repository import MenuImportSessionRepository
 from app.modules.assistant.skills.menu_import.session_schemas import MenuImportSessionStatus
 from app.modules.assistant.skills.menu_import.theme_tools import apply_menu_theme
@@ -21,18 +20,6 @@ from app.modules.digital_menu_themes.repository import DigitalMenuThemeRepositor
 from app.modules.menu.service import MenuService
 from app.modules.promotions.service import PromotionService
 from tests.conftest import requires_db
-
-
-def test_unanswered_question_ids():
-    batch = ImportBatch(
-        batch_index=0,
-        open_questions=[
-            OpenQuestion(id="q1", question_es="¿Precio?"),
-            OpenQuestion(id="q2", question_es="¿Horario?"),
-        ],
-    )
-    assert _unanswered_question_ids(batch, {"q1": "100"}) == ["q2"]
-    assert _unanswered_question_ids(batch, {"q1": "100", "q2": "Viernes"}) == []
 
 
 def test_apply_import_batch_rejects_unconfirmed_without_db():
@@ -331,6 +318,130 @@ def test_apply_full_import_reconciles_existing_menu_without_duplicates(session):
 
 
 @requires_db
+def test_apply_full_import_moves_reconciled_products_to_new_category(session):
+    from app.modules.assistant.skills.menu_import.draft_schema import ImportDraft
+    from app.modules.assistant.skills.menu_import.menu_reconcile import (
+        build_reconciliation_plan,
+    )
+
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant_id, conversation_id = _create_restaurant_and_conversation(session)
+    repo = MenuImportSessionRepository(session)
+    ctx = AgentContext(
+        restaurant_id=restaurant_id,
+        conversation_id=conversation_id,
+        uow=uow,
+        effective_skill_ids=["menu_import"],
+    )
+
+    first_batch = {
+        "batch_index": 0,
+        "categories": [
+            {
+                "ref": "cat_boneless",
+                "name": "BONELESS",
+                "sort_order": 0,
+                "products": [
+                    {
+                        "ref": "prod_boneless",
+                        "name": "Boneless",
+                        "price_mxn": 150,
+                        "currency": "MXN",
+                        "sort_order": 0,
+                        "option_groups": [],
+                    }
+                ],
+            },
+            {
+                "ref": "cat_alitas_old",
+                "name": "Orden de alitas",
+                "sort_order": 1,
+                "products": [
+                    {
+                        "ref": "prod_alitas",
+                        "name": "Alitas",
+                        "price_mxn": 120,
+                        "currency": "MXN",
+                        "sort_order": 0,
+                        "option_groups": [],
+                    }
+                ],
+            },
+        ],
+        "promotions": [],
+        "open_questions": [],
+    }
+    first_session = repo.create(
+        restaurant_id=restaurant_id,
+        conversation_id=conversation_id,
+        status=MenuImportSessionStatus.PREVIEW_BATCH,
+    )
+    first_session.draft_batches = [first_batch]
+    repo.update(first_session)
+    assert apply_full_import(ctx, first_session, confirmed=True).ok is True
+
+    merged_batch = {
+        "batch_index": 0,
+        "categories": [
+            {
+                "ref": "cat_alitas",
+                "name": "Alitas",
+                "sort_order": 0,
+                "products": [
+                    {
+                        "ref": "prod_alitas",
+                        "name": "Alitas",
+                        "price_mxn": 120,
+                        "currency": "MXN",
+                        "sort_order": 0,
+                        "option_groups": [],
+                    },
+                    {
+                        "ref": "prod_boneless",
+                        "name": "Boneless",
+                        "price_mxn": 150,
+                        "currency": "MXN",
+                        "sort_order": 1,
+                        "option_groups": [],
+                    },
+                ],
+            }
+        ],
+        "promotions": [],
+        "open_questions": [],
+    }
+    second_session = repo.create(
+        restaurant_id=restaurant_id,
+        conversation_id=conversation_id,
+        status=MenuImportSessionStatus.PREVIEW_BATCH,
+    )
+    second_session.draft_batches = [merged_batch]
+    repo.update(second_session)
+
+    draft = ImportBatch.model_validate(merged_batch)
+    menu = MenuService(uow.menu)
+    plan = build_reconciliation_plan(
+        ImportDraft(categories=draft.categories, promotions=draft.promotions),
+        menu.get_full_menu(restaurant_id),
+    )
+    assert plan.new_categories == 1
+    assert plan.updated_products == 2
+
+    result = apply_full_import(ctx, second_session, confirmed=True, reconciliation=plan)
+    assert result.ok is True
+
+    categories_after = menu.list_all_categories(
+        restaurant_id, PaginationParams(limit=50, cursor=None)
+    )
+    alitas_category = next(item for item in categories_after.items if item.name == "Alitas")
+    products_after = menu.list_products(restaurant_id, PaginationParams(limit=50, cursor=None))
+    assert len(products_after.items) == 2
+    for product in products_after.items:
+        assert alitas_category.id in product.category_ids
+
+
+@requires_db
 def test_apply_import_batch_rejects_unconfirmed(session):
     uow = SqlAlchemyUnitOfWork(lambda: session)
     uow.__enter__()
@@ -354,40 +465,6 @@ def test_apply_import_batch_rejects_unconfirmed(session):
 
     assert result.ok is False
     assert "confirmed" in result.summary
-
-
-@requires_db
-def test_apply_import_batch_rejects_unanswered_open_questions(session):
-    uow = SqlAlchemyUnitOfWork(lambda: session)
-    uow.__enter__()
-    restaurant_id, conversation_id = _create_restaurant_and_conversation(session)
-    repo = MenuImportSessionRepository(session)
-    batch = _sample_batch_payload()
-    batch["open_questions"] = [
-        OpenQuestion(
-            id="q_price",
-            question_es="¿Cuál es el precio del combo?",
-            context="Ambiguo en OCR",
-        ).model_dump()
-    ]
-    import_session = repo.create(
-        restaurant_id=restaurant_id,
-        conversation_id=conversation_id,
-        status=MenuImportSessionStatus.CLARIFYING,
-    )
-    import_session.draft_batches = [batch]
-    repo.update(import_session)
-    ctx = AgentContext(
-        restaurant_id=restaurant_id,
-        conversation_id=conversation_id,
-        uow=uow,
-        effective_skill_ids=["menu_import"],
-    )
-
-    result = apply_import_batch(ctx, import_session, 0, confirmed=True)
-
-    assert result.ok is False
-    assert "q_price" in result.summary
 
 
 @requires_db

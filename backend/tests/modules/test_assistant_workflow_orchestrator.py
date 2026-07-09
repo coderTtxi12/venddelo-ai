@@ -15,11 +15,7 @@ from app.modules.assistant.agent.workflow.schemas import (
     WorkflowEvaluation,
     WorkflowRouteDecision,
 )
-from app.modules.assistant.skills.menu_import.response_schema import (
-    MenuImportQuizOption,
-    MenuImportQuizQuestion,
-    MenuImportUserResponse,
-)
+from app.modules.assistant.skills.menu_import.response_schema import MenuImportUserResponse
 
 
 def _executor_route() -> WorkflowRouteDecision:
@@ -364,22 +360,13 @@ def test_workflow_orchestrator_menu_import_emits_quiz_event():
         reason="Menú adjunto para importación.",
     )
     import_response = MenuImportUserResponse(
-        message="Necesito aclarar unos complementos antes de continuar.",
-        questions=[
-            MenuImportQuizQuestion(
-                id="q_complement_tacos",
-                question="¿La salsa extra es obligatoria en Tacos al pastor?",
-                suggested_answers=[
-                    MenuImportQuizOption(id="opt_1", label="Obligatorio"),
-                    MenuImportQuizOption(id="opt_2", label="Opcional"),
-                ],
-            ),
-        ],
+        message="Menú importado y publicado correctamente.",
+        questions=[],
     )
     execution = ExecutionRecord(
         status="success",
-        summary="OCR listo; hay open_questions pendientes sobre complementos.",
-        notes=["q_complement_tacos: salsa extra en tacos al pastor"],
+        summary="OCR + apply completados; 12 productos publicados.",
+        notes=[],
     )
 
     def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
@@ -408,11 +395,9 @@ def test_workflow_orchestrator_menu_import_emits_quiz_event():
         events = asyncio.run(_collect(orchestrator, message="Importa este menú"))
 
     quiz_events = [event for event in events if event.event == "menu_import.quiz"]
-    assert len(quiz_events) == 1
-    assert quiz_events[0].data["questions"][0]["id"] == "q_complement_tacos"
+    assert len(quiz_events) == 0
     assert events[-1].event == "message.complete"
     assert events[-1].data["content"] == import_response.message
-    assert events[-1].data["menu_import"]["questions"][0]["question"].endswith("?")
 
 
 async def _collect(orchestrator: WorkflowOrchestrator, message: str = "¿Qué categorías tengo?"):

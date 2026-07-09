@@ -43,40 +43,19 @@ EXTRACTION_FIXTURE = {
     "promotions": [],
     "global_rules": ["Precios en MXN"],
     "unmapped_text": [],
-    "open_questions": [
-        {
-            "id": "q_promo",
-            "question_es": "¿La promo 2x1 aplica los viernes?",
-            "context": "Promo parcial en OCR",
-            "related_refs": [],
-        }
-    ],
 }
 
 
 class StubVisionProvider(VisionPort):
-    """Returns fixture JSON for extraction and photo-match calls."""
+    """Returns fixture JSON for extraction calls."""
 
-    def __init__(
-        self,
-        *,
-        extraction_payload: dict | None = None,
-        photo_match_payload: dict | None = None,
-    ) -> None:
+    def __init__(self, *, extraction_payload: dict | None = None) -> None:
         self._extraction = extraction_payload or EXTRACTION_FIXTURE
-        self._photo_match = photo_match_payload or {
-            "product_id": "replace-me",
-            "confidence": 0.91,
-            "reason_es": "Taco al pastor visible",
-        }
         self.calls: list[VisionAnalysisRequest] = []
 
     def analyze_json(self, request: VisionAnalysisRequest) -> VisionAnalysisResult:
         self.calls.append(request)
-        if "You match restaurant product photos to items on a live digital menu" in request.prompt:
-            data = self._photo_match
-        else:
-            data = self._extraction
+        data = self._extraction
         return VisionAnalysisResult(data=data, model="stub", raw_text=json.dumps(data))
 
 
@@ -131,14 +110,14 @@ def test_menu_import_full_flow_stub(session):
         assert start.ok is True
         assert start.data["status"] == MenuImportSessionStatus.DISCOVERY.value
 
-        discovery = _run(
+        context_saved = _run(
             registry,
-            "save_discovery_answers",
-            {"answers": {"cuisine": "Mexicana", "currency": "MXN"}},
+            "save_menu_context",
+            {"menu_context": "Menú de tacos al pastor, precios en MXN"},
             ctx,
         )
-        assert discovery.ok is True
-        assert discovery.data["status"] == MenuImportSessionStatus.COLLECTING_SOURCES.value
+        assert context_saved.ok is True
+        assert context_saved.data["status"] == MenuImportSessionStatus.COLLECTING_SOURCES.value
 
         registered = _run(
             registry,
@@ -156,28 +135,9 @@ def test_menu_import_full_flow_stub(session):
         extracted = _run(registry, "start_menu_extraction_batch", {}, ctx)
         assert extracted.ok is True
         assert extracted.data["draft_batches_total"] == 1
-        assert extracted.data["status"] == MenuImportSessionStatus.CLARIFYING.value
-        assert extracted.data["open_questions"]
-
-        clarified = _run(
-            registry,
-            "save_clarification_answers",
-            {"answers": {"q_promo": "Solo viernes de 18:00 a 22:00"}},
-            ctx,
-        )
-        assert clarified.ok is True
-        assert clarified.data["status"] == MenuImportSessionStatus.PREVIEW_BATCH.value
-        assert clarified.data["unanswered_question_ids"] == []
-
-        applied = _run(
-            registry,
-            "apply_full_import",
-            {"confirmed": True},
-            ctx,
-        )
-        assert applied.ok is True
-        assert applied.data["products"] == 1
-        assert applied.data["status"] == MenuImportSessionStatus.ENRICHING.value
+        assert extracted.data["draft_batches_applied"] == 1
+        assert extracted.data["status"] == MenuImportSessionStatus.ENRICHING.value
+        assert extracted.data["products"] == 1
 
         closed = _run(registry, "update_menu_knowledge", {"notes": "Import OK"}, ctx)
         assert closed.ok is True

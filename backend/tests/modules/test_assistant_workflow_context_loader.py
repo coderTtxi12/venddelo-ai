@@ -145,7 +145,17 @@ def test_router_input_includes_menu_import_signals():
 
     assert "## Menu import capability" in payload
     assert "archivo(s) de menú" in payload
+    assert "menu_import" in payload
+    assert "no al executor" in payload
     assert "## Active menu import session" in payload
+
+
+def test_router_instructions_prioritize_menu_import_with_attachments():
+    from app.modules.assistant.agent.workflow.prompts import ROUTER_INSTRUCTIONS
+
+    assert "menu_import" in ROUTER_INSTRUCTIONS
+    assert "menu_source" in ROUTER_INSTRUCTIONS
+    assert "executor" in ROUTER_INSTRUCTIONS
 
 
 def test_menu_import_input_uses_menu_import_conversation_history():

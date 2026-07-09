@@ -15,8 +15,9 @@ def test_menu_import_skill_registered():
     tools = registry.tool_definitions(["menu_import"])
     names = {tool.name for tool in tools}
     assert "start_menu_import_session" in names
+    assert "load_menu_best_practices" not in names
     assert "update_menu_knowledge" in names
-    assert len(names) == 9
+    assert len(names) == 8
     assert "analyze_import_vs_live" not in names
     assert "preview_full_import" not in names
     assert "optimize_import_draft" not in names
@@ -31,10 +32,10 @@ def test_menu_import_skill_registered():
 def test_menu_import_skill_exposes_expected_tool_effects():
     skill = MenuImportSkill()
     by_name = {tool.name: tool.effect for tool in skill.tool_definitions()}
+    assert "load_menu_best_practices" not in by_name
     assert by_name["get_import_session"] == "read"
     assert by_name["apply_full_import"] == "mutate"
     assert by_name["update_menu_knowledge"] == "mutate"
-
 
 @requires_db
 def test_start_menu_import_session_creates_session(session):

@@ -6,9 +6,9 @@ from app.modules.assistant.skills.menu_import.session_context import (
 
 def _session(**overrides):
     defaults = dict(
-        status="clarifying",
+        status="extracting",
         draft_batches=[],
-        clarification_answers={},
+        discovery_answers={},
         source_files=[],
     )
     defaults.update(overrides)
@@ -24,7 +24,7 @@ def test_returns_none_for_terminal_session():
     assert build_import_session_context(_session(status="cancelled")) is None
 
 
-def test_summarizes_active_session_with_pending_questions():
+def test_summarizes_active_session_with_menu_context():
     batch = {
         "batch_index": 0,
         "categories": [
@@ -37,13 +37,10 @@ def test_summarizes_active_session_with_pending_questions():
                 ],
             }
         ],
-        "open_questions": [
-            {"id": "q_papas", "question_es": "¿Qué extras para papas?"},
-            {"id": "q_carne", "question_es": "¿Extras de carne?"},
-        ],
     }
     session = _session(
         draft_batches=[batch],
+        discovery_answers={"menu_context": "Alitas y boneless van en una sola categoría"},
         source_files=[{"path": "a.pdf", "mime_type": "application/pdf"}],
     )
 
@@ -51,31 +48,8 @@ def test_summarizes_active_session_with_pending_questions():
 
     assert summary is not None
     assert "ACTIVA" in summary
-    assert "clarifying" in summary
-    assert "Productos extraídos por OCR: 2" in summary
+    assert "extracting" in summary
+    assert "Productos en borrador editable (OCR copia): 2" in summary
     assert "Archivos fuente registrados: 1" in summary
-    assert "Preguntas de aclaración pendientes: 2" in summary
-    assert "[q_papas] ¿Qué extras para papas?" in summary
-    assert "[q_carne] ¿Extras de carne?" in summary
-
-
-def test_excludes_already_answered_questions():
-    batch = {
-        "batch_index": 0,
-        "categories": [],
-        "open_questions": [
-            {"id": "q1", "question_es": "Pregunta 1"},
-            {"id": "q2", "question_es": "Pregunta 2"},
-        ],
-    }
-    session = _session(
-        draft_batches=[batch],
-        clarification_answers={"q1": "ya respondida"},
-    )
-
-    summary = build_import_session_context(session)
-
-    assert summary is not None
-    assert "Preguntas de aclaración pendientes: 1" in summary
-    assert "[q2] Pregunta 2" in summary
-    assert "q1" not in summary
+    assert "Contexto del dueño (pre-OCR)" in summary
+    assert "Alitas y boneless" in summary
