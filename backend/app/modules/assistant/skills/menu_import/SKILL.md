@@ -17,9 +17,8 @@ End-to-end **concierge menu import** for restaurant owners — one preview, one 
 
 The **main assistant executor** calls a single tool:
 
-- **`run_menu_import_onboarding`** — sub-agent with all internal `menu_import` tools, Postgres
-  session memory (`live_menu_snapshot`, `reconciliation_snapshot`), batch questions, and
-  one-shot `apply_full_import`.
+- **`run_menu_import_onboarding`** — sub-agent pair: **MenuImportExecutor** (tools) +
+  **MenuImportResponder** (owner-facing JSON), Postgres session memory, one-shot `apply_full_import`.
 
 Granular `menu_import` tools are **internal** to that sub-agent, not exposed on the main executor.
 
@@ -30,18 +29,18 @@ Before any import tool, load:
 1. **`load_skill(menu_read)`** — investigate the **current** menu (categories, products, complements) so you know what already exists
 2. **`load_skill(menu_write)`** — how to map categories, complements, layouts (not product photos)
 
-## Investigate → plan → apply
+## Plan → apply
 
-Be the concierge: **investigate first, plan, then apply the whole menu in one shot.**
+Be the concierge: **extract, clarify only what's ambiguous, then apply the whole menu in one shot.**
 
-1. **Investigate:** `analyze_import_vs_live` caches the live menu snapshot in Postgres and reconciles the OCR draft — do not re-scan the live menu every turn.
-2. **Plan:** decide what to **create** vs **update**. `preview_full_import` and `apply_full_import` reconcile the draft against the live menu **by name** — existing categories/products are updated (never duplicated), new ones are created, and complements on products that already have groups are left untouched unless the owner clarifies.
-3. **Ask only what's necessary:** infer everything you can (complement rules, prices, layouts). Raise an `open_question` **only** for genuine ambiguities you cannot resolve from the document or context.
+1. **Extract:** OCR the uploaded menu into one draft batch.
+2. **Clarify:** ask only `open_questions` from the draft (one batch message). Do not invent questions.
+3. **Apply:** `apply_full_import` reconciles the draft against the live menu **by name** — existing categories/products are updated (never duplicated), new ones are created, and complements on products that already have groups are left untouched unless the owner clarifies.
 4. **Ask in one batch:** when there are `open_questions`, return them in the structured JSON field `questions` (2–4 short `suggested_answers` per item, `allow_other: true`). Do not embed questions in `message`.
 5. **Apply as-is:** publish menu copy exactly as extracted (plus owner clarification answers).
    Layout (`vertical` / `grid` / `horizontal`) and sort order are applied automatically at
-   preview/apply to improve average ticket and sales.
-6. **Apply once:** publish the entire menu with a single `apply_full_import`.
+   apply to improve average ticket and sales.
+6. **Apply once:** publish the entire menu with a single `apply_full_import` after explicit owner confirmation.
 
 ## Important rules
 
@@ -73,12 +72,10 @@ After `apply_full_import` succeeds:
 2. Owner uploads files → **`register_menu_source_file`** for each `storage_path` from chat attachments
 3. Optional context → **`save_discovery_answers`**
 4. **`start_menu_extraction_batch`** — OCR all sources → **one full-menu draft**
-5. **`analyze_import_vs_live`** — cache live menu + reconciliation; merge complement questions
-6. If `open_questions` → ask **all questions in one message** → **`save_clarification_answers`** with every answer at once
-7. **`preview_full_import`** — show executive summary in Spanish (as extracted); includes the **reconciliation plan** (nuevas vs existentes) and complement rules
-8. Owner confirms once → **`apply_full_import`** (`confirmed: true`) — creates new + updates existing, no duplicates
-9. **`load_skill(promotions)`** → **`generate_promotion_banner`** for each NxM promo (if any)
-10. **`update_menu_knowledge`** — append import notes; session **completed**
+5. If `open_questions` → ask **all questions in one message** → **`save_clarification_answers`** with every answer at once
+6. Owner confirms once → **`apply_full_import`** (`confirmed: true`) — creates new + updates existing, no duplicates
+7. **`load_skill(promotions)`** → **`generate_promotion_banner`** for each NxM promo (if any)
+8. **`update_menu_knowledge`** — append import notes; session **completed**
 
 ## Complement detection
 
@@ -123,14 +120,12 @@ Without rewriting copy, the import pipeline sets:
 | `register_menu_source_file` | mutate | Register uploaded PDF/DOCX/image path |
 | `start_menu_extraction_batch` | mutate | OCR all sources → one full-menu draft |
 | `get_extraction_status` | read | Batch progress + optional preview |
-| `analyze_import_vs_live` | mutate | Cache live menu snapshot + reconciliation; complement questions |
 | `save_clarification_answers` | mutate | Answer all `open_questions` in one call |
 
-### Preview & apply
+### Apply
 
 | Tool | Effect | Purpose |
 |------|--------|---------|
-| `preview_full_import` | read | Full menu executive preview as extracted (MXN) |
 | `apply_full_import` | mutate | Apply the **entire** menu in one shot (`confirmed: true`) |
 
 There are **no per-section apply tools** — the whole menu (categories, products, complements,
@@ -146,8 +141,8 @@ sections; `apply_full_import` materializes everything in a single call.
 ## Owner communication
 
 - Explain flow in **Spanish** — concierge, minimal steps.
-- Show **`preview_full_import`** before apply (precios en **pesos MXN**).
-- Show complement groups as obligatorio/opcional with min/max in preview.
+- Summarize what will be published in chat before apply (precios en **pesos MXN**).
+- Show complement groups as obligatorio/opcional with min/max when summarizing.
 - Ask explicitly before `apply_full_import` with `confirmed: true`.
 
 ## Integrations
