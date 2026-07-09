@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
@@ -23,7 +22,6 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', path: '/', icon: <DashboardOutlinedIcon fontSize="small" /> },
   { label: 'Órdenes', path: '/orders', icon: <ShoppingBagOutlinedIcon fontSize="small" /> },
   { label: 'Productos', path: '/products', icon: <Inventory2OutlinedIcon fontSize="small" /> },
   { label: 'Menú Digital', path: '/digital-menu', icon: <QrCode2OutlinedIcon fontSize="small" /> },
@@ -46,7 +44,7 @@ function shouldSidebarStartCollapsed(width: number): boolean {
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { pendingOrdersCount } = useRestaurantOrders();
+  const { pendingOrdersCount, restaurantName } = useRestaurantOrders();
   const { isOpen: isChatOpen, openChat, closeChat } = useAssistantChat();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const wasChatOpenRef = useRef(false);
@@ -65,7 +63,9 @@ export default function Sidebar() {
   return (
     <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}>
       <div className={styles.headerRow}>
-        <div className={styles.logo}>Venddelo AI</div>
+        <div className={styles.logo} title={restaurantName ?? undefined}>
+          {restaurantName ?? 'Mi restaurante'}
+        </div>
         <button
           type="button"
           className={styles.toggleButton}

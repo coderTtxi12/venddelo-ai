@@ -13,6 +13,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useNewOrderSoundAlert } from '@/hooks/useNewOrderSoundAlert';
 import { listRestaurantOrders } from '@/lib/api/orders';
+import { getRestaurant } from '@/lib/api/restaurants';
 import { fetchAllPages } from '@/lib/api/pagination';
 import type { Order } from '@/lib/api/types';
 import { sortOrdersNewestFirst } from '@/lib/orders/orderDisplay';
@@ -25,6 +26,7 @@ import { legacyDb as db } from '@/services/legacyDb';
 
 type RestaurantOrdersContextValue = {
   restaurantId: string | null;
+  restaurantName: string | null;
   orders: Order[];
   pendingOrdersCount: number;
   socketLive: boolean;
@@ -41,6 +43,7 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
   const { firebaseUser, accessToken, loading: authLoading } = useAuth();
 
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
+  const [restaurantName, setRestaurantName] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -79,6 +82,7 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
         bootstrapTokenRef.current = null;
         setLoading(false);
         setRestaurantId(null);
+        setRestaurantName(null);
         setOrders([]);
         return;
       }
@@ -104,7 +108,14 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
         if (cancelled) return;
         bootstrapTokenRef.current = accessToken;
         setRestaurantId(resolved.supplierId);
-        await loadOrders(accessToken, resolved.supplierId);
+
+        const [restaurantData] = await Promise.all([
+          getRestaurant(accessToken, resolved.supplierId),
+          loadOrders(accessToken, resolved.supplierId),
+        ]);
+        if (!cancelled) {
+          setRestaurantName(restaurantData.name);
+        }
       } catch (error) {
         console.error(error);
         if (!cancelled) setLoadError('No se pudo conectar con los pedidos.');
@@ -146,6 +157,7 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
   const value = useMemo(
     () => ({
       restaurantId,
+      restaurantName,
       orders,
       pendingOrdersCount,
       socketLive,
@@ -157,6 +169,7 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
     }),
     [
       restaurantId,
+      restaurantName,
       orders,
       pendingOrdersCount,
       socketLive,

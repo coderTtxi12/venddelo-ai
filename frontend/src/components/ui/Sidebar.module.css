@@ -28,9 +28,15 @@
 }
 
 .logo {
-  font-size: 1.3rem;
+  flex: 1;
+  min-width: 0;
+  font-size: 1.1rem;
   font-weight: 800;
   color: var(--color-text);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .collapsed .logo {
