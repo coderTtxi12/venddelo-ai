@@ -179,6 +179,10 @@ class OpenQuestion(BaseModel):
     question_es: str
     context: str = ""
     related_refs: list[str] = Field(default_factory=list)
+    suggested_answers: list[str] = Field(
+        default_factory=list,
+        description="2–4 short Spanish answer labels for the owner quiz (never include Otro).",
+    )
 
 
 class ImportDraft(BaseModel):

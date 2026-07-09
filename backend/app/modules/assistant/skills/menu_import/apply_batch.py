@@ -70,18 +70,6 @@ def _batch_dict_to_model(batch_data: dict[str, Any]) -> ImportBatch:
     return ImportBatch.model_validate(batch_data)
 
 
-def _unanswered_question_ids(
-    batch: ImportBatch,
-    clarification_answers: dict[str, Any],
-) -> list[str]:
-    unanswered: list[str] = []
-    for question in batch.open_questions:
-        answer = clarification_answers.get(question.id)
-        if answer is None or not str(answer).strip():
-            unanswered.append(question.id)
-    return unanswered
-
-
 def _accumulated_ref_map(draft_batches: list[Any]) -> dict[str, uuid.UUID]:
     merged: dict[str, uuid.UUID] = {}
     for entry in draft_batches:
@@ -257,6 +245,7 @@ def _apply_products(
                     description=product.description,
                     price_cents=mxn_to_cents(product.price_mxn),
                     status="active" if product.is_available else "inactive",
+                    category_ids=[category_id],
                 )
                 menu.update_product(ctx.restaurant_id, existing_id, product_update)
                 ref_map[product.ref] = existing_id
@@ -421,15 +410,6 @@ def apply_import_batch(
         return ApplyBatchResult(ok=False, summary=f"Batch {batch_index} was already applied")
 
     batch = _batch_dict_to_model(batch_entry)
-    unanswered = _unanswered_question_ids(batch, session.clarification_answers or {})
-    if unanswered:
-        return ApplyBatchResult(
-            ok=False,
-            summary=(
-                "Batch has unanswered open_questions; save clarification answers first: "
-                + ", ".join(unanswered)
-            ),
-        )
 
     batch = apply_import_merchandising(
         batch,
@@ -497,18 +477,6 @@ def _count_session_products(session: MenuImportSession) -> int:
     return total
 
 
-def _all_unanswered_question_ids(session: MenuImportSession) -> list[str]:
-    unanswered: list[str] = []
-    for entry in session.draft_batches or []:
-        if not isinstance(entry, dict):
-            continue
-        batch = ImportBatch.model_validate(entry)
-        unanswered.extend(
-            _unanswered_question_ids(batch, session.clarification_answers or {})
-        )
-    return unanswered
-
-
 def apply_full_import(
     ctx: AgentContext,
     session: MenuImportSession,
@@ -525,16 +493,6 @@ def apply_full_import(
         return ApplyFullResult(
             ok=False,
             summary=f"Menu has {product_total} products; full import limit is {limit}",
-        )
-
-    unanswered = _all_unanswered_question_ids(session)
-    if unanswered:
-        return ApplyFullResult(
-            ok=False,
-            summary=(
-                "Import has unanswered open_questions; save clarification answers first: "
-                + ", ".join(unanswered)
-            ),
         )
 
     batches = list(session.draft_batches or [])
