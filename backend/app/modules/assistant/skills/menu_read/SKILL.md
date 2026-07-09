@@ -258,7 +258,7 @@ Each promotion includes:
 | `campaign` | `starts_at` / `ends_at` window |
 | `schedule` | Weekdays + daily time window when restricted |
 | `products` / `categories` | Resolved targets with `id` + `name` |
-| `option_item_ids` | Raw ids from `promotion_option_items`. Bundle = **allow-list** of eligible add-ons; percent/amount = **waived** add-ons. Empty = no restriction |
+| `option_item_ids` | Raw ids from `promotion_option_items`. Bundle = **allow-list** of eligible add-ons; percent/amount = **waived** add-ons. Empty bundle list = no complements participate |
 | `applies_via` | Product-context only (`get_product` / `list_product_promotions`): how it reaches the product (`product`, `category`, `order`) |
 | `option_participation` | Product-context only: which of THIS product's add-ons participate. See below |
 | `pricing_note` | Plain-language summary of how it affects the total |
@@ -275,8 +275,7 @@ For a **bundle / NxM** (`semantics: "bundle_allow_list"`):
 
 | `mode` | Meaning |
 |--------|---------|
-| `all_participate` | `option_item_ids` is empty → every add-on participates |
-| `restricted` | `participating[]` = eligible add-ons; `not_participating[]` = add-ons that, if chosen, **remove that unit from the 2×1** (it pays full price) |
+| `restricted` | Only add-ons in `participating[]` qualify; `not_participating[]` exclude the unit from the NxM if chosen |
 
 For **percent / amount** (`semantics: "waived"`): `free_complements[]` are not charged
 under the promo; `charged_complements[]` are billed normally.
@@ -291,9 +290,9 @@ Each add-on entry is `{ id, label, group_title }`. Use `not_participating` /
   must be the same SKU; `cross_product` = mix from the promo pool.
 - **Add-ons that don't participate in a bundle:** a bundle may restrict which add-ons
   are eligible via `promotion_option_items` (DB) → `option_item_ids` (payload). It is an
-  **allow-list**: if it is empty, **every** add-on participates; if it has ids, any
-  add-on **not** in it does **not** participate, and picking one **drops that unit from
-  the NxM** (it pays full price). See `option_participation` below.
+  **allow-list**: only listed add-ons participate; any add-on **not** in it does **not**
+  participate, and picking one **drops that unit from the NxM** (it pays full price).
+  See `option_participation` below.
 - **`percent` / `amount`:** discount on the affected line subtotal (or whole order when
   `scope=order`). Line promos don't stack — the cheapest outcome wins.
 - **`combo`:** label only; it does **not** change the cart total.
@@ -462,9 +461,8 @@ Never invent values missing from tool results.
 
 1. `get_product` or `list_products` (find the product), or `list_product_promotions`.
 2. Find the bundle promo and read `option_participation`:
-   - `mode = "all_participate"` → "Todos los complementos participan en el 2×1".
-   - `mode = "restricted"` → list `not_participating[]` by `label` and warn that choosing
-     one of those saca esa unidad del 2×1 (paga precio completo).
+   - List `not_participating[]` by `label` and warn that choosing one saca esa unidad del
+     2×1 (paga precio completo). If `participating[]` is empty, ningún complemento entra al 2×1.
 3. Add-ons are charged anyway in a bundle; the allow-list only controls **eligibility**.
 
 ### "¿Cuántos productos (no) tienen promociones?" (aggregate)

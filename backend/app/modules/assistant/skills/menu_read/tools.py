@@ -297,7 +297,7 @@ def _option_participation(promo: PromotionDTO, product: ProductDTO) -> dict[str,
     DB source: the ``promotion_option_items`` table (promotion_id ↔ option_item_id),
     surfaced as ``promo.option_item_ids``. For NxM bundles this is an **allow-list**:
     add-ons NOT in it do **not** participate — picking one drops that unit from the 2×1.
-    An empty list means every add-on participates. For percent/amount it is a
+    An empty list means no complements participate. For percent/amount it is a
     **waived** list (those add-ons are free; the rest are charged normally).
     """
     api_type = serialize_promotion_type(promo.type)
@@ -308,12 +308,6 @@ def _option_participation(promo: PromotionDTO, product: ProductDTO) -> dict[str,
     items = _product_option_items(product)
 
     if api_type == "bundle":
-        if not allowed:
-            return {
-                "semantics": "bundle_allow_list",
-                "mode": "all_participate",
-                "note": "Todos los complementos participan en el NxM.",
-            }
         participating = [it for it in items if it["id"] in allowed]
         not_participating = [it for it in items if it["id"] not in allowed]
         return {
@@ -322,7 +316,8 @@ def _option_participation(promo: PromotionDTO, product: ProductDTO) -> dict[str,
             "participating": participating,
             "not_participating": not_participating,
             "note": (
-                "Si el cliente elige un complemento de 'not_participating', "
+                "Solo los complementos en 'participating' entran al NxM. "
+                "Si el cliente elige uno de 'not_participating', "
                 "esa unidad queda fuera del NxM (paga precio completo)."
             ),
         }
@@ -808,7 +803,7 @@ _PRODUCT_PROMOTIONS_DOC = (
     "promotions[] (product/category/order scope: id, name, type, scope, schedule, "
     "effective_status, pricing_note, applies_via, option_participation when relevant — "
     "for bundle NxM: participating[] vs not_participating[] from promotion_option_items; "
-    "empty allow-list = all complements participate; for percent/amount: free_complements[] "
+    "only listed complements participate; for percent/amount: free_complements[] "
     "vs charged_complements[]), has_promotions"
 )
 

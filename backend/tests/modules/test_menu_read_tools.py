@@ -902,7 +902,7 @@ def test_menu_read_bundle_reports_non_participating_complements(session):
 
 
 @requires_db
-def test_menu_read_bundle_without_allow_list_lets_all_complements_participate(session):
+def test_menu_read_bundle_without_allow_list_marks_all_complements_as_excluded(session):
     uow = SqlAlchemyUnitOfWork(lambda: session)
     uow.__enter__()
     restaurant = uow.restaurants.add(
@@ -945,7 +945,10 @@ def test_menu_read_bundle_without_allow_list_lets_all_complements_participate(se
 
     assert detail.ok is True
     participation = detail.data["product"]["promotions"][0]["option_participation"]
-    assert participation["mode"] == "all_participate"
+    assert participation["mode"] == "restricted"
+    assert participation["participating"] == []
+    assert len(participation["not_participating"]) == 1
+    assert participation["not_participating"][0]["label"] == "BBQ"
 
 
 @requires_db

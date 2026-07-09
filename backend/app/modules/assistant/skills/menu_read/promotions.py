@@ -120,7 +120,8 @@ def promotion_payload(
         payload["categories"] = [
             {"id": cid, "name": category_names.get(cid)} for cid in category_ids
         ]
-    if promo.option_item_ids:
+    api_type = serialize_promotion_type(promo.type)
+    if promo.option_item_ids or api_type == "bundle":
         payload["option_item_ids"] = [str(oid) for oid in promo.option_item_ids]
 
     payload["pricing_note"] = _pricing_note(promo, api_type)
