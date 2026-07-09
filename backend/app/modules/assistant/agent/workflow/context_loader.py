@@ -263,6 +263,22 @@ def menu_import_input(context: WorkflowContext, route: WorkflowRouteDecision) ->
     return "\n\n".join(parts)
 
 
+def menu_import_responder_input(
+    context: WorkflowContext,
+    route: WorkflowRouteDecision,
+    execution: ExecutionRecord,
+) -> str:
+    parts = [
+        f"## Conversation history\n\n{context.menu_import_conversation_history}",
+        f"## User request\n\n{context.user_message}",
+        f"## User goal\n\n{route.goal}",
+        f"## Execution findings\n\n{_format_execution_findings(execution)}",
+    ]
+    if context.import_session_context:
+        parts.append(f"## Import session\n\n{context.import_session_context}")
+    return "\n\n".join(parts) + "\n"
+
+
 def executor_input(
     context: WorkflowContext,
     route: WorkflowRouteDecision,

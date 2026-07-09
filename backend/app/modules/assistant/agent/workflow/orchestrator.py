@@ -28,6 +28,7 @@ from app.modules.assistant.agent.workflow.context_loader import (
     executor_input,
     load_workflow_runtime,
     menu_import_input,
+    menu_import_responder_input,
     responder_input,
     router_input,
 )
@@ -51,7 +52,10 @@ from app.modules.assistant.skills.menu_import.clarification import (
     hydrate_menu_import_response,
     try_apply_clarification_from_user_message,
 )
-from app.modules.assistant.skills.menu_import.onboarding_agent import build_menu_import_agent
+from app.modules.assistant.skills.menu_import.onboarding_agent import (
+    build_menu_import_executor_agent,
+    build_menu_import_responder_agent,
+)
 from app.modules.assistant.skills.menu_import.response_schema import MenuImportUserResponse
 from app.modules.assistant.skills.menu_import.session_context import (
     build_import_session_context,
@@ -222,10 +226,11 @@ class WorkflowOrchestrator:
                 )
                 menu_import_response_box: list[MenuImportUserResponse] = []
                 async for event in self._stream_menu_import(
-                    build_menu_import_agent(
+                    build_menu_import_executor_agent(
                         settings=self._settings,
                         registry=menu_import_registry,
                     ),
+                    build_menu_import_responder_agent(settings=self._settings),
                     menu_import_context,
                     route,
                     self._build_run_context(
@@ -484,7 +489,8 @@ class WorkflowOrchestrator:
 
     async def _stream_menu_import(
         self,
-        agent: Agent[AssistantRunContext],
+        executor: Agent[AssistantRunContext],
+        responder: Agent[AssistantRunContext],
         workflow_context: WorkflowContext,
         route: WorkflowRouteDecision,
         run_context: AssistantRunContext,
@@ -495,17 +501,47 @@ class WorkflowOrchestrator:
         restaurant_id: uuid.UUID,
         uow: SqlAlchemyUnitOfWork,
     ) -> AsyncIterator[ChatStreamEvent]:
-        streamed = Runner.run_streamed(
-            agent,
+        executor_streamed = Runner.run_streamed(
+            executor,
             menu_import_input(workflow_context, route),
             context=run_context,
             max_turns=MENU_IMPORT_MAX_TURNS,
         )
 
-        trace_ctx = _workflow_trace("menu_import", settings=self._settings)
+        trace_ctx = _workflow_trace("menu_import_executor", settings=self._settings)
+        execution = ExecutionRecord()
 
         with trace_ctx:
-            async for event in streamed.stream_events():
+            async for event in executor_streamed.stream_events():
+                mapped = map_agent_stream_event(
+                    event,
+                    registry=registry,
+                    effective_skill_ids=["menu_import"],
+                    include_text_deltas=False,
+                )
+                if mapped is not None:
+                    yield mapped
+
+            execution = clear_execution_approval_gates(
+                executor_streamed.final_output_as(ExecutionRecord, raise_if_incorrect_type=True)
+            )
+
+        yield ChatStreamEvent(
+            event="agent.phase",
+            data={"phase": "responding", "label": "Preparando respuesta"},
+        )
+
+        responder_streamed = Runner.run_streamed(
+            responder,
+            menu_import_responder_input(workflow_context, route, execution),
+            context=run_context,
+            max_turns=1,
+        )
+
+        responder_trace = _workflow_trace("menu_import_responder", settings=self._settings)
+
+        with responder_trace:
+            async for event in responder_streamed.stream_events():
                 mapped = map_agent_stream_event(
                     event,
                     registry=registry,
@@ -516,7 +552,10 @@ class WorkflowOrchestrator:
                     continue
                 yield mapped
 
-            response = streamed.final_output_as(MenuImportUserResponse, raise_if_incorrect_type=True)
+            response = responder_streamed.final_output_as(
+                MenuImportUserResponse,
+                raise_if_incorrect_type=True,
+            )
             active_session = get_active_import_for_conversation(
                 uow,
                 restaurant_id=restaurant_id,
