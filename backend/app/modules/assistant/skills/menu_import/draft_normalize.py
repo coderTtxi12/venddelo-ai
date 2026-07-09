@@ -17,6 +17,8 @@ _LIST_FIELDS = frozenset(
         "target_product_refs",
         "target_category_refs",
         "eligible_option_item_refs",
+        "participating_complements",
+        "excluded_complements",
         "related_refs",
         "weekdays",
     }
@@ -28,7 +30,6 @@ _NUMERIC_DEFAULTS = frozenset(
         "price_delta_mxn",
         "sort_order",
         "min_selections",
-        "max_selections",
         "get_quantity",
         "pay_quantity",
         "batch_index",
@@ -41,12 +42,11 @@ _BOOL_DEFAULT_VALUES = {
     "use_time_window": False,
 }
 
-_OPTIONAL_NULLABLE_NUMERIC = frozenset({"percent", "amount_mxn"})
+_OPTIONAL_NULLABLE_NUMERIC = frozenset({"percent", "amount_mxn", "max_selections"})
 
 
 def _default_for_numeric(key: str) -> float | int:
     defaults: dict[str, float | int] = {
-        "max_selections": 1,
         "get_quantity": 2,
         "pay_quantity": 1,
         "batch_index": 0,

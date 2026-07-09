@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 from app.modules.assistant.skills.menu_import.draft_normalize import normalize_import_draft_payload
 from app.modules.assistant.skills.menu_import.price_units import (
@@ -40,9 +40,44 @@ class ImportOptionGroup(BaseModel):
     selection: Literal["single", "multi"] = "single"
     required: bool = False
     min_selections: int = 0
-    max_selections: int = 1
+    max_selections: int | None = None
     sort_order: int = 0
     items: list[ImportOptionItem] = Field(default_factory=list)
+
+
+class ImportCatalogDiscount(BaseModel):
+    type: Literal["percent", "amount"]
+    percent: float | None = None
+    amount_mxn: float | None = None
+    label: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_amount(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            return _coerce_legacy_cents_field(data, mxn_key="amount_mxn", cents_key="amount_cents")
+        return data
+
+
+class ImportComplementRef(BaseModel):
+    ref: str
+    label: str
+    product_ref: str
+    product_name: str
+    group_title: str
+    price_delta_mxn: float = 0
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_price_delta(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            return _coerce_legacy_cents_field(
+                data,
+                mxn_key="price_delta_mxn",
+                cents_key="price_delta_cents",
+                null_default=0,
+            )
+        return data
 
 
 class ImportProduct(BaseModel):
@@ -55,6 +90,12 @@ class ImportProduct(BaseModel):
     sort_order: int = 0
     option_groups: list[ImportOptionGroup] = Field(default_factory=list)
     constraints_notes: str | None = None
+    catalog_discount: ImportCatalogDiscount | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def has_catalog_discount(self) -> bool:
+        return self.catalog_discount is not None
 
     @model_validator(mode="before")
     @classmethod
@@ -110,6 +151,14 @@ class ImportPromotion(BaseModel):
     schedule_notes: str | None = None
     schedule: PromotionSchedule | None = None
     constraints_notes: str | None = None
+    label: str | None = None
+    participating_complements: list[ImportComplementRef] = Field(default_factory=list)
+    excluded_complements: list[ImportComplementRef] = Field(default_factory=list)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def is_nxm(self) -> bool:
+        return self.type == "two_for_one"
 
     @model_validator(mode="before")
     @classmethod
