@@ -128,10 +128,10 @@ def _unit_qualifies_for_bundle_promo(
     product: ProductDTO,
     selected_options: dict[str, Any] | None,
 ) -> bool:
-    allowed = set(promo.option_item_ids)
-    if not allowed:
-        return True
     selected = set(_selected_option_item_ids(selected_options))
+    if not selected:
+        return True
+    allowed = set(promo.option_item_ids)
     return selected.issubset(allowed)
 
 
@@ -141,8 +141,6 @@ def _excluded_option_item_ids(
     selected_options: dict[str, Any] | None,
 ) -> list[uuid.UUID]:
     allowed = set(promo.option_item_ids)
-    if not allowed:
-        return []
     selected = set(_selected_option_item_ids(selected_options))
     return sorted(selected - allowed)
 
@@ -335,8 +333,6 @@ def _bundle_warnings_for_line(
     warnings: list[str] = []
     for promo in bundle_promos:
         if not _promotion_applies_to_product(promo, product):
-            continue
-        if not promo.option_item_ids:
             continue
         if _excluded_option_item_ids(promo, product, line.selected_options):
             warnings.append(PROMO_WARNING_COMPLEMENT_EXCLUDED)
