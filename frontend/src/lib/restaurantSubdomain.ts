@@ -3,7 +3,7 @@ export const SUBDOMAIN_MAX_LENGTH = 63;
 export const SUBDOMAIN_PATTERN = /^[a-z0-9](-?[a-z0-9])*$/;
 
 export const MENU_PUBLIC_DOMAIN =
-  process.env.NEXT_PUBLIC_MENU_PUBLIC_DOMAIN ?? 'venddelo.ai';
+  process.env.NEXT_PUBLIC_MENU_PUBLIC_DOMAIN ?? 'mxy.mx';
 
 const LOCALHOST_HOSTS = new Set(['localhost', '127.0.0.1']);
 

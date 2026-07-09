@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     google_maps_api_key: str | None = None
     translation_cache_ttl_seconds: int = 3600
     cors_origins: str = "http://localhost:3000"
-    menu_public_domain: str = "venddelo.ai"
+    menu_public_domain: str = "mxy.mx"
 
     @field_validator("database_url", "database_url_test")
     @classmethod
