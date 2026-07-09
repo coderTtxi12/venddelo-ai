@@ -2,23 +2,22 @@
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
 from typing import Any
 
+from app.core.config import get_settings
 from app.core.exceptions import NotFoundError, ValidationError
 from app.db.models.menu_import_session import MenuImportSession
 from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.import_assets import validate_import_asset_path
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
-from app.modules.assistant.skills.menu_import.apply_batch import apply_full_import
+from app.modules.assistant.skills.menu_import.apply_batch import ApplyFullResult, apply_full_import
 from app.modules.assistant.skills.menu_import.batching import (
     count_batch_products,
     single_batch_from_draft,
 )
 from app.modules.assistant.skills.menu_import.draft_enrich import enrich_import_draft
 from app.modules.assistant.skills.menu_import.draft_merge import merge_draft_batches
-from app.modules.assistant.skills.menu_import.clarification import apply_clarification_answers
 from app.modules.assistant.skills.menu_import.menu_reconcile import (
     ReconciliationPlan,
     build_reconciliation_plan,
@@ -30,6 +29,11 @@ from app.modules.assistant.skills.menu_import.extraction import (
     extract_from_text,
     merge_page_drafts,
 )
+from app.modules.assistant.skills.menu_import.public_menu_url import build_public_menu_url
+from app.modules.assistant.skills.menu_import.session_draft_store import (
+    persist_extraction_snapshots,
+    validate_working_batch,
+)
 from app.modules.assistant.skills.menu_import.session_repository import MenuImportSessionRepository
 from app.modules.assistant.skills.menu_import.session_schemas import MenuImportSessionStatus
 from app.modules.menu.service import MenuService
@@ -39,11 +43,10 @@ MENU_IMPORT_INTERNAL_TOOL_NAMES: frozenset[str] = frozenset(
     {
         "start_menu_import_session",
         "get_import_session",
-        "save_discovery_answers",
+        "save_menu_context",
         "register_menu_source_file",
         "start_menu_extraction_batch",
         "get_extraction_status",
-        "save_clarification_answers",
         "apply_full_import",
         "update_menu_knowledge",
     }
@@ -81,9 +84,10 @@ def _require_session(ctx: AgentContext) -> tuple[MenuImportSession | None, ToolR
 
 
 def _extraction_context(session: MenuImportSession) -> dict[str, Any]:
+    discovery = session.discovery_answers or {}
     return {
-        "discovery_answers": session.discovery_answers or {},
-        "clarification_answers": session.clarification_answers or {},
+        "discovery_answers": discovery,
+        "menu_context": str(discovery.get("menu_context") or "").strip(),
     }
 
 
@@ -99,6 +103,8 @@ def _session_summary(session: MenuImportSession) -> dict[str, Any]:
     batches = _batch_entries(session)
     applied = sum(1 for batch in batches if batch.get("applied_at"))
     pending = len(batches) - applied
+    discovery = session.discovery_answers or {}
+    menu_context = str(discovery.get("menu_context") or "").strip()
     return {
         "session_id": str(session.id),
         "status": session.status,
@@ -106,6 +112,9 @@ def _session_summary(session: MenuImportSession) -> dict[str, Any]:
         "draft_batches_total": len(batches),
         "draft_batches_applied": applied,
         "draft_batches_pending": pending,
+        "has_menu_context": bool(menu_context),
+        "menu_context_preview": menu_context[:200] if menu_context else "",
+        "has_ocr_original": bool(session.ocr_original),
         "live_menu_snapshot_at": (session.live_menu_snapshot or {}).get("captured_at"),
         "reconciliation_cached": bool(session.reconciliation_snapshot),
     }
@@ -121,12 +130,6 @@ def _preview_batch_markdown(batch: ImportBatch) -> str:
         lines.append("**Reglas globales:**")
         for rule in batch.global_rules:
             lines.append(f"- {rule}")
-        lines.append("")
-
-    if batch.open_questions:
-        lines.append("**Preguntas abiertas:**")
-        for question in batch.open_questions:
-            lines.append(f"- [{question.id}] {question.question_es}")
         lines.append("")
 
     lines.append("| Categoría | Producto | Precio |")
@@ -162,6 +165,31 @@ def _current_reconciliation(ctx: AgentContext, draft: ImportDraft) -> Reconcilia
     return build_reconciliation_plan(draft, current)
 
 
+def _public_menu_url(ctx: AgentContext) -> str:
+    restaurant = ctx.uow.restaurants.get(ctx.restaurant_id)
+    if restaurant is None:
+        return ""
+    return build_public_menu_url(restaurant.subdomain, settings=get_settings())
+
+
+def _apply_draft_to_live_menu(
+    ctx: AgentContext,
+    session: MenuImportSession,
+) -> tuple[ApplyFullResult, ImportBatch, ReconciliationPlan | None]:
+    working = validate_working_batch(session)
+    merged_draft = merge_draft_batches(
+        [ImportBatch.model_validate(entry) for entry in _batch_entries(session)]
+    )
+    reconciliation = _current_reconciliation(ctx, merged_draft)
+    result = apply_full_import(
+        ctx, session, confirmed=True, reconciliation=reconciliation
+    )
+    if result.ok:
+        session.status = MenuImportSessionStatus.ENRICHING.value
+        _repo(ctx).update(session)
+    return result, working, reconciliation
+
+
 def _build_import_notes(session: MenuImportSession, notes: str | None) -> str:
     parts: list[str] = ["## Notas de importación", ""]
     if notes and notes.strip():
@@ -169,16 +197,10 @@ def _build_import_notes(session: MenuImportSession, notes: str | None) -> str:
         parts.append("")
 
     discovery = session.discovery_answers or {}
-    if discovery:
-        parts.append("### Contexto del restaurante")
-        parts.append(json.dumps(discovery, ensure_ascii=False, indent=2))
-        parts.append("")
-
-    clarification = session.clarification_answers or {}
-    if clarification:
-        parts.append("### Reglas confirmadas")
-        for key, value in clarification.items():
-            parts.append(f"- **{key}**: {value}")
+    menu_context = str(discovery.get("menu_context") or "").strip()
+    if menu_context:
+        parts.append("### Contexto del dueño (pre-OCR)")
+        parts.append(menu_context)
         parts.append("")
 
     global_rules = _collect_global_rules(_batch_entries(session))
@@ -222,21 +244,21 @@ class MenuImportSkill:
                 input_schema={"type": "object", "properties": {}, "required": []},
             ),
             ToolDefinition(
-                name="save_discovery_answers",
+                name="save_menu_context",
                 description=(
-                    "Persist initial discovery questionnaire answers (cuisine, currency, promo rules) "
-                    "and advance to collecting menu source files."
+                    "Save owner-provided menu context BEFORE OCR (structure hints, category groupings, "
+                    "naming conventions, promos). Injected into the extraction/mapping prompt."
                 ),
                 effect="mutate",
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "answers": {
-                            "type": "object",
-                            "description": "Key-value discovery answers from the owner.",
+                        "menu_context": {
+                            "type": "string",
+                            "description": "Free-text notes from the owner about how to read/organize the menu.",
                         },
                     },
-                    "required": ["answers"],
+                    "required": ["menu_context"],
                 },
             ),
             ToolDefinition(
@@ -259,9 +281,8 @@ class MenuImportSkill:
             ToolDefinition(
                 name="start_menu_extraction_batch",
                 description=(
-                    "Run OCR/vision extraction on all registered menu source files and store "
-                    "the ENTIRE menu as one draft (categories, products, complements, promotions). "
-                    "Runs synchronously in-process."
+                    "Run OCR/vision extraction on all registered menu source files, persist ocr_original "
+                    "and draft_batches, then apply the full menu to the live catalog in one step."
                 ),
                 effect="mutate",
                 input_schema={"type": "object", "properties": {}, "required": []},
@@ -269,7 +290,7 @@ class MenuImportSkill:
             ToolDefinition(
                 name="get_extraction_status",
                 description=(
-                    "Read extraction progress: batch counts, applied vs pending, and open questions."
+                    "Read extraction progress: batch counts, applied vs pending, and optional preview."
                 ),
                 effect="read",
                 input_schema={
@@ -284,28 +305,11 @@ class MenuImportSkill:
                 },
             ),
             ToolDefinition(
-                name="save_clarification_answers",
-                description=(
-                    "Save owner answers to open_questions from extraction. "
-                    "Advances to preview when all questions are answered."
-                ),
-                effect="mutate",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "answers": {
-                            "type": "object",
-                            "description": "Map of question_id → answer text.",
-                        },
-                    },
-                    "required": ["answers"],
-                },
-            ),
-            ToolDefinition(
                 name="apply_full_import",
                 description=(
-                    "Apply ALL pending import batches in one call. Requires confirmed=true and "
-                    "no unanswered open_questions."
+                    "Apply the editable working draft (draft_batches) to the live menu. "
+                    "Normally called automatically by start_menu_extraction_batch; use manually "
+                    "only to re-apply an existing unapplied draft."
                 ),
                 effect="mutate",
                 input_schema={
@@ -313,7 +317,7 @@ class MenuImportSkill:
                     "properties": {
                         "confirmed": {
                             "type": "boolean",
-                            "description": "Owner must confirm before applying.",
+                            "description": "Must be true to apply.",
                             "default": False,
                         },
                     },
@@ -382,16 +386,18 @@ class MenuImportSkill:
             return error
         assert session is not None
 
-        if tool_name == "save_discovery_answers":
-            answers = args.get("answers")
-            if not isinstance(answers, dict) or not answers:
-                return ToolResult(ok=False, summary="answers must be a non-empty object")
-            session.discovery_answers = answers
+        if tool_name == "save_menu_context":
+            menu_context = str(args.get("menu_context") or "").strip()
+            if not menu_context:
+                return ToolResult(ok=False, summary="menu_context is required")
+            existing = dict(session.discovery_answers or {})
+            existing["menu_context"] = menu_context
+            session.discovery_answers = existing
             session.status = MenuImportSessionStatus.COLLECTING_SOURCES.value
             _repo(ctx).update(session)
             return ToolResult(
                 ok=True,
-                summary="Saved discovery answers",
+                summary="Saved menu context for OCR",
                 data=_session_summary(session),
             )
 
@@ -428,23 +434,50 @@ class MenuImportSkill:
             if not source_files:
                 return ToolResult(ok=False, summary="Register at least one menu source file first")
 
-            if session.draft_batches:
-                batches = _batch_entries(session)
-                batch = ImportBatch.model_validate(batches[0]) if batches else None
-                product_count = count_batch_products(batch) if batch is not None else 0
+            batches = _batch_entries(session)
+            if batches and batches[0].get("applied_at"):
+                batch = ImportBatch.model_validate(batches[0])
+                product_count = count_batch_products(batch)
                 return ToolResult(
                     ok=True,
-                    summary=f"Reusing existing extraction ({product_count} product(s))",
+                    summary=f"Menu already extracted and applied ({product_count} product(s))",
                     data={
                         **_session_summary(session),
-                        "open_questions": [
-                            q.model_dump()
-                            for q in (batch.open_questions if batch is not None else [])
-                        ],
+                        "public_menu_url": _public_menu_url(ctx),
+                        "global_rules": batch.global_rules,
                     },
                 )
 
+            if batches and not batches[0].get("applied_at"):
+                try:
+                    apply_result, working, reconciliation = _apply_draft_to_live_menu(ctx, session)
+                except ValueError as exc:
+                    return ToolResult(ok=False, summary=str(exc))
+                data: dict[str, Any] = {
+                    **_session_summary(session),
+                    "public_menu_url": _public_menu_url(ctx),
+                    "batches_applied": apply_result.batches_applied,
+                    "categories": apply_result.categories,
+                    "products": apply_result.products,
+                    "working_batch_products": count_batch_products(working),
+                    "working_batch_categories": len(working.categories),
+                }
+                if reconciliation is not None:
+                    data["reconciliation"] = {
+                        "new_categories": reconciliation.new_categories,
+                        "reused_categories": reconciliation.reused_categories,
+                        "new_products": reconciliation.new_products,
+                        "updated_products": reconciliation.updated_products,
+                    }
+                summary = (
+                    f"Applied existing draft: {apply_result.products} product(s)"
+                    if apply_result.ok
+                    else apply_result.summary
+                )
+                return ToolResult(ok=apply_result.ok, summary=summary, data=data)
+
             context = _extraction_context(session)
+            literal: ImportDraft | None = None
             page_drafts: list[ImportDraft] = []
             for entry in _pending_source_files(source_files):
                 path = str(entry.get("path") or "").strip()
@@ -454,34 +487,69 @@ class MenuImportSkill:
                 validate_import_asset_path(ctx.restaurant_id, path, kind="menu_source")
                 payload = load_menu_source_from_storage(path, mime)
                 if payload.pages:
-                    page_drafts.append(extract_from_pages(payload.pages, context))
+                    ocr, modeled = extract_from_pages(payload.pages, context)
                 elif payload.text:
-                    page_drafts.append(extract_from_text(payload.text, context))
+                    ocr, modeled = extract_from_text(payload.text, context)
+                else:
+                    continue
+                if literal is None:
+                    literal = ocr
+                else:
+                    literal = merge_page_drafts([literal, ocr])
+                page_drafts.append(modeled)
                 entry["extracted_at"] = datetime.now(UTC).isoformat()
 
             merged = merge_page_drafts(page_drafts) if page_drafts else ImportDraft()
             merged = enrich_import_draft(merged)
             batch = single_batch_from_draft(merged)
-            session.draft_batches = [batch.model_dump()]
+            persist_extraction_snapshots(
+                session,
+                ocr_original=literal or ImportDraft(),
+                working_batch=batch,
+            )
             session.source_files = source_files
-            session.status = (
-                MenuImportSessionStatus.CLARIFYING.value
-                if merged.open_questions
-                else MenuImportSessionStatus.PREVIEW_BATCH.value
-            )
             _repo(ctx).update(session)
+
             product_count = count_batch_products(batch)
-            return ToolResult(
-                ok=True,
-                summary=(
-                    f"Extracted {product_count} product(s) as one full menu"
-                ),
-                data={
-                    **_session_summary(session),
-                    "open_questions": [q.model_dump() for q in merged.open_questions],
-                    "global_rules": merged.global_rules,
-                },
+            try:
+                apply_result, working, reconciliation = _apply_draft_to_live_menu(ctx, session)
+            except ValueError as exc:
+                return ToolResult(
+                    ok=False,
+                    summary=f"Extracted {product_count} product(s) but apply failed: {exc}",
+                    data={
+                        **_session_summary(session),
+                        "global_rules": merged.global_rules,
+                    },
+                )
+
+            data = {
+                **_session_summary(session),
+                "public_menu_url": _public_menu_url(ctx),
+                "extracted_products": product_count,
+                "batches_applied": apply_result.batches_applied,
+                "categories": apply_result.categories,
+                "products": apply_result.products,
+                "option_groups": apply_result.option_groups,
+                "option_items": apply_result.option_items,
+                "promotions": apply_result.promotions,
+                "working_batch_products": count_batch_products(working),
+                "working_batch_categories": len(working.categories),
+                "global_rules": merged.global_rules,
+            }
+            if reconciliation is not None:
+                data["reconciliation"] = {
+                    "new_categories": reconciliation.new_categories,
+                    "reused_categories": reconciliation.reused_categories,
+                    "new_products": reconciliation.new_products,
+                    "updated_products": reconciliation.updated_products,
+                }
+            summary = (
+                f"Extracted and applied {apply_result.products} product(s) to live menu"
+                if apply_result.ok
+                else apply_result.summary
             )
+            return ToolResult(ok=apply_result.ok, summary=summary, data=data)
 
         if tool_name == "get_extraction_status":
             batches = _batch_entries(session)
@@ -495,7 +563,6 @@ class MenuImportSkill:
                         "product_count": count_batch_products(
                             ImportBatch.model_validate(batch)
                         ),
-                        "open_questions": len(batch.get("open_questions") or []),
                     }
                     for index, batch in enumerate(batches)
                 ],
@@ -516,39 +583,25 @@ class MenuImportSkill:
                 data=payload,
             )
 
-        if tool_name == "save_clarification_answers":
-            answers = args.get("answers")
-            if not isinstance(answers, dict) or not answers:
-                return ToolResult(ok=False, summary="answers must be a non-empty object")
-            unanswered = apply_clarification_answers(session, answers)
-            _repo(ctx).update(session)
-            return ToolResult(
-                ok=True,
-                summary="Saved clarification answers",
-                data={**_session_summary(session), "unanswered_question_ids": unanswered},
-            )
-
         if tool_name == "apply_full_import":
-            confirmed = bool(args.get("confirmed", False))
-            reconciliation: ReconciliationPlan | None = None
-            if confirmed:
-                merged_draft = merge_draft_batches(
-                    [ImportBatch.model_validate(entry) for entry in _batch_entries(session)]
-                )
-                reconciliation = _current_reconciliation(ctx, merged_draft)
-            result = apply_full_import(
-                ctx, session, confirmed=confirmed, reconciliation=reconciliation
-            )
-            if result.ok:
-                session.status = MenuImportSessionStatus.ENRICHING.value
-                _repo(ctx).update(session)
-            data: dict[str, Any] = {
-                "batches_applied": result.batches_applied,
-                "categories": result.categories,
-                "products": result.products,
-                "option_groups": result.option_groups,
-                "option_items": result.option_items,
-                "promotions": result.promotions,
+            try:
+                confirmed = bool(args.get("confirmed", False))
+                if not confirmed:
+                    return ToolResult(ok=False, summary="confirmed=true is required to apply full import")
+                apply_result, working, reconciliation = _apply_draft_to_live_menu(ctx, session)
+            except ValueError as exc:
+                return ToolResult(ok=False, summary=str(exc))
+            data = {
+                "batches_applied": apply_result.batches_applied,
+                "categories": apply_result.categories,
+                "products": apply_result.products,
+                "option_groups": apply_result.option_groups,
+                "option_items": apply_result.option_items,
+                "promotions": apply_result.promotions,
+                "public_menu_url": _public_menu_url(ctx),
+                "working_batch_products": count_batch_products(working),
+                "working_batch_categories": len(working.categories),
+                "working_batch_promotions": len(working.promotions),
                 **_session_summary(session),
             }
             if reconciliation is not None:
@@ -558,7 +611,7 @@ class MenuImportSkill:
                     "new_products": reconciliation.new_products,
                     "updated_products": reconciliation.updated_products,
                 }
-            return ToolResult(ok=result.ok, summary=result.summary, data=data)
+            return ToolResult(ok=apply_result.ok, summary=apply_result.summary, data=data)
 
         if tool_name == "update_menu_knowledge":
             notes = args.get("notes")
