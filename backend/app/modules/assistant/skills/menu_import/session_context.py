@@ -10,28 +10,6 @@ from app.modules.assistant.skills.menu_import.batching import count_batch_produc
 from app.modules.assistant.skills.menu_import.draft_schema import ImportBatch
 from app.modules.assistant.skills.menu_import.session_schemas import is_active_status
 
-_MAX_QUESTIONS_SHOWN = 20
-
-
-def _pending_questions(
-    draft_batches: list[Any] | None,
-    answers: dict[str, Any] | None,
-) -> list[tuple[str, str]]:
-    resolved_answers = answers if isinstance(answers, dict) else {}
-    pending: list[tuple[str, str]] = []
-    for entry in draft_batches or []:
-        if not isinstance(entry, dict):
-            continue
-        try:
-            batch = ImportBatch.model_validate(entry)
-        except Exception:
-            continue
-        for question in batch.open_questions:
-            existing = resolved_answers.get(question.id)
-            if existing is None or not str(existing).strip():
-                pending.append((question.id, question.question_es))
-    return pending
-
 
 def _product_total(draft_batches: list[Any] | None) -> int:
     total = 0
@@ -50,11 +28,14 @@ def get_active_import_for_conversation(
     *,
     restaurant_id: uuid.UUID,
     conversation_id: uuid.UUID,
+    fresh: bool = False,
 ) -> Any | None:
     """Return the active import session only when it belongs to this chat conversation."""
     active = uow.menu_import_sessions.get_active_for_restaurant(restaurant_id)
     if active is None or active.conversation_id != conversation_id:
         return None
+    if fresh:
+        uow.session.refresh(active)
     return active
 
 
@@ -77,22 +58,22 @@ def build_import_session_context(session: Any | None) -> str | None:
 
     product_total = _product_total(session.draft_batches)
     source_files = len(session.source_files or [])
-    pending = _pending_questions(session.draft_batches, session.clarification_answers or {})
+    discovery = session.discovery_answers or {}
+    menu_context = str(discovery.get("menu_context") or "").strip()
+    batches = session.draft_batches or []
+    applied = any(
+        isinstance(entry, dict) and entry.get("applied_at") for entry in batches
+    )
 
     lines = [
         f"Hay una **sesión de importación de menú ACTIVA** (fase: {session.status}).",
-        f"- Productos extraídos por OCR: {product_total}",
+        f"- Productos en borrador editable (OCR copia): {product_total}",
+        f"- OCR original congelado: {'sí' if getattr(session, 'ocr_original', None) else 'no'}",
         f"- Archivos fuente registrados: {source_files}",
-        f"- Preguntas de aclaración pendientes: {len(pending)}",
+        f"- Menú ya aplicado al live: {'sí' if applied else 'no'}",
     ]
-    if pending:
-        lines.append(
-            "- Preguntas pendientes (el mensaje del usuario probablemente las responde):"
-        )
-        for question_id, text in pending[:_MAX_QUESTIONS_SHOWN]:
-            lines.append(f"  - [{question_id}] {text}")
-        remaining = len(pending) - _MAX_QUESTIONS_SHOWN
-        if remaining > 0:
-            lines.append(f"  - … y {remaining} más")
+    if menu_context:
+        preview = menu_context if len(menu_context) <= 240 else f"{menu_context[:239]}…"
+        lines.append(f"- Contexto del dueño (pre-OCR): {preview}")
 
     return "\n".join(lines)
