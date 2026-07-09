@@ -215,3 +215,15 @@ class RestaurantDeliveryPartnershipDTO(BaseModel):
 
 class RestaurantDeliveryPartnershipResponse(BaseModel):
     partnership: RestaurantDeliveryPartnershipDTO | None = None
+
+
+class DeliveryProviderAdminInviteDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    email: str
+    created_at: datetime
+
+
+class DeliveryProviderAdminInviteCreate(BaseModel):
+    email: str = Field(min_length=3, max_length=320)

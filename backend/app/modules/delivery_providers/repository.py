@@ -6,6 +6,8 @@ from collections.abc import Sequence
 
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
+    DeliveryProviderAdminInviteCreate,
+    DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
     DeliveryProviderPricingConfigDTO,
     DeliveryProviderPaymentMethodCreate,
@@ -163,3 +165,19 @@ class DeliveryProviderRepository(ABC):
     def get_mexy_partnership_for_restaurant(
         self, restaurant_id: uuid.UUID
     ) -> RestaurantDeliveryPartnershipDTO | None: ...
+
+    @abstractmethod
+    def list_admin_invites(
+        self, provider_id: uuid.UUID
+    ) -> Sequence[DeliveryProviderAdminInviteDTO]: ...
+
+    @abstractmethod
+    def add_admin_invite(
+        self, provider_id: uuid.UUID, email: str
+    ) -> DeliveryProviderAdminInviteDTO: ...
+
+    @abstractmethod
+    def remove_admin_invite(self, provider_id: uuid.UUID, invite_id: uuid.UUID) -> None: ...
+
+    @abstractmethod
+    def claim_admin_invites(self, user_id: uuid.UUID, email: str) -> bool: ...
