@@ -10,13 +10,17 @@ from app.core.vision.ports import VisionAnalysisRequest, VisionPort
 from app.infra.llm.factory import build_llm_provider
 from app.infra.vision.factory import build_vision_provider
 from app.modules.assistant.skills.menu_import.document_loader import VisionPage
+from app.modules.assistant.skills.menu_import.draft_modeling import model_import_draft
 from app.modules.assistant.skills.menu_import.draft_schema import (
     ImportCategory,
     ImportDraft,
     ImportProduct,
     OpenQuestion,
 )
-from app.modules.assistant.skills.menu_import.extraction_prompt import build_extraction_prompt
+from app.modules.assistant.skills.menu_import.extraction_prompt import (
+    build_literal_ocr_prompt,
+    build_modeling_prompt,
+)
 
 
 def _normalize_name(name: str) -> str:
@@ -116,33 +120,6 @@ def merge_page_drafts(drafts: list[ImportDraft]) -> ImportDraft:
     )
 
 
-def extract_from_pages(
-    pages: list[VisionPage],
-    context: dict[str, Any],
-    *,
-    vision: VisionPort | None = None,
-) -> ImportDraft:
-    """Run vision OCR on each page and merge into a single draft."""
-    if not pages:
-        return ImportDraft()
-
-    provider = vision or build_vision_provider()
-    prompt = build_extraction_prompt(context)
-    page_drafts: list[ImportDraft] = []
-
-    for page in pages:
-        result = provider.analyze_json(
-            VisionAnalysisRequest(
-                prompt=prompt,
-                image_bytes=page.image_bytes,
-                image_media_type=page.media_type,
-            )
-        )
-        page_drafts.append(ImportDraft.model_validate(result.data))
-
-    return merge_page_drafts(page_drafts)
-
-
 def _collect_chat_json(provider: LLMProviderPort, request: ChatCompletionRequest) -> dict[str, Any]:
     content = ""
     for event in provider.stream_chat(request):
@@ -158,19 +135,46 @@ def _collect_chat_json(provider: LLMProviderPort, request: ChatCompletionRequest
     return parsed if isinstance(parsed, dict) else {}
 
 
-def extract_from_text(
+def extract_literal_from_pages(
+    pages: list[VisionPage],
+    context: dict[str, Any],
+    *,
+    vision: VisionPort | None = None,
+) -> ImportDraft:
+    """Phase 1: vision OCR — literal transcription as printed."""
+    if not pages:
+        return ImportDraft()
+
+    provider = vision or build_vision_provider()
+    prompt = build_literal_ocr_prompt(context)
+    page_drafts: list[ImportDraft] = []
+
+    for page in pages:
+        result = provider.analyze_json(
+            VisionAnalysisRequest(
+                prompt=prompt,
+                image_bytes=page.image_bytes,
+                image_media_type=page.media_type,
+            )
+        )
+        page_drafts.append(ImportDraft.model_validate(result.data))
+
+    return merge_page_drafts(page_drafts)
+
+
+def extract_literal_from_text(
     text: str,
     context: dict[str, Any],
     *,
     llm: LLMProviderPort | None = None,
 ) -> ImportDraft:
-    """Extract a menu draft from plain text (DOCX) via LLM JSON completion."""
+    """Phase 1: literal transcription from plain text."""
     stripped = text.strip()
     if not stripped:
         return ImportDraft()
 
     provider = llm or build_llm_provider()
-    prompt = build_extraction_prompt(context)
+    prompt = build_literal_ocr_prompt(context)
     data = _collect_chat_json(
         provider,
         ChatCompletionRequest(
@@ -178,10 +182,45 @@ def extract_from_text(
                 ChatCompletionMessage(role="system", content=prompt),
                 ChatCompletionMessage(
                     role="user",
-                    content=f"Extract the menu from this document text:\n\n{stripped}",
+                    content=f"Transcribe this menu document:\n\n{stripped}",
                 ),
             ],
             response_format="json_object",
         ),
     )
     return ImportDraft.model_validate(data)
+
+
+def extract_from_pages(
+    pages: list[VisionPage],
+    context: dict[str, Any],
+    *,
+    vision: VisionPort | None = None,
+    llm: LLMProviderPort | None = None,
+) -> tuple[ImportDraft, ImportDraft]:
+    """OCR literal draft, then model for digital ordering. Returns (literal, modeled)."""
+    literal = extract_literal_from_pages(pages, context, vision=vision)
+    modeled = model_import_draft(literal, context, llm=llm)
+    return literal, modeled
+
+
+def extract_from_text(
+    text: str,
+    context: dict[str, Any],
+    *,
+    llm: LLMProviderPort | None = None,
+) -> tuple[ImportDraft, ImportDraft]:
+    """Literal text extraction, then model for digital ordering. Returns (literal, modeled)."""
+    literal = extract_literal_from_text(text, context, llm=llm)
+    modeled = model_import_draft(literal, context, llm=llm)
+    return literal, modeled
+
+
+__all__ = [
+    "extract_from_pages",
+    "extract_from_text",
+    "extract_literal_from_pages",
+    "extract_literal_from_text",
+    "merge_page_drafts",
+    "model_import_draft",
+]
