@@ -1,0 +1,466 @@
+{
+  "counts": {
+    "products": 12,
+    "categories": 5
+  },
+  "products": [
+    {
+      "id": "69968033-60a9-4f65-a2fc-01647687bf84",
+      "name": "BONELESS & FRIES WITC SAUCE",
+      "status": "active",
+      "description": "Boneless crujiente de 350 g con papas (200 g). Incluye cuatro secciones para personalizar: tamaño (12 o 24 piezas), guarniciones, extras y salsas; acompaña toppings crujientes. Personalizable con salsas BBQ o Habanero y aderezos para adaptar el sabor. Ideal para compartir o para un plato contundente.",
+      "price_cents": 22900,
+      "category_ids": [
+        "c751e1c0-a012-4089-8fd0-f15756a3bdcd",
+        "7de2ad4d-ff2e-41a6-ab31-280a9b72c1d4",
+        "8c7cd342-4c95-4467-afaf-c4aca24dcd38"
+      ],
+      "option_groups": [
+        {
+          "id": "og-tamano-porciones",
+          "items": [
+            { "label": "24 piezas", "is_active": true, "price_delta_cents": 5000 },
+            { "label": "12 piezas", "is_active": true, "price_delta_cents": 0 }
+          ],
+          "title": "Tamaño y porciones",
+          "required": true,
+          "selection": "single",
+          "min_selections": 1,
+          "max_selections": 1,
+          "sort_index": 0
+        },
+        {
+          "id": "og-guarniciones",
+          "items": [
+            { "label": "Papas gajo", "is_active": true, "price_delta_cents": 3500 },
+            { "label": "Papas a la francesa", "is_active": true, "price_delta_cents": 3000 }
+          ],
+          "title": "Guarniciones",
+          "required": false,
+          "selection": "multi",
+          "min_selections": 0,
+          "max_selections": null,
+          "sort_index": 1
+        },
+        {
+          "id": "og-extras",
+          "items": [
+            { "label": "Aderezo", "is_active": true, "price_delta_cents": 800 },
+            { "label": "Salsa", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Napkins", "is_active": true, "price_delta_cents": 0 }
+          ],
+          "title": "Extras y acompañamientos",
+          "required": false,
+          "selection": "multi",
+          "min_selections": 0,
+          "max_selections": null,
+          "sort_index": 2
+        },
+        {
+          "id": "og-salsas",
+          "items": [
+            { "label": "Habanero", "is_active": true, "price_delta_cents": 1500 },
+            { "label": "BBQ", "is_active": true, "price_delta_cents": 0 }
+          ],
+          "title": "Salsas",
+          "required": true,
+          "selection": "single",
+          "min_selections": 1,
+          "max_selections": 1,
+          "sort_index": 3
+        },
+        {
+          "id": "og-toppings",
+          "items": [
+            { "label": "Cilantro", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Cebolla", "is_active": true, "price_delta_cents": 0 }
+          ],
+          "title": "Toppings crujientes",
+          "required": false,
+          "selection": "multi",
+          "min_selections": 0,
+          "max_selections": null,
+          "sort_index": 4
+        },
+        {
+          "id": "og-bebidas",
+          "items": [],
+          "title": "Bebidas",
+          "required": false,
+          "selection": "single",
+          "min_selections": 0,
+          "max_selections": 1,
+          "sort_index": 5
+        }
+      ]
+    },
+    {
+      "id": "b91ace0b-62f3-4756-92f6-e6f644b962f4",
+      "name": "Chilaquiles - Edición ampliada",
+      "status": "active",
+      "description": "Chilaquiles: totopos crujientes bañados en salsa verde o roja, coronados con queso fresco y crema. Dos tamaños disponibles: chica y grande (+50 MXN). Sabores: Verde y Rojo. Descripción ampliada para mejorar la presentación en el menú.",
+      "price_cents": 50000,
+      "category_ids": [
+        "c751e1c0-a012-4089-8fd0-f15756a3bdcd",
+        "8c7cd342-4c95-4467-afaf-c4aca24dcd38"
+      ],
+      "option_groups": [
+        {
+          "items": [
+            { "label": "Chica", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Grande", "is_active": true, "price_delta_cents": 5000 }
+          ],
+          "title": "Tamaño",
+          "required": false,
+          "selection": "single"
+        },
+        {
+          "items": [
+            { "label": "Verde", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Rojo", "is_active": true, "price_delta_cents": 0 }
+          ],
+          "title": "Sabores",
+          "required": false,
+          "selection": "single"
+        }
+      ]
+    },
+    {
+      "id": "2d1cb9bf-e3d2-46e9-bc81-dae86a0f0529",
+      "name": "La norteña",
+      "status": "active",
+      "description": "La norteña: arachera, cebolla, guacamole, chile toreado, mix de quesos y ensalada de la casa. Incluye guarnición y opción de añadir complementos para personalizar el sabor.",
+      "price_cents": 129,
+      "category_ids": ["d1106376-77e2-42eb-909d-9aa64a0756f9"],
+      "option_groups": [
+        {
+          "items": [
+            { "label": "Papas gajo", "is_active": true, "price_delta_cents": 3500 },
+            { "label": "Papas a la francesa", "is_active": true, "price_delta_cents": 3000 }
+          ],
+          "title": "Guarniciones",
+          "required": true,
+          "selection": "single"
+        }
+      ]
+    },
+    {
+      "id": "aa553dfe-4045-46d6-adf1-6451a74d66e7",
+      "name": "Gula-Cholca",
+      "status": "active",
+      "description": "Gula-Cholca: doble carne de la casa con chistorra, tocino crujiente, guacamole, tomate asado, cebolla cambray caramelizada, chile toreado y mezcla de quesos, servido con ensalada de la casa.",
+      "price_cents": 129,
+      "category_ids": ["d1106376-77e2-42eb-909d-9aa64a0756f9"],
+      "option_groups": [
+        {
+          "items": [
+            { "label": "Papas gajo", "is_active": true, "price_delta_cents": 3500 },
+            { "label": "Papas a la francesa", "is_active": true, "price_delta_cents": 3000 }
+          ],
+          "title": "Guarniciones",
+          "required": true,
+          "selection": "single"
+        }
+      ]
+    },
+    {
+      "id": "c135c8c8-b9c7-43ac-8f06-48138de55fbc",
+      "name": "Hawai 2.0",
+      "status": "active",
+      "description": "Hawai 2.0: carne de la casa con piña, mix de dos quesos, tocino y ensalada de la casa. Una versión tropical con sabor a la isla.",
+      "price_cents": 8900,
+      "category_ids": ["bad365fb-4729-4cf4-b8bd-30a70e32e5ca"],
+      "option_groups": [
+        {
+          "items": [
+            { "label": "Papas gajo", "is_active": true, "price_delta_cents": 3500 },
+            { "label": "Papas a la francesa", "is_active": true, "price_delta_cents": 3000 }
+          ],
+          "title": "Guarniciones",
+          "required": true,
+          "selection": "single"
+        }
+      ]
+    },
+    {
+      "id": "dd2f481b-69a0-4c62-86cb-af90605d9032",
+      "name": "Monster Gula",
+      "status": "active",
+      "description": "Monster Gula: carne de la casa, costilla de BBQ, chorizo español, salchicha ahumada, guacamole, chile toreado, cebollita cambray y ensalada de la casa. Personalizable con guarniciones y complementos para un sabor contundente.",
+      "price_cents": 149,
+      "category_ids": ["d1106376-77e2-42eb-909d-9aa64a0756f9"],
+      "option_groups": [
+        {
+          "items": [
+            { "label": "Papas gajo", "is_active": true, "price_delta_cents": 3500 },
+            { "label": "Papas a la francesa", "is_active": true, "price_delta_cents": 3000 }
+          ],
+          "title": "Guarniciones",
+          "required": true,
+          "selection": "single"
+        }
+      ]
+    },
+    {
+      "id": "02697d9b-5e27-4c08-9e11-5f9e16142702",
+      "name": "BURGER & BONELESS",
+      "status": "inactive",
+      "description": "Combo ganador: hamburguesa de la casa con boneless crujiente (150 g) y papas doradas. Incluye carne jugosa, queso fundente y salsa de la casa; permite personalizar con 1–2 complementos de las opciones disponibles (p. ej., Cebolla, Cilantro, Sprite) y escoger una salsa de tu preferencia. Ideal para quienes buscan variedad en un solo plato.",
+      "price_cents": 10000,
+      "category_ids": [
+        "c751e1c0-a012-4089-8fd0-f15756a3bdcd",
+        "8c7cd342-4c95-4467-afaf-c4aca24dcd38"
+      ],
+      "option_groups": [
+        {
+          "items": [
+            { "label": "Cebolla", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Cilantro", "is_active": true, "price_delta_cents": 0 }
+          ],
+          "title": "Elige tus complementos",
+          "required": true,
+          "selection": "multi"
+        },
+        {
+          "items": [
+            { "label": "Papas gajo", "is_active": true, "price_delta_cents": 3500 },
+            { "label": "Papas a la francesa", "is_active": true, "price_delta_cents": 3000 }
+          ],
+          "title": "Guarniciones",
+          "required": false,
+          "selection": "multi"
+        },
+        {
+          "items": [
+            { "label": "BBQ", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Habanero", "is_active": true, "price_delta_cents": 0 }
+          ],
+          "title": "Elige tu salsa",
+          "required": true,
+          "selection": "single"
+        }
+      ]
+    },
+    {
+      "id": "13871a47-cf3e-47a2-86b7-2bd15a1d2826",
+      "name": "WINGS & FRIES",
+      "status": "inactive",
+      "description": "Alitas crujientes de 450 g con papas en gajos cubiertas de queso (201 g). Incluye opción de salsas para mojar; ideal para compartir como entrante o plato principal para dos personas.",
+      "price_cents": 24400,
+      "category_ids": [
+        "c751e1c0-a012-4089-8fd0-f15756a3bdcd",
+        "7de2ad4d-ff2e-41a6-ab31-280a9b72c1d4",
+        "8c7cd342-4c95-4467-afaf-c4aca24dcd38"
+      ],
+      "option_groups": []
+    },
+    {
+      "id": "5240f78d-d3ef-4bbf-8048-9eb675f4f9ff",
+      "name": "HAMBURGUESA",
+      "status": "inactive",
+      "description": "Hamburguesa clásica de carne jugosa con queso fundente, lechuga y tomate, bañada en salsa de la casa. Personalizable con guarniciones (papas gajo o papas a la francesa) y opciones de complementos para adaptar el sabor a tu gusto.",
+      "price_cents": 5000,
+      "category_ids": ["8c7cd342-4c95-4467-afaf-c4aca24dcd38"],
+      "option_groups": [
+        {
+          "items": [],
+          "title": "Salsa BBQ extra",
+          "required": false,
+          "selection": "single"
+        },
+        {
+          "items": [],
+          "title": "Champiñones salteados",
+          "required": false,
+          "selection": "single"
+        },
+        {
+          "items": [],
+          "title": "Jalapeños",
+          "required": false,
+          "selection": "single"
+        },
+        {
+          "items": [],
+          "title": "Queso extra",
+          "required": false,
+          "selection": "single"
+        },
+        {
+          "items": [],
+          "title": "Bacon crujiente",
+          "required": false,
+          "selection": "single"
+        },
+        {
+          "items": [],
+          "title": "Doble carne",
+          "required": false,
+          "selection": "single"
+        },
+        {
+          "items": [],
+          "title": "Aguacate / Guacamole",
+          "required": false,
+          "selection": "single"
+        },
+        {
+          "items": [],
+          "title": "Cebolla caramelizada",
+          "required": false,
+          "selection": "single"
+        },
+        {
+          "items": [
+            { "label": "Papas gajo", "is_active": true, "price_delta_cents": 3500 },
+            { "label": "Papas a la francesa", "is_active": true, "price_delta_cents": 3000 }
+          ],
+          "title": "Guarniciones",
+          "required": false,
+          "selection": "multi"
+        },
+        {
+          "items": [],
+          "title": "Sprite",
+          "required": false,
+          "selection": "single"
+        },
+        {
+          "items": [
+            { "label": "Queso extra", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Bacon crujiente", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Aguacate", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Huevo", "is_active": true, "price_delta_cents": 0 }
+          ],
+          "title": "Complementos básicos",
+          "required": false,
+          "selection": "multi"
+        },
+        {
+          "items": [
+            { "label": "Jalapeños", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Huevo", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Queso extra", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Bacon crujiente", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Aguacate", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Cebolla caramelizada", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Salsa BBQ extra", "is_active": true, "price_delta_cents": 0 }
+          ],
+          "title": "Complementos Basicos",
+          "required": false,
+          "selection": "multi"
+        },
+        {
+          "items": [
+            { "label": "Cebolla caramelizada", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Jalapeños", "is_active": true, "price_delta_cents": 0 }
+          ],
+          "title": "Toppings de sabor",
+          "required": false,
+          "selection": "multi"
+        },
+        {
+          "items": [
+            { "label": "Salsa BBQ extra", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Jalapeños", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Cebolla caramelizada", "is_active": true, "price_delta_cents": 0 },
+            { "label": "Huevo", "is_active": true, "price_delta_cents": 0 }
+          ],
+          "title": "Complementos de Sabor",
+          "required": false,
+          "selection": "multi"
+        }
+      ]
+    },
+    {
+      "id": "12943585-9ee9-4664-a328-f58f84a897e5",
+      "name": "Clásica",
+      "status": "inactive",
+      "description": "Clásica hamburguesa de carne de la casa con dos quesos fundidos, lechuga fresca, tomate y cebolla morada sobre pan suave. Acompañada de ensalada de la casa; añade la guarnición de tu preferencia entre papas gajo o papas a la francesa. Personalizable con guarniciones y complementos para adaptar el sabor a tu gusto.",
+      "price_cents": 7000,
+      "category_ids": ["bad365fb-4729-4cf4-b8bd-30a70e32e5ca"],
+      "option_groups": [
+        {
+          "items": [
+            { "label": "Papas gajo", "is_active": true, "price_delta_cents": 3500 },
+            { "label": "Papas a la francesa", "is_active": true, "price_delta_cents": 3000 }
+          ],
+          "title": "Guarniciones",
+          "required": true,
+          "selection": "single"
+        }
+      ]
+    },
+    {
+      "id": "62266577-437c-42ce-ac61-43aab7d18100",
+      "name": "Fungi-Burger",
+      "status": "inactive",
+      "description": "Fungi-Burger: hamburguesa de la casa con champiñón salteado, pimiento morrón, tocino crujiente y un mix de dos quesos fundentes; se sirve con ensalada de la casa. Personalizable con guarniciones y complementos para adaptar el sabor.",
+      "price_cents": 8900,
+      "category_ids": ["bad365fb-4729-4cf4-b8bd-30a70e32e5ca"],
+      "option_groups": [
+        {
+          "items": [
+            { "label": "Papas gajo", "is_active": true, "price_delta_cents": 3500 },
+            { "label": "Papas a la francesa", "is_active": true, "price_delta_cents": 3000 }
+          ],
+          "title": "Guarniciones",
+          "required": true,
+          "selection": "single"
+        }
+      ]
+    },
+    {
+      "id": "a6d108ba-9bdc-45e6-9201-4944bacd9d81",
+      "name": "Big-Gula",
+      "status": "inactive",
+      "description": "Big-Gula: hamburguesa de la casa con doble carne, chorizo español, guacamole, mezcla de quesos, chile toreado, tocino y ensalada de la casa.",
+      "price_cents": 109,
+      "category_ids": ["d1106376-77e2-42eb-909d-9aa64a0756f9"],
+      "option_groups": [
+        {
+          "items": [
+            { "label": "Papas gajo", "is_active": true, "price_delta_cents": 3500 },
+            { "label": "Papas a la francesa", "is_active": true, "price_delta_cents": 3000 }
+          ],
+          "title": "Guarniciones",
+          "required": true,
+          "selection": "single"
+        }
+      ]
+    }
+  ],
+  "categories": [
+    {
+      "id": "c751e1c0-a012-4089-8fd0-f15756a3bdcd",
+      "name": "Combos",
+      "is_active": true,
+      "sort_index": 0
+    },
+    {
+      "id": "bad365fb-4729-4cf4-b8bd-30a70e32e5ca",
+      "name": "HAMBURGUESAS TRADICIONALES",
+      "is_active": true,
+      "sort_index": 0
+    },
+    {
+      "id": "7de2ad4d-ff2e-41a6-ab31-280a9b72c1d4",
+      "name": "Pollo",
+      "is_active": true,
+      "sort_index": 1
+    },
+    {
+      "id": "d1106376-77e2-42eb-909d-9aa64a0756f9",
+      "name": "CONSEÑTIDAS DE LA CASA",
+      "is_active": true,
+      "sort_index": 1
+    },
+    {
+      "id": "8c7cd342-4c95-4467-afaf-c4aca24dcd38",
+      "name": "Hamburguesas",
+      "is_active": true,
+      "sort_index": 2
+    }
+  ],
+  "captured_at": "2026-07-08T09:53:31.339232+00:00"
+}

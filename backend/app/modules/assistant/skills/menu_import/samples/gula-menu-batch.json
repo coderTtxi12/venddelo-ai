@@ -1,0 +1,444 @@
+[
+  {
+    "categories": [
+      {
+        "ref": "cat_1",
+        "name": "Orden de alitas",
+        "products": [
+          {
+            "ref": "prod_1",
+            "name": "8 piezas",
+            "currency": "MXN",
+            "price_mxn": 125,
+            "sort_order": 0,
+            "description": "1 solo sabor",
+            "is_available": true,
+            "catalog_discount": null,
+            "has_catalog_discount": false,
+            "option_groups": [
+              {
+                "ref": "og_1",
+                "items": [
+                  { "ref": "oi_1", "label": "Pica Gula", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_2", "label": "Chiltepin", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_3", "label": "Piña habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_4", "label": "Mango habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_5", "label": "Búfalo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_6", "label": "Tamarindo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_7", "label": "BBQ", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_8", "label": "Parmesano", "sort_order": 0, "price_delta_mxn": 0 }
+                ],
+                "title": "Sabor",
+                "required": true,
+                "selection": "single",
+                "sort_order": 0,
+                "max_selections": 1,
+                "min_selections": 1
+              }
+            ],
+            "constraints_notes": "Elige 1 solo sabor."
+          },
+          {
+            "ref": "prod_2",
+            "name": "12 piezas",
+            "currency": "MXN",
+            "price_mxn": 175,
+            "sort_order": 0,
+            "description": "Hasta 2 sabores",
+            "is_available": true,
+            "option_groups": [
+              {
+                "ref": "og_2",
+                "items": [
+                  { "ref": "oi_9", "label": "Pica Gula", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_10", "label": "Chiltepin", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_11", "label": "Piña habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_12", "label": "Mango habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_13", "label": "Búfalo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_14", "label": "Tamarindo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_15", "label": "BBQ", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_16", "label": "Parmesano", "sort_order": 0, "price_delta_mxn": 0 }
+                ],
+                "title": "Sabor",
+                "required": false,
+                "selection": "single",
+                "sort_order": 0,
+                "max_selections": 1,
+                "min_selections": 1
+              }
+            ],
+            "constraints_notes": "Hasta 2 sabores (no se especifica cómo se empata en el selector)."
+          },
+          {
+            "ref": "prod_3",
+            "name": "16 piezas",
+            "currency": "MXN",
+            "price_mxn": 215,
+            "sort_order": 0,
+            "description": "Hasta 2 sabores",
+            "is_available": true,
+            "option_groups": [
+              {
+                "ref": "og_3",
+                "items": [
+                  { "ref": "oi_17", "label": "Pica Gula", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_18", "label": "Chiltepin", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_19", "label": "Piña habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_20", "label": "Mango habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_21", "label": "Búfalo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_22", "label": "Tamarindo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_23", "label": "BBQ", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_24", "label": "Parmesano", "sort_order": 0, "price_delta_mxn": 0 }
+                ],
+                "title": "Sabor",
+                "required": false,
+                "selection": "single",
+                "sort_order": 0,
+                "max_selections": 1,
+                "min_selections": 1
+              }
+            ],
+            "constraints_notes": "Hasta 2 sabores (no se especifica cómo se empata en el selector)."
+          },
+          {
+            "ref": "prod_4",
+            "name": "24 piezas",
+            "currency": "MXN",
+            "price_mxn": 285,
+            "sort_order": 0,
+            "description": "Hasta 3 sabores",
+            "is_available": true,
+            "option_groups": [
+              {
+                "ref": "og_4",
+                "items": [
+                  { "ref": "oi_25", "label": "Pica Gula", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_26", "label": "Chiltepin", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_27", "label": "Piña habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_28", "label": "Mango habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_29", "label": "Búfalo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_30", "label": "Tamarindo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_31", "label": "BBQ", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_32", "label": "Parmesano", "sort_order": 0, "price_delta_mxn": 0 }
+                ],
+                "title": "Sabor",
+                "required": false,
+                "selection": "single",
+                "sort_order": 0,
+                "max_selections": 1,
+                "min_selections": 1
+              }
+            ],
+            "constraints_notes": "Hasta 3 sabores (no se especifica cómo se empata en el selector)."
+          },
+          {
+            "ref": "prod_5",
+            "name": "1 kg",
+            "currency": "MXN",
+            "price_mxn": 245,
+            "sort_order": 0,
+            "description": "Hasta 2 sabores",
+            "is_available": true,
+            "option_groups": [
+              {
+                "ref": "og_5",
+                "items": [
+                  { "ref": "oi_33", "label": "Pica Gula", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_34", "label": "Chiltepin", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_35", "label": "Piña habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_36", "label": "Mango habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_37", "label": "Búfalo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_38", "label": "Tamarindo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_39", "label": "BBQ", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_40", "label": "Parmesano", "sort_order": 0, "price_delta_mxn": 0 }
+                ],
+                "title": "Sabor",
+                "required": false,
+                "selection": "single",
+                "sort_order": 0,
+                "max_selections": 1,
+                "min_selections": 1
+              }
+            ],
+            "constraints_notes": "Hasta 2 sabores (no se especifica cómo se empata en el selector)."
+          }
+        ],
+        "sort_order": 0,
+        "description": null,
+        "display_layout": null
+      },
+      {
+        "ref": "cat_2",
+        "name": "BONELESS",
+        "products": [
+          {
+            "ref": "prod_6",
+            "name": "300 gr",
+            "currency": "MXN",
+            "price_mxn": 179,
+            "sort_order": 0,
+            "description": "1 solo sabor",
+            "is_available": true,
+            "option_groups": [
+              {
+                "ref": "og_6",
+                "items": [
+                  { "ref": "oi_41", "label": "Pica Gula", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_42", "label": "Chiltepin", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_43", "label": "Piña habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_44", "label": "Mango habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_45", "label": "Búfalo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_46", "label": "Tamarindo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_47", "label": "BBQ", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_48", "label": "Parmesano", "sort_order": 0, "price_delta_mxn": 0 }
+                ],
+                "title": "Sabor",
+                "required": true,
+                "selection": "single",
+                "sort_order": 0,
+                "max_selections": 1,
+                "min_selections": 1
+              }
+            ],
+            "constraints_notes": "Elige 1 solo sabor."
+          },
+          {
+            "ref": "prod_7",
+            "name": "500 gr",
+            "currency": "MXN",
+            "price_mxn": 249,
+            "sort_order": 0,
+            "description": "1 solo sabor",
+            "is_available": true,
+            "option_groups": [
+              {
+                "ref": "og_7",
+                "items": [
+                  { "ref": "oi_49", "label": "Pica Gula", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_50", "label": "Chiltepin", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_51", "label": "Piña habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_52", "label": "Mango habanero", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_53", "label": "Búfalo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_54", "label": "Tamarindo", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_55", "label": "BBQ", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_56", "label": "Parmesano", "sort_order": 0, "price_delta_mxn": 0 }
+                ],
+                "title": "Sabor",
+                "required": true,
+                "selection": "single",
+                "sort_order": 0,
+                "max_selections": 1,
+                "min_selections": 1
+              }
+            ],
+            "constraints_notes": "Elige 1 solo sabor."
+          }
+        ],
+        "sort_order": 1,
+        "description": "Todas las alitas y boneless incluyen guarnición de zanahoria o pepino y aderezo ranch.",
+        "display_layout": null
+      },
+      {
+        "ref": "cat_3",
+        "name": "AL A PLANCHA",
+        "products": [
+          {
+            "ref": "prod_8",
+            "name": "Gula tacos",
+            "currency": "MXN",
+            "price_mxn": 0,
+            "sort_order": 0,
+            "description": "Roast beef, arrachera, chorizo argentino, chorizo campestre.\nGuarnición: Guacamole, cebolla cambray, chile toreado",
+            "is_available": true,
+            "option_groups": [],
+            "constraints_notes": "Precio aparece como \"$ 50 c/u\"; falta confirmar si es 50 MXN sin decimales."
+          },
+          {
+            "ref": "prod_9",
+            "name": "Gula taco combinado",
+            "currency": "MXN",
+            "price_mxn": 0,
+            "sort_order": 0,
+            "description": "2 carnes a elegir",
+            "is_available": true,
+            "option_groups": [],
+            "constraints_notes": "Precio aparece como \"$ 60 c/u\"; falta confirmar si es 60 MXN sin decimales."
+          },
+          {
+            "ref": "prod_10",
+            "name": "Burrito pechugón",
+            "currency": "MXN",
+            "price_mxn": 129,
+            "sort_order": 0,
+            "description": "Pechuga de pollo con sazón de la casa, pimienta morrón, guacamole, frijoles, arroz, mix de quesos.",
+            "is_available": true,
+            "option_groups": [],
+            "constraints_notes": null
+          },
+          {
+            "ref": "prod_11",
+            "name": "Burrito de arrachera",
+            "currency": "MXN",
+            "price_mxn": 149,
+            "sort_order": 0,
+            "description": "Arrachera, cebollitas con sazón de la casa, guacamole, frijoles, arroz, mix de quesos.",
+            "is_available": true,
+            "option_groups": [],
+            "constraints_notes": null
+          },
+          {
+            "ref": "prod_12",
+            "name": "Papa Ranch",
+            "currency": "MXN",
+            "price_mxn": 149,
+            "sort_order": 0,
+            "description": "Papa al horno sazonada con especias de la casa, gravy, tocino crispy, mix de quesos, carne a elegir (roast beef o arrachera)",
+            "is_available": true,
+            "option_groups": [],
+            "constraints_notes": "Carne a elegir: roast beef o arrachera."
+          },
+          {
+            "ref": "prod_13",
+            "name": "Burrada",
+            "currency": "MXN",
+            "price_mxn": 165,
+            "sort_order": 0,
+            "description": "Chuleta ahumada, salchicha ahumada, tocino ahumada, guacamole, frijoles, arroz, mix de quesos, una carne a elegir (arrachera, roast beef, chistorra, chorizo argentino, chorizo campestre)",
+            "is_available": true,
+            "option_groups": [],
+            "constraints_notes": "Una carne a elegir: arrachera, roast beef, chistorra, chorizo argentino, chorizo campestre."
+          }
+        ],
+        "sort_order": 2,
+        "description": null,
+        "display_layout": null
+      },
+      {
+        "ref": "cat_4",
+        "name": "POSTRES",
+        "products": [
+          {
+            "ref": "prod_14",
+            "name": "Bolas de helado",
+            "currency": "MXN",
+            "price_mxn": 50,
+            "sort_order": 0,
+            "description": null,
+            "is_available": true,
+            "option_groups": [],
+            "constraints_notes": null
+          },
+          {
+            "ref": "prod_15",
+            "name": "Pan de elote",
+            "currency": "MXN",
+            "price_mxn": 65,
+            "sort_order": 0,
+            "description": null,
+            "is_available": true,
+            "option_groups": [],
+            "constraints_notes": null
+          },
+          {
+            "ref": "prod_16",
+            "name": "Churros",
+            "currency": "MXN",
+            "price_mxn": 70,
+            "sort_order": 0,
+            "description": "Sabor a elegir: Lechera, cajeta o chocolate",
+            "is_available": true,
+            "option_groups": [
+              {
+                "ref": "og_8",
+                "items": [
+                  { "ref": "oi_57", "label": "Lechera", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_58", "label": "cajeta", "sort_order": 0, "price_delta_mxn": 0 },
+                  { "ref": "oi_59", "label": "chocolate", "sort_order": 0, "price_delta_mxn": 0 }
+                ],
+                "title": "Sabor",
+                "required": false,
+                "selection": "single",
+                "sort_order": 0,
+                "max_selections": 1,
+                "min_selections": 0
+              }
+            ],
+            "constraints_notes": null
+          },
+          {
+            "ref": "prod_17",
+            "name": "Gula cookies",
+            "currency": "MXN",
+            "price_mxn": 70,
+            "sort_order": 0,
+            "description": null,
+            "is_available": true,
+            "option_groups": [],
+            "constraints_notes": null
+          }
+        ],
+        "sort_order": 3,
+        "description": null,
+        "display_layout": null
+      }
+    ],
+    "promotions": [
+      {
+        "ref": "promo_1",
+        "name": "2×1 Alitas",
+        "type": "two_for_one",
+        "scope": "product",
+        "bundle": {
+          "get_quantity": 2,
+          "pay_quantity": 1,
+          "pairing_mode": "same_product"
+        },
+        "target_product_refs": ["prod_1", "prod_2"],
+        "target_category_refs": [],
+        "eligible_option_item_refs": ["oi_1", "oi_2"],
+        "schedule": { "weekdays": [5, 6], "use_time_window": false },
+        "label": "2×1",
+        "is_nxm": true,
+        "participating_complements": [
+          {
+            "ref": "oi_1",
+            "label": "Pica Gula",
+            "product_ref": "prod_1",
+            "product_name": "8 piezas",
+            "group_title": "Sabor",
+            "price_delta_mxn": 0
+          }
+        ],
+        "excluded_complements": []
+      }
+    ],
+    "batch_index": 0,
+    "global_rules": [],
+    "open_questions": [
+      {
+        "id": "q1",
+        "context": "AL A PLANCHA > Gula tacos > \"$ 50 c/u\"",
+        "question_es": "En \"Gula tacos\" el precio aparece como \"$ 50 c/u\". ¿Confirmas que el precio es 50 MXN por unidad (sin centavos) o hay algún formato/variación que no se ve en la imagen?",
+        "related_refs": ["prod_8"]
+      },
+      {
+        "id": "q2",
+        "context": "AL A PLANCHA > Gula taco combinado > \"$ 60 c/u\"",
+        "question_es": "En \"Gula taco combinado\" el precio aparece como \"$ 60 c/u\". ¿Confirmas que el precio es 60 MXN por unidad (sin centavos) o hay algún formato/variación que no se ve en la imagen?",
+        "related_refs": ["prod_9"]
+      },
+      {
+        "id": "q3",
+        "context": "Orden de alitas (ALITAS) opciones con \"Hasta 2 sabores\" / \"Hasta 3 sabores\"",
+        "question_es": "Para \"12 piezas\", \"16 piezas\" y \"1 kg\" dice \"Hasta 2 sabores\" y para \"24 piezas\" dice \"Hasta 3 sabores\". ¿El selector debe permitir seleccionar 2 o 3 sabores (multi-selección), y cómo se reparte el número de piezas entre sabores?",
+        "related_refs": ["prod_2", "prod_3", "prod_4", "prod_5"]
+      },
+      {
+        "id": "q4",
+        "context": "Bloque \"SABORES\" en la sección de ALITAS/BONELESS con \"Sabor extra: $ 20\" y \"Aderezo ranch extra: $ 20\"",
+        "question_es": "¿\"Sabor extra: $20\" y \"Aderezo ranch extra: $20\" aplican como extras opcionales para todo el menú de alitas/boneless, o solo para algunas presentaciones? ¿Son extras de cobro por cada selección?",
+        "related_refs": []
+      }
+    ]
+  }
+]
