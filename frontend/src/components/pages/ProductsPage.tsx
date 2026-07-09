@@ -26,26 +26,25 @@ import {
   type ProductVisibilityState,
 } from '@/lib/menu/productVisibility';
 import { ProductVisibilitySelect } from '@/components/products/ProductVisibilitySelect';
+import { ListPagination } from '@/components/ui/ListPagination';
+import { paginateItems } from '@/lib/paginate';
 import {
   CATEGORIES_PAGE_SIZE,
-  fetchSupplierCategoriesPage,
+  fetchAllSupplierCategories,
   normalizeOptionGroups,
   PRODUCTS_PAGE_SIZE,
-  fetchSupplierProductsPage,
+  fetchAllSupplierProducts,
   resolveSupplierIdByEmail,
   saveSupplierCategory,
   updateSupplierCategoryActive,
   saveSupplierProduct,
   updateSupplierProductVisibility,
-  type PageCursor,
-} from '@/services/db';
-import type {
-  CategoryDraft,
-  Id,
-  ImageDraft,
-  MoneyUSD,
-  OptionGroupDraft,
-  ProductDraft,
+  type CategoryDraft,
+  type Id,
+  type ImageDraft,
+  type MoneyUSD,
+  type OptionGroupDraft,
+  type ProductDraft,
 } from '@/services/db';
 
 function nowIso(): string {
@@ -298,120 +297,63 @@ export default function ProductsPage() {
     };
   }, [firebaseUser?.email, accessToken]);
 
-  // Categorías desde Firestore (paginadas)
+  // Categorías (todas las páginas; paginación en cliente)
   const [categories, setCategories] = useState<CategoryDraft[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
-  const [categoriesLoadingMore, setCategoriesLoadingMore] = useState(false);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
-  const [categoriesHasMore, setCategoriesHasMore] = useState(false);
-  const categoriesCursorRef = useRef<PageCursor>(null);
+  const [categoriesPage, setCategoriesPage] = useState(1);
 
-  async function loadCategoriesFirstPage() {
+  async function loadCategories() {
     if (!supplierId || !accessToken) return;
     setCategoriesLoading(true);
     setCategoriesError(null);
-    categoriesCursorRef.current = null;
     try {
-      const result = await fetchSupplierCategoriesPage(accessToken, db, supplierId, { cursor: null });
-      categoriesCursorRef.current = result.cursor;
-      setCategoriesHasMore(result.hasMore);
-      setCategories(result.items);
+      const items = await fetchAllSupplierCategories(accessToken, db, supplierId);
+      setCategories(items);
+      setCategoriesPage(1);
     } catch (e) {
       console.error(e);
       setCategoriesError('No se pudieron cargar las categorías. Intenta de nuevo.');
       setCategories([]);
-      setCategoriesHasMore(false);
+      setCategoriesPage(1);
     } finally {
       setCategoriesLoading(false);
     }
   }
 
-  async function loadCategoriesMore() {
-    if (!supplierId || !accessToken || !categoriesHasMore || categoriesLoadingMore || !categoriesCursorRef.current) return;
-    setCategoriesLoadingMore(true);
-    setCategoriesError(null);
-    try {
-      const result = await fetchSupplierCategoriesPage(accessToken, db, supplierId, {
-        cursor: categoriesCursorRef.current,
-      });
-      categoriesCursorRef.current = result.cursor;
-      setCategoriesHasMore(result.hasMore);
-      setCategories((prev) => [...prev, ...result.items]);
-    } catch (e) {
-      console.error(e);
-      setCategoriesError('No se pudieron cargar más categorías. Intenta de nuevo.');
-    } finally {
-      setCategoriesLoadingMore(false);
-    }
-  }
-
-  // Productos desde Firestore (paginados)
+  // Productos (todas las páginas; paginación en cliente)
   const [products, setProducts] = useState<ProductDraft[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
-  const [productsLoadingMore, setProductsLoadingMore] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
-  const [productsHasMore, setProductsHasMore] = useState(false);
-  const productsCursorRef = useRef<PageCursor>(null);
+  const [productsPage, setProductsPage] = useState(1);
   const catalogPromotionsRef = useRef<Promotion[] | null>(null);
 
-  async function loadProductsFirstPage(catalogPromotions?: Promotion[]) {
+  async function loadProducts() {
     if (!supplierId || !accessToken) return;
     setProductsLoading(true);
     setProductsError(null);
-    productsCursorRef.current = null;
     try {
-      const result = await fetchSupplierProductsPage(
-        accessToken,
-        db,
-        supplierId,
-        { cursor: null },
-        catalogPromotions ?? catalogPromotionsRef.current ?? undefined,
-      );
+      const result = await fetchAllSupplierProducts(accessToken, db, supplierId);
       catalogPromotionsRef.current = result.catalogPromotions;
-      productsCursorRef.current = result.cursor;
-      setProductsHasMore(result.hasMore);
       setProducts(result.items);
+      setProductsPage(1);
     } catch (e) {
       console.error(e);
       setProductsError('No se pudieron cargar los productos. Intenta de nuevo.');
       setProducts([]);
-      setProductsHasMore(false);
+      setProductsPage(1);
     } finally {
       setProductsLoading(false);
     }
   }
 
-  async function loadProductsMore() {
-    if (!supplierId || !accessToken || !productsHasMore || productsLoadingMore || !productsCursorRef.current) return;
-    setProductsLoadingMore(true);
-    setProductsError(null);
-    try {
-      const result = await fetchSupplierProductsPage(
-        accessToken,
-        db,
-        supplierId,
-        { cursor: productsCursorRef.current },
-        catalogPromotionsRef.current ?? undefined,
-      );
-      catalogPromotionsRef.current = result.catalogPromotions;
-      productsCursorRef.current = result.cursor;
-      setProductsHasMore(result.hasMore);
-      setProducts((prev) => [...prev, ...result.items]);
-    } catch (e) {
-      console.error(e);
-      setProductsError('No se pudieron cargar más productos. Intenta de nuevo.');
-    } finally {
-      setProductsLoadingMore(false);
-    }
-  }
-
   useEffect(() => {
-    void loadProductsFirstPage();
+    void loadProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierId]);
 
   useEffect(() => {
-    void loadCategoriesFirstPage();
+    void loadCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierId]);
 
@@ -500,6 +442,31 @@ export default function ProductsPage() {
     productPriceSort,
     productDiscountSort,
     productTotalSort,
+  ]);
+
+  const paginatedCategories = useMemo(
+    () => paginateItems(filteredCategories, categoriesPage, CATEGORIES_PAGE_SIZE),
+    [filteredCategories, categoriesPage],
+  );
+
+  const paginatedProducts = useMemo(
+    () => paginateItems(displayedProducts, productsPage, PRODUCTS_PAGE_SIZE),
+    [displayedProducts, productsPage],
+  );
+
+  useEffect(() => {
+    setCategoriesPage(1);
+  }, [categorySearch]);
+
+  useEffect(() => {
+    setProductsPage(1);
+  }, [
+    productNameFilter,
+    productCategoryFilterIds,
+    productPriceSort,
+    productDiscountSort,
+    productTotalSort,
+    productVisibilityFilter,
   ]);
 
   function clearProductTableFilters() {
@@ -662,7 +629,7 @@ export default function ProductsPage() {
             />
           ) : (
             <div className={styles.grid}>
-              {filteredCategories.map((c) => (
+              {paginatedCategories.items.map((c) => (
                 <div
                   key={c.id}
                   className={`${styles.card} ${styles.categoryCard} ${styles.clickableCard} ${c.isActive ? '' : styles.cardInactive}`}
@@ -772,17 +739,17 @@ export default function ProductsPage() {
             <div className={styles.errorBanner} role="alert">{categoryActiveError}</div>
           ) : null}
 
-          {!categoriesLoading && categoriesHasMore ? (
-            <div className={styles.pagination}>
-              <button
-                type="button"
-                className={styles.secondaryBtn}
-                onClick={() => void loadCategoriesMore()}
-                disabled={categoriesLoadingMore}
-              >
-                {categoriesLoadingMore ? 'Cargando…' : `Cargar ${CATEGORIES_PAGE_SIZE} más`}
-              </button>
-            </div>
+          {!categoriesLoading ? (
+            <ListPagination
+              page={paginatedCategories.page}
+              totalPages={paginatedCategories.totalPages}
+              totalItems={paginatedCategories.totalItems}
+              rangeStart={paginatedCategories.rangeStart}
+              rangeEnd={paginatedCategories.rangeEnd}
+              pageSize={CATEGORIES_PAGE_SIZE}
+              itemLabel="categorías"
+              onPageChange={setCategoriesPage}
+            />
           ) : null}
 
           <Drawer
@@ -800,7 +767,7 @@ export default function ProductsPage() {
                   throw new Error(supplierIdError ?? 'No hay sesión o restaurante disponible.');
                 }
                 await saveSupplierCategory(accessToken, db, storage, supplierId, payload);
-                await loadCategoriesFirstPage();
+                await loadCategories();
                 setCategoryDrawerOpen(false);
               }}
             />
@@ -1075,7 +1042,7 @@ export default function ProductsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {displayedProducts.length === 0 ? (
+                      {paginatedProducts.items.length === 0 ? (
                         <tr>
                           <td colSpan={6} className={styles.filterNoResults}>
                             <div className={styles.filterNoResultsInner}>
@@ -1089,7 +1056,7 @@ export default function ProductsPage() {
                           </td>
                         </tr>
                       ) : null}
-                      {displayedProducts.map((p) => {
+                      {paginatedProducts.items.map((p) => {
                         const catNames = p.categoryIds
                           .map((id) => categories.find((c) => c.id === id)?.name)
                           .filter(Boolean) as string[];
@@ -1223,17 +1190,17 @@ export default function ProductsPage() {
                 <div className={styles.errorBanner} role="alert">{productsError}</div>
               ) : null}
 
-              {!productsLoading && productsHasMore ? (
-                <div className={styles.pagination}>
-                  <button
-                    type="button"
-                    className={styles.secondaryBtn}
-                    onClick={() => void loadProductsMore()}
-                    disabled={productsLoadingMore}
-                  >
-                    {productsLoadingMore ? 'Cargando…' : `Cargar ${PRODUCTS_PAGE_SIZE} más`}
-                  </button>
-                </div>
+              {!productsLoading ? (
+                <ListPagination
+                  page={paginatedProducts.page}
+                  totalPages={paginatedProducts.totalPages}
+                  totalItems={paginatedProducts.totalItems}
+                  rangeStart={paginatedProducts.rangeStart}
+                  rangeEnd={paginatedProducts.rangeEnd}
+                  pageSize={PRODUCTS_PAGE_SIZE}
+                  itemLabel="productos"
+                  onPageChange={setProductsPage}
+                />
               ) : null}
 
               <Drawer

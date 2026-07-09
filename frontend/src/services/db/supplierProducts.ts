@@ -100,6 +100,34 @@ export async function fetchSupplierProductsPage(
   };
 }
 
+export async function fetchAllSupplierProducts(
+  accessToken: string,
+  db: LegacyDbClient,
+  restaurantId: string,
+): Promise<{ items: ProductDraft[]; catalogPromotions: Promotion[] }> {
+  const items: ProductDraft[] = [];
+  let cursor: PageCursor = null;
+  let hasMore = true;
+  let catalogPromotions: Promotion[] = [];
+
+  while (hasMore) {
+    const result = await fetchSupplierProductsPage(
+      accessToken,
+      db,
+      restaurantId,
+      { cursor },
+      catalogPromotions.length > 0 ? catalogPromotions : undefined,
+    );
+    catalogPromotions = result.catalogPromotions;
+    items.push(...result.items);
+    cursor = result.cursor;
+    hasMore = result.hasMore;
+    if (result.items.length === 0) break;
+  }
+
+  return { items, catalogPromotions };
+}
+
 export type SaveSupplierProductPayload = {
   id?: string;
   name: string;

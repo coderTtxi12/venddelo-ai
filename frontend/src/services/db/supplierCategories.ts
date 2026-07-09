@@ -1,4 +1,5 @@
 import { createCategory, listCategories, updateCategory } from '@/lib/api/menu';
+import { fetchAllPages } from '@/lib/api/pagination';
 import { mapCategoryToDraft } from '@/lib/api/mappers';
 import { resolveImagePathForUpload } from '@/lib/storage/resolveImagePath';
 import type { LegacyDbClient, LegacyStorageClient } from '../legacyDb';
@@ -40,6 +41,20 @@ export async function fetchSupplierCategoriesPage(
     cursor: page.next_cursor,
     hasMore: page.has_more,
   };
+}
+
+export async function fetchAllSupplierCategories(
+  accessToken: string,
+  _db: LegacyDbClient,
+  restaurantId: string,
+): Promise<CategoryDraft[]> {
+  // Match digital menu: fetch in large pages so sort_index ordering is not broken by
+  // keyset cursors that only use (created_at, id).
+  const rows = await fetchAllPages(
+    (cursor) => listCategories(accessToken, restaurantId, 100, cursor, { includeInactive: true }),
+    100,
+  );
+  return rows.map(mapCategoryToDraft);
 }
 
 export type SaveSupplierCategoryPayload = {

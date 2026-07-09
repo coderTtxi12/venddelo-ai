@@ -26,6 +26,7 @@ export type {
 export { resolveSupplierIdByEmail, type ResolveSupplierResult } from './supplierResolve';
 export {
   CATEGORIES_PAGE_SIZE,
+  fetchAllSupplierCategories,
   fetchSupplierCategoriesPage,
   mapCategoryDoc,
   saveSupplierCategory,
@@ -36,6 +37,7 @@ export {
 } from './supplierCategories';
 export {
   PRODUCTS_PAGE_SIZE,
+  fetchAllSupplierProducts,
   fetchSupplierProductsPage,
   mapProductDoc,
   normalizeOptionGroups,
