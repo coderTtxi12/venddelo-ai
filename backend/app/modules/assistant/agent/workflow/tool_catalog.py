@@ -85,8 +85,8 @@ TOOL_GROUPS: list[tuple[str, list[str]]] = [
         "Promotions",
         [
             "create_promotion",
-            "update_promotion",
-            "set_promotion_targets",
+            "update_nxm_promotion",
+            "update_nxm_promotion_complements",
             "generate_promotion_banner",
             "disable_promotion",
         ],
@@ -163,8 +163,8 @@ TOOL_RETURNS_HINTS: dict[str, str] = {
     "analyze_product_image": "analysis (quality, suggestions; read-only).",
     # Promotions
     "create_promotion": "promotion (id, type, scope, targets).",
-    "update_promotion": "promotion (updated fields).",
-    "set_promotion_targets": "promotion (targets updated).",
+    "update_nxm_promotion": "promotion (products added/removed incrementally).",
+    "update_nxm_promotion_complements": "promotion (complement allow-list updated).",
     "generate_promotion_banner": "banner (image_path or asset reference).",
     "disable_promotion": "promotion (is_active=false).",
 }

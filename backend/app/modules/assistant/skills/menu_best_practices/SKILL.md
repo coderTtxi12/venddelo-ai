@@ -91,7 +91,7 @@ Responde al dueño en **español**, con markdown claro.
 | Producto / platillo | `products` (`name`, `description`, `price_cents`, `image_path`, M:N categories) | `list_products`, `get_product`, `create_product`, `update_product` |
 | Grupo de complementos | `option_groups` (`title`, `required`, `selection`, `min/max_selections`) | `add_option_group`, `update_option_group` |
 | Complemento / opción | `option_items` (`label`, `price_delta_cents`, `is_active`) | `add_option_item`, `update_option_item` |
-| Promo de marketing (2×1, banner) | `promotions` type `bundle` (NxM), scope product/category | `create_promotion`, `set_promotion_targets` (`load_skill(promotions)`) |
+| Promo de marketing (2×1, banner) | `promotions` type `bundle` (NxM), scope product/category | `create_promotion`, `update_nxm_promotion`, `update_nxm_promotion_complements`, `generate_promotion_banner` (`load_skill(promotions)`) |
 | Descuento en producto | `promotions` type `percent` / `amount` (`is_catalog_discount`) | Admin UI / `apply_product_discount` (pendiente en agente) |
 | Badge visual, sin cálculo | `promotions` type `combo` (`priced_in_cart=false`) | `create_promotion` |
 | Logo / portada / tema | branding de `restaurants` | `menu_write` `list_menu_themes`, `apply_menu_theme` |
@@ -289,7 +289,9 @@ Este sistema separa **campañas de marketing** de **descuentos de catálogo**. N
 ### Buenas prácticas
 
 - Nombre corto de promo ("2×1 Alitas", "Combo Familiar").
-- Targets claros (`set_promotion_targets`).
+- Targets claros al crear (`create_promotion` con todos los productos/categorías).
+- Para agregar/quitar productos después: `update_nxm_promotion` (incremental, no reemplaza la lista).
+- Para excluir/rehabilitar complementos: `update_nxm_promotion_complements`.
 - Fechas/horario cuando sea temporal (`starts_at`, `ends_at`, schedule).
 - Desactiva con `disable_promotion` cuando termine — nunca "eliminar".
 

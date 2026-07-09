@@ -23,6 +23,7 @@ from app.modules.assistant.skills.menu_read.tools import (
     _restaurant_timezone,
     _score_promotions,
 )
+from app.modules.assistant.skills.menu_write.option_item_bulk import option_item_label_matches
 from app.modules.assistant.skills.product_resolve import resolve_product
 from app.modules.assistant.skills.promotions.banner_generate import (
     generate_and_attach_promotion_banner,
@@ -33,15 +34,17 @@ from app.modules.promotions.schemas import (
     PromotionCreate,
     PromotionDTO,
     PromotionScheduleInput,
-    PromotionUpdate,
     enrich_promotion_dto,
 )
 from app.modules.promotions.service import PromotionService
 from app.modules.promotions.types import normalize_promotion_type
 from app.modules.promotions.option_item_sync import (
+    add_products_to_nxm_promo,
     collect_option_items_for_products,
+    disable_complements_in_nxm_promo,
+    enable_complements_in_nxm_promo,
     is_nxm_bundle_promo,
-    sync_option_items_for_product_change,
+    remove_products_from_nxm_promo,
 )
 
 
@@ -209,6 +212,76 @@ def _resolve_category_ids(
             )
         category_ids.append(matches[0].id)
     return category_ids, None
+
+
+def _require_nxm_product_promo(promo: PromotionDTO) -> ToolResult | None:
+    if not is_nxm_bundle_promo(promo):
+        return ToolResult(
+            ok=False,
+            summary="This tool only applies to NxM / 2×1 promotions (bundle scope product or category)",
+        )
+    if promo.scope not in ("product", "category"):
+        return ToolResult(ok=False, summary="NxM promotion must target products or categories")
+    return None
+
+
+def _resolve_option_item_ids_for_promo(
+    menu: MenuService,
+    ctx: AgentContext,
+    product_ids: list[uuid.UUID],
+    args: dict[str, Any],
+    *,
+    ids_key: str,
+    labels_key: str,
+) -> tuple[list[uuid.UUID], ToolResult | None]:
+    if args.get(ids_key) is not None:
+        try:
+            return _parse_uuid_list(args.get(ids_key), ids_key), None
+        except ValidationError as exc:
+            return [], ToolResult(ok=False, summary=str(exc))
+
+    labels = args.get(labels_key)
+    if labels is None:
+        return [], None
+    if not isinstance(labels, list) or not labels:
+        return [], ToolResult(ok=False, summary=f"{labels_key} must be a non-empty list")
+
+    eligible: dict[uuid.UUID, str] = {}
+    for product_id in product_ids:
+        product = menu.get_product(ctx.restaurant_id, product_id)
+        for group in product.option_groups or []:
+            if not group.is_active:
+                continue
+            for item in group.items:
+                if item.is_active:
+                    eligible[item.id] = item.label
+
+    resolved: list[uuid.UUID] = []
+    for raw_label in labels:
+        label = _optional_str(raw_label)
+        if not label:
+            return [], ToolResult(ok=False, summary=f"Each {labels_key} entry must be a string")
+        matches = [
+            item_id for item_id, item_label in eligible.items() if option_item_label_matches(label, item_label)
+        ]
+        if len(matches) == 1:
+            resolved.append(matches[0])
+            continue
+        if len(matches) > 1:
+            candidates = [
+                {"id": str(item_id), "label": eligible[item_id]} for item_id in matches[:5]
+            ]
+            return [], ToolResult(
+                ok=False,
+                summary=f"Ambiguous complement label {label!r}; choose one by id",
+                data={"candidates": candidates, "ambiguous": True},
+            )
+        return [], ToolResult(
+            ok=False,
+            summary=f"No complement matched label {label!r} on promo products",
+            data={"query": label},
+        )
+    return resolved, None
 
 
 def _resolve_promotion(
@@ -425,7 +498,7 @@ class PromotionsSkill:
             "option_item_ids": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "For NxM: allow-list of participating add-ons (empty = all).",
+                "description": "For NxM: explicit allow-list of participating add-ons (only listed ids participate).",
             },
         }
         schedule_props = {
@@ -503,9 +576,12 @@ class PromotionsSkill:
                 },
             ),
             ToolDefinition(
-                name="update_promotion",
+                name="update_nxm_promotion",
                 description=(
-                    "Update an existing promotion. Provide promotion_id or name plus fields to change."
+                    "Incrementally add or remove products on an existing NxM / 2×1 promotion. "
+                    "Does not replace the full product list. Provide promotion_id or name plus "
+                    "add_product_names/add_product_ids and/or remove_product_names/remove_product_ids. "
+                    "Complements for new products are added to the allow-list automatically."
                 ),
                 effect="mutate",
                 input_schema={
@@ -513,32 +589,31 @@ class PromotionsSkill:
                     "properties": {
                         "promotion_id": {"type": "string"},
                         "name": {"type": "string", "description": "Lookup by promo name when no id."},
-                        "new_name": {"type": "string", "description": "Rename the promotion."},
-                        "image_path": {"type": "string"},
-                        "type": {
-                            "type": "string",
-                            "enum": ["bundle", "2x1", "combo", "percent", "amount"],
+                        "add_product_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
                         },
-                        "scope": {
-                            "type": "string",
-                            "enum": ["product", "category", "order"],
+                        "add_product_names": {
+                            "type": "array",
+                            "items": {"type": "string"},
                         },
-                        "percent": {"type": "integer"},
-                        "amount_cents": {"type": "integer"},
-                        "min_order_cents": {"type": "integer"},
-                        "starts_at": {"type": "string"},
-                        "ends_at": {"type": "string"},
-                        **target_props,
-                        **schedule_props,
-                        **bundle_props,
+                        "remove_product_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "remove_product_names": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
                     },
                 },
             ),
             ToolDefinition(
-                name="set_promotion_targets",
+                name="update_nxm_promotion_complements",
                 description=(
-                    "Replace products, categories, or option items linked to a promotion. "
-                    "Provide promotion_id or name. Only supplied lists are updated."
+                    "Enable or disable specific complements on an NxM / 2×1 promotion allow-list. "
+                    "Use disable_* to exclude add-ons from the promo; use enable_* to re-include "
+                    "add-ons that were previously excluded. Does not change linked products."
                 ),
                 effect="mutate",
                 input_schema={
@@ -546,7 +621,22 @@ class PromotionsSkill:
                     "properties": {
                         "promotion_id": {"type": "string"},
                         "name": {"type": "string"},
-                        **target_props,
+                        "enable_option_item_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "enable_option_item_labels": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "disable_option_item_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "disable_option_item_labels": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
                     },
                 },
             ),
@@ -617,7 +707,6 @@ class PromotionsSkill:
     def execute(self, tool_name: str, args: dict[str, Any], ctx: AgentContext) -> ToolResult:
         menu = MenuService(ctx.uow.menu)
         promo_service = PromotionService(ctx.uow.promotions)
-        timezone = _restaurant_timezone(ctx)
 
         if tool_name == "create_promotion":
             create, used_placeholder, build_err = _build_promotion_create(ctx, menu, args)
@@ -637,163 +726,164 @@ class PromotionsSkill:
                 extra=extra,
             )
 
-        if tool_name == "update_promotion":
+        if tool_name == "update_nxm_promotion":
             promo, resolve_err = _resolve_promotion(promo_service, ctx, args)
             if resolve_err:
                 return resolve_err
             assert promo is not None
+            nxm_err = _require_nxm_product_promo(promo)
+            if nxm_err:
+                return nxm_err
 
-            update_fields: dict[str, Any] = {}
-            new_name = _optional_str(args.get("new_name"))
-            if new_name:
-                update_fields["name"] = new_name
-            if "image_path" in args:
-                update_fields["image_path"] = _optional_str(args.get("image_path"))
-            if "type" in args:
-                try:
-                    update_fields["type"] = normalize_promotion_type(str(args["type"]))
-                except ValueError as exc:
-                    return ToolResult(ok=False, summary=str(exc))
-            if "scope" in args:
-                update_fields["scope"] = str(args["scope"])
-            if "percent" in args:
-                update_fields["percent"] = int(args["percent"])
-            if "amount_cents" in args:
-                update_fields["amount_cents"] = int(args["amount_cents"])
-            if "min_order_cents" in args:
-                update_fields["min_order_cents"] = int(args["min_order_cents"])
-            if "starts_at" in args:
-                try:
-                    update_fields["starts_at"] = _parse_datetime(args.get("starts_at"), "starts_at")
-                except ValidationError as exc:
-                    return ToolResult(ok=False, summary=str(exc))
-            if "ends_at" in args:
-                try:
-                    update_fields["ends_at"] = _parse_datetime(args.get("ends_at"), "ends_at")
-                except ValidationError as exc:
-                    return ToolResult(ok=False, summary=str(exc))
-            if "bundle" in args or "get_quantity" in args or "pay_quantity" in args or "pairing_mode" in args:
-                try:
-                    update_fields["bundle"] = _parse_bundle(args)
-                except ValidationError as exc:
-                    return ToolResult(ok=False, summary=str(exc))
-            if "schedule" in args:
-                try:
-                    update_fields["schedule"] = _parse_schedule(args)
-                except ValidationError as exc:
-                    return ToolResult(ok=False, summary=str(exc))
-
-            if any(key in args for key in ("product_ids", "product_names")):
-                product_ids, product_err = _resolve_product_ids(menu, ctx, args)
-                if product_err:
-                    return product_err
-                update_fields["product_ids"] = product_ids
-                if (
-                    "option_item_ids" not in args
-                    and is_nxm_bundle_promo(promo)
-                    and product_ids is not None
-                ):
-                    update_fields["option_item_ids"] = sync_option_items_for_product_change(
-                        menu,
-                        ctx.restaurant_id,
-                        previous_product_ids=promo.product_ids,
-                        new_product_ids=product_ids,
-                        current_option_item_ids=promo.option_item_ids,
-                    )
-            if any(key in args for key in ("category_ids", "category_names")):
-                category_ids, category_err = _resolve_category_ids(menu, ctx, args)
-                if category_err:
-                    return category_err
-                update_fields["category_ids"] = category_ids
-            if "option_item_ids" in args:
-                try:
-                    update_fields["option_item_ids"] = _parse_uuid_list(
-                        args.get("option_item_ids"), "option_item_ids"
-                    )
-                except ValidationError as exc:
-                    return ToolResult(ok=False, summary=str(exc))
-
-            if not update_fields:
-                return ToolResult(ok=False, summary="Provide at least one field to update")
-
-            promotion_id = promo.id
-
-            def action() -> PromotionDTO:
-                return promo_service.update(
-                    ctx.restaurant_id,
-                    promotion_id,
-                    PromotionUpdate(**update_fields),
-                    timezone=timezone,
-                )
-
-            return _run_mutation(
-                ctx,
+            add_ids, add_err = _resolve_product_ids(
                 menu,
-                action,
-                summary=f"Updated promotion {promotion_display_name(promo)!r}",
+                ctx,
+                {"product_ids": args.get("add_product_ids"), "product_names": args.get("add_product_names")},
             )
-
-        if tool_name == "set_promotion_targets":
-            promo, resolve_err = _resolve_promotion(promo_service, ctx, args)
-            if resolve_err:
-                return resolve_err
-            assert promo is not None
-
-            product_ids: list[uuid.UUID] | None = None
-            category_ids: list[uuid.UUID] | None = None
-            option_item_ids: list[uuid.UUID] | None = None
-
-            if any(key in args for key in ("product_ids", "product_names")):
-                resolved_products, product_err = _resolve_product_ids(menu, ctx, args)
-                if product_err:
-                    return product_err
-                product_ids = resolved_products
-                if "option_item_ids" not in args and is_nxm_bundle_promo(promo):
-                    option_item_ids = sync_option_items_for_product_change(
-                        menu,
-                        ctx.restaurant_id,
-                        previous_product_ids=promo.product_ids,
-                        new_product_ids=product_ids,
-                        current_option_item_ids=promo.option_item_ids,
-                    )
-            if any(key in args for key in ("category_ids", "category_names")):
-                resolved_categories, category_err = _resolve_category_ids(menu, ctx, args)
-                if category_err:
-                    return category_err
-                category_ids = resolved_categories
-            if "option_item_ids" in args:
-                try:
-                    option_item_ids = _parse_uuid_list(args.get("option_item_ids"), "option_item_ids")
-                except ValidationError as exc:
-                    return ToolResult(ok=False, summary=str(exc))
-
-            if product_ids is None and category_ids is None and option_item_ids is None:
+            if add_err:
+                return add_err
+            remove_ids, remove_err = _resolve_product_ids(
+                menu,
+                ctx,
+                {
+                    "product_ids": args.get("remove_product_ids"),
+                    "product_names": args.get("remove_product_names"),
+                },
+            )
+            if remove_err:
+                return remove_err
+            if not add_ids and not remove_ids:
                 return ToolResult(
                     ok=False,
                     summary=(
-                        "Provide product_ids/product_names, category_ids/category_names, "
-                        "or option_item_ids"
+                        "Provide add_product_names/add_product_ids and/or "
+                        "remove_product_names/remove_product_ids"
                     ),
+                )
+
+            current_products = list(promo.product_ids)
+            current_options = list(promo.option_item_ids)
+            try:
+                if remove_ids:
+                    current_products, current_options = remove_products_from_nxm_promo(
+                        menu,
+                        ctx.restaurant_id,
+                        current_product_ids=current_products,
+                        remove_product_ids=remove_ids,
+                        current_option_item_ids=current_options,
+                    )
+                if add_ids:
+                    current_products, current_options = add_products_to_nxm_promo(
+                        menu,
+                        ctx.restaurant_id,
+                        current_product_ids=current_products,
+                        add_product_ids=add_ids,
+                        current_option_item_ids=current_options,
+                    )
+            except ValidationError as exc:
+                return ToolResult(ok=False, summary=str(exc))
+
+            promotion_id = promo.id
+            next_products = current_products
+            next_options = current_options
+
+            def action() -> PromotionDTO:
+                promo_service.set_products(ctx.restaurant_id, promotion_id, next_products)
+                promo_service.set_option_items(ctx.restaurant_id, promotion_id, next_options)
+                return promo_service.get(ctx.restaurant_id, promotion_id)
+
+            parts: list[str] = []
+            if add_ids:
+                parts.append(f"added {len(add_ids)} product(s)")
+            if remove_ids:
+                parts.append(f"removed {len(remove_ids)} product(s)")
+            return _run_mutation(
+                ctx,
+                menu,
+                action,
+                summary=f"Updated NxM promotion {promotion_display_name(promo)!r}: {', '.join(parts)}",
+            )
+
+        if tool_name == "update_nxm_promotion_complements":
+            promo, resolve_err = _resolve_promotion(promo_service, ctx, args)
+            if resolve_err:
+                return resolve_err
+            assert promo is not None
+            nxm_err = _require_nxm_product_promo(promo)
+            if nxm_err:
+                return nxm_err
+            if not promo.product_ids:
+                return ToolResult(
+                    ok=False,
+                    summary="NxM promotion has no linked products; link products before editing complements",
+                )
+
+            enable_ids, enable_err = _resolve_option_item_ids_for_promo(
+                menu,
+                ctx,
+                promo.product_ids,
+                args,
+                ids_key="enable_option_item_ids",
+                labels_key="enable_option_item_labels",
+            )
+            if enable_err:
+                return enable_err
+            disable_ids, disable_err = _resolve_option_item_ids_for_promo(
+                menu,
+                ctx,
+                promo.product_ids,
+                args,
+                ids_key="disable_option_item_ids",
+                labels_key="disable_option_item_labels",
+            )
+            if disable_err:
+                return disable_err
+            if not enable_ids and not disable_ids:
+                return ToolResult(
+                    ok=False,
+                    summary=(
+                        "Provide enable_option_item_labels/enable_option_item_ids and/or "
+                        "disable_option_item_labels/disable_option_item_ids"
+                    ),
+                )
+
+            next_options = list(promo.option_item_ids)
+            if disable_ids:
+                next_options = disable_complements_in_nxm_promo(
+                    menu,
+                    ctx.restaurant_id,
+                    product_ids=promo.product_ids,
+                    current_option_item_ids=next_options,
+                    disable_option_item_ids=disable_ids,
+                )
+            if enable_ids:
+                next_options = enable_complements_in_nxm_promo(
+                    menu,
+                    ctx.restaurant_id,
+                    product_ids=promo.product_ids,
+                    current_option_item_ids=next_options,
+                    enable_option_item_ids=enable_ids,
                 )
 
             promotion_id = promo.id
 
             def action() -> PromotionDTO:
-                if product_ids is not None:
-                    promo_service.set_products(ctx.restaurant_id, promotion_id, product_ids)
-                if category_ids is not None:
-                    promo_service.set_categories(ctx.restaurant_id, promotion_id, category_ids)
-                if option_item_ids is not None:
-                    promo_service.set_option_items(
-                        ctx.restaurant_id, promotion_id, option_item_ids
-                    )
+                promo_service.set_option_items(ctx.restaurant_id, promotion_id, next_options)
                 return promo_service.get(ctx.restaurant_id, promotion_id)
 
+            parts: list[str] = []
+            if enable_ids:
+                parts.append(f"enabled {len(enable_ids)} complement(s)")
+            if disable_ids:
+                parts.append(f"disabled {len(disable_ids)} complement(s)")
             return _run_mutation(
                 ctx,
                 menu,
                 action,
-                summary=f"Updated targets for {promotion_display_name(promo)!r}",
+                summary=(
+                    f"Updated NxM complements for {promotion_display_name(promo)!r}: "
+                    f"{', '.join(parts)}"
+                ),
             )
 
         if tool_name == "generate_promotion_banner":

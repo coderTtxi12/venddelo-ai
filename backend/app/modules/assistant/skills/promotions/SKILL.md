@@ -15,12 +15,14 @@ those.
 
 ## When to use this skill
 
-Use `promotions` when the owner asks to **create or change a promotion**:
+Use `promotions` when the owner asks to **create a promotion**, **adjust an NxM promo**, or **turn one off**:
 
 - 2×1 / NxM bundles on specific products or categories
 - Visual combo badges (`type: combo`)
 - Percent or amount campaigns with a banner (not catalog discounts)
-- Link products/categories to an existing promo
+- Link products/categories at create time (include all targets in `create_promotion`)
+- Add/remove products on an existing **NxM / 2×1** promo (`update_nxm_promotion`)
+- Enable/disable complements on NxM promos (`update_nxm_promotion_complements`)
 - Turn off an expired campaign
 
 Use `menu_read` first (`list_promotions`, `get_promotion`, `get_product`) to inspect live
@@ -66,7 +68,7 @@ campaigns** (2×1/NxM, % off with banner, fixed amount off, combo badge).
 | 5 | **Regla** | 2×1: confirm "lleva 2 paga 1" or other NxM. %: "¿Qué porcentaje?" Amount: "¿Cuántos pesos de descuento?" Combo badge: skip (visual only). Order scope: optional minimum ("¿Pedido mínimo?"). |
 | 6 | **Fechas** (optional) | "¿Tiene fecha de inicio o fin, o la dejamos siempre activa?" |
 | 7 | **Horario** (optional) | "¿Solo ciertos días u horario? (ej. fines de semana, happy hour)" |
-| 8 | **Banner** (optional) | "¿Generamos un banner con IA o subes una imagen? Si no, usamos placeholder y luego `generate_promotion_banner` o `update_promotion`." |
+| 8 | **Banner** (optional) | "¿Generamos un banner con IA o subes una imagen? Si no, usamos placeholder y luego `generate_promotion_banner`." |
 | 9 | **Recap + confirm** | Short bullet recap in Spanish (tipo, nombre, productos/categoría, regla, fechas si hay); end with "¿La creamos así?" / "¿Confirmo?" |
 
 Only after **explicit yes** on the recap → **`create_promotion`**.
@@ -80,8 +82,7 @@ Only after **explicit yes** on the recap → **`create_promotion`**.
 - Owner says pesos for fixed discounts → convert to `amount_cents` (×100) silently; never say "centavos" to them.
 - **NxM / 2×1** requires `scope` `product` or `category` with at least one target — never create without targets.
 - **`type: combo`** is visual only (no cart math) — say that plainly if they pick combo badge.
-- Mention placeholder banner if they skip image; offer **`generate_promotion_banner`** after create
-  or `update_promotion` when they upload an asset.
+- Mention placeholder banner if they skip image; offer **`generate_promotion_banner`** after create.
 
 ### Example dialogue (2×1)
 
@@ -105,12 +106,12 @@ You:  [create_promotion] Listo, ya está tu promo de marketing.
 
 ### After create (optional)
 
-- **Banner:** `generate_promotion_banner` (AI, 16:9 delivery-style creative) or `update_promotion`
-  with `image_path` when they upload an asset.
-- **Targets:** `set_promotion_targets` if they want to add/remove products later. For NxM/2×1,
-  **all complements of new products are included automatically** — do not pass `option_item_ids`
-  unless the owner wants to **exclude** specific add-ons from the promo.
+- **Banner:** `generate_promotion_banner` (AI, 16:9 delivery-style creative).
+- **NxM products:** `update_nxm_promotion` to add/remove products without replacing the full list.
+- **NxM complements:** `update_nxm_promotion_complements` to exclude or re-include add-ons.
 - **End campaign:** `disable_promotion` when it expires — never hard-delete.
+
+Other edits (dates, rules, non-NxM promos) are done in the **admin UI**.
 
 ---
 
@@ -119,8 +120,8 @@ You:  [create_promotion] Listo, ya está tu promo de marketing.
 | Tool | Purpose |
 |------|---------|
 | `create_promotion` | New marketing promo after secretary recap confirmed (name, type, scope, targets, optional schedule/dates) |
-| `update_promotion` | Change name, banner, bundle rules, schedule, dates, or targets |
-| `set_promotion_targets` | Replace linked products, categories, or option items on one promo |
+| `update_nxm_promotion` | Incrementally add/remove products on an existing NxM / 2×1 promo |
+| `update_nxm_promotion_complements` | Enable or disable complements on an NxM allow-list |
 | `disable_promotion` | Soft-disable (`is_active=false`) by `promotion_id` or name |
 | `generate_promotion_banner` | AI 16:9 marketing banner → storage → sets `image_path` on one promo |
 
