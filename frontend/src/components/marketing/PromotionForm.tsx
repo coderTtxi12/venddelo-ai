@@ -68,6 +68,34 @@ function activeOptionItemIdsForProduct(product: Product): string[] {
   return ids;
 }
 
+
+function setComplementChecked(
+  complementOptionItemIds: string[],
+  itemId: string,
+  checked: boolean,
+): string[] {
+  if (checked) {
+    return complementOptionItemIds.includes(itemId)
+      ? complementOptionItemIds
+      : [...complementOptionItemIds, itemId];
+  }
+  return complementOptionItemIds.filter((id) => id !== itemId);
+}
+
+function setGroupComplementsChecked(
+  complementOptionItemIds: string[],
+  groupItemIds: string[],
+  checked: boolean,
+): string[] {
+  if (checked) {
+    const next = new Set(complementOptionItemIds);
+    for (const id of groupItemIds) next.add(id);
+    return [...next];
+  }
+  const remove = new Set(groupItemIds);
+  return complementOptionItemIds.filter((id) => !remove.has(id));
+}
+
 function cleanupComplementsForRemovedProducts(
   complementOptionItemIds: string[],
   removedProductIds: string[],
@@ -564,9 +592,9 @@ export function PromotionForm({
             ) : null}
           </legend>
           <p className={styles.helpText}>
-            Se incluyen automáticamente todos los extras de cada producto seleccionado. Si el cliente
-            elige en el menú un complemento que no esté marcado aquí, la promoción no aplicará y verá
-            un aviso en el menú.
+            Marca los extras que entran al NxM. Solo los complementos seleccionados participan en la
+            promoción. Si el cliente elige uno no marcado, la promoción no aplicará y verá un aviso
+            en el menú.
           </p>
           <div className={styles.complementList}>
             {complementProducts.map((product) => {
@@ -595,16 +623,11 @@ export function PromotionForm({
                             onClick={() =>
                               setForm((prev) => ({
                                 ...prev,
-                                complementOptionItemIds: allSelected
-                                  ? prev.complementOptionItemIds.filter(
-                                      (id: string) => !groupItemIds.includes(id),
-                                    )
-                                  : [
-                                      ...new Set([
-                                        ...prev.complementOptionItemIds,
-                                        ...groupItemIds,
-                                      ]),
-                                    ],
+                                complementOptionItemIds: setGroupComplementsChecked(
+                                  prev.complementOptionItemIds,
+                                  groupItemIds,
+                                  !allSelected,
+                                ),
                               }))
                             }
                           >
@@ -617,12 +640,13 @@ export function PromotionForm({
                               <input
                                 type="checkbox"
                                 checked={form.complementOptionItemIds.includes(item.id)}
-                                onChange={() =>
+                                onChange={(e) =>
                                   setForm((prev) => ({
                                     ...prev,
-                                    complementOptionItemIds: toggleId(
+                                    complementOptionItemIds: setComplementChecked(
                                       prev.complementOptionItemIds,
                                       item.id,
+                                      e.target.checked,
                                     ),
                                   }))
                                 }

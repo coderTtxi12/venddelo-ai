@@ -45,11 +45,10 @@ export function getBundleComplementRulesForProduct(
     if (!isNxmBundlePromo(promotion)) continue;
     if (!isPromotionEffective(promotion, now, timezone)) continue;
     if (!promoAppliesToProduct(promotion, product)) continue;
-    if (!promotion.option_item_ids?.length) continue;
     return {
       promoName: promotion.name,
       promoBadge: bundlePromoShortBadge(promotion),
-      allowedOptionItemIds: new Set(promotion.option_item_ids),
+      allowedOptionItemIds: new Set(promotion.option_item_ids ?? []),
     };
   }
   return null;

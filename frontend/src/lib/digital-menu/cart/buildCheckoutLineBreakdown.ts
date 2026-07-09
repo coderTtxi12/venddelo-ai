@@ -139,10 +139,7 @@ function bundleNotAppliedReasonForLine(
   quantity: number,
   quoteLine: CartQuoteLine,
 ): string | null {
-  if (
-    lineHasComplementExcludedWarning(quoteLine) &&
-    (promotion.option_item_ids?.length ?? 0) > 0
-  ) {
+  if (lineHasComplementExcludedWarning(quoteLine)) {
     return 'Complemento fuera de la promoción';
   }
   return bundleNotAppliedReason(promotion, quantity);
