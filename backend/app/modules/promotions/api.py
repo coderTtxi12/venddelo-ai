@@ -114,7 +114,7 @@ def set_promotion_products(
     promo = service.get(restaurant.id, promotion_id)
     previous_product_ids = list(promo.product_ids)
     service.set_products(restaurant.id, promotion_id, body.ids)
-    if is_nxm_bundle_promo(promo) and promo.option_item_ids:
+    if is_nxm_bundle_promo(promo):
         menu = MenuService(uow.menu)
         synced = sync_option_items_for_product_change(
             menu,
