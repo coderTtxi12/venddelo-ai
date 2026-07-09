@@ -16,7 +16,7 @@ export default function OnboardingPage() {
 
     void listRestaurants(accessToken, 1).then((page) => {
       if (page.items.length > 0) {
-        router.replace('/');
+        router.replace('/orders');
       }
     });
   }, [accessToken, loading, router]);
@@ -29,7 +29,7 @@ export default function OnboardingPage() {
     <OnboardingWizard
       userId={user.uid}
       onComplete={() => {
-        router.replace('/');
+        router.replace('/orders');
         router.refresh();
       }}
     />

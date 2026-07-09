@@ -44,7 +44,13 @@ export async function updateSession(request: NextRequest) {
 
   if (user && pathname === '/login') {
     const url = request.nextUrl.clone();
-    url.pathname = '/';
+    url.pathname = '/orders';
+    return NextResponse.redirect(url);
+  }
+
+  if (user && pathname === '/') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/orders';
     return NextResponse.redirect(url);
   }
 

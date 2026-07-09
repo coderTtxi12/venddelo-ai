@@ -1,5 +1,5 @@
-import DashboardPage from '@/components/pages/DashboardPage';
+import { redirect } from 'next/navigation';
 
 export default function HomePage() {
-  return <DashboardPage />;
+  redirect('/orders');
 }
