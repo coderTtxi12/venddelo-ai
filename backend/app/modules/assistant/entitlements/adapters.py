@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.db.models.assistant_profile import RestaurantAssistantEntitlement
@@ -55,11 +56,25 @@ class SqlAlchemyRestaurantEntitlementsRepository(RestaurantEntitlementsRepositor
         existing = self.get(restaurant_id)
         if existing is not None:
             return existing
-        return self.create_default(
-            restaurant_id,
-            granted_skill_ids=granted_skill_ids,
-            source=source,
+
+        stmt = (
+            insert(RestaurantAssistantEntitlement)
+            .values(
+                restaurant_id=restaurant_id,
+                granted_skill_ids=list(granted_skill_ids),
+                source=source,
+            )
+            .on_conflict_do_nothing(index_elements=["restaurant_id"])
         )
+        self._session.execute(stmt)
+        self._session.flush()
+
+        obj = self._session.get(RestaurantAssistantEntitlement, restaurant_id)
+        if obj is None:
+            raise RuntimeError(
+                f"Entitlements row missing after upsert for restaurant {restaurant_id}"
+            )
+        return _to_record(obj)
 
 
 # Backward-compatible alias for existing imports.
