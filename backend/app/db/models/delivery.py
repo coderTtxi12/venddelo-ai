@@ -48,6 +48,9 @@ class DeliveryProvider(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     members: Mapped[list["DeliveryProviderMember"]] = relationship(
         back_populates="delivery_provider", cascade="all, delete-orphan"
     )
+    admin_invites: Mapped[list["DeliveryProviderAdminInvite"]] = relationship(
+        back_populates="delivery_provider", cascade="all, delete-orphan"
+    )
     zones: Mapped[list["DeliveryProviderZone"]] = relationship(
         back_populates="delivery_provider", cascade="all, delete-orphan"
     )
@@ -111,6 +114,24 @@ class DeliveryProviderMember(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "member_role IN ('owner','admin','dispatcher','driver')",
             name="member_role_allowed",
         ),
+    )
+
+
+class DeliveryProviderAdminInvite(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "delivery_provider_admin_invites"
+
+    delivery_provider_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_providers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+
+    delivery_provider: Mapped["DeliveryProvider"] = relationship(back_populates="admin_invites")
+
+    __table_args__ = (
+        UniqueConstraint("delivery_provider_id", "email"),
+        Index("ix_delivery_provider_admin_invites_email", "email"),
     )
 
 
