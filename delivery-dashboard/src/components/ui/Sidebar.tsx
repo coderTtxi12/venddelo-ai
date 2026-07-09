@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import HandshakeOutlinedIcon from '@mui/icons-material/HandshakeOutlined';
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
@@ -20,7 +19,6 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', path: '/', icon: <DashboardOutlinedIcon fontSize="small" /> },
   { label: 'Restaurantes', path: '/partnerships', icon: <HandshakeOutlinedIcon fontSize="small" /> },
   { label: 'Tarifas', path: '/tariffs', icon: <LocalShippingOutlinedIcon fontSize="small" /> },
   { label: 'Horarios', path: '/horarios', icon: <AccessTimeOutlinedIcon fontSize="small" /> },
@@ -40,7 +38,7 @@ export default function Sidebar() {
   return (
     <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}>
       <div className={styles.headerRow}>
-        <div className={styles.logo}>Delivery Dashboard</div>
+        <div className={styles.logo}>Mexy Dashboard</div>
         <button
           type="button"
           className={styles.toggleButton}
