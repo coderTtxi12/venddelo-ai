@@ -242,6 +242,10 @@ def router_input(context: WorkflowContext) -> str:
                 f"El usuario adjuntó **{context.menu_source_attachment_count}** archivo(s) "
                 "de menú (`menu_source`) en este mensaje."
             )
+            parts.append(
+                "Con archivos `menu_source`, la subida/importación del menú va a "
+                "**menu_import** — no al executor de altas manuales."
+            )
     if context.import_session_context:
         parts.append(f"## Active menu import session\n\n{context.import_session_context}")
     return "\n\n".join(parts)

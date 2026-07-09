@@ -41,17 +41,13 @@ from app.modules.assistant.agent.workflow.schemas import (
     adjust_evaluation_for_execution,
     clear_execution_approval_gates,
 )
-from app.modules.assistant.agent.workflow.sse import agent_thought_event, evaluation_event, menu_import_quiz_event, phase_event
+from app.modules.assistant.agent.workflow.sse import agent_thought_event, evaluation_event, phase_event
 from app.modules.assistant.agent.workflow.stream_mapping import (
     RouterReasonStreamParser,
     map_agent_stream_event,
     map_router_stream_event,
 )
 from app.modules.assistant.skills.context import AgentContext
-from app.modules.assistant.skills.menu_import.clarification import (
-    hydrate_menu_import_response,
-    try_apply_clarification_from_user_message,
-)
 from app.modules.assistant.skills.menu_import.onboarding_agent import (
     build_menu_import_executor_agent,
     build_menu_import_responder_agent,
@@ -205,21 +201,18 @@ class WorkflowOrchestrator:
 
             if route.is_menu_import and workflow_context.menu_import_enabled and menu_import_registry:
                 menu_import_context = workflow_context
-                if try_apply_clarification_from_user_message(
-                    uow=uow,
-                    restaurant_id=restaurant_id,
-                    conversation_id=resolved_conversation_id,
-                    user_message=workflow_context.user_message,
-                ):
+                if workflow_context.import_session_context:
                     active_import = get_active_import_for_conversation(
                         uow,
                         restaurant_id=restaurant_id,
                         conversation_id=resolved_conversation_id,
+                        fresh=True,
                     )
-                    menu_import_context = replace(
-                        workflow_context,
-                        import_session_context=build_import_session_context(active_import),
-                    )
+                    if active_import is not None:
+                        menu_import_context = replace(
+                            workflow_context,
+                            import_session_context=build_import_session_context(active_import),
+                        )
                 yield ChatStreamEvent(
                     event="agent.phase",
                     data={"phase": "executing", "label": "Importando menú"},
@@ -253,21 +246,11 @@ class WorkflowOrchestrator:
                     if menu_import_response_box
                     else MenuImportUserResponse(message="".join(content_parts).strip())
                 )
-                active_session = get_active_import_for_conversation(
-                    uow,
-                    restaurant_id=restaurant_id,
-                    conversation_id=resolved_conversation_id,
-                )
-                response = hydrate_menu_import_response(response, active_session)
                 final_output = response.message.strip() or "".join(content_parts).strip()
                 complete_data: dict[str, object] = {
                     "conversation_id": str(resolved_conversation_id),
                     "content": final_output,
                 }
-                if response.questions:
-                    complete_data["menu_import"] = {
-                        "questions": [question.model_dump() for question in response.questions],
-                    }
                 yield ChatStreamEvent(event="message.complete", data=complete_data)
                 if final_output:
                     schedule_persist_turn(
@@ -531,9 +514,20 @@ class WorkflowOrchestrator:
             data={"phase": "responding", "label": "Preparando respuesta"},
         )
 
+        active_import = get_active_import_for_conversation(
+            uow,
+            restaurant_id=restaurant_id,
+            conversation_id=workflow_context.conversation_id,
+            fresh=True,
+        )
+        responder_context = replace(
+            workflow_context,
+            import_session_context=build_import_session_context(active_import),
+        )
+
         responder_streamed = Runner.run_streamed(
             responder,
-            menu_import_responder_input(workflow_context, route, execution),
+            menu_import_responder_input(responder_context, route, execution),
             context=run_context,
             max_turns=1,
         )
@@ -556,12 +550,6 @@ class WorkflowOrchestrator:
                 MenuImportUserResponse,
                 raise_if_incorrect_type=True,
             )
-            active_session = get_active_import_for_conversation(
-                uow,
-                restaurant_id=restaurant_id,
-                conversation_id=workflow_context.conversation_id,
-            )
-            response = hydrate_menu_import_response(response, active_session)
             response_box.append(response)
 
             if response.message:
@@ -571,9 +559,6 @@ class WorkflowOrchestrator:
                     event="content.delta",
                     data={"delta": response.message},
                 )
-
-            if response.questions:
-                yield menu_import_quiz_event(response.questions)
 
     async def _stream_responder(
         self,
