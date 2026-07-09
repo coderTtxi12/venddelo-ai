@@ -50,6 +50,16 @@ class MenuImportSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         server_default="[]",
     )
+    ocr_original: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default="{}",
+    )
+    open_questions: Mapped[list[Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default="[]",
+    )
     selected_theme_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     enhance_descriptions: Mapped[bool] = mapped_column(
         Boolean,
