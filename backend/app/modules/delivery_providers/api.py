@@ -8,6 +8,8 @@ from app.infra.storage.factory import build_storage
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
+    DeliveryProviderAdminInviteCreate,
+    DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
     DeliveryProviderMeResponse,
     DeliveryProviderOnboardingSubmit,
@@ -52,7 +54,7 @@ def get_my_delivery_provider(
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryProviderService = Depends(_service),
 ) -> DeliveryProviderMeResponse:
-    return service.get_me(user.id)
+    return service.get_me(user.id, user.email)
 
 
 @router.post(
@@ -75,6 +77,36 @@ def update_my_delivery_provider(
     service: DeliveryProviderService = Depends(_service),
 ) -> DeliveryProviderDTO:
     return service.update_profile(user.id, data)
+
+
+@router.get("/me/admin-invites", response_model=list[DeliveryProviderAdminInviteDTO])
+def list_my_delivery_provider_admin_invites(
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> list[DeliveryProviderAdminInviteDTO]:
+    return service.list_admin_invites(user.id)
+
+
+@router.post(
+    "/me/admin-invites",
+    response_model=DeliveryProviderAdminInviteDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_my_delivery_provider_admin_invite(
+    data: DeliveryProviderAdminInviteCreate,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> DeliveryProviderAdminInviteDTO:
+    return service.add_admin_invite(user.id, data)
+
+
+@router.delete("/me/admin-invites/{invite_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_my_delivery_provider_admin_invite(
+    invite_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> None:
+    service.remove_admin_invite(user.id, invite_id)
 
 
 @router.get("/me/schedules", response_model=list[DeliveryProviderScheduleDTO])
