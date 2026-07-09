@@ -1,6 +1,7 @@
 import { apiRequest } from './client';
 import type {
   DeliveryProvider,
+  DeliveryProviderAdminInvite,
   DeliveryProviderMeResponse,
   DeliveryProviderPricingResponse,
   DeliveryProviderPricingUpdate,
@@ -18,6 +19,27 @@ import type {
 
 export function getMyDeliveryProvider(token: string) {
   return apiRequest<DeliveryProviderMeResponse>('/delivery-providers/me', { token });
+}
+
+export function listMyDeliveryProviderAdminInvites(token: string) {
+  return apiRequest<DeliveryProviderAdminInvite[]>('/delivery-providers/me/admin-invites', {
+    token,
+  });
+}
+
+export function addMyDeliveryProviderAdminInvite(token: string, email: string) {
+  return apiRequest<DeliveryProviderAdminInvite>('/delivery-providers/me/admin-invites', {
+    method: 'POST',
+    token,
+    body: { email },
+  });
+}
+
+export function removeMyDeliveryProviderAdminInvite(token: string, inviteId: string) {
+  return apiRequest<void>(`/delivery-providers/me/admin-invites/${inviteId}`, {
+    method: 'DELETE',
+    token,
+  });
 }
 
 export function updateMyDeliveryProvider(token: string, body: DeliveryProviderProfileUpdate) {

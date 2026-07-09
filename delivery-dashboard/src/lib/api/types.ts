@@ -48,6 +48,12 @@ export type DeliveryProviderMeResponse = {
   primary_zone: DeliveryProviderZone | null;
 };
 
+export type DeliveryProviderAdminInvite = {
+  id: string;
+  email: string;
+  created_at: string;
+};
+
 export type DeliveryProviderProfileUpdate = {
   company_name: string;
   responsible_name: string;
