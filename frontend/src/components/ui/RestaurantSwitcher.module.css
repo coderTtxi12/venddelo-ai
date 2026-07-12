@@ -1,0 +1,355 @@
+.root {
+  position: relative;
+}
+
+.rootCollapsed {
+  display: flex;
+  justify-content: center;
+  padding: 0 0 0.85rem;
+}
+
+.rootExpanded {
+  padding: 0 0.25rem 1rem;
+}
+
+.rootToolbar {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+}
+
+.rootToolbar.rootCollapsed {
+  padding: 0;
+  justify-content: center;
+  width: 100%;
+}
+
+.triggerCompact {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg);
+  color: var(--color-primary);
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.triggerExpanded {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.triggerCompact:hover:not(:disabled),
+.triggerExpanded:hover:not(:disabled) {
+  border-color: rgba(79, 70, 229, 0.35);
+  background: rgba(79, 70, 229, 0.05);
+}
+
+.triggerCompact:focus-visible,
+.triggerExpanded:focus-visible {
+  outline: 2px solid rgba(79, 70, 229, 0.35);
+  outline-offset: 2px;
+}
+
+.triggerOpen {
+  border-color: rgba(79, 70, 229, 0.45);
+  background: rgba(79, 70, 229, 0.08);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.1);
+}
+
+.triggerCompact:disabled,
+.triggerExpanded:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.triggerAvatar {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+  pointer-events: none;
+}
+
+.triggerIcon {
+  position: absolute;
+  right: -0.15rem;
+  bottom: -0.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 0.68rem;
+  color: var(--color-primary);
+}
+
+.triggerCount {
+  position: absolute;
+  top: -0.3rem;
+  right: -0.3rem;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.2rem;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.1rem;
+  text-align: center;
+  border: 2px solid var(--color-surface);
+}
+
+.triggerExpandedAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  color: var(--color-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.triggerExpandedBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.triggerExpandedName {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.triggerExpandedMeta {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+
+.triggerExpandedChevron {
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+
+.triggerExpandedChevronOpen {
+  transform: rotate(180deg);
+  color: var(--color-primary);
+}
+
+.menu {
+  z-index: 40;
+  padding: 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow:
+    0 18px 40px rgba(15, 23, 42, 0.12),
+    0 4px 12px rgba(15, 23, 42, 0.06);
+  animation: menuIn 0.16s ease-out;
+}
+
+.menuCollapsed {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 0.65rem);
+  width: min(17.5rem, calc(100vw - 6rem));
+}
+
+.menuExpanded {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  right: 0;
+}
+
+.menuHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.35rem 0.45rem 0.55rem;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 0.35rem;
+}
+
+.menuEyebrow {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.menuTitle {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+
+.menuList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.menuItem:hover:not(:disabled) {
+  background: rgba(79, 70, 229, 0.05);
+  border-color: rgba(79, 70, 229, 0.12);
+}
+
+.menuItem:focus-visible {
+  outline: 2px solid rgba(79, 70, 229, 0.35);
+  outline-offset: 1px;
+}
+
+.menuItemSelected {
+  background: rgba(79, 70, 229, 0.08);
+  border-color: rgba(79, 70, 229, 0.18);
+}
+
+.menuItem:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.menuItemAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  color: var(--color-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.menuItemBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.menuItemName {
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menuItemMeta {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+
+.menuItemCheck {
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.menuCollapsed {
+  animation-name: menuInSide;
+}
+
+@keyframes menuInSide {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu {
+    animation: none;
+  }
+
+  .triggerCompact,
+  .triggerExpanded,
+  .menuItem,
+  .triggerExpandedChevron {
+    transition: none;
+  }
+}
