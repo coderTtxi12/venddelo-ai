@@ -102,3 +102,4 @@ class PublicDeliveryQuoteDTO(BaseModel):
     distance_km: float | None = None
     provider_name: str | None = None
     partnership_status: Literal["none", "pending", "active", "suspended"] = "none"
+    weather_mode: Literal["none", "light", "heavy", "intense"] = "none"
