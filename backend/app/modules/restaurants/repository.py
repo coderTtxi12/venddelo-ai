@@ -8,8 +8,12 @@ from app.core.pagination import CursorPage, PaginationParams
 from app.modules.restaurants.schemas import (
     PaymentMethodCreate,
     PaymentMethodDTO,
+    RestaurantAdminInviteCreate,
+    RestaurantAdminInviteDTO,
     RestaurantCreate,
     RestaurantDTO,
+    RestaurantAccessItem,
+    RestaurantMemberDTO,
     RestaurantUpdate,
     ScheduleCreate,
     ScheduleDTO,
@@ -55,3 +59,52 @@ class RestaurantRepository(ABC):
     def set_payment_methods(
         self, id: uuid.UUID, methods: Sequence[PaymentMethodCreate]
     ) -> None: ...
+
+    @abstractmethod
+    def get_for_user(
+        self,
+        user_id: uuid.UUID,
+        *,
+        restaurant_id: uuid.UUID | None = None,
+    ) -> tuple[RestaurantDTO, str] | None: ...
+
+    @abstractmethod
+    def list_accessible(self, user_id: uuid.UUID) -> Sequence[RestaurantAccessItem]: ...
+
+    @abstractmethod
+    def touch_last_accessed(self, user_id: uuid.UUID, restaurant_id: uuid.UUID) -> None: ...
+
+    @abstractmethod
+    def remove_admin_member(self, restaurant_id: uuid.UUID, member_id: uuid.UUID) -> None: ...
+
+    @abstractmethod
+    def user_has_membership(self, user_id: uuid.UUID) -> bool: ...
+
+    @abstractmethod
+    def email_associated_with_other_restaurant(
+        self,
+        email: str,
+        *,
+        exclude_restaurant_id: uuid.UUID | None = None,
+    ) -> bool: ...
+
+    @abstractmethod
+    def list_admin_invites(
+        self, restaurant_id: uuid.UUID
+    ) -> Sequence[RestaurantAdminInviteDTO]: ...
+
+    @abstractmethod
+    def add_admin_invite(
+        self, restaurant_id: uuid.UUID, email: str
+    ) -> RestaurantAdminInviteDTO: ...
+
+    @abstractmethod
+    def remove_admin_invite(self, restaurant_id: uuid.UUID, invite_id: uuid.UUID) -> None: ...
+
+    @abstractmethod
+    def list_admin_members(
+        self, restaurant_id: uuid.UUID
+    ) -> Sequence[RestaurantMemberDTO]: ...
+
+    @abstractmethod
+    def claim_admin_invites(self, user_id: uuid.UUID, email: str) -> bool: ...
