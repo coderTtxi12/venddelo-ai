@@ -9,6 +9,7 @@ import { RestaurantLocationMapPicker } from '@/components/settings/RestaurantLoc
 import type { RestaurantLocationMapPickerHandle } from '@/components/settings/RestaurantLocationMapPicker';
 import { RestaurantPlaceAutocomplete } from '@/components/settings/RestaurantPlaceAutocomplete';
 import { useAuth } from '@/hooks/useAuth';
+import { checkRestaurantSubdomainAvailability } from '@/lib/api/restaurants';
 import { createDefaultOnboardingData } from '@/lib/onboarding/defaults';
 import { normalizeOnboardingScheduleDrafts } from '@/lib/onboarding/schedule';
 import {
@@ -28,7 +29,16 @@ import {
   PAYMENT_METHOD_ORDER,
   type PaymentMethodKey,
 } from '@/lib/restaurantPaymentConfig';
+import {
+  MENU_PUBLIC_DOMAIN,
+  normalizeSubdomainInput,
+  normalizeSubdomainDraft,
+  restaurantPublicMenuUrl,
+  subdomainAvailabilityMessage,
+  validateSubdomain,
+} from '@/lib/restaurantSubdomain';
 import { RESTAURANT_SERVICE_LABELS } from '@/lib/restaurantServices';
+
 import styles from './OnboardingWizard.module.css';
 
 const STEP_COPY: Record<
@@ -40,53 +50,58 @@ const STEP_COPY: Record<
     title: '¿Cómo se llama tu negocio?',
     subtitle: 'Este nombre aparecerá en tu menú digital y en las comunicaciones con tus clientes.',
   },
+  subdomain: {
+    questionLabel: 'Paso 2',
+    title: 'Elige la URL de tu menú',
+    subtitle: 'Tus clientes accederán a tu menú digital con este enlace. Debe ser único.',
+  },
   description: {
     questionLabel: 'Opcional',
     title: '¿Cómo describirías tu negocio?',
     subtitle: 'Una breve presentación para tus clientes en el menú digital. Puedes omitir este paso.',
   },
   ownerName: {
-    questionLabel: 'Paso 2',
+    questionLabel: 'Paso 3',
     title: '¿Quién es el responsable del negocio?',
     subtitle: 'Persona de contacto principal para temas administrativos.',
   },
   ownerPhone: {
-    questionLabel: 'Paso 3',
+    questionLabel: 'Paso 4',
     title: '¿Cuál es el celular del responsable?',
     subtitle: 'Lo usaremos solo para contactarte sobre tu cuenta.',
   },
   branchCount: {
-    questionLabel: 'Paso 4',
+    questionLabel: 'Paso 5',
     title: '¿Cuántas sucursales tiene tu negocio?',
     subtitle: 'Si tienes un local, deja el valor en 1.',
   },
   logo: {
-    questionLabel: 'Paso 5',
+    questionLabel: 'Paso 6',
     title: 'Sube el logo de tu negocio',
     subtitle: 'Un logo claro ayuda a que tus clientes te reconozcan al instante.',
   },
   cover: {
-    questionLabel: 'Paso 6',
+    questionLabel: 'Paso 7',
     title: 'Sube la foto de portada',
     subtitle: 'Esta imagen se mostrará en la página principal de tu menú digital.',
   },
   location: {
-    questionLabel: 'Paso 7',
+    questionLabel: 'Paso 8',
     title: '¿Dónde está ubicado tu negocio?',
     subtitle: 'Busca tu dirección y ajusta el pin para marcar la entrada exacta.',
   },
   schedule: {
-    questionLabel: 'Paso 8',
+    questionLabel: 'Paso 9',
     title: '¿Cuál es el horario de tu negocio?',
     subtitle: 'Ajusta el horario de acuerdo a tu negocio.',
   },
   orderTypes: {
-    questionLabel: 'Paso 9',
+    questionLabel: 'Paso 10',
     title: '¿Qué tipos de pedido quieres ofrecer?',
     subtitle: 'Entrega a domicilio, recoger en tienda o ambos. Todos vienen activados por defecto. Desactiva los que no ofrezca tu negocio.',
   },
   paymentMethods: {
-    questionLabel: 'Paso 10',
+    questionLabel: 'Paso 11',
     title: '¿Qué métodos de pago aceptas en tu establecimiento?',
     subtitle: 'Todos vienen activados. Desactiva los que no uses.',
   },
@@ -126,6 +141,10 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
   const [stepError, setStepError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [subdomainTouched, setSubdomainTouched] = useState(false);
+  const [subdomainChecking, setSubdomainChecking] = useState(false);
+  const [subdomainVerified, setSubdomainVerified] = useState(false);
+  const [subdomainCheckError, setSubdomainCheckError] = useState<string | null>(null);
 
   const visibleSteps = useMemo(() => getVisibleSteps(data), [data]);
   const currentIndex = stepIndex(visibleSteps, currentStepId);
@@ -135,6 +154,76 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
       : 100;
 
   const copy = STEP_COPY[currentStepId];
+
+  const subdomainPreviewUrl = useMemo(() => {
+    const normalized = normalizeSubdomainInput(data.subdomain);
+    if (!normalized || validateSubdomain(normalized)) return null;
+    return restaurantPublicMenuUrl(normalized);
+  }, [data.subdomain]);
+
+  useEffect(() => {
+    if (currentStepId !== 'subdomain' || data.subdomain.trim()) return;
+    const suggestion = normalizeSubdomainInput(data.businessName);
+    if (suggestion) {
+      setData((prev) => ({ ...prev, subdomain: suggestion }));
+      setSubdomainTouched(true);
+    }
+  }, [currentStepId, data.businessName, data.subdomain]);
+
+  useEffect(() => {
+    if (currentStepId !== 'subdomain') return;
+    if (!accessToken) return;
+
+    const normalized = normalizeSubdomainInput(data.subdomain);
+    if (!normalized) {
+      setSubdomainCheckError(null);
+      setSubdomainChecking(false);
+      setSubdomainVerified(false);
+      return;
+    }
+
+    if (data.subdomain.endsWith('-')) {
+      setSubdomainCheckError(null);
+      setSubdomainChecking(false);
+      setSubdomainVerified(false);
+      return;
+    }
+
+    const formatError = validateSubdomain(normalized);
+    if (formatError) {
+      setSubdomainCheckError(formatError);
+      setSubdomainChecking(false);
+      setSubdomainVerified(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSubdomainChecking(true);
+    setSubdomainVerified(false);
+
+    const timer = window.setTimeout(() => {
+      void checkRestaurantSubdomainAvailability(accessToken, normalized)
+        .then((result) => {
+          if (cancelled) return;
+          const message = subdomainAvailabilityMessage(result);
+          setSubdomainCheckError(message);
+          setSubdomainVerified(message === null);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setSubdomainCheckError('No se pudo verificar la disponibilidad del subdominio.');
+          setSubdomainVerified(false);
+        })
+        .finally(() => {
+          if (!cancelled) setSubdomainChecking(false);
+        });
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [accessToken, currentStepId, data.subdomain]);
 
   useEffect(() => {
     const saved = loadOnboardingState(userId);
@@ -280,6 +369,17 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
       return;
     }
 
+    if (currentStepId === 'subdomain') {
+      if (subdomainChecking) {
+        setStepError('Espera mientras comprobamos la disponibilidad.');
+        return;
+      }
+      if (!subdomainVerified) {
+        setStepError(subdomainCheckError ?? 'Confirma que el subdominio esté disponible.');
+        return;
+      }
+    }
+
     const nextStep = visibleSteps[currentIndex + 1];
     if (nextStep) {
       setCurrentStepId(nextStep);
@@ -301,11 +401,15 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
       onComplete();
     } catch (error) {
       console.error(error);
-      setSubmitError('No se pudo guardar tu negocio. Revisa tu conexión e inténtalo de nuevo.');
+      const message =
+        error instanceof Error && /subdomain|409|conflict/i.test(error.message)
+          ? 'Este subdominio ya no está disponible. Regresa y elige otro.'
+          : 'No se pudo guardar tu negocio. Revisa tu conexión e inténtalo de nuevo.';
+      setSubmitError(message);
     } finally {
       setSubmitting(false);
     }
-  }, [accessToken, currentIndex, currentStepId, data, onComplete, userId, visibleSteps]);
+  }, [accessToken, currentIndex, currentStepId, data, onComplete, subdomainCheckError, subdomainChecking, subdomainVerified, userId, visibleSteps]);
 
   const goSkipOptionalStep = useCallback(() => {
     if (currentStepId !== 'description') return;
@@ -371,6 +475,72 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
             onKeyDown={handleKeyDown}
             onChange={(e) => patchData({ businessName: e.target.value })}
           />
+        );
+
+      case 'subdomain':
+        return (
+          <div className={styles.subdomainWrap}>
+            <label className={styles.subdomainLabel} htmlFor="onboarding-subdomain">
+              Subdominio del menú
+            </label>
+            <div
+              className={`${styles.subdomainInputWrap} ${
+                subdomainCheckError ? styles.subdomainInputWrapError : ''
+              }`}
+            >
+              <input
+                id="onboarding-subdomain"
+                className={styles.subdomainInput}
+                value={data.subdomain}
+                autoComplete="off"
+                spellCheck={false}
+                autoFocus
+                aria-describedby="onboarding-subdomain-help onboarding-subdomain-feedback"
+                aria-invalid={subdomainCheckError ? true : undefined}
+                placeholder="taqueria-el-sol"
+                onKeyDown={handleKeyDown}
+                onChange={(e) => {
+                  patchData({ subdomain: normalizeSubdomainDraft(e.target.value) });
+                  setSubdomainTouched(true);
+                  setSubdomainVerified(false);
+                }}
+                onBlur={() => {
+                  setSubdomainTouched(true);
+                  patchData({ subdomain: normalizeSubdomainInput(data.subdomain) });
+                }}
+              />
+              <span className={styles.subdomainSuffix} aria-hidden="true">
+                .{MENU_PUBLIC_DOMAIN}
+              </span>
+            </div>
+            <p id="onboarding-subdomain-help" className={styles.subdomainHelp}>
+              Solo letras minúsculas, números y guiones. Mínimo 3 caracteres.
+            </p>
+            <p
+              id="onboarding-subdomain-feedback"
+              className={
+                subdomainCheckError
+                  ? styles.subdomainFeedbackError
+                  : subdomainChecking
+                    ? styles.subdomainFeedbackPending
+                    : subdomainTouched && subdomainVerified
+                      ? styles.subdomainFeedbackOk
+                      : styles.subdomainFeedbackNeutral
+              }
+              role="status"
+              aria-live="polite"
+            >
+              {subdomainChecking
+                ? 'Comprobando disponibilidad…'
+                : subdomainCheckError
+                  ? subdomainCheckError
+                  : subdomainTouched && subdomainVerified
+                    ? 'Subdominio disponible.'
+                    : subdomainPreviewUrl
+                      ? `Vista previa: ${subdomainPreviewUrl.replace(/^https:\/\//, '')}`
+                      : `Ejemplo: tu-restaurante.${MENU_PUBLIC_DOMAIN}`}
+            </p>
+          </div>
         );
 
       case 'description':
@@ -648,6 +818,9 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
   }
 
   const isLastStep = currentIndex === visibleSteps.length - 1;
+  const subdomainContinueBlocked =
+    currentStepId === 'subdomain' &&
+    (subdomainChecking || !subdomainVerified || Boolean(subdomainCheckError));
 
   return (
     <div className={styles.page} ref={pageRef}>
@@ -710,7 +883,7 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
           <button
             type="button"
             className={styles.continueBtn}
-            disabled={submitting}
+            disabled={submitting || subdomainContinueBlocked}
             onClick={() => void goNext()}
           >
             {submitting

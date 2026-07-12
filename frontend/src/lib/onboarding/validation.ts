@@ -1,6 +1,7 @@
 import { findCountryByIso, formatE164 } from '@/lib/phone/countryDialCodes';
 import { normalizeOnboardingScheduleDrafts } from '@/lib/onboarding/schedule';
 import { validateScheduleDrafts } from '@/lib/restaurantScheduleHours';
+import { validateSubdomain } from '@/lib/restaurantSubdomain';
 import type { OnboardingData, OnboardingStepId } from './types';
 
 export function validateStep(stepId: OnboardingStepId, data: OnboardingData): string | null {
@@ -10,6 +11,14 @@ export function validateStep(stepId: OnboardingStepId, data: OnboardingData): st
         return 'Escribe el nombre de tu negocio (mínimo 2 caracteres).';
       }
       return null;
+
+    case 'subdomain': {
+      const normalized = data.subdomain.trim();
+      if (!normalized) {
+        return 'Elige la URL de tu menú digital.';
+      }
+      return validateSubdomain(normalized);
+    }
 
     case 'description': {
       const text = data.businessDescription.trim();

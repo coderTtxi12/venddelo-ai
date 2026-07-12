@@ -12,6 +12,7 @@ export { createDefaultOnboardingSchedule, createOnboardingDefaultSlot } from './
 export function createDefaultOnboardingData(): OnboardingData {
   return {
     businessName: '',
+    subdomain: '',
     businessDescription: '',
     ownerName: '',
     ownerPhoneCountryIso: DEFAULT_COUNTRY_ISO,

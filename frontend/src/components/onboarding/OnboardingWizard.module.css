@@ -172,6 +172,101 @@
   border-bottom-color: var(--color-primary);
 }
 
+.subdomainWrap {
+  width: 100%;
+  max-width: 32rem;
+}
+
+.subdomainLabel {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.subdomainInputWrap {
+  display: flex;
+  align-items: stretch;
+  min-height: 48px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-surface);
+  transition: border-color 0.2s ease;
+}
+
+.subdomainInputWrap:focus-within {
+  border-color: var(--color-primary);
+}
+
+.subdomainInputWrapError {
+  border-color: #f87171;
+}
+
+.subdomainInputWrapError:focus-within {
+  border-color: #ef4444;
+}
+
+.subdomainInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  padding: 0.75rem 0.875rem;
+  font-size: 1.0625rem;
+  font-family: inherit;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.subdomainInput:focus {
+  outline: none;
+}
+
+.subdomainSuffix {
+  display: flex;
+  align-items: center;
+  padding: 0 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-border) 35%, var(--color-bg));
+  border-left: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.subdomainHelp {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+.subdomainFeedbackNeutral,
+.subdomainFeedbackPending,
+.subdomainFeedbackOk,
+.subdomainFeedbackError {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.subdomainFeedbackNeutral {
+  color: var(--color-text-secondary);
+}
+
+.subdomainFeedbackPending {
+  color: var(--color-text-secondary);
+}
+
+.subdomainFeedbackOk {
+  color: #166534;
+}
+
+.subdomainFeedbackError {
+  color: #991b1b;
+}
+
 .descriptionWrap {
   width: 100%;
   max-width: 32rem;

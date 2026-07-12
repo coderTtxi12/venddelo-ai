@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard';
 import { useAuth } from '@/hooks/useAuth';
-import { listRestaurants } from '@/lib/api/restaurants';
+import { resolveMyRestaurantAccess } from '@/lib/api/restaurants';
 import styles from './onboarding.module.css';
 
 export default function OnboardingPage() {
@@ -14,8 +14,8 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (loading || !accessToken) return;
 
-    void listRestaurants(accessToken, 1).then((page) => {
-      if (page.items.length > 0) {
+    void resolveMyRestaurantAccess(accessToken, { userId: user.uid }).then((response) => {
+      if (response.restaurant) {
         router.replace('/orders');
       }
     });

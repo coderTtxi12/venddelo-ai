@@ -22,18 +22,11 @@ function dataUrlToFile(dataUrl: string, fileName: string): File {
   return new File([bytes], fileName, { type: mime });
 }
 
-function generateSubdomain(businessName: string): string {
-  const slug = normalizeSubdomainInput(businessName);
-  const base = (slug || 'negocio').slice(0, 48);
-  const suffix = Math.random().toString(36).slice(2, 7);
-  return `${base}-${suffix}`.slice(0, 63);
-}
-
 export async function submitOnboarding(
   token: string,
   data: OnboardingData,
 ): Promise<{ restaurantId: string }> {
-  const subdomain = generateSubdomain(data.businessName);
+  const subdomain = normalizeSubdomainInput(data.subdomain);
 
   const restaurantDescription = buildRestaurantDescription(data);
 
