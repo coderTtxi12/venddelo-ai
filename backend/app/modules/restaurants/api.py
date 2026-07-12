@@ -14,8 +14,14 @@ from app.modules.delivery_providers.partnerships import DeliveryPartnershipServi
 from app.modules.restaurants.schemas import (
     PaymentMethodCreate,
     PaymentMethodDTO,
+    RestaurantAdminInviteCreate,
+    RestaurantAdminInviteDTO,
     RestaurantCreate,
     RestaurantDTO,
+    RestaurantAccessListResponse,
+    RestaurantMeResponse,
+    RestaurantMemberDTO,
+    RestaurantSelectRequest,
     RestaurantUpdate,
     ScheduleCreate,
     ScheduleDTO,
@@ -98,6 +104,79 @@ def check_subdomain_availability(
         valid=valid,
         message=message,
     )
+
+
+@router.get("/me", response_model=RestaurantMeResponse)
+def get_my_restaurant(
+    restaurant_id: UUID | None = Query(None),
+    user: UserDTO = Depends(get_synced_user),
+    service: RestaurantService = Depends(_service),
+) -> RestaurantMeResponse:
+    return service.get_me(user.id, user.email, restaurant_id=restaurant_id)
+
+
+@router.get("/me/access", response_model=RestaurantAccessListResponse)
+def list_my_restaurant_access(
+    user: UserDTO = Depends(get_synced_user),
+    service: RestaurantService = Depends(_service),
+) -> RestaurantAccessListResponse:
+    return service.list_access(user.id, user.email)
+
+
+@router.post("/me/select", response_model=RestaurantMeResponse)
+def select_my_restaurant(
+    data: RestaurantSelectRequest,
+    user: UserDTO = Depends(get_synced_user),
+    service: RestaurantService = Depends(_service),
+) -> RestaurantMeResponse:
+    return service.select_restaurant(user.id, data)
+
+
+@router.get("/me/admin-invites", response_model=list[RestaurantAdminInviteDTO])
+def list_my_restaurant_admin_invites(
+    user: UserDTO = Depends(get_synced_user),
+    service: RestaurantService = Depends(_service),
+) -> list[RestaurantAdminInviteDTO]:
+    return service.list_admin_invites(user.id)
+
+
+@router.get("/me/members", response_model=list[RestaurantMemberDTO])
+def list_my_restaurant_members(
+    user: UserDTO = Depends(get_synced_user),
+    service: RestaurantService = Depends(_service),
+) -> list[RestaurantMemberDTO]:
+    return service.list_admin_members(user.id)
+
+
+@router.post(
+    "/me/admin-invites",
+    response_model=RestaurantAdminInviteDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_my_restaurant_admin_invite(
+    data: RestaurantAdminInviteCreate,
+    user: UserDTO = Depends(get_synced_user),
+    service: RestaurantService = Depends(_service),
+) -> RestaurantAdminInviteDTO:
+    return service.add_admin_invite(user.id, data)
+
+
+@router.delete("/me/admin-invites/{invite_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_my_restaurant_admin_invite(
+    invite_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    service: RestaurantService = Depends(_service),
+) -> None:
+    service.remove_admin_invite(user.id, invite_id)
+
+
+@router.delete("/me/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_my_restaurant_admin_member(
+    member_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    service: RestaurantService = Depends(_service),
+) -> None:
+    service.remove_admin_member(user.id, member_id)
 
 
 @router.get("/{restaurant_id}", response_model=RestaurantDTO)
