@@ -97,7 +97,10 @@ export type PublicDeliveryQuote = {
   distance_km: number | null;
   provider_name: string | null;
   partnership_status: 'none' | 'pending' | 'active' | 'suspended';
+  weather_mode: DeliveryWeatherMode;
 };
+
+export type DeliveryWeatherMode = 'none' | 'light' | 'heavy' | 'intense';
 
 export type PublicDeliveryQuoteInput = {
   latitude: number;
