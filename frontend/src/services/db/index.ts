@@ -23,7 +23,7 @@ export type {
   OptionItemDraft,
   ProductDraft,
 } from './supplierCatalogTypes';
-export { resolveSupplierIdByEmail, type ResolveSupplierResult } from './supplierResolve';
+export { resolveSupplierIdByEmail, clearSupplierResolveCache, type ResolveSupplierResult } from './supplierResolve';
 export {
   CATEGORIES_PAGE_SIZE,
   fetchAllSupplierCategories,
