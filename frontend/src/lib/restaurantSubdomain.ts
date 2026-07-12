@@ -18,6 +18,25 @@ export function normalizeSubdomainInput(raw: string): string {
     .replace(/-+$/, '');
 }
 
+/** Live input normalization — keeps a trailing hyphen while the user is still typing. */
+export function normalizeSubdomainDraft(raw: string): string {
+  const trimmed = raw.toLowerCase().trim();
+  const preserveTrailingHyphen = trimmed.endsWith('-');
+
+  const core = trimmed
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
+
+  if (preserveTrailingHyphen && core.length > 0) {
+    return `${core}-`;
+  }
+
+  return core;
+}
+
 export function validateSubdomain(subdomain: string): string | null {
   if (subdomain.length < SUBDOMAIN_MIN_LENGTH) {
     return `Usa al menos ${SUBDOMAIN_MIN_LENGTH} caracteres.`;
