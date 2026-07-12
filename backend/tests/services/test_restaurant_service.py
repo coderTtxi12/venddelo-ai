@@ -79,6 +79,47 @@ class FakeRestaurantRepo(RestaurantRepository):
     def set_payment_methods(self, id, methods) -> None:
         pass
 
+    def get_for_user(self, user_id: uuid.UUID, *, restaurant_id: uuid.UUID | None = None):
+        for dto in self.items.values():
+            if dto.owner_id == user_id:
+                return dto, "owner"
+        return None
+
+    def list_accessible(self, user_id: uuid.UUID):
+        return []
+
+    def touch_last_accessed(self, user_id: uuid.UUID, restaurant_id: uuid.UUID) -> None:
+        return None
+
+    def remove_admin_member(self, restaurant_id: uuid.UUID, member_id: uuid.UUID) -> None:
+        raise NotImplementedError
+
+    def user_has_membership(self, user_id: uuid.UUID) -> bool:
+        return any(dto.owner_id == user_id for dto in self.items.values())
+
+    def email_associated_with_other_restaurant(
+        self,
+        email: str,
+        *,
+        exclude_restaurant_id: uuid.UUID | None = None,
+    ) -> bool:
+        return False
+
+    def list_admin_invites(self, restaurant_id: uuid.UUID):
+        return []
+
+    def add_admin_invite(self, restaurant_id: uuid.UUID, email: str):
+        raise NotImplementedError
+
+    def remove_admin_invite(self, restaurant_id: uuid.UUID, invite_id: uuid.UUID) -> None:
+        raise NotImplementedError
+
+    def list_admin_members(self, restaurant_id: uuid.UUID):
+        return []
+
+    def claim_admin_invites(self, user_id: uuid.UUID, email: str) -> bool:
+        return False
+
 
 def test_create_validates_subdomain():
     repo = FakeRestaurantRepo()
@@ -91,8 +132,9 @@ def test_create_rejects_duplicate_subdomain():
     repo = FakeRestaurantRepo()
     svc = RestaurantService(repo)
     svc.create(OWNER, RestaurantCreate(name="R", subdomain="tacos"))
+    other_owner = uuid.uuid4()
     with pytest.raises(ConflictError):
-        svc.create(OWNER, RestaurantCreate(name="R2", subdomain="tacos"))
+        svc.create(other_owner, RestaurantCreate(name="R2", subdomain="tacos"))
 
 
 def test_update_validates_digital_menu_theme_id():
@@ -115,7 +157,8 @@ def test_update_rejects_duplicate_subdomain():
     repo = FakeRestaurantRepo()
     svc = RestaurantService(repo)
     first = svc.create(OWNER, RestaurantCreate(name="R1", subdomain="tacos"))
-    second = svc.create(OWNER, RestaurantCreate(name="R2", subdomain="burgers"))
+    other_owner = uuid.uuid4()
+    second = svc.create(other_owner, RestaurantCreate(name="R2", subdomain="burgers"))
     with pytest.raises(ConflictError):
         svc.update(second.id, RestaurantUpdate(subdomain="tacos"))
 
