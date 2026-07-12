@@ -1,9 +1,10 @@
 import uuid
-from datetime import time
+from datetime import datetime, time
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    DateTime,
     Float,
     ForeignKey,
     Index,
@@ -69,6 +70,12 @@ class Restaurant(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     payment_methods: Mapped[list["RestaurantPaymentMethod"]] = relationship(
         back_populates="restaurant", cascade="all, delete-orphan"
     )
+    members: Mapped[list["RestaurantMember"]] = relationship(
+        back_populates="restaurant", cascade="all, delete-orphan"
+    )
+    admin_invites: Mapped[list["RestaurantAdminInvite"]] = relationship(
+        back_populates="restaurant", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint("subdomain", name="uq_restaurants_subdomain"),
@@ -125,4 +132,56 @@ class RestaurantPaymentMethod(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ),
         CheckConstraint("method IN ('cash','transfer','card_terminal')", name="method_allowed"),
         CheckConstraint("service_type IN ('takeout','delivery')", name="pm_service_type_allowed"),
+    )
+
+
+class RestaurantMember(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "restaurant_members"
+
+    restaurant_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("restaurants.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    member_role: Mapped[str] = mapped_column(String, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    last_accessed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    restaurant: Mapped["Restaurant"] = relationship(back_populates="members")
+
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "user_id"),
+        CheckConstraint(
+            "member_role IN ('owner','admin')",
+            name="restaurant_member_role_allowed",
+        ),
+        Index("ix_restaurant_members_restaurant_id", "restaurant_id"),
+        Index("ix_restaurant_members_user_id", "user_id"),
+    )
+
+
+class RestaurantAdminInvite(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "restaurant_admin_invites"
+
+    restaurant_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("restaurants.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+
+    restaurant: Mapped["Restaurant"] = relationship(back_populates="admin_invites")
+
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "email"),
+        UniqueConstraint("email"),
+        Index("ix_restaurant_admin_invites_email", "email"),
     )

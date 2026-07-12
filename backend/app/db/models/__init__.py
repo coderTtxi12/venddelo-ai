@@ -33,6 +33,8 @@ from app.db.models.promotions import (
 )
 from app.db.models.restaurant import (
     Restaurant,
+    RestaurantAdminInvite,
+    RestaurantMember,
     RestaurantPaymentMethod,
     RestaurantSchedule,
 )
@@ -44,6 +46,8 @@ __all__ = [
     "DigitalMenuTheme",
     "MenuImportSession",
     "Restaurant",
+    "RestaurantMember",
+    "RestaurantAdminInvite",
     "RestaurantSchedule",
     "RestaurantPaymentMethod",
     "Category",
