@@ -12,7 +12,9 @@ import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
 import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import { useAssistantChat } from '@/contexts/AssistantChatContext';
+import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
+import RestaurantSwitcher from '@/components/ui/RestaurantSwitcher';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
@@ -44,7 +46,8 @@ function shouldSidebarStartCollapsed(width: number): boolean {
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { pendingOrdersCount, restaurantName } = useRestaurantOrders();
+  const { pendingOrdersCount } = useRestaurantOrders();
+  const { selectedRestaurantName, canSwitchRestaurants } = useRestaurantAccess();
   const { isOpen: isChatOpen, openChat, closeChat } = useAssistantChat();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const wasChatOpenRef = useRef(false);
@@ -62,19 +65,35 @@ export default function Sidebar() {
 
   return (
     <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}>
-      <div className={styles.headerRow}>
-        <div className={styles.logo} title={restaurantName ?? undefined}>
-          {restaurantName ?? 'Mi restaurante'}
-        </div>
-        <button
-          type="button"
-          className={styles.toggleButton}
-          onClick={() => setIsCollapsed((prev) => !prev)}
-          aria-label={isCollapsed ? 'Expandir sidebar' : 'Contraer sidebar'}
+      {canSwitchRestaurants ? (
+        <div
+          className={`${styles.headerToolbar} ${isCollapsed ? styles.headerToolbarCollapsed : ''}`}
         >
-          <span className={styles.toggleIcon}>{isCollapsed ? '»' : '«'}</span>
-        </button>
-      </div>
+          <RestaurantSwitcher collapsed={isCollapsed} layout="toolbar" />
+          <button
+            type="button"
+            className={styles.toggleButton}
+            onClick={() => setIsCollapsed((prev) => !prev)}
+            aria-label={isCollapsed ? 'Expandir sidebar' : 'Contraer sidebar'}
+          >
+            <span className={styles.toggleIcon}>{isCollapsed ? '»' : '«'}</span>
+          </button>
+        </div>
+      ) : (
+        <div className={styles.headerRow}>
+          <div className={styles.logo} title={selectedRestaurantName ?? undefined}>
+            {selectedRestaurantName ?? 'Mi restaurante'}
+          </div>
+          <button
+            type="button"
+            className={styles.toggleButton}
+            onClick={() => setIsCollapsed((prev) => !prev)}
+            aria-label={isCollapsed ? 'Expandir sidebar' : 'Contraer sidebar'}
+          >
+            <span className={styles.toggleIcon}>{isCollapsed ? '»' : '«'}</span>
+          </button>
+        </div>
+      )}
 
       <nav className={styles.nav}>
         {navItems.map((item) => {

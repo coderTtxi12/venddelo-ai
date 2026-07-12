@@ -23,8 +23,30 @@
   padding: 0 0.25rem 1.25rem;
 }
 
+.headerToolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.25rem 1rem;
+}
+
+.headerToolbarCollapsed {
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  padding-bottom: 0.85rem;
+}
+
+.headerToolbar .toggleButton {
+  flex-shrink: 0;
+}
+
 .collapsed .headerRow {
   justify-content: center;
+}
+
+.collapsed .headerToolbarCollapsed {
+  padding-bottom: 1rem;
 }
 
 .logo {
