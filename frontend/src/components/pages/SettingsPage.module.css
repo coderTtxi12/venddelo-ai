@@ -515,6 +515,233 @@
   font-size: 0.85rem;
 }
 
+.successBanner {
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 0.85rem;
+}
+
+.adminSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-top: 0.15rem;
+}
+
+.adminSection + .adminSection {
+  border-top: 1px solid var(--color-border);
+  padding-top: 1rem;
+  margin-top: 0.15rem;
+}
+
+.adminSectionTitle {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.adminAddRow {
+  display: flex;
+  gap: 0.65rem;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.adminAddRow .input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.adminMemberList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.adminMemberCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.8rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.adminMemberCard:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 20%, var(--color-border));
+}
+
+.adminMemberAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.adminMemberBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.adminMemberTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.adminMemberName {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.adminMemberEmail {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  word-break: break-all;
+}
+
+.adminMemberMeta {
+  font-size: 0.76rem;
+  color: var(--color-text-secondary);
+}
+
+.roleBadgeOwner,
+.roleBadgeAdmin,
+.roleBadgePending {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.roleBadgeIcon {
+  width: 0.95rem !important;
+  height: 0.95rem !important;
+}
+
+.roleBadgeOwner {
+  background: color-mix(in srgb, var(--color-primary) 14%, #fff);
+  color: var(--color-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
+}
+
+.roleBadgeAdmin {
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+}
+
+.roleBadgePending {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.adminList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.adminListItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg);
+}
+
+.adminInviteMain {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.adminInviteIcon {
+  color: var(--color-text-secondary) !important;
+  flex-shrink: 0;
+}
+
+.adminInviteText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.adminInviteMeta {
+  font-size: 0.76rem;
+  color: var(--color-text-secondary);
+}
+
+.adminEmail {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+  word-break: break-all;
+}
+
+.removeBtn {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
+}
+
+.removeBtn:hover {
+  border-color: #fca5a5;
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.removeBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .loading,
 .empty {
   font-size: 0.9rem;
@@ -524,6 +751,19 @@
 @media (max-width: 820px) {
   .formGrid {
     grid-template-columns: 1fr;
+  }
+
+  .adminListItem {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .adminInviteMain {
+    flex-wrap: wrap;
+  }
+
+  .removeBtn {
+    width: 100%;
   }
 }
 

@@ -1,6 +1,9 @@
 'use client';
 
 import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
+import MailOutlineOutlinedIcon from '@mui/icons-material/MailOutlineOutlined';
+import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
+import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
 import { DashboardRestaurantHours } from '@/components/settings/DashboardRestaurantHours';
@@ -10,12 +13,18 @@ import type { RestaurantLocationMapPickerHandle } from '@/components/settings/Re
 import { RestaurantPlaceAutocomplete } from '@/components/settings/RestaurantPlaceAutocomplete';
 import type { MapLocationUpdate } from '@/lib/loadGoogleMapsPlaces';
 import { useAuth } from '@/hooks/useAuth';
+import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import {
+  addMyRestaurantAdminInvite,
   checkRestaurantSubdomainAvailability,
   getRestaurant,
   getRestaurantDeliveryPartnership,
+  listMyRestaurantAdminInvites,
+  listMyRestaurantMembers,
   listRestaurantPaymentMethods,
   listRestaurantSchedules,
+  removeMyRestaurantAdminInvite,
+  removeMyRestaurantAdminMember,
   setRestaurantPaymentMethods,
   setRestaurantSchedules,
   updateRestaurant,
@@ -23,7 +32,9 @@ import {
 import type {
   DeliveryProviderSchedule,
   Restaurant,
+  RestaurantAdminInvite,
   RestaurantDeliveryPartnership,
+  RestaurantMember,
   RestaurantSchedule,
 } from '@/lib/api/types';
 import { ApiError } from '@/lib/api/types';
@@ -44,6 +55,7 @@ import {
 import {
   MENU_PUBLIC_DOMAIN,
   normalizeSubdomainInput,
+  normalizeSubdomainDraft,
   restaurantPublicMenuUrl,
   subdomainAvailabilityMessage,
   validateSubdomain,
@@ -58,8 +70,6 @@ import { buildPhoneE164, parseE164Phone } from '@/lib/phone/parseE164';
 import { syncRestaurantDeliveryPartnership } from '@/lib/syncDeliveryPartnership';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
-import { resolveSupplierIdByEmail } from '@/services/db';
-import { legacyDb as db } from '@/services/legacyDb';
 import styles from './SettingsPage.module.css';
 
 type LocationDraft = {
@@ -118,8 +128,34 @@ function Toggle({
   );
 }
 
+function memberPrimaryLabel(member: RestaurantMember): string {
+  return member.display_name?.trim() || member.email?.trim() || 'Usuario sin nombre';
+}
+
+function memberSecondaryLabel(member: RestaurantMember): string | null {
+  const email = member.email?.trim();
+  const name = member.display_name?.trim();
+  if (email && name && email.toLowerCase() !== name.toLowerCase()) return email;
+  return null;
+}
+
+function formatMemberJoinedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 export default function SettingsPage() {
   const { firebaseUser, accessToken, loading: authLoading } = useAuth();
+  const {
+    selectedRestaurantId,
+    memberRole: accessMemberRole,
+    loading: accessLoading,
+  } = useRestaurantAccess();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const mapPickerRef = useRef<RestaurantLocationMapPickerHandle>(null);
 
@@ -166,14 +202,32 @@ export default function SettingsPage() {
   const [whatsappCountryIso, setWhatsappCountryIso] = useState(DEFAULT_COUNTRY_ISO);
   const [whatsappLocal, setWhatsappLocal] = useState('');
   const [whatsappTouched, setWhatsappTouched] = useState(false);
+  const [memberRole, setMemberRole] = useState<string | null>(null);
+  const [adminMembers, setAdminMembers] = useState<RestaurantMember[]>([]);
+  const [adminMembersLoading, setAdminMembersLoading] = useState(false);
+  const [adminInvites, setAdminInvites] = useState<RestaurantAdminInvite[]>([]);
+  const [adminInvitesLoading, setAdminInvitesLoading] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminSaving, setAdminSaving] = useState(false);
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
+  const [removingInviteId, setRemovingInviteId] = useState<string | null>(null);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      if (authLoading) return;
+      if (authLoading || accessLoading) return;
       if (!accessToken) {
         setLoadError('No hay sesión activa. Inicia sesión de nuevo.');
+        setLoading(false);
+        return;
+      }
+      if (!selectedRestaurantId) {
+        setLoadError(
+          'No tienes ningún restaurante asociado. Completa el registro inicial para continuar.',
+        );
         setLoading(false);
         return;
       }
@@ -182,17 +236,8 @@ export default function SettingsPage() {
       setLoadError(null);
 
       try {
-        const resolved = await resolveSupplierIdByEmail(
-          db,
-          firebaseUser?.email ?? '',
-          accessToken,
-        );
-        if ('error' in resolved) {
-          if (!cancelled) setLoadError(resolved.error);
-          return;
-        }
-
-        const rid = resolved.supplierId;
+        const rid = selectedRestaurantId;
+        setMemberRole(accessMemberRole ?? null);
         const [restaurantData, scheduleRows, paymentRows] = await Promise.all([
           getRestaurant(accessToken, rid),
           listRestaurantSchedules(accessToken, rid),
@@ -292,10 +337,59 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, authLoading, firebaseUser?.email]);
+  }, [accessToken, accessLoading, accessMemberRole, authLoading, firebaseUser?.email, selectedRestaurantId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAdminData() {
+      if (!accessToken || memberRole !== 'owner') {
+        setAdminMembers([]);
+        setAdminInvites([]);
+        return;
+      }
+
+      setAdminMembersLoading(true);
+      setAdminInvitesLoading(true);
+      setAdminError(null);
+
+      try {
+        const [members, invites] = await Promise.all([
+          listMyRestaurantMembers(accessToken),
+          listMyRestaurantAdminInvites(accessToken),
+        ]);
+        if (!cancelled) {
+          setAdminMembers(members);
+          setAdminInvites(invites);
+        }
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) {
+          setAdminError('No se pudieron cargar los administradores.');
+        }
+      } finally {
+        if (!cancelled) {
+          setAdminMembersLoading(false);
+          setAdminInvitesLoading(false);
+        }
+      }
+    }
+
+    void loadAdminData();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, memberRole]);
 
   useEffect(() => {
     if (!accessToken || !restaurantId || !subdomainTouched) return;
+
+    if (subdomain.endsWith('-')) {
+      setSubdomainError(null);
+      setSubdomainChecking(false);
+      setSubdomainVerified(false);
+      return;
+    }
 
     const formatError = validateSubdomain(subdomain);
     if (formatError) {
@@ -547,6 +641,106 @@ export default function SettingsPage() {
     }
   };
 
+  const handleAddAdmin = async () => {
+    if (!accessToken) {
+      setAdminError('No hay sesión activa. Inicia sesión de nuevo.');
+      return;
+    }
+
+    const trimmed = adminEmail.trim();
+    if (!trimmed) {
+      setAdminError('Escribe un correo electrónico.');
+      return;
+    }
+
+    const normalized = trimmed.toLowerCase();
+    if (
+      adminMembers.some((member) => member.email?.trim().toLowerCase() === normalized)
+    ) {
+      setAdminError('Ese correo ya pertenece al equipo.');
+      return;
+    }
+    if (adminInvites.some((invite) => invite.email.trim().toLowerCase() === normalized)) {
+      setAdminError('Ese correo ya está en la lista de administradores.');
+      return;
+    }
+
+    setAdminSaving(true);
+    setAdminError(null);
+    setAdminSuccess(null);
+
+    try {
+      const created = await addMyRestaurantAdminInvite(accessToken, trimmed);
+      setAdminInvites((current) => [...current, created]);
+      setAdminEmail('');
+      setAdminSuccess('Administrador agregado. Podrá entrar cuando inicie sesión con ese correo.');
+      window.setTimeout(() => setAdminSuccess(null), 4000);
+    } catch (err) {
+      console.error(err);
+      if (err instanceof ApiError) {
+        setAdminError(err.message);
+      } else {
+        setAdminError('No se pudo agregar el administrador.');
+      }
+    } finally {
+      setAdminSaving(false);
+    }
+  };
+
+  const handleRemoveAdminMember = async (memberId: string) => {
+    if (!accessToken) {
+      setAdminError('No hay sesión activa. Inicia sesión de nuevo.');
+      return;
+    }
+
+    setRemovingMemberId(memberId);
+    setAdminError(null);
+    setAdminSuccess(null);
+
+    try {
+      await removeMyRestaurantAdminMember(accessToken, memberId);
+      setAdminMembers((current) => current.filter((member) => member.id !== memberId));
+      setAdminSuccess('Administrador eliminado del equipo.');
+      window.setTimeout(() => setAdminSuccess(null), 4000);
+    } catch (err) {
+      console.error(err);
+      if (err instanceof ApiError) {
+        setAdminError(err.message);
+      } else {
+        setAdminError('No se pudo eliminar al administrador.');
+      }
+    } finally {
+      setRemovingMemberId(null);
+    }
+  };
+
+  const handleRemoveAdmin = async (inviteId: string) => {
+    if (!accessToken) {
+      setAdminError('No hay sesión activa. Inicia sesión de nuevo.');
+      return;
+    }
+
+    setRemovingInviteId(inviteId);
+    setAdminError(null);
+    setAdminSuccess(null);
+
+    try {
+      await removeMyRestaurantAdminInvite(accessToken, inviteId);
+      setAdminInvites((current) => current.filter((invite) => invite.id !== inviteId));
+      setAdminSuccess('Invitación eliminada.');
+      window.setTimeout(() => setAdminSuccess(null), 4000);
+    } catch (err) {
+      console.error(err);
+      if (err instanceof ApiError) {
+        setAdminError(err.message);
+      } else {
+        setAdminError('No se pudo eliminar la invitación.');
+      }
+    } finally {
+      setRemovingInviteId(null);
+    }
+  };
+
   const hasScheduleContent = takeoutEnabled || deliveryEnabled;
   const deliveryPartnershipActive = isActiveDeliveryPartnership(deliveryPartnership);
 
@@ -660,12 +854,15 @@ export default function SettingsPage() {
                 aria-describedby="settings-subdomain-help settings-subdomain-feedback"
                 aria-invalid={subdomainError ? true : undefined}
                 onChange={(e) => {
-                  setSubdomain(normalizeSubdomainInput(e.target.value));
+                  setSubdomain(normalizeSubdomainDraft(e.target.value));
                   setSubdomainTouched(true);
                   setSubdomainVerified(false);
                   setSaveOk(false);
                 }}
-                onBlur={() => setSubdomainTouched(true)}
+                onBlur={() => {
+                  setSubdomainTouched(true);
+                  setSubdomain(normalizeSubdomainInput(subdomain));
+                }}
                 placeholder="wild-rooster"
               />
               <span className={styles.subdomainSuffix} aria-hidden="true">
@@ -878,6 +1075,160 @@ export default function SettingsPage() {
           onLocationChange={handleMapLocationChange}
         />
       </section>
+
+      {memberRole === 'owner' ? (
+        <section className={styles.panel} aria-labelledby="settings-admins">
+          <h2 id="settings-admins" className={styles.panelTitle}>
+            Administradores
+          </h2>
+          <p className={styles.panelHint}>
+            Solo puedes invitar correos que no sean propietarios de otro restaurante.
+            Los administradores pueden pertenecer a varios restaurantes. No necesitan cuenta previa: al iniciar sesión con Google usando ese
+            correo, entrarán directo al panel.
+          </p>
+          {adminError ? (
+            <div className={styles.errorBanner} role="alert">
+              {adminError}
+            </div>
+          ) : null}
+          {adminSuccess ? (
+            <div className={styles.successBanner} role="status">
+              {adminSuccess}
+            </div>
+          ) : null}
+
+          <div className={styles.adminSection}>
+            <h3 className={styles.adminSectionTitle}>Equipo activo</h3>
+            {adminMembersLoading ? (
+              <p className={styles.loading} role="status">
+                Cargando equipo…
+              </p>
+            ) : adminMembers.length === 0 ? (
+              <p className={styles.empty}>Aún no hay administradores activos.</p>
+            ) : (
+              <ul className={styles.adminMemberList}>
+                {adminMembers.map((member) => {
+                  const secondary = memberSecondaryLabel(member);
+                  const joinedAt = formatMemberJoinedAt(member.created_at);
+                  const isOwner = member.member_role === 'owner';
+                  return (
+                    <li key={member.id} className={styles.adminMemberCard}>
+                      <div className={styles.adminMemberAvatar} aria-hidden="true">
+                        <PersonOutlineOutlinedIcon fontSize="small" />
+                      </div>
+                      <div className={styles.adminMemberBody}>
+                        <div className={styles.adminMemberTopRow}>
+                          <span className={styles.adminMemberName}>
+                            {memberPrimaryLabel(member)}
+                          </span>
+                          <span
+                            className={
+                              isOwner ? styles.roleBadgeOwner : styles.roleBadgeAdmin
+                            }
+                          >
+                            {isOwner ? (
+                              <ShieldOutlinedIcon className={styles.roleBadgeIcon} />
+                            ) : (
+                              <PersonOutlineOutlinedIcon className={styles.roleBadgeIcon} />
+                            )}
+                            {isOwner ? 'Propietario' : 'Administrador'}
+                          </span>
+                        </div>
+                        {secondary ? (
+                          <span className={styles.adminMemberEmail}>{secondary}</span>
+                        ) : null}
+                        {joinedAt ? (
+                          <span className={styles.adminMemberMeta}>
+                            Acceso desde {joinedAt}
+                          </span>
+                        ) : null}
+                      </div>
+                      {memberRole === 'owner' && !isOwner ? (
+                        <button
+                          type="button"
+                          className={styles.removeBtn}
+                          disabled={removingMemberId === member.id}
+                          onClick={() => void handleRemoveAdminMember(member.id)}
+                        >
+                          {removingMemberId === member.id ? 'Quitando…' : 'Quitar'}
+                        </button>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <div className={styles.adminSection}>
+            <h3 className={styles.adminSectionTitle}>Invitar administrador</h3>
+            <div className={styles.adminAddRow}>
+              <input
+                className={styles.input}
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="correo@empresa.com"
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void handleAddAdmin();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                disabled={adminSaving || adminInvitesLoading || adminMembersLoading}
+                onClick={() => void handleAddAdmin()}
+              >
+                {adminSaving ? 'Agregando…' : 'Agregar'}
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.adminSection}>
+            <h3 className={styles.adminSectionTitle}>Invitaciones pendientes</h3>
+            {adminInvitesLoading ? (
+              <p className={styles.loading} role="status">
+                Cargando invitaciones…
+              </p>
+            ) : adminInvites.length === 0 ? (
+              <p className={styles.empty}>No hay invitaciones pendientes.</p>
+            ) : (
+              <ul className={styles.adminList}>
+                {adminInvites.map((invite) => (
+                  <li key={invite.id} className={styles.adminListItem}>
+                    <div className={styles.adminInviteMain}>
+                      <MailOutlineOutlinedIcon
+                        className={styles.adminInviteIcon}
+                        aria-hidden="true"
+                      />
+                      <div className={styles.adminInviteText}>
+                        <span className={styles.adminEmail}>{invite.email}</span>
+                        <span className={styles.adminInviteMeta}>
+                          Esperando primer inicio de sesión
+                        </span>
+                      </div>
+                      <span className={styles.roleBadgePending}>Pendiente</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.removeBtn}
+                      disabled={removingInviteId === invite.id}
+                      onClick={() => void handleRemoveAdmin(invite.id)}
+                    >
+                      {removingInviteId === invite.id ? 'Quitando…' : 'Quitar'}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       <section className={styles.panel} aria-labelledby="settings-hours">
         <h2 id="settings-hours" className={styles.panelTitle}>

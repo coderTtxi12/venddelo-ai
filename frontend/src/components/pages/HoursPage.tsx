@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { DashboardRestaurantHours } from '@/components/settings/DashboardRestaurantHours';
 import { DeliveryPartnershipStatus } from '@/components/settings/DeliveryPartnershipStatus';
 import { useAuth } from '@/hooks/useAuth';
+import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import {
   getRestaurant,
   listRestaurantSchedules,
@@ -18,12 +19,11 @@ import type {
 } from '@/lib/api/types';
 import { fetchActiveDeliveryProviderConfig } from '@/lib/fetchActiveDeliveryProviderConfig';
 import { syncRestaurantDeliveryPartnership } from '@/lib/syncDeliveryPartnership';
-import { resolveSupplierIdByEmail } from '@/services/db';
-import { legacyDb as db } from '@/services/legacyDb';
 import styles from './HoursPage.module.css';
 
 export default function HoursPage() {
   const { firebaseUser, accessToken, loading: authLoading } = useAuth();
+  const { selectedRestaurantId, loading: accessLoading } = useRestaurantAccess();
 
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -41,9 +41,13 @@ export default function HoursPage() {
     let cancelled = false;
 
     async function load() {
-      if (authLoading) return;
+      if (authLoading || accessLoading) return;
       if (!accessToken) {
         setLoadError('No hay sesión activa. Inicia sesión de nuevo.');
+        setLoading(false);
+        return;
+      }
+      if (!selectedRestaurantId) {
         setLoading(false);
         return;
       }
@@ -52,17 +56,7 @@ export default function HoursPage() {
       setLoadError(null);
 
       try {
-        const resolved = await resolveSupplierIdByEmail(
-          db,
-          firebaseUser?.email ?? '',
-          accessToken,
-        );
-        if ('error' in resolved) {
-          if (!cancelled) setLoadError(resolved.error);
-          return;
-        }
-
-        const rid = resolved.supplierId;
+        const rid = selectedRestaurantId;
         const [restaurantData, scheduleRows] = await Promise.all([
           getRestaurant(accessToken, rid),
           listRestaurantSchedules(accessToken, rid),
@@ -118,7 +112,7 @@ export default function HoursPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, authLoading, firebaseUser?.email]);
+  }, [accessToken, accessLoading, authLoading, selectedRestaurantId]);
 
   const hasScheduleContent =
     restaurant?.takeout_enabled || restaurant?.delivery_enabled;
