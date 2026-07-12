@@ -1,13 +1,29 @@
 'use client';
 
+import MenuOutlinedIcon from '@mui/icons-material/MenuOutlined';
 import { useAuth } from '@/hooks/useAuth';
+import { useMobileSidebar } from '@/contexts/MobileSidebarContext';
 import styles from './TopBar.module.css';
 
 export default function TopBar() {
   const { user, logout } = useAuth();
+  const { isMobileDrawer, isDrawerOpen, toggleDrawer } = useMobileSidebar();
 
   return (
     <header className={styles.topbar}>
+      {isMobileDrawer ? (
+        <button
+          type="button"
+          className={styles.menuButton}
+          onClick={toggleDrawer}
+          aria-label={isDrawerOpen ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={isDrawerOpen}
+          aria-controls="app-sidebar"
+        >
+          <MenuOutlinedIcon fontSize="small" />
+        </button>
+      ) : null}
+
       <div className={styles.searchBox}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="11" cy="11" r="8" />
