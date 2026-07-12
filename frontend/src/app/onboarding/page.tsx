@@ -12,14 +12,14 @@ export default function OnboardingPage() {
   const { user, accessToken, loading } = useAuth();
 
   useEffect(() => {
-    if (loading || !accessToken) return;
+    if (loading || !accessToken || !user) return;
 
     void resolveMyRestaurantAccess(accessToken, { userId: user.uid }).then((response) => {
       if (response.restaurant) {
         router.replace('/orders');
       }
     });
-  }, [accessToken, loading, router]);
+  }, [accessToken, loading, router, user]);
 
   if (loading || !user) {
     return <div className={styles.loading}>Verificando sesión…</div>;
