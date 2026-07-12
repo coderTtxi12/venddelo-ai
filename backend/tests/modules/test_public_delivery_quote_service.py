@@ -134,6 +134,33 @@ def test_quote_delivery_allows_outside_polygon_during_regular_hours():
     assert quote.available is True
     assert quote.inside_polygon is False
     assert quote.delivery_fee_cents == 6500
+    assert quote.weather_mode == "none"
+
+
+def test_quote_delivery_exposes_weather_mode():
+    repo = _active_outside_quote_repo()
+    repo.get_weather_mode.return_value = "heavy"
+    service = PublicDeliveryQuoteService(repo)
+    now = datetime(2026, 6, 22, 18, 0, tzinfo=UTC)
+
+    with (
+        patch(
+            "app.modules.public.delivery_quote_service.get_settings",
+            return_value=MagicMock(google_maps_api_key="test-key"),
+        ),
+        patch(
+            "app.modules.public.delivery_quote_service.fetch_driving_distance_km",
+            return_value=5.0,
+        ),
+    ):
+        quote = service.quote_delivery(
+            _restaurant(),
+            delivery_latitude=19.45,
+            delivery_longitude=-99.12,
+            now=now,
+        )
+
+    assert quote.weather_mode == "heavy"
 
 
 def test_resolve_delivery_service_blocks_pending_partnership():
