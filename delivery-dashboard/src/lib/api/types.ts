@@ -54,6 +54,15 @@ export type DeliveryProviderAdminInvite = {
   created_at: string;
 };
 
+export type DeliveryProviderMember = {
+  id: string;
+  user_id: string;
+  email: string | null;
+  display_name: string | null;
+  member_role: 'owner' | 'admin' | 'dispatcher' | 'driver';
+  created_at: string;
+};
+
 export type DeliveryProviderProfileUpdate = {
   company_name: string;
   responsible_name: string;

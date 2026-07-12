@@ -2,6 +2,7 @@ import { apiRequest } from './client';
 import type {
   DeliveryProvider,
   DeliveryProviderAdminInvite,
+  DeliveryProviderMember,
   DeliveryProviderMeResponse,
   DeliveryProviderPricingResponse,
   DeliveryProviderPricingUpdate,
@@ -23,6 +24,12 @@ export function getMyDeliveryProvider(token: string) {
 
 export function listMyDeliveryProviderAdminInvites(token: string) {
   return apiRequest<DeliveryProviderAdminInvite[]>('/delivery-providers/me/admin-invites', {
+    token,
+  });
+}
+
+export function listMyDeliveryProviderMembers(token: string) {
+  return apiRequest<DeliveryProviderMember[]>('/delivery-providers/me/members', {
     token,
   });
 }
