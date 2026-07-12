@@ -304,6 +304,20 @@
   justify-content: center;
   flex-shrink: 0;
   cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+}
+
+.compactIconBtn:hover {
+  background: color-mix(in srgb, var(--dm-text, #111827) 8%, transparent);
+}
+
+.compactIconBtn:focus-visible {
+  outline: 2px solid var(--color-primary, #4f46e5);
+  outline-offset: 2px;
+}
+
+.compactIconBtn:active {
+  transform: scale(0.96);
 }
 
 .headerActions {
@@ -354,6 +368,20 @@
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   cursor: pointer;
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+}
+
+.floatIconBtn:hover {
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.16);
+}
+
+.floatIconBtn:focus-visible {
+  outline: 2px solid var(--color-primary, #4f46e5);
+  outline-offset: 2px;
+}
+
+.floatIconBtn:active {
+  transform: scale(0.96);
 }
 
 .phoneScroll::-webkit-scrollbar {
