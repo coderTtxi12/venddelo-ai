@@ -140,40 +140,28 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
     `${bold('Tipo de pedido:')} ${RESTAURANT_SERVICE_LABELS[fulfillment.serviceType]}`,
   ];
 
+  const deliveryMapsUrl =
+    fulfillment.serviceType === 'delivery' ? buildGoogleMapsDeliveryUrl(fulfillment) : null;
+  const restaurantMapsUrl =
+    fulfillment.serviceType === 'delivery'
+      ? buildGoogleMapsRestaurantUrl(restaurantLocation)
+      : null;
+
   if (fulfillment.serviceType === 'delivery') {
     parts.push(`${bold('Dirección:')} ${fulfillment.deliveryAddress.trim()}`);
     const details = fulfillment.deliveryAddressDetails.trim();
     if (details) {
       parts.push(`${bold('Referencias:')} ${details}`);
     }
-    const deliveryMapsUrl = buildGoogleMapsDeliveryUrl(fulfillment);
+
     if (deliveryMapsUrl) {
-      parts.push(`${bold('Ubicación en mapa:')}`);
-      parts.push(deliveryMapsUrl);
-    }
-
-    const restaurantMapsUrl = buildGoogleMapsRestaurantUrl(restaurantLocation);
-    if (restaurantMapsUrl) {
-      parts.push(`${bold('Ubicación del restaurante:')}`);
-      parts.push(restaurantMapsUrl);
-    }
-  }
-
-  if (fulfillment.paymentMethod) {
-    parts.push(`${bold('Método de pago:')} ${PAYMENT_METHOD_LABELS[fulfillment.paymentMethod]}`);
-  }
-
-  if (
-    fulfillment.serviceType === 'delivery' &&
-    fulfillment.paymentMethod === 'cash' &&
-    fulfillment.cashDenominationCents != null
-  ) {
-    parts.push(
-      `${bold('Pagará con:')} ${formatMoney(fulfillment.cashDenominationCents / 100, currency)}`,
-    );
-    const changeCents = fulfillment.cashDenominationCents - Math.round(grandTotal * 100);
-    if (changeCents > 0) {
-      parts.push(`${bold('Cambio:')} ${formatMoney(changeCents / 100, currency)}`);
+      parts.push(
+        '',
+        '——————————————',
+        bold('Mapa de entrega (cliente)'),
+        deliveryMapsUrl,
+        '——————————————',
+      );
     }
   }
 
@@ -218,6 +206,35 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
   }
 
   parts.push(bold(`TOTAL: ${formatMoney(grandTotal, currency)}`));
+  parts.push('——————————————');
+
+  if (fulfillment.paymentMethod) {
+    parts.push(`${bold('Método de pago:')} ${PAYMENT_METHOD_LABELS[fulfillment.paymentMethod]}`);
+  }
+
+  if (
+    fulfillment.serviceType === 'delivery' &&
+    fulfillment.paymentMethod === 'cash' &&
+    fulfillment.cashDenominationCents != null
+  ) {
+    parts.push(
+      `${bold('Pagará con:')} ${formatMoney(fulfillment.cashDenominationCents / 100, currency)}`,
+    );
+    const changeCents = fulfillment.cashDenominationCents - Math.round(grandTotal * 100);
+    if (changeCents > 0) {
+      parts.push(`${bold('Cambio:')} ${formatMoney(changeCents / 100, currency)}`);
+    }
+  }
+
+  if (restaurantMapsUrl) {
+    parts.push(
+      '',
+      '——————————————',
+      bold('Mapa del restaurante (recolección)'),
+      restaurantMapsUrl,
+      '——————————————',
+    );
+  }
 
   return parts.join('\n');
 }
