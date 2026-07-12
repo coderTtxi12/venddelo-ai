@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
+import MailOutlineOutlinedIcon from '@mui/icons-material/MailOutlineOutlined';
+import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
+import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import { DeliveryProviderHoursEditor } from '@/components/settings/DeliveryProviderHoursEditor';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
 import { ServiceZoneMapDrawer } from '@/components/onboarding/ServiceZoneMapDrawer';
@@ -11,6 +14,7 @@ import {
   addMyDeliveryProviderAdminInvite,
   getMyDeliveryProvider,
   listMyDeliveryProviderAdminInvites,
+  listMyDeliveryProviderMembers,
   listMyDeliveryProviderPaymentMethods,
   listMyDeliveryProviderSchedules,
   removeMyDeliveryProviderAdminInvite,
@@ -19,7 +23,7 @@ import {
   updateMyDeliveryProvider,
 } from '@/lib/api/deliveryProviders';
 import { ApiError } from '@/lib/api/types';
-import type { DeliveryProviderAdminInvite } from '@/lib/api/types';
+import type { DeliveryProviderAdminInvite, DeliveryProviderMember } from '@/lib/api/types';
 import { prepareImageForUpload } from '@/lib/image/convertToWebp';
 import { createDefaultOnboardingData } from '@/lib/onboarding/defaults';
 import type { OnboardingData } from '@/lib/onboarding/types';
@@ -52,6 +56,27 @@ async function fileToStoredImage(file: File): Promise<{ dataUrl: string; fileNam
   return { dataUrl, fileName: optimized.name };
 }
 
+function formatMemberJoinedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function memberPrimaryLabel(member: DeliveryProviderMember): string {
+  return member.display_name?.trim() || member.email?.trim() || 'Usuario sin nombre';
+}
+
+function memberSecondaryLabel(member: DeliveryProviderMember): string | null {
+  const email = member.email?.trim();
+  const name = member.display_name?.trim();
+  if (email && name && email.toLowerCase() !== name.toLowerCase()) return email;
+  return null;
+}
+
 export default function SettingsPage() {
   const { accessToken } = useAuth();
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -74,6 +99,8 @@ export default function SettingsPage() {
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [memberRole, setMemberRole] = useState<string | null>(null);
+  const [adminMembers, setAdminMembers] = useState<DeliveryProviderMember[]>([]);
+  const [adminMembersLoading, setAdminMembersLoading] = useState(false);
   const [adminInvites, setAdminInvites] = useState<DeliveryProviderAdminInvite[]>([]);
   const [adminInvitesLoading, setAdminInvitesLoading] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
@@ -125,29 +152,40 @@ export default function SettingsPage() {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadAdminInvites() {
+    async function loadAdminData() {
       if (!accessToken || memberRole !== 'owner') {
+        setAdminMembers([]);
         setAdminInvites([]);
         return;
       }
 
+      setAdminMembersLoading(true);
       setAdminInvitesLoading(true);
       setAdminError(null);
 
       try {
-        const invites = await listMyDeliveryProviderAdminInvites(accessToken);
-        if (!cancelled) setAdminInvites(invites);
+        const [members, invites] = await Promise.all([
+          listMyDeliveryProviderMembers(accessToken),
+          listMyDeliveryProviderAdminInvites(accessToken),
+        ]);
+        if (!cancelled) {
+          setAdminMembers(members);
+          setAdminInvites(invites);
+        }
       } catch (err) {
         console.error(err);
         if (!cancelled) {
           setAdminError('No se pudieron cargar los administradores.');
         }
       } finally {
-        if (!cancelled) setAdminInvitesLoading(false);
+        if (!cancelled) {
+          setAdminMembersLoading(false);
+          setAdminInvitesLoading(false);
+        }
       }
     }
 
-    void loadAdminInvites();
+    void loadAdminData();
     return () => {
       cancelled = true;
     };
@@ -342,6 +380,18 @@ export default function SettingsPage() {
     const trimmed = adminEmail.trim();
     if (!trimmed) {
       setAdminError('Escribe un correo electrónico.');
+      return;
+    }
+
+    const normalized = trimmed.toLowerCase();
+    if (
+      adminMembers.some((member) => member.email?.trim().toLowerCase() === normalized)
+    ) {
+      setAdminError('Ese correo ya pertenece al equipo.');
+      return;
+    }
+    if (adminInvites.some((invite) => invite.email.trim().toLowerCase() === normalized)) {
+      setAdminError('Ese correo ya está en la lista de administradores.');
       return;
     }
 
@@ -594,9 +644,9 @@ export default function SettingsPage() {
                 Administradores
               </h2>
               <p className={styles.panelHint}>
-                Agrega correos de personas que podrán administrar este perfil de delivery. No
-                necesitan tener cuenta previa: al iniciar sesión con Google usando ese correo,
-                entrarán directo al panel.
+                Consulta quién tiene acceso al panel y agrega correos para nuevos
+                administradores. No necesitan cuenta previa: al iniciar sesión con Google
+                usando ese correo, entrarán directo al panel.
               </p>
               {adminError ? (
                 <div className={styles.errorBanner} role="alert">
@@ -608,54 +658,127 @@ export default function SettingsPage() {
                   {adminSuccess}
                 </div>
               ) : null}
-              <div className={styles.adminAddRow}>
-                <input
-                  className={styles.input}
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  placeholder="correo@empresa.com"
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      void handleAddAdmin();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className={styles.secondaryBtn}
-                  disabled={adminSaving || adminInvitesLoading}
-                  onClick={() => void handleAddAdmin()}
-                >
-                  {adminSaving ? 'Agregando…' : 'Agregar'}
-                </button>
+
+              <div className={styles.adminSection}>
+                <h3 className={styles.adminSectionTitle}>Equipo activo</h3>
+                {adminMembersLoading ? (
+                  <p className={styles.loading} role="status">
+                    Cargando equipo…
+                  </p>
+                ) : adminMembers.length === 0 ? (
+                  <p className={styles.empty}>Aún no hay administradores activos.</p>
+                ) : (
+                  <ul className={styles.adminMemberList}>
+                    {adminMembers.map((member) => {
+                      const secondary = memberSecondaryLabel(member);
+                      const joinedAt = formatMemberJoinedAt(member.created_at);
+                      const isOwner = member.member_role === 'owner';
+                      return (
+                        <li key={member.id} className={styles.adminMemberCard}>
+                          <div className={styles.adminMemberAvatar} aria-hidden="true">
+                            <PersonOutlineOutlinedIcon fontSize="small" />
+                          </div>
+                          <div className={styles.adminMemberBody}>
+                            <div className={styles.adminMemberTopRow}>
+                              <span className={styles.adminMemberName}>
+                                {memberPrimaryLabel(member)}
+                              </span>
+                              <span
+                                className={
+                                  isOwner ? styles.roleBadgeOwner : styles.roleBadgeAdmin
+                                }
+                              >
+                                {isOwner ? (
+                                  <ShieldOutlinedIcon className={styles.roleBadgeIcon} />
+                                ) : (
+                                  <PersonOutlineOutlinedIcon className={styles.roleBadgeIcon} />
+                                )}
+                                {isOwner ? 'Propietario' : 'Administrador'}
+                              </span>
+                            </div>
+                            {secondary ? (
+                              <span className={styles.adminMemberEmail}>{secondary}</span>
+                            ) : null}
+                            {joinedAt ? (
+                              <span className={styles.adminMemberMeta}>
+                                Acceso desde {joinedAt}
+                              </span>
+                            ) : null}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
-              {adminInvitesLoading ? (
-                <p className={styles.loading} role="status">
-                  Cargando administradores…
-                </p>
-              ) : adminInvites.length === 0 ? (
-                <p className={styles.empty}>Aún no hay administradores invitados.</p>
-              ) : (
-                <ul className={styles.adminList}>
-                  {adminInvites.map((invite) => (
-                    <li key={invite.id} className={styles.adminListItem}>
-                      <span className={styles.adminEmail}>{invite.email}</span>
-                      <button
-                        type="button"
-                        className={styles.removeBtn}
-                        disabled={removingInviteId === invite.id}
-                        onClick={() => void handleRemoveAdmin(invite.id)}
-                      >
-                        {removingInviteId === invite.id ? 'Quitando…' : 'Quitar'}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+
+              <div className={styles.adminSection}>
+                <h3 className={styles.adminSectionTitle}>Invitar administrador</h3>
+                <div className={styles.adminAddRow}>
+                  <input
+                    className={styles.input}
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    placeholder="correo@empresa.com"
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void handleAddAdmin();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className={styles.secondaryBtn}
+                    disabled={adminSaving || adminInvitesLoading || adminMembersLoading}
+                    onClick={() => void handleAddAdmin()}
+                  >
+                    {adminSaving ? 'Agregando…' : 'Agregar'}
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.adminSection}>
+                <h3 className={styles.adminSectionTitle}>Invitaciones pendientes</h3>
+                {adminInvitesLoading ? (
+                  <p className={styles.loading} role="status">
+                    Cargando invitaciones…
+                  </p>
+                ) : adminInvites.length === 0 ? (
+                  <p className={styles.empty}>No hay invitaciones pendientes.</p>
+                ) : (
+                  <ul className={styles.adminList}>
+                    {adminInvites.map((invite) => (
+                      <li key={invite.id} className={styles.adminListItem}>
+                        <div className={styles.adminInviteMain}>
+                          <MailOutlineOutlinedIcon
+                            className={styles.adminInviteIcon}
+                            aria-hidden="true"
+                          />
+                          <div className={styles.adminInviteText}>
+                            <span className={styles.adminEmail}>{invite.email}</span>
+                            <span className={styles.adminInviteMeta}>
+                              Esperando primer inicio de sesión
+                            </span>
+                          </div>
+                          <span className={styles.roleBadgePending}>Pendiente</span>
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.removeBtn}
+                          disabled={removingInviteId === invite.id}
+                          onClick={() => void handleRemoveAdmin(invite.id)}
+                        >
+                          {removingInviteId === invite.id ? 'Quitando…' : 'Quitar'}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </section>
           ) : null}
 
