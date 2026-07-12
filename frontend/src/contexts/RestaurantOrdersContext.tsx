@@ -6,12 +6,12 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNewOrderSoundAlert } from '@/hooks/useNewOrderSoundAlert';
+import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import { listRestaurantOrders } from '@/lib/api/orders';
 import { getRestaurant } from '@/lib/api/restaurants';
 import { fetchAllPages } from '@/lib/api/pagination';
@@ -21,8 +21,6 @@ import {
   applyKitchenOrderSocketEvent,
   useKitchenOrdersSocket,
 } from '@/lib/orders/useKitchenOrdersSocket';
-import { resolveSupplierIdByEmail } from '@/services/db';
-import { legacyDb as db } from '@/services/legacyDb';
 
 type RestaurantOrdersContextValue = {
   restaurantId: string | null;
@@ -40,17 +38,20 @@ type RestaurantOrdersContextValue = {
 const RestaurantOrdersContext = createContext<RestaurantOrdersContextValue | null>(null);
 
 export function RestaurantOrdersProvider({ children }: { children: ReactNode }) {
-  const { firebaseUser, accessToken, loading: authLoading } = useAuth();
+  const { accessToken } = useAuth();
+  const {
+    loading: accessLoading,
+    selectedRestaurantId,
+    selectedRestaurantName,
+    loadError: accessError,
+  } = useRestaurantAccess();
 
-  const [restaurantId, setRestaurantId] = useState<string | null>(null);
-  const [restaurantName, setRestaurantName] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [socketLive, setSocketLive] = useState(false);
   const alertNewOrder = useNewOrderSoundAlert();
-  const bootstrapTokenRef = useRef<string | null>(null);
 
   const loadOrders = useCallback(
     async (token: string, rid: string, options?: { silent?: boolean }) => {
@@ -76,46 +77,22 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
   useEffect(() => {
     let cancelled = false;
 
-    async function bootstrap() {
-      if (authLoading) return;
-      if (!accessToken) {
-        bootstrapTokenRef.current = null;
-        setLoading(false);
-        setRestaurantId(null);
-        setRestaurantName(null);
+    async function loadRestaurantData() {
+      if (accessLoading) return;
+      if (!accessToken || !selectedRestaurantId) {
         setOrders([]);
-        return;
-      }
-
-      if (bootstrapTokenRef.current === accessToken) {
+        setLoading(false);
         return;
       }
 
       setLoading(true);
-      setLoadError(null);
+      setLoadError(accessError);
 
       try {
-        const resolved = await resolveSupplierIdByEmail(
-          db,
-          firebaseUser?.email ?? '',
-          accessToken,
-        );
-        if ('error' in resolved) {
-          if (!cancelled) setLoadError(resolved.error);
-          return;
-        }
-
-        if (cancelled) return;
-        bootstrapTokenRef.current = accessToken;
-        setRestaurantId(resolved.supplierId);
-
-        const [restaurantData] = await Promise.all([
-          getRestaurant(accessToken, resolved.supplierId),
-          loadOrders(accessToken, resolved.supplierId),
+        await Promise.all([
+          getRestaurant(accessToken, selectedRestaurantId),
+          loadOrders(accessToken, selectedRestaurantId),
         ]);
-        if (!cancelled) {
-          setRestaurantName(restaurantData.name);
-        }
       } catch (error) {
         console.error(error);
         if (!cancelled) setLoadError('No se pudo conectar con los pedidos.');
@@ -124,13 +101,24 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
       }
     }
 
-    void bootstrap();
+    void loadRestaurantData();
     return () => {
       cancelled = true;
     };
-  }, [accessToken, authLoading, firebaseUser?.email, loadOrders]);
+  }, [accessLoading, accessToken, accessError, selectedRestaurantId, loadOrders]);
 
-  useKitchenOrdersSocket(restaurantId, accessToken, (event) => {
+  useEffect(() => {
+    const handleRestaurantChanged = () => {
+      setSocketLive(false);
+      setOrders([]);
+    };
+    window.addEventListener('venddelo:restaurant-changed', handleRestaurantChanged);
+    return () => {
+      window.removeEventListener('venddelo:restaurant-changed', handleRestaurantChanged);
+    };
+  }, []);
+
+  useKitchenOrdersSocket(selectedRestaurantId, accessToken, (event) => {
     setOrders((current) => {
       alertNewOrder(event, current);
       return applyKitchenOrderSocketEvent(current, event);
@@ -144,9 +132,9 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
   );
 
   const refreshOrders = useCallback(() => {
-    if (!accessToken || !restaurantId) return;
-    void loadOrders(accessToken, restaurantId);
-  }, [accessToken, restaurantId, loadOrders]);
+    if (!accessToken || !selectedRestaurantId) return;
+    void loadOrders(accessToken, selectedRestaurantId);
+  }, [accessToken, selectedRestaurantId, loadOrders]);
 
   const replaceOrder = useCallback((order: Order) => {
     setOrders((current) =>
@@ -156,24 +144,25 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
 
   const value = useMemo(
     () => ({
-      restaurantId,
-      restaurantName,
+      restaurantId: selectedRestaurantId,
+      restaurantName: selectedRestaurantName,
       orders,
       pendingOrdersCount,
       socketLive,
-      loading,
+      loading: loading || accessLoading,
       loadError,
       refreshing,
       refreshOrders,
       replaceOrder,
     }),
     [
-      restaurantId,
-      restaurantName,
+      selectedRestaurantId,
+      selectedRestaurantName,
       orders,
       pendingOrdersCount,
       socketLive,
       loading,
+      accessLoading,
       loadError,
       refreshing,
       refreshOrders,
