@@ -35,7 +35,11 @@ async def orders_kitchen_ws(
     if restaurant is None:
         await websocket.close(code=4404)
         return
-    if restaurant.owner_id is None or restaurant.owner_id != user.id:
+    allowed = restaurant.owner_id == user.id
+    if not allowed:
+        found = uow.restaurants.get_for_user(user.id, restaurant_id=restaurant_id)
+        allowed = found is not None and found[1] in ("owner", "admin")
+    if not allowed:
         await websocket.close(code=4403)
         return
 

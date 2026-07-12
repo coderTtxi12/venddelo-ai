@@ -54,6 +54,9 @@ def require_owned_restaurant(
     restaurant = uow.restaurants.get(restaurant_id)
     if restaurant is None:
         raise NotFoundError("Restaurant not found")
-    if restaurant.owner_id is None or restaurant.owner_id != user.id:
-        raise ForbiddenError("You do not own this restaurant")
-    return restaurant
+    if restaurant.owner_id == user.id:
+        return restaurant
+    found = uow.restaurants.get_for_user(user.id, restaurant_id=restaurant_id)
+    if found is not None and found[1] in ("owner", "admin"):
+        return restaurant
+    raise ForbiddenError("You do not have access to this restaurant")
