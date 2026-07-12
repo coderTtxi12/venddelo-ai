@@ -1,4 +1,7 @@
+import uuid
+
 from app.core.pagination import PaginationParams
+from app.db.models.restaurant import RestaurantMember
 from app.modules.restaurants.adapters import SqlAlchemyRestaurantRepository
 from app.modules.restaurants.schemas import (
     PaymentMethodCreate,
@@ -90,3 +93,75 @@ def test_set_schedules_and_payment_methods(session):
     methods = repo.list_payment_methods(dto.id)
     assert len(methods) == 1
     assert methods[0].method == "transfer"
+
+
+@requires_db
+def test_get_for_user_prefers_owner_id_over_stale_membership(session):
+    owner_id = uuid.uuid4()
+    repo = SqlAlchemyRestaurantRepository(session)
+
+    primary = repo.add(
+        RestaurantCreate(name="Primary", subdomain="primary-rest"),
+        owner_id=owner_id,
+    )
+    session.query(RestaurantMember).filter_by(restaurant_id=primary.id).delete()
+    session.flush()
+
+    draft = repo.add(
+        RestaurantCreate(name="Draft", subdomain="draft-rest"),
+        owner_id=uuid.uuid4(),
+    )
+    session.add(
+        RestaurantMember(
+            restaurant_id=draft.id,
+            user_id=owner_id,
+            member_role="owner",
+            is_active=True,
+        )
+    )
+    session.flush()
+
+    found = repo.get_for_user(owner_id)
+    assert found is not None
+    restaurant, role = found
+    assert restaurant.id == primary.id
+    assert role == "owner"
+
+
+@requires_db
+def test_get_for_user_falls_back_to_membership_for_admin(session):
+    owner_id = uuid.uuid4()
+    admin_id = uuid.uuid4()
+    repo = SqlAlchemyRestaurantRepository(session)
+
+    invited = repo.add(
+        RestaurantCreate(name="Invited", subdomain="invited-rest"),
+        owner_id=owner_id,
+    )
+    repo.add_admin_invite(invited.id, "admin@empresa.com")
+    repo.claim_admin_invites(admin_id, "admin@empresa.com")
+
+    found = repo.get_for_user(admin_id)
+    assert found is not None
+    restaurant, role = found
+    assert restaurant.id == invited.id
+    assert role == "admin"
+
+
+@requires_db
+def test_get_for_user_falls_back_to_legacy_owner_id(session):
+    owner_id = uuid.uuid4()
+    repo = SqlAlchemyRestaurantRepository(session)
+    created = repo.add(
+        RestaurantCreate(name="Legacy", subdomain="legacy-owner"),
+        owner_id=owner_id,
+    )
+    session.query(RestaurantMember).filter_by(restaurant_id=created.id).delete()
+    session.flush()
+
+    found = repo.get_for_user(owner_id)
+    assert found is not None
+    restaurant, role = found
+    assert restaurant.id == created.id
+    assert restaurant.subdomain == "legacy-owner"
+    assert role == "owner"
