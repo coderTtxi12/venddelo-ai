@@ -234,6 +234,7 @@ def quote_public_delivery(
         distance_km=quote.distance_km,
         provider_name=quote.provider_name,
         partnership_status=quote.partnership_status,
+        weather_mode=quote.weather_mode,
     )
 
 
