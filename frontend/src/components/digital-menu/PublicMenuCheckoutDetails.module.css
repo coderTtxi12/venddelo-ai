@@ -205,6 +205,28 @@
   color: var(--dm-text-secondary, #64748b);
 }
 
+.deliveryWeatherNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0.35rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: #0369a1;
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.18);
+}
+
+.deliveryWeatherIcon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  opacity: 0.85;
+}
+
 .serviceOptionIcon {
   width: 20px;
   height: 20px;
