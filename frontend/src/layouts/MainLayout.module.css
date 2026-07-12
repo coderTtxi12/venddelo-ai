@@ -17,3 +17,9 @@
   padding: 1.5rem;
   background: var(--color-bg);
 }
+
+@media (max-width: 900px) {
+  .content {
+    padding: 1rem;
+  }
+}
