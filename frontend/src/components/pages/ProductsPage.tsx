@@ -283,7 +283,9 @@ export default function ProductsPage() {
       setSupplierId(null);
       setSupplierIdError(null);
       const email = firebaseUser?.email ?? '';
-      const result = await resolveSupplierIdByEmail(db, email, accessToken);
+      const result = await resolveSupplierIdByEmail(db, email, accessToken, {
+        userId: firebaseUser?.uid,
+      });
       if (cancelled) return;
       if ('error' in result) {
         setSupplierIdError(result.error);

@@ -39,6 +39,7 @@ export function RestaurantGate({ children }: { children: React.ReactNode }) {
           db,
           user.email ?? '',
           accessToken,
+          { userId: user.uid },
         );
         const found = 'supplierId' in resolved;
         if (!cancelled) {

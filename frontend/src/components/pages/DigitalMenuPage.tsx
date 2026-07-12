@@ -127,6 +127,7 @@ export default function DigitalMenuPage() {
           db,
           firebaseUser?.email ?? '',
           accessToken,
+          { userId: firebaseUser?.uid },
         );
         if ('error' in resolved) {
           if (!cancelled) {

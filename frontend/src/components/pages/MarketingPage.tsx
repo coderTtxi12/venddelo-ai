@@ -194,7 +194,9 @@ export default function MarketingPage() {
     if (!email || !accessToken) return;
     void (async () => {
       try {
-        const result = await resolveSupplierIdByEmail(db, email, accessToken);
+        const result = await resolveSupplierIdByEmail(db, email, accessToken, {
+          userId: user?.uid,
+        });
         if ('error' in result) {
           setSupplierError(result.error);
           setSupplierId(null);
