@@ -141,6 +141,93 @@ def test_invited_admin_claims_membership_on_me_and_skips_onboarding(client, engi
 
 
 @requires_db
+def test_owner_can_list_active_admin_members(client):
+    _create_provider(client)
+
+    client.post(
+        "/api/v1/delivery-providers/me/admin-invites",
+        json={"email": "nuevo.admin@empresa.com"},
+        headers=AUTH,
+    )
+
+    app.dependency_overrides[get_auth] = lambda: FakeAuth(
+        user_id=ADMIN,
+        email="nuevo.admin@empresa.com",
+    )
+    try:
+        claimed = client.get("/api/v1/delivery-providers/me", headers=AUTH)
+        assert claimed.status_code == 200
+        assert claimed.json()["member_role"] == "admin"
+    finally:
+        app.dependency_overrides.pop(get_auth, None)
+
+    listed = client.get("/api/v1/delivery-providers/me/members", headers=AUTH)
+    assert listed.status_code == 200, listed.text
+    members = listed.json()
+    assert len(members) == 2
+    roles = {row["member_role"] for row in members}
+    assert roles == {"owner", "admin"}
+    assert members[0]["member_role"] == "owner"
+    admin_row = next(row for row in members if row["member_role"] == "admin")
+    assert admin_row["email"] == "nuevo.admin@empresa.com"
+    assert admin_row["user_id"] == str(ADMIN)
+
+
+@requires_db
+def test_owner_cannot_invite_active_admin_again(client):
+    _create_provider(client)
+
+    client.post(
+        "/api/v1/delivery-providers/me/admin-invites",
+        json={"email": "activo.admin@empresa.com"},
+        headers=AUTH,
+    )
+
+    app.dependency_overrides[get_auth] = lambda: FakeAuth(
+        user_id=ADMIN,
+        email="activo.admin@empresa.com",
+    )
+    try:
+        claimed = client.get("/api/v1/delivery-providers/me", headers=AUTH)
+        assert claimed.status_code == 200
+        assert claimed.json()["member_role"] == "admin"
+    finally:
+        app.dependency_overrides.pop(get_auth, None)
+
+    blocked = client.post(
+        "/api/v1/delivery-providers/me/admin-invites",
+        json={"email": "activo.admin@empresa.com"},
+        headers=AUTH,
+    )
+    assert blocked.status_code == 409
+
+
+@requires_db
+def test_non_owner_cannot_list_admin_members(client):
+    _create_provider(client)
+
+    client.post(
+        "/api/v1/delivery-providers/me/admin-invites",
+        json={"email": "activo.admin@empresa.com"},
+        headers=AUTH,
+    )
+
+    app.dependency_overrides[get_auth] = lambda: FakeAuth(
+        user_id=ADMIN,
+        email="activo.admin@empresa.com",
+    )
+    try:
+        me = client.get("/api/v1/delivery-providers/me", headers=AUTH)
+        assert me.status_code == 200
+        assert me.json()["member_role"] == "admin"
+
+        forbidden = client.get("/api/v1/delivery-providers/me/members", headers=AUTH)
+        assert forbidden.status_code == 403
+    finally:
+        app.dependency_overrides.pop(get_auth, None)
+
+
+@requires_db
 def test_active_invited_admin_gets_provider_without_onboarding(client, engine):
     provider_id = _create_provider(client)
 
