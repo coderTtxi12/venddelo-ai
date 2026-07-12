@@ -93,14 +93,71 @@
   }
 }
 
-.filters {
+.filtersBar {
   display: flex;
-  gap: 0.45rem;
+  align-items: stretch;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+.filterWorkflow {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow-x: auto;
-  padding-bottom: 0.15rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-primary) 3%, var(--color-surface));
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
-  flex-shrink: 0;
+}
+
+.filterFlowStep {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex: 0 0 auto;
+}
+
+.filterFlowArrow {
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+  opacity: 0.4;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+  padding: 0 0.05rem;
+}
+
+.filterSideGroups {
+  display: flex;
+  align-items: stretch;
+  gap: 0.45rem;
+  flex: 0 0 auto;
+}
+
+.filterArchiveGroup,
+.filterViewGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 0 0 auto;
+  padding: 0.35rem 0.55rem;
+  border-radius: 14px;
+}
+
+.filterArchiveGroup {
+  border: 1px dashed color-mix(in srgb, var(--order-delivered) 32%, var(--color-border));
+  background: color-mix(in srgb, var(--order-delivered) 5%, var(--color-surface));
+}
+
+.filterViewGroup {
+  border: 1px dashed color-mix(in srgb, var(--color-text-secondary) 28%, var(--color-border));
+  background: color-mix(in srgb, var(--color-text-secondary) 4%, var(--color-surface));
 }
 
 .filterChip {
@@ -109,8 +166,8 @@
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
-  min-height: 44px;
-  padding: 0 0.9rem;
+  min-height: 40px;
+  padding: 0 0.85rem;
   border-radius: 999px;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -121,6 +178,19 @@
   transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 }
 
+.filterChipWorkflow {
+  font-size: 0.82rem;
+}
+
+.filterChipArchive {
+  font-size: 0.82rem;
+}
+
+.filterChipView {
+  min-height: 40px;
+  font-weight: 700;
+}
+
 .filterChip:hover {
   border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
 }
@@ -129,6 +199,13 @@
   border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
   background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
   color: var(--color-text);
+}
+
+.filterChipView.filterChipActive {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--color-text-secondary) 35%, var(--color-border));
+  background: var(--color-surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
 }
 
 .filterChipNew {
@@ -146,6 +223,42 @@
   background: color-mix(in srgb, var(--order-pending) 12%, var(--color-surface));
   color: #991b1b;
   font-weight: 800;
+}
+
+.filterChipToneActive.filterChipTonePending {
+  border-color: var(--order-pending);
+  background: color-mix(in srgb, var(--order-pending) 12%, var(--color-surface));
+  color: #991b1b;
+}
+
+.filterChipToneActive.filterChipToneConfirmed {
+  border-color: var(--order-confirmed);
+  background: color-mix(in srgb, var(--order-confirmed) 14%, var(--color-surface));
+  color: #92400e;
+}
+
+.filterChipToneActive.filterChipTonePreparing {
+  border-color: var(--order-preparing);
+  background: color-mix(in srgb, var(--order-preparing) 12%, var(--color-surface));
+  color: #1d4ed8;
+}
+
+.filterChipToneActive.filterChipToneReady {
+  border-color: var(--order-ready);
+  background: color-mix(in srgb, var(--order-ready) 12%, var(--color-surface));
+  color: #15803d;
+}
+
+.filterChipToneActive.filterChipToneDelivered {
+  border-color: var(--order-delivered);
+  background: color-mix(in srgb, var(--order-delivered) 14%, var(--color-surface));
+  color: #475569;
+}
+
+.filterChipToneActive.filterChipToneCancelled {
+  border-color: var(--order-cancelled);
+  background: color-mix(in srgb, var(--order-cancelled) 16%, var(--color-surface));
+  color: #64748b;
 }
 
 .filterChipCount {
@@ -181,6 +294,12 @@
   background: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));
   color: var(--color-text);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 25%, transparent);
+}
+
+.filterChipToneActive .filterChipCountTone {
+  background: #fff;
+  color: inherit;
+  box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 25%, transparent);
 }
 
 .board {
@@ -822,6 +941,22 @@
     gap: 0.65rem;
   }
 
+  .filtersBar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.45rem;
+  }
+
+  .filterSideGroups {
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .filterArchiveGroup,
+  .filterViewGroup {
+    justify-content: flex-start;
+  }
+
   .detailBody {
     padding: 0.75rem 0.85rem 1rem;
   }
@@ -856,6 +991,7 @@
   .ticket,
   .refreshBtn,
   .filterChip,
+  .filtersBar,
   .actionPrimary,
   .actionSecondary,
   .actionDanger {
