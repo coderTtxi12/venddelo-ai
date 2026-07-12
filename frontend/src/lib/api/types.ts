@@ -52,6 +52,37 @@ export type Restaurant = {
   updated_at: string;
 };
 
+export type RestaurantMeResponse = {
+  restaurant: Restaurant | null;
+  member_role: string | null;
+};
+
+export type RestaurantAccessItem = {
+  restaurant: Restaurant;
+  member_role: 'owner' | 'admin';
+  member_id: string;
+  last_accessed_at: string | null;
+};
+
+export type RestaurantAccessListResponse = {
+  items: RestaurantAccessItem[];
+};
+
+export type RestaurantAdminInvite = {
+  id: string;
+  email: string;
+  created_at: string;
+};
+
+export type RestaurantMember = {
+  id: string;
+  user_id: string;
+  email: string | null;
+  display_name: string | null;
+  member_role: 'owner' | 'admin';
+  created_at: string;
+};
+
 export type RestaurantSchedule = {
   id: string;
   service_type: 'takeout' | 'delivery';
