@@ -23,6 +23,7 @@ _SUMMARY_ARG_KEYS = (
     "skill_id",
     "category_name",
     "search",
+    "limit",
     "promotion_name",
 )
 
