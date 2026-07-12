@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime, time
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ScheduleCreate(BaseModel):
@@ -119,3 +120,44 @@ class RestaurantDTO(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class RestaurantMeResponse(BaseModel):
+    restaurant: RestaurantDTO | None = None
+    member_role: str | None = None
+
+
+class RestaurantAccessItem(BaseModel):
+    restaurant: RestaurantDTO
+    member_role: Literal["owner", "admin"]
+    member_id: uuid.UUID
+    last_accessed_at: datetime | None = None
+
+
+class RestaurantAccessListResponse(BaseModel):
+    items: list[RestaurantAccessItem]
+
+
+class RestaurantSelectRequest(BaseModel):
+    restaurant_id: uuid.UUID
+
+
+class RestaurantAdminInviteDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    email: str
+    created_at: datetime
+
+
+class RestaurantAdminInviteCreate(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+
+
+class RestaurantMemberDTO(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    email: str | None = None
+    display_name: str | None = None
+    member_role: Literal["owner", "admin"]
+    created_at: datetime
