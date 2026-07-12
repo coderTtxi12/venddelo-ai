@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import IosShareOutlinedIcon from '@mui/icons-material/IosShareOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
+import { DigitalMenuShareButton } from '@/components/digital-menu/DigitalMenuShareButton';
 import { DigitalMenuCategorySections } from '@/components/digital-menu/DigitalMenuCategorySections';
 import { DigitalMenuProductDetail } from '@/components/digital-menu/DigitalMenuProductDetail';
 import { PromotionShortcutProductsView } from '@/components/digital-menu/PromotionShortcutProductsView';
@@ -777,9 +777,12 @@ export default function PublicDigitalMenuPage({
                     </span>
                   ) : null}
                 </button>
-                <span className={menuStyles.compactIconBtn} aria-label="Compartir">
-                  <IosShareOutlinedIcon fontSize="small" />
-                </span>
+                <DigitalMenuShareButton
+                  restaurantName={restaurant.name}
+                  menuUrl=""
+                  fallbackSubdomain={subdomain}
+                  className={menuStyles.compactIconBtn}
+                />
                 <button
                   type="button"
                   className={menuStyles.compactIconBtn}
@@ -890,9 +893,12 @@ export default function PublicDigitalMenuPage({
                             </span>
                           ) : null}
                         </button>
-                        <span className={menuStyles.floatIconBtn} aria-label="Compartir">
-                          <IosShareOutlinedIcon fontSize="small" />
-                        </span>
+                        <DigitalMenuShareButton
+                          restaurantName={restaurant.name}
+                          menuUrl=""
+                          fallbackSubdomain={subdomain}
+                          className={menuStyles.floatIconBtn}
+                        />
                         <button
                           type="button"
                           className={menuStyles.floatIconBtn}
