@@ -30,7 +30,8 @@ import { DigitalMenuQrDialog } from '@/components/digital-menu/DigitalMenuQrDial
 import { DigitalMenuSpecialCategoriesPanel } from '@/components/digital-menu/DigitalMenuSpecialCategoriesPanel';
 import { DigitalMenuThemePicker } from '@/components/digital-menu/DigitalMenuThemePicker';
 import type { ProductDragTarget } from '@/components/digital-menu/SortableProductList';
-import { productsForCategory, sortCategories } from '@/components/digital-menu/menuProductUi';
+import { productsForCategory, sortCategories, categoryProductOrderWithDraftTail } from '@/components/digital-menu/menuProductUi';
+import { filterPublicMenuProducts } from '@/lib/digital-menu/orderableProducts';
 import {
   DEFAULT_DIGITAL_MENU_THEME_ID,
   getDigitalMenuThemeOrDefault,
@@ -194,9 +195,14 @@ export default function DigitalMenuPage() {
     };
   }, [accessToken, authLoading, firebaseUser?.email]);
 
+  const previewProducts = useMemo(
+    () => filterPublicMenuProducts(products),
+    [products],
+  );
+
   const productDiscounts = useMemo(
-    () => buildMenuProductDiscountMap(products, promotions, new Date(), promotionTimezone),
-    [products, promotions, promotionTimezone],
+    () => buildMenuProductDiscountMap(previewProducts, promotions, new Date(), promotionTimezone),
+    [previewProducts, promotions, promotionTimezone],
   );
 
   const promotionCountdownContext = useMemo(
@@ -210,13 +216,13 @@ export default function DigitalMenuPage() {
   const productTimeLimitedPromotions = useMemo(
     () =>
       buildProductTimeLimitedPromotionMap(
-        products,
+        previewProducts,
         promotions,
         new Date(),
         promotionTimezone,
         promotionCountdownContext,
       ),
-    [products, promotions, promotionTimezone, promotionCountdownContext],
+    [previewProducts, promotions, promotionTimezone, promotionCountdownContext],
   );
 
   const specialCategoryConfig = useMemo(
@@ -225,8 +231,8 @@ export default function DigitalMenuPage() {
   );
 
   const promotionShortcuts = useMemo(
-    () => listLivePromotionShortcuts(promotions, products, new Date(), promotionTimezone),
-    [promotions, products, promotionTimezone],
+    () => listLivePromotionShortcuts(promotions, previewProducts, new Date(), promotionTimezone),
+    [promotions, previewProducts, promotionTimezone],
   );
 
   const displayCategories = useMemo(
@@ -353,7 +359,7 @@ export default function DigitalMenuPage() {
       if (from < 0 || to < 0) return;
 
       const reordered = arrayMove(catProducts, from, to);
-      const orderedProductIds = reordered.map((product) => product.id);
+      const orderedProductIds = categoryProductOrderWithDraftTail(products, categoryId, reordered);
       const previousProducts = products;
 
       applyCategoryProductOrder(categoryId, orderedProductIds);
@@ -613,7 +619,7 @@ export default function DigitalMenuPage() {
           <DigitalMenuEditorPreview
             restaurant={restaurant}
             displayCategories={displayCategories}
-            products={products}
+            products={previewProducts}
             schedules={schedules}
             enabledServices={enabledServices}
             productDiscounts={productDiscounts}
@@ -623,6 +629,7 @@ export default function DigitalMenuPage() {
             countdownContext={promotionCountdownContext}
             logoUrl={logoUrl}
             coverUrl={coverUrl}
+            menuUrl={liveMenuUrl}
             menuThemeStyle={menuThemeStyle}
             categoryTabStyle={menuTheme.style.categoryTabStyle}
             activeCategoryId={activeCategoryId}

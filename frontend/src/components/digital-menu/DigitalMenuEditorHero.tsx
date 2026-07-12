@@ -1,8 +1,8 @@
 'use client';
 
 import type { RefObject } from 'react';
-import IosShareOutlinedIcon from '@mui/icons-material/IosShareOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
+import { DigitalMenuShareButton } from '@/components/digital-menu/DigitalMenuShareButton';
 import type { Restaurant, RestaurantSchedule } from '@/lib/api/types';
 import { RestaurantOpenStatusBadge } from '@/components/digital-menu/RestaurantOpenStatusBadge';
 import { RestaurantServiceChips } from '@/components/digital-menu/RestaurantServiceChips';
@@ -15,6 +15,7 @@ type DigitalMenuEditorHeroProps = {
   enabledServices: RestaurantServiceType[];
   logoUrl: string | null;
   coverUrl: string | null;
+  menuUrl: string;
   showFloatControls: boolean;
   heroSentinelRef: RefObject<HTMLDivElement | null>;
   coverInputRef: RefObject<HTMLInputElement | null>;
@@ -30,6 +31,7 @@ export function DigitalMenuEditorHero({
   enabledServices,
   logoUrl,
   coverUrl,
+  menuUrl,
   showFloatControls,
   heroSentinelRef,
   coverInputRef,
@@ -53,9 +55,12 @@ export function DigitalMenuEditorHero({
           aria-hidden={!showFloatControls}
         >
           <div className={menuStyles.headerActions}>
-            <span className={menuStyles.floatIconBtn} aria-label="Compartir">
-              <IosShareOutlinedIcon fontSize="small" />
-            </span>
+            <DigitalMenuShareButton
+              restaurantName={restaurant.name}
+              menuUrl={menuUrl}
+              fallbackSubdomain={restaurant.subdomain}
+              className={menuStyles.floatIconBtn}
+            />
             <span className={menuStyles.floatIconBtn} aria-label="Buscar">
               <SearchOutlinedIcon fontSize="small" />
             </span>

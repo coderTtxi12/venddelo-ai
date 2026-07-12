@@ -60,6 +60,7 @@ type DigitalMenuEditorPreviewProps = {
   countdownContext: PromotionCountdownContext;
   logoUrl: string | null;
   coverUrl: string | null;
+  menuUrl: string;
   menuThemeStyle: CSSProperties;
   categoryTabStyle: string;
   activeCategoryId: string | null;
@@ -154,6 +155,7 @@ export function DigitalMenuEditorPreview({
   countdownContext,
   logoUrl,
   coverUrl,
+  menuUrl,
   menuThemeStyle,
   categoryTabStyle,
   activeCategoryId,
@@ -623,6 +625,7 @@ export function DigitalMenuEditorPreview({
                       enabledServices={enabledServices}
                       logoUrl={logoUrl}
                       coverUrl={coverUrl}
+                      menuUrl={menuUrl}
                       heroSentinelRef={heroSentinelRef}
                       showFloatControls={showFloatControls}
                       coverInputRef={coverInputRef}
