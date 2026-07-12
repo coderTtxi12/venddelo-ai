@@ -55,19 +55,40 @@ export const ORDER_STATUS_META: Record<OrderStatus, OrderStatusMeta> = {
 
 export type OrderStatusFilter = 'new' | 'all' | 'active' | OrderStatus;
 
-export const ORDER_STATUS_FILTER_OPTIONS: Array<{
+export type OrderStatusFilterGroup = 'workflow' | 'archive' | 'view';
+
+export type OrderStatusFilterOption = {
   value: OrderStatusFilter;
   label: string;
+  group: OrderStatusFilterGroup;
   primary?: boolean;
-}> = [
-  { value: 'new', label: 'Nuevos', primary: true },
-  { value: 'active', label: 'Activos' },
-  { value: 'all', label: 'Todos' },
-  { value: 'confirmed', label: 'Confirmados' },
-  { value: 'preparing', label: 'Preparando' },
-  { value: 'ready', label: 'Listos' },
-  { value: 'delivered', label: 'Entregados' },
-  { value: 'cancelled', label: 'Cancelados' },
+  tone?: OrderStatusMeta['tone'];
+};
+
+/** Active kitchen pipeline: Nuevos → Confirmados → Preparando → Listos */
+export const KITCHEN_WORKFLOW_FILTER_OPTIONS: OrderStatusFilterOption[] = [
+  { value: 'new', label: 'Nuevos', group: 'workflow', primary: true, tone: 'pending' },
+  { value: 'confirmed', label: 'Confirmados', group: 'workflow', tone: 'confirmed' },
+  { value: 'preparing', label: 'Preparando', group: 'workflow', tone: 'preparing' },
+  { value: 'ready', label: 'Listos', group: 'workflow', tone: 'ready' },
+];
+
+/** Closed orders — outside the live kitchen flow */
+export const KITCHEN_ARCHIVE_FILTER_OPTIONS: OrderStatusFilterOption[] = [
+  { value: 'delivered', label: 'Entregados', group: 'archive', tone: 'delivered' },
+  { value: 'cancelled', label: 'Cancelados', group: 'archive', tone: 'cancelled' },
+];
+
+/** Aggregate views — separated from status-specific filters */
+export const KITCHEN_VIEW_FILTER_OPTIONS: OrderStatusFilterOption[] = [
+  { value: 'active', label: 'Activos', group: 'view' },
+  { value: 'all', label: 'Todos', group: 'view' },
+];
+
+export const ORDER_STATUS_FILTER_OPTIONS: OrderStatusFilterOption[] = [
+  ...KITCHEN_WORKFLOW_FILTER_OPTIONS,
+  ...KITCHEN_ARCHIVE_FILTER_OPTIONS,
+  ...KITCHEN_VIEW_FILTER_OPTIONS,
 ];
 
 export const DEFAULT_KITCHEN_STATUS_FILTER: OrderStatusFilter = 'new';
