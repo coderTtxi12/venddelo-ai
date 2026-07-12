@@ -42,6 +42,7 @@ class ResolvedDeliveryQuote:
     distance_km: float | None
     provider_name: str | None
     partnership_status: PartnershipStatus
+    weather_mode: DeliveryWeatherMode = "none"
 
 
 def _partnership_status(
@@ -180,6 +181,7 @@ class PublicDeliveryQuoteService:
             )
 
         provider_id = service.provider_id
+        weather_mode: DeliveryWeatherMode = self._repo.get_weather_mode(provider_id)  # type: ignore[assignment]
         if restaurant.latitude is None or restaurant.longitude is None:
             return ResolvedDeliveryQuote(
                 available=False,
@@ -189,6 +191,7 @@ class PublicDeliveryQuoteService:
                 distance_km=None,
                 provider_name=provider_name,
                 partnership_status=status,
+                weather_mode=weather_mode,
             )
 
         inside_polygon = self._repo.point_in_primary_zone(
@@ -212,6 +215,7 @@ class PublicDeliveryQuoteService:
                     distance_km=None,
                     provider_name=provider_name,
                     partnership_status=status,
+                    weather_mode=weather_mode,
                 )
             try:
                 distance_km = fetch_driving_distance_km(
@@ -230,6 +234,7 @@ class PublicDeliveryQuoteService:
                     distance_km=None,
                     provider_name=provider_name,
                     partnership_status=status,
+                    weather_mode=weather_mode,
                 )
 
         pricing_dto = self._repo.get_pricing_config(provider_id)
@@ -245,6 +250,7 @@ class PublicDeliveryQuoteService:
                 distance_km=distance_km,
                 provider_name=provider_name,
                 partnership_status=status,
+                weather_mode=weather_mode,
             )
 
         parsed = config_from_json(
@@ -256,7 +262,6 @@ class PublicDeliveryQuoteService:
 
         schedules = list(self._repo.list_schedules(provider_id))
         timezone = self._repo.get_provider_timezone(provider_id)
-        weather_mode: DeliveryWeatherMode = self._repo.get_weather_mode(provider_id)  # type: ignore[assignment]
 
         if not inside_polygon and not is_within_regular_schedule(
             schedules, timezone=timezone, now=quote_now
@@ -272,6 +277,7 @@ class PublicDeliveryQuoteService:
                 distance_km=distance_km,
                 provider_name=provider_name,
                 partnership_status=status,
+                weather_mode=weather_mode,
             )
 
         is_night = (
@@ -296,4 +302,5 @@ class PublicDeliveryQuoteService:
             distance_km=distance_km if not inside_polygon else distance_km,
             provider_name=provider_name,
             partnership_status=status,
+            weather_mode=weather_mode,
         )
