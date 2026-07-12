@@ -1,5 +1,6 @@
 import type { CategoryDisplayLayout, Product, Promotion } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
+import { isPublicMenuListed } from '@/lib/menu/productVisibility';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
 import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
@@ -14,7 +15,9 @@ export function isProductAvailable(product: Product): boolean {
 }
 
 export function productsForCategory(products: Product[], categoryId: string): Product[] {
-  const inCategory = products.filter((p) => p.category_ids.includes(categoryId));
+  const inCategory = products.filter(
+    (product) => product.category_ids.includes(categoryId) && isPublicMenuListed(product),
+  );
   const sortByCategoryIndex = (list: Product[]) =>
     [...list].sort((a, b) => {
       const sa = a.category_sort_indices?.[categoryId] ?? Number.MAX_SAFE_INTEGER;
@@ -25,6 +28,30 @@ export function productsForCategory(products: Product[], categoryId: string): Pr
   const available = sortByCategoryIndex(inCategory.filter((p) => p.status === 'active'));
   const unavailable = sortByCategoryIndex(inCategory.filter((p) => p.status !== 'active'));
   return [...available, ...unavailable];
+}
+
+/** Preserve draft products at the end when persisting category order from the menu preview. */
+export function categoryProductOrderWithDraftTail(
+  allProducts: Product[],
+  categoryId: string,
+  reorderedMenuProducts: Product[],
+): string[] {
+  const visibleIds = new Set(reorderedMenuProducts.map((product) => product.id));
+  const draftTail = allProducts
+    .filter(
+      (product) =>
+        product.status === 'draft' &&
+        product.category_ids.includes(categoryId) &&
+        !visibleIds.has(product.id),
+    )
+    .sort((a, b) => {
+      const sa = a.category_sort_indices?.[categoryId] ?? Number.MAX_SAFE_INTEGER;
+      const sb = b.category_sort_indices?.[categoryId] ?? Number.MAX_SAFE_INTEGER;
+      if (sa !== sb) return sa - sb;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    })
+    .map((product) => product.id);
+  return [...reorderedMenuProducts.map((product) => product.id), ...draftTail];
 }
 
 export function ProductListThumb({ product, className }: { product: Product; className?: string }) {
