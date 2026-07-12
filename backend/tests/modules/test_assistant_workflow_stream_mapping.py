@@ -17,6 +17,11 @@ from app.modules.assistant.agent.workflow.stream_mapping import (
 from openai.types.responses.response_text_delta_event import ResponseTextDeltaEvent
 
 
+class _FakeAgent:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
 def test_summarize_tool_args_keeps_short_search_fields():
     summary = summarize_tool_args({"query": "tacos al pastor", "limit": 5})
     assert summary["query"] == "tacos al pastor"
@@ -32,7 +37,7 @@ def test_summarize_tool_output_reads_json_summary():
 def test_map_agent_stream_event_emits_tool_start():
     registry = build_skill_registry(["menu_read"])
     item = ToolCallItem(
-        agent=SimpleNamespace(name="Executor"),
+        agent=_FakeAgent("Executor"),
         raw_item=SimpleNamespace(
             name="list_categories",
             call_id="call-1",
@@ -55,7 +60,7 @@ def test_map_agent_stream_event_emits_tool_start():
 
 def test_map_agent_stream_event_emits_tool_result():
     item = ToolCallOutputItem(
-        agent=SimpleNamespace(name="Executor"),
+        agent=_FakeAgent("Executor"),
         raw_item=SimpleNamespace(call_id="call-1", name="list_categories"),
         output='{"ok": true, "summary": "Hay 2 categorías"}',
     )
@@ -125,7 +130,7 @@ def test_map_agent_stream_event_emits_reasoning_delta():
 
 def test_map_agent_stream_event_emits_reasoning_item_created():
     item = ReasoningItem(
-        agent=SimpleNamespace(name="Router"),
+        agent=_FakeAgent("Router"),
         raw_item=SimpleNamespace(
             id="rs_1",
             type="reasoning",
