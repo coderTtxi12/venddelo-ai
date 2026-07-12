@@ -9,6 +9,7 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderAdminInviteCreate,
     DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
+    DeliveryProviderMemberDTO,
     DeliveryProviderPricingConfigDTO,
     DeliveryProviderPaymentMethodCreate,
     DeliveryProviderPaymentMethodDTO,
@@ -165,6 +166,11 @@ class DeliveryProviderRepository(ABC):
     def get_mexy_partnership_for_restaurant(
         self, restaurant_id: uuid.UUID
     ) -> RestaurantDeliveryPartnershipDTO | None: ...
+
+    @abstractmethod
+    def list_admin_members(
+        self, provider_id: uuid.UUID
+    ) -> Sequence[DeliveryProviderMemberDTO]: ...
 
     @abstractmethod
     def list_admin_invites(

@@ -225,5 +225,14 @@ class DeliveryProviderAdminInviteDTO(BaseModel):
     created_at: datetime
 
 
+class DeliveryProviderMemberDTO(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    email: str | None = None
+    display_name: str | None = None
+    member_role: Literal["owner", "admin", "dispatcher", "driver"]
+    created_at: datetime
+
+
 class DeliveryProviderAdminInviteCreate(BaseModel):
     email: str = Field(min_length=3, max_length=320)

@@ -11,6 +11,7 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderAdminInviteCreate,
     DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
+    DeliveryProviderMemberDTO,
     DeliveryProviderMeResponse,
     DeliveryProviderOnboardingSubmit,
     DeliveryProviderPaymentMethodCreate,
@@ -85,6 +86,14 @@ def list_my_delivery_provider_admin_invites(
     service: DeliveryProviderService = Depends(_service),
 ) -> list[DeliveryProviderAdminInviteDTO]:
     return service.list_admin_invites(user.id)
+
+
+@router.get("/me/members", response_model=list[DeliveryProviderMemberDTO])
+def list_my_delivery_provider_members(
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> list[DeliveryProviderMemberDTO]:
+    return service.list_admin_members(user.id)
 
 
 @router.post(

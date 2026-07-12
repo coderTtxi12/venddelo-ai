@@ -38,6 +38,7 @@ from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRestaurantDTO,
     DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
+    DeliveryProviderMemberDTO,
     DeliveryProviderPricingConfigDTO,
     DeliveryProviderPaymentMethodCreate,
     DeliveryProviderPaymentMethodDTO,
@@ -826,6 +827,38 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
                 delivery_enabled=restaurant.delivery_enabled,
             ),
         )
+
+    def list_admin_members(
+        self, provider_id: uuid.UUID
+    ) -> Sequence[DeliveryProviderMemberDTO]:
+        rows = self._session.execute(
+            select(
+                DeliveryProviderMember,
+                User.email,
+                User.display_name,
+            )
+            .join(User, User.id == DeliveryProviderMember.user_id)
+            .where(
+                DeliveryProviderMember.delivery_provider_id == provider_id,
+                DeliveryProviderMember.is_active.is_(True),
+                DeliveryProviderMember.member_role.in_(("owner", "admin")),
+            )
+            .order_by(
+                DeliveryProviderMember.member_role.desc(),
+                DeliveryProviderMember.created_at.asc(),
+            )
+        ).all()
+        return [
+            DeliveryProviderMemberDTO(
+                id=member.id,
+                user_id=member.user_id,
+                email=email,
+                display_name=display_name,
+                member_role=member.member_role,
+                created_at=member.created_at,
+            )
+            for member, email, display_name in rows
+        ]
 
     def list_admin_invites(
         self, provider_id: uuid.UUID

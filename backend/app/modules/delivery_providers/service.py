@@ -18,6 +18,7 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderAdminInviteCreate,
     DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
+    DeliveryProviderMemberDTO,
     DeliveryProviderMeResponse,
     DeliveryProviderOnboardingSubmit,
     DeliveryProviderPaymentMethodCreate,
@@ -64,11 +65,20 @@ class DeliveryProviderService:
         provider_id = self._require_owner_provider_id(user_id)
         return list(self._repo.list_admin_invites(provider_id))
 
+    def list_admin_members(self, user_id: uuid.UUID) -> list[DeliveryProviderMemberDTO]:
+        provider_id = self._require_owner_provider_id(user_id)
+        return list(self._repo.list_admin_members(provider_id))
+
     def add_admin_invite(
         self, user_id: uuid.UUID, data: DeliveryProviderAdminInviteCreate
     ) -> DeliveryProviderAdminInviteDTO:
         provider_id = self._require_owner_provider_id(user_id)
         normalized = self._normalize_admin_email(data.email)
+        if any(
+            member.email and member.email.strip().lower() == normalized
+            for member in self._repo.list_admin_members(provider_id)
+        ):
+            raise ConflictError("Ese correo ya pertenece al equipo")
         existing = [row for row in self._repo.list_admin_invites(provider_id) if row.email == normalized]
         if existing:
             raise ConflictError("Ese correo ya está en la lista de administradores")
