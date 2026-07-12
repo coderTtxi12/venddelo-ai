@@ -10,6 +10,7 @@ import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import type { SvgIconProps } from '@mui/material/SvgIcon';
 import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
 import { getPublicCheckoutConfig, type PublicCheckoutConfig } from '@/lib/api/public';
 import {
   checkoutFieldHasIssue,
@@ -30,6 +31,7 @@ import {
   readCheckoutPreferencesFromStorage,
 } from '@/lib/digital-menu/checkout/preferencesStorage';
 import { usePublicDeliveryQuote } from '@/lib/digital-menu/checkout/usePublicDeliveryQuote';
+import { getDeliveryWeatherNotice } from '@/lib/digital-menu/checkout/deliveryWeatherNotice';
 import { formatMoney } from '@/lib/currency';
 import {
   PAYMENT_METHOD_LABELS,
@@ -200,6 +202,16 @@ export function PublicMenuCheckoutDetails({
       ? deliveryQuoteError ??
         deliveryQuote?.reason ??
         (!deliverySelectable ? deliveryServiceReason : null)
+      : null;
+
+  const deliveryWeatherFeeNotice =
+    deliveryQuote?.available === true
+      ? getDeliveryWeatherNotice(deliveryQuote.weather_mode, 'fee')
+      : null;
+
+  const deliveryWeatherBlockedNotice =
+    deliveryQuote?.available === false
+      ? getDeliveryWeatherNotice(deliveryQuote.weather_mode, 'blocked')
       : null;
 
   const deliveryPaymentReady =
@@ -555,7 +567,7 @@ export function PublicMenuCheckoutDetails({
 
             {deliveryBlockingReason ? (
               <p className={styles.deliveryAlert} role="alert">
-                {deliveryBlockingReason}
+                {deliveryWeatherBlockedNotice ?? deliveryBlockingReason}
               </p>
             ) : null}
 
@@ -572,6 +584,15 @@ export function PublicMenuCheckoutDetails({
                       ? `${deliveryQuote.distance_km.toFixed(1)} km de ruta · solo horario diurno`
                       : 'Fuera del polígono de cobertura · solo horario diurno'}
                 </span>
+                {deliveryWeatherFeeNotice ? (
+                  <p className={styles.deliveryWeatherNotice}>
+                    <WaterDropOutlinedIcon
+                      className={styles.deliveryWeatherIcon}
+                      aria-hidden
+                    />
+                    <span>{deliveryWeatherFeeNotice}</span>
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </section>
