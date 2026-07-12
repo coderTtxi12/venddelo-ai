@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
-import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
 import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlined';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
@@ -37,9 +35,12 @@ import {
   DEFAULT_KITCHEN_STATUS_FILTER,
   buildOrderStatusFilterCounts,
   matchesOrderStatusFilter,
-  ORDER_STATUS_FILTER_OPTIONS,
+  KITCHEN_ARCHIVE_FILTER_OPTIONS,
+  KITCHEN_VIEW_FILTER_OPTIONS,
+  KITCHEN_WORKFLOW_FILTER_OPTIONS,
   ORDER_STATUS_META,
   type OrderStatusFilter,
+  type OrderStatusFilterOption,
   type OrderStatusMeta,
 } from '@/lib/orders/orderStatus';
 import { OrderCancelDialog } from '@/components/orders/OrderCancelDialog';
@@ -47,7 +48,6 @@ import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import {
   buildOrderAcceptedWhatsAppMessage,
   buildOrderCancelledWhatsAppMessage,
-  buildOrderGoogleMapsUrl,
   openCustomerWhatsAppMessage,
   type KitchenCancelReason,
 } from '@/lib/orders/kitchenWhatsApp';
@@ -69,6 +69,81 @@ function statusClassName(tone: OrderStatusMeta['tone']): string {
     default:
       return styles.statusCancelled;
   }
+}
+
+function filterToneClassName(tone: OrderStatusMeta['tone'] | undefined): string {
+  switch (tone) {
+    case 'pending':
+      return styles.filterChipTonePending;
+    case 'confirmed':
+      return styles.filterChipToneConfirmed;
+    case 'preparing':
+      return styles.filterChipTonePreparing;
+    case 'ready':
+      return styles.filterChipToneReady;
+    case 'delivered':
+      return styles.filterChipToneDelivered;
+    case 'cancelled':
+      return styles.filterChipToneCancelled;
+    default:
+      return '';
+  }
+}
+
+function StatusFilterChip({
+  option,
+  isActive,
+  count,
+  onSelect,
+}: {
+  option: OrderStatusFilterOption;
+  isActive: boolean;
+  count: number;
+  onSelect: (value: OrderStatusFilter) => void;
+}) {
+  const isWorkflow = option.group === 'workflow';
+  const isArchive = option.group === 'archive';
+  const isNewTab = option.value === 'new';
+  const toneClass = isWorkflow || isArchive ? filterToneClassName(option.tone) : '';
+  const chipVariantClass = isWorkflow
+    ? styles.filterChipWorkflow
+    : isArchive
+      ? styles.filterChipArchive
+      : styles.filterChipView;
+
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={isActive}
+      aria-label={`${option.label} (${count})`}
+      className={[
+        styles.filterChip,
+        chipVariantClass,
+        toneClass,
+        isNewTab ? styles.filterChipNew : '',
+        isActive && !isNewTab && !toneClass ? styles.filterChipActive : '',
+        isActive && isNewTab ? styles.filterChipNewActive : '',
+        isActive && toneClass && !isNewTab ? styles.filterChipToneActive : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      onClick={() => onSelect(option.value)}
+    >
+      {option.label}
+      <span
+        className={[
+          styles.filterChipCount,
+          isNewTab ? styles.filterChipCountNew : styles.filterChipCountNeutral,
+          isActive && toneClass && !isNewTab ? styles.filterChipCountTone : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        {count}
+      </span>
+    </button>
+  );
 }
 
 function OrderStatusBadge({ status }: { status: OrderStatus }) {
@@ -226,7 +301,6 @@ function OrderDetailContent({
   const itemCount = countOrderItems(order.items);
   const noteParts = splitOrderNote(order.note);
   const orderRef = extractOrderRefFromNote(order.note);
-  const mapsUrl = buildOrderGoogleMapsUrl(order);
   const totals = buildOrderTotalsBreakdown(order);
   const lineDiscountRows = useMemo(
     () => collectOrderDiscountRows(order.items, productsById, promotions),
@@ -288,24 +362,6 @@ function OrderDetailContent({
             <div className={`${styles.infoCard} ${styles.infoCardWide}`}>
               <p className={styles.infoLabel}>Referencia</p>
               <p className={styles.infoValue}>#{orderRef}</p>
-            </div>
-          ) : null}
-          {order.type === 'delivery' && order.delivery_address ? (
-            <div className={`${styles.infoCard} ${styles.infoCardWide}`}>
-              <p className={styles.infoLabel}>Dirección de entrega</p>
-              <p className={`${styles.infoValue} ${styles.addressBlock}`}>{order.delivery_address}</p>
-              {mapsUrl ? (
-                <a
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.mapsLink}
-                >
-                  <MapOutlinedIcon sx={{ fontSize: 18 }} />
-                  Abrir en Google Maps
-                  <OpenInNewOutlinedIcon sx={{ fontSize: 16 }} />
-                </a>
-              ) : null}
             </div>
           ) : null}
         </div>
@@ -683,36 +739,50 @@ export function KitchenOrdersView() {
         </div>
       </header>
 
-      <div className={styles.filters} role="tablist" aria-label="Filtrar pedidos">
-        {ORDER_STATUS_FILTER_OPTIONS.map((option) => {
-          const isActive = statusFilter === option.value;
-          const isNewTab = option.value === 'new';
-          const count = filterCounts[option.value];
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              aria-label={`${option.label} (${count})`}
-              className={`${styles.filterChip} ${isNewTab ? styles.filterChipNew : ''} ${
-                isActive
-                  ? `${styles.filterChipActive} ${isNewTab ? styles.filterChipNewActive : ''}`
-                  : ''
-              }`}
-              onClick={() => setStatusFilter(option.value)}
-            >
-              {option.label}
-              <span
-                className={`${styles.filterChipCount} ${
-                  isNewTab ? styles.filterChipCountNew : styles.filterChipCountNeutral
-                }`}
-              >
-                {count}
-              </span>
-            </button>
-          );
-        })}
+      <div className={styles.filtersBar}>
+        <div className={styles.filterWorkflow} role="tablist" aria-label="Flujo de pedidos">
+          {KITCHEN_WORKFLOW_FILTER_OPTIONS.map((option, index) => (
+            <div key={option.value} className={styles.filterFlowStep}>
+              {index > 0 ? (
+                <span className={styles.filterFlowArrow} aria-hidden>
+                  ›
+                </span>
+              ) : null}
+              <StatusFilterChip
+                option={option}
+                isActive={statusFilter === option.value}
+                count={filterCounts[option.value]}
+                onSelect={setStatusFilter}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className={styles.filterSideGroups}>
+          <div className={styles.filterArchiveGroup} role="tablist" aria-label="Pedidos cerrados">
+            {KITCHEN_ARCHIVE_FILTER_OPTIONS.map((option) => (
+              <StatusFilterChip
+                key={option.value}
+                option={option}
+                isActive={statusFilter === option.value}
+                count={filterCounts[option.value]}
+                onSelect={setStatusFilter}
+              />
+            ))}
+          </div>
+
+          <div className={styles.filterViewGroup} role="tablist" aria-label="Vistas generales">
+            {KITCHEN_VIEW_FILTER_OPTIONS.map((option) => (
+              <StatusFilterChip
+                key={option.value}
+                option={option}
+                isActive={statusFilter === option.value}
+                count={filterCounts[option.value]}
+                onSelect={setStatusFilter}
+              />
+            ))}
+          </div>
+        </div>
       </div>
 
       {actionError ? (
