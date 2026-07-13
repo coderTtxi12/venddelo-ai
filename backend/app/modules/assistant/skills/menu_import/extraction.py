@@ -5,22 +5,44 @@ import re
 import unicodedata
 from typing import Any
 
+from app.core.config import get_settings
 from app.core.llm.ports import ChatCompletionMessage, ChatCompletionRequest, LLMProviderPort
 from app.core.vision.ports import VisionAnalysisRequest, VisionPort
 from app.infra.llm.factory import build_llm_provider
 from app.infra.vision.factory import build_vision_provider
 from app.modules.assistant.skills.menu_import.document_loader import VisionPage
-from app.modules.assistant.skills.menu_import.draft_modeling import model_import_draft
 from app.modules.assistant.skills.menu_import.draft_schema import (
     ImportCategory,
     ImportDraft,
     ImportProduct,
     OpenQuestion,
 )
-from app.modules.assistant.skills.menu_import.extraction_prompt import (
-    build_literal_ocr_prompt,
-    build_modeling_prompt,
-)
+from app.modules.assistant.skills.menu_import.extraction_prompt import build_literal_ocr_prompt
+
+
+def _vision_extraction_metadata(
+    provider: VisionPort,
+    *,
+    models_used: list[str],
+) -> dict[str, Any]:
+    settings = get_settings()
+    return {
+        "extraction_mode": "vision",
+        "vision_provider": settings.vision_provider,
+        "configured_vision_model": settings.openai_vision_model,
+        "models_used": models_used,
+        "provider_class": provider.__class__.__name__,
+    }
+
+
+def _text_extraction_metadata(provider: LLMProviderPort) -> dict[str, Any]:
+    settings = get_settings()
+    return {
+        "extraction_mode": "text",
+        "llm_provider": settings.llm_provider,
+        "configured_text_model": settings.openai_model,
+        "provider_class": provider.__class__.__name__,
+    }
 
 
 def _normalize_name(name: str) -> str:
@@ -107,6 +129,7 @@ def merge_page_drafts(drafts: list[ImportDraft]) -> ImportDraft:
             categories_by_name[key] = current.model_copy(
                 update={
                     "description": current.description or category.description,
+                    "constraints_notes": current.constraints_notes or category.constraints_notes,
                     "products": _merge_products(current.products, category.products),
                 }
             )
@@ -140,14 +163,18 @@ def extract_literal_from_pages(
     context: dict[str, Any],
     *,
     vision: VisionPort | None = None,
-) -> ImportDraft:
+) -> tuple[ImportDraft, dict[str, Any]]:
     """Phase 1: vision OCR — literal transcription as printed."""
     if not pages:
-        return ImportDraft()
+        return ImportDraft(), _vision_extraction_metadata(
+            vision or build_vision_provider(),
+            models_used=[],
+        )
 
     provider = vision or build_vision_provider()
     prompt = build_literal_ocr_prompt(context)
     page_drafts: list[ImportDraft] = []
+    models_used: list[str] = []
 
     for page in pages:
         result = provider.analyze_json(
@@ -157,9 +184,13 @@ def extract_literal_from_pages(
                 image_media_type=page.media_type,
             )
         )
+        models_used.append(result.model)
         page_drafts.append(ImportDraft.model_validate(result.data))
 
-    return merge_page_drafts(page_drafts)
+    return merge_page_drafts(page_drafts), _vision_extraction_metadata(
+        provider,
+        models_used=models_used,
+    )
 
 
 def extract_literal_from_text(
@@ -167,13 +198,13 @@ def extract_literal_from_text(
     context: dict[str, Any],
     *,
     llm: LLMProviderPort | None = None,
-) -> ImportDraft:
+) -> tuple[ImportDraft, dict[str, Any]]:
     """Phase 1: literal transcription from plain text."""
     stripped = text.strip()
-    if not stripped:
-        return ImportDraft()
-
     provider = llm or build_llm_provider()
+    if not stripped:
+        return ImportDraft(), _text_extraction_metadata(provider)
+
     prompt = build_literal_ocr_prompt(context)
     data = _collect_chat_json(
         provider,
@@ -188,7 +219,7 @@ def extract_literal_from_text(
             response_format="json_object",
         ),
     )
-    return ImportDraft.model_validate(data)
+    return ImportDraft.model_validate(data), _text_extraction_metadata(provider)
 
 
 def extract_from_pages(
@@ -197,11 +228,10 @@ def extract_from_pages(
     *,
     vision: VisionPort | None = None,
     llm: LLMProviderPort | None = None,
-) -> tuple[ImportDraft, ImportDraft]:
-    """OCR literal draft, then model for digital ordering. Returns (literal, modeled)."""
-    literal = extract_literal_from_pages(pages, context, vision=vision)
-    modeled = model_import_draft(literal, context, llm=llm)
-    return literal, modeled
+) -> tuple[ImportDraft, dict[str, Any]]:
+    """Literal OCR from vision pages. Modeling is disabled in the current import flow."""
+    del llm
+    return extract_literal_from_pages(pages, context, vision=vision)
 
 
 def extract_from_text(
@@ -209,11 +239,9 @@ def extract_from_text(
     context: dict[str, Any],
     *,
     llm: LLMProviderPort | None = None,
-) -> tuple[ImportDraft, ImportDraft]:
-    """Literal text extraction, then model for digital ordering. Returns (literal, modeled)."""
-    literal = extract_literal_from_text(text, context, llm=llm)
-    modeled = model_import_draft(literal, context, llm=llm)
-    return literal, modeled
+) -> tuple[ImportDraft, dict[str, Any]]:
+    """Literal OCR from plain text. Modeling is disabled in the current import flow."""
+    return extract_literal_from_text(text, context, llm=llm)
 
 
 __all__ = [
@@ -222,5 +250,4 @@ __all__ = [
     "extract_literal_from_pages",
     "extract_literal_from_text",
     "merge_page_drafts",
-    "model_import_draft",
 ]
