@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { MenuImportQuizQuestion } from '@/lib/api/assistant';
 import styles from './MenuImportQuiz.module.css';
 
@@ -17,6 +17,7 @@ type MenuImportQuizProps = {
   disabled?: boolean;
   submitted?: boolean;
   onSubmit: (answers: MenuImportQuizAnswers) => void;
+  onAnswersChange?: (answers: MenuImportQuizAnswers) => void;
 };
 
 const OTHER_OPTION_ID = '__other__';
@@ -53,9 +54,14 @@ export default function MenuImportQuiz({
   disabled = false,
   submitted = false,
   onSubmit,
+  onAnswersChange,
 }: MenuImportQuizProps) {
   const [answers, setAnswers] = useState<MenuImportQuizAnswers>({});
   const [activeOtherId, setActiveOtherId] = useState<string | null>(null);
+
+  useEffect(() => {
+    onAnswersChange?.(answers);
+  }, [answers, onAnswersChange]);
 
   const allAnswered = questions.every((question) => isQuestionAnswered(question, answers));
   const isLocked = disabled || submitted;

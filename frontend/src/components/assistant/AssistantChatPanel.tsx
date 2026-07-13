@@ -8,11 +8,15 @@ import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
 import ChatAttachmentList from '@/components/assistant/ChatAttachmentList';
 import ChatAgentActivity from '@/components/assistant/ChatAgentActivity';
 import ChatMarkdown from '@/components/assistant/ChatMarkdown';
+import MenuImportQuiz, {
+  type MenuImportQuizAnswers,
+} from '@/components/assistant/MenuImportQuiz';
 import { useAssistantChat } from '@/contexts/AssistantChatContext';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useChatPanelResize } from '@/hooks/useChatPanelResize';
 import { resetAssistantConversation, streamAssistantChat } from '@/lib/api/assistant';
+import type { MenuImportQuizPayload } from '@/lib/api/assistant';
 import { isFetchAbortError } from '@/lib/api/assistantStream';
 import {
   CHAT_ATTACHMENT_ACCEPT,
@@ -43,6 +47,11 @@ import {
   MAX_CHAT_PANEL_WIDTH,
   MIN_CHAT_PANEL_WIDTH,
 } from '@/lib/assistant/chatPanelWidth';
+import {
+  composeMenuImportUserTurn,
+  findPendingMenuImportQuiz,
+  hasMenuImportQuizAnswers,
+} from '@/lib/assistant/menuImportQuizSubmit';
 import { ApiError } from '@/lib/api/types';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import styles from './AssistantChatPanel.module.css';
@@ -54,6 +63,8 @@ type ChatMessage = {
   role: ChatRole;
   content: string;
   attachments?: ChatAttachment[];
+  menuImportQuiz?: MenuImportQuizPayload | null;
+  menuImportQuizSubmitted?: boolean;
 };
 
 const WELCOME_MESSAGE: ChatMessage = {
@@ -90,6 +101,9 @@ export default function AssistantChatPanel() {
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [agentProcessing, setAgentProcessing] = useState(false);
   const [agentActivity, setAgentActivity] = useState<AgentActivityState>(INITIAL_AGENT_ACTIVITY);
+  const [quizAnswersByMessageId, setQuizAnswersByMessageId] = useState<
+    Record<string, MenuImportQuizAnswers>
+  >({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -173,7 +187,11 @@ export default function AssistantChatPanel() {
   }, [draft, resizeTextarea]);
 
   const sendMessage = useCallback(
-    async (rawText: string, attachmentsToSend: ChatAttachment[] = pendingAttachments) => {
+    async (
+      rawText: string,
+      attachmentsToSend: ChatAttachment[] = pendingAttachments,
+      linkedQuizMessageId?: string,
+    ) => {
       const text = rawText.trim();
       const hasAttachments = attachmentsToSend.length > 0;
       if ((!text && !hasAttachments) || sendInFlightRef.current) return;
@@ -258,12 +276,27 @@ export default function AssistantChatPanel() {
           prev.length === 1 && prev[0]?.id === 'welcome'
             ? []
             : prev.filter((message) => message.id !== 'welcome');
+        const withSubmittedQuiz = linkedQuizMessageId
+          ? withoutWelcome.map((message) =>
+              message.id === linkedQuizMessageId
+                ? { ...message, menuImportQuizSubmitted: true }
+                : message,
+            )
+          : withoutWelcome;
         return [
-          ...withoutWelcome,
+          ...withSubmittedQuiz,
           userMessage,
           { id: assistantMessageId, role: 'assistant', content: '' },
         ];
       });
+
+      if (linkedQuizMessageId) {
+        setQuizAnswersByMessageId((current) => {
+          const next = { ...current };
+          delete next[linkedQuizMessageId];
+          return next;
+        });
+      }
 
       let streamedContent = '';
       let streamFinished = false;
@@ -340,6 +373,15 @@ export default function AssistantChatPanel() {
             onToolResult: (payload) => {
               setAgentActivity((current) => applyToolResult(current, payload));
             },
+            onMenuImportQuiz: (quiz) => {
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.id === assistantMessageId
+                    ? { ...message, menuImportQuiz: quiz }
+                    : message,
+                ),
+              );
+            },
             onComplete: (payload) => {
               cancelPendingFrame();
               const finalContent = payload.content || streamedContent;
@@ -352,6 +394,7 @@ export default function AssistantChatPanel() {
                     ? {
                         ...message,
                         content: finalContent,
+                        menuImportQuiz: payload.menu_import ?? message.menuImportQuiz,
                       }
                     : message,
                 ),
@@ -421,9 +464,55 @@ export default function AssistantChatPanel() {
     [accessToken, clearPendingAttachments, conversationId, pendingAttachments, restaurantId],
   );
 
+  const submitMenuImportQuiz = useCallback(
+    (messageId: string, answers: MenuImportQuizAnswers) => {
+      let submissionText = '';
+      setMessages((prev) => {
+        const target = prev.find((message) => message.id === messageId);
+        if (!target?.menuImportQuiz || target.menuImportQuizSubmitted) {
+          return prev;
+        }
+        submissionText = composeMenuImportUserTurn(draft, target.menuImportQuiz, answers);
+        return prev.map((message) =>
+          message.id === messageId
+            ? { ...message, menuImportQuizSubmitted: true }
+            : message,
+        );
+      });
+      if (submissionText) {
+        setDraft('');
+        setQuizAnswersByMessageId((current) => {
+          const next = { ...current };
+          delete next[messageId];
+          return next;
+        });
+        void sendMessage(submissionText);
+      }
+    },
+    [draft, sendMessage],
+  );
+
   const handleSubmit = () => {
     if (isBusy || sendInFlightRef.current) return;
-    void sendMessage(draft, pendingAttachments);
+    const pendingQuiz = findPendingMenuImportQuiz(messages);
+    const pendingAnswers = pendingQuiz
+      ? quizAnswersByMessageId[pendingQuiz.messageId]
+      : undefined;
+    const includeQuiz =
+      Boolean(pendingQuiz) &&
+      Boolean(pendingAnswers) &&
+      hasMenuImportQuizAnswers(pendingAnswers ?? {});
+    const outgoingText = composeMenuImportUserTurn(
+      draft,
+      includeQuiz ? pendingQuiz?.quiz : null,
+      pendingAnswers,
+    );
+    if (!outgoingText.trim() && pendingAttachments.length === 0) return;
+    void sendMessage(
+      outgoingText,
+      pendingAttachments,
+      includeQuiz ? pendingQuiz?.messageId : undefined,
+    );
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -469,8 +558,15 @@ export default function AssistantChatPanel() {
     restaurantId,
   ]);
 
+  const pendingMenuImportQuiz = findPendingMenuImportQuiz(messages);
+  const pendingQuizAnswers = pendingMenuImportQuiz
+    ? quizAnswersByMessageId[pendingMenuImportQuiz.messageId]
+    : undefined;
   const canSend =
-    !isBusy && (draft.trim().length > 0 || pendingAttachments.length > 0);
+    !isBusy &&
+    (draft.trim().length > 0 ||
+      pendingAttachments.length > 0 ||
+      hasMenuImportQuizAnswers(pendingQuizAnswers ?? {}));
 
   const handleDragEnter = (event: React.DragEvent) => {
     event.preventDefault();
@@ -576,7 +672,7 @@ export default function AssistantChatPanel() {
             isStreaming &&
             (agentProcessing || hasVisibleAgentActivity(agentActivity) || !message.content);
 
-          if (!isUser && !message.content && !isStreaming) {
+          if (!isUser && !message.content && !isStreaming && !message.menuImportQuiz?.questions.length) {
             return null;
           }
 
@@ -646,6 +742,20 @@ export default function AssistantChatPanel() {
                         ) : (
                           <ChatMarkdown content={message.content} />
                         )
+                      ) : null}
+                      {message.menuImportQuiz?.questions.length ? (
+                        <MenuImportQuiz
+                          questions={message.menuImportQuiz.questions}
+                          disabled={isBusy}
+                          submitted={message.menuImportQuizSubmitted}
+                          onSubmit={(answers) => submitMenuImportQuiz(message.id, answers)}
+                          onAnswersChange={(answers) => {
+                            setQuizAnswersByMessageId((current) => ({
+                              ...current,
+                              [message.id]: answers,
+                            }));
+                          }}
+                        />
                       ) : null}
                     </div>
                   )}

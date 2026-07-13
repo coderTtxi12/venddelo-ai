@@ -269,8 +269,24 @@ function EmptyState({
   );
 }
 
+function CatalogLoadingState({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className={styles.stateBox} role="status" aria-live="polite" aria-busy="true">
+      <div className={styles.loadingSpinner} aria-hidden />
+      <p className={styles.stateTitle}>{title}</p>
+      <p className={styles.stateText}>{subtitle}</p>
+    </div>
+  );
+}
+
 export default function ProductsPage() {
-  const { firebaseUser, accessToken } = useAuth();
+  const { firebaseUser, accessToken, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<'categories' | 'products'>('products');
 
   // supplierId is the supplier doc id in `suppliers/`
@@ -563,6 +579,26 @@ export default function ProductsPage() {
     setProductDrawerOpen(true);
   }
 
+  const supplierPending = Boolean(
+    !authLoading && firebaseUser && accessToken && !supplierId && !supplierIdError,
+  );
+
+  const categoriesTabLoading = authLoading || supplierPending || categoriesLoading;
+  const productsTabLoading =
+    authLoading || supplierPending || categoriesLoading || productsLoading;
+
+  const catalogLoadingTitle = supplierPending
+    ? 'Conectando con tu restaurante…'
+    : activeTab === 'categories'
+      ? 'Cargando categorías…'
+      : 'Cargando productos…';
+
+  const catalogLoadingSubtitle = supplierPending
+    ? 'Preparando tu catálogo.'
+    : activeTab === 'categories'
+      ? 'Organizando las secciones de tu menú.'
+      : 'Preparando tu catálogo de productos.';
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -605,6 +641,10 @@ export default function ProductsPage() {
 
       {activeTab === 'categories' ? (
         <section className={styles.section}>
+          {categoriesTabLoading ? (
+            <CatalogLoadingState title={catalogLoadingTitle} subtitle={catalogLoadingSubtitle} />
+          ) : (
+            <>
           <div className={styles.toolbar}>
             <div className={styles.search}>
               <input
@@ -774,10 +814,14 @@ export default function ProductsPage() {
               }}
             />
           </Drawer>
+            </>
+          )}
         </section>
       ) : (
         <section className={styles.section}>
-          {activeCategories.length === 0 ? (
+          {productsTabLoading ? (
+            <CatalogLoadingState title={catalogLoadingTitle} subtitle={catalogLoadingSubtitle} />
+          ) : activeCategories.length === 0 ? (
             <EmptyState
               title="Primero crea una categoría"
               subtitle="Cada producto debe pertenecer al menos a una categoría."
@@ -832,6 +876,26 @@ export default function ProductsPage() {
                   {productVisibilityError ? (
                     <div className={styles.errorBanner} role="alert">{productVisibilityError}</div>
                   ) : null}
+                  <ProductMobileControls
+                    categories={categories}
+                    productCategoryFilterIds={productCategoryFilterIds}
+                    productVisibilityFilter={productVisibilityFilter}
+                    productPriceSort={productPriceSort}
+                    setProductPriceSort={setProductPriceSort}
+                    productDiscountSort={productDiscountSort}
+                    setProductDiscountSort={setProductDiscountSort}
+                    productTotalSort={productTotalSort}
+                    setProductTotalSort={setProductTotalSort}
+                    categoryFilterAnchor={categoryFilterAnchor}
+                    setCategoryFilterAnchor={setCategoryFilterAnchor}
+                    statusFilterAnchor={statusFilterAnchor}
+                    setStatusFilterAnchor={setStatusFilterAnchor}
+                    selectedStatusTags={selectedStatusTags}
+                    removeCategoryFilter={removeCategoryFilter}
+                    removeStatusTag={removeStatusTag}
+                    productFiltersActive={productFiltersActive}
+                    onClearFilters={clearProductTableFilters}
+                  />
                   <table className={styles.table}>
                     <thead>
                       <tr className={styles.headerLabelRow}>
@@ -1075,28 +1139,39 @@ export default function ProductsPage() {
                               }
                             }}
                           >
-                            <td>
+                            <td className={styles.productPrimaryCell}>
                               <div className={styles.productCell}>
                                 <div className={styles.productThumb}>
                                   {p.image ? <img src={p.image.previewUrl} alt="" /> : <div className={styles.thumbEmpty}>Sin imagen</div>}
                                 </div>
-                                <div>
+                                <div className={styles.productMeta}>
                                   <div className={styles.productName}>{p.name}</div>
                                   <div className={styles.productDesc}>{p.description || '—'}</div>
                                 </div>
                               </div>
                             </td>
-                            <td>
+                            <td className={`${styles.labeledCell} ${styles.categoryCell}`} data-label="Categorías">
                               <div className={styles.chips}>
                                 {catNames.length > 0 ? catNames.map((n) => <span key={n} className={styles.chip}>{n}</span>) : <span className={styles.muted}>—</span>}
                               </div>
                             </td>
-                            <td className={styles.nowrap}>{formatMoney(p.price.amount, p.price.currency)}</td>
-                            <td className={styles.nowrap}>{p.discountUsd > 0 ? `-${formatMoney(p.discountUsd, p.price.currency)}` : '—'}</td>
-                            <td className={styles.nowrap}>{formatMoney(productLineTotal(p), p.price.currency)}</td>
-                            <td onClick={(event) => event.stopPropagation()}>
+                            <td className={`${styles.labeledCell} ${styles.priceCell}`} data-label="Precio">
+                              {formatMoney(p.price.amount, p.price.currency)}
+                            </td>
+                            <td className={`${styles.labeledCell} ${styles.priceCell} ${styles.discountCell}`} data-label="Descuento">
+                              {p.discountUsd > 0 ? `-${formatMoney(p.discountUsd, p.price.currency)}` : '—'}
+                            </td>
+                            <td className={`${styles.labeledCell} ${styles.priceCell} ${styles.totalCell}`} data-label="Total">
+                              {formatMoney(productLineTotal(p), p.price.currency)}
+                            </td>
+                            <td
+                              className={`${styles.labeledCell} ${styles.statusCell}`}
+                              data-label="Estado"
+                              onClick={(event) => event.stopPropagation()}
+                            >
                               <ProductVisibilitySelect
                                 product={p}
+                                className={styles.productStatusSelect}
                                 saving={productVisibilitySavingId === p.id}
                                 disabled={!supplierId || !accessToken}
                                 onChange={(nextState) => {
@@ -1864,6 +1939,161 @@ function ProductEditor({
         </button>
       </div>
     </form>
+  );
+}
+
+function ProductMobileControls({
+  categories,
+  productCategoryFilterIds,
+  productVisibilityFilter,
+  productPriceSort,
+  setProductPriceSort,
+  productDiscountSort,
+  setProductDiscountSort,
+  productTotalSort,
+  setProductTotalSort,
+  categoryFilterAnchor,
+  setCategoryFilterAnchor,
+  statusFilterAnchor,
+  setStatusFilterAnchor,
+  selectedStatusTags,
+  removeCategoryFilter,
+  removeStatusTag,
+  productFiltersActive,
+  onClearFilters,
+}: {
+  categories: CategoryDraft[];
+  productCategoryFilterIds: Id[];
+  productVisibilityFilter: ProductVisibilityFilter[];
+  productPriceSort: ColumnSort;
+  setProductPriceSort: React.Dispatch<React.SetStateAction<ColumnSort>>;
+  productDiscountSort: ColumnSort;
+  setProductDiscountSort: React.Dispatch<React.SetStateAction<ColumnSort>>;
+  productTotalSort: ColumnSort;
+  setProductTotalSort: React.Dispatch<React.SetStateAction<ColumnSort>>;
+  categoryFilterAnchor: HTMLElement | null;
+  setCategoryFilterAnchor: React.Dispatch<React.SetStateAction<HTMLElement | null>>;
+  statusFilterAnchor: HTMLElement | null;
+  setStatusFilterAnchor: React.Dispatch<React.SetStateAction<HTMLElement | null>>;
+  selectedStatusTags: { key: string; label: string }[];
+  removeCategoryFilter: (id: Id) => void;
+  removeStatusTag: (key: string) => void;
+  productFiltersActive: boolean;
+  onClearFilters: () => void;
+}) {
+  function sortLabel(sort: ColumnSort): string {
+    if (sort === 'asc') return ' ↑';
+    if (sort === 'desc') return ' ↓';
+    return '';
+  }
+
+  return (
+    <div className={styles.mobileTableControls} aria-label="Filtros y orden en móvil">
+      <div className={styles.mobileControlSection}>
+        <span className={styles.mobileControlHeading}>Filtrar</span>
+        <div className={styles.mobileControlRow}>
+          <button
+            type="button"
+            className={`${styles.mobileControlBtn} ${productCategoryFilterIds.length > 0 ? styles.mobileControlBtnActive : ''}`}
+            aria-expanded={Boolean(categoryFilterAnchor)}
+            aria-haspopup="dialog"
+            onClick={(e) => {
+              setStatusFilterAnchor(null);
+              setCategoryFilterAnchor(categoryFilterAnchor ? null : e.currentTarget);
+            }}
+          >
+            <FilterListIcon sx={{ fontSize: 16 }} aria-hidden />
+            Categorías
+            {productCategoryFilterIds.length > 0 ? (
+              <span className={styles.mobileControlCount}>{productCategoryFilterIds.length}</span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            className={`${styles.mobileControlBtn} ${productVisibilityFilter.length > 0 ? styles.mobileControlBtnActive : ''}`}
+            aria-expanded={Boolean(statusFilterAnchor)}
+            aria-haspopup="dialog"
+            onClick={(e) => {
+              setCategoryFilterAnchor(null);
+              setStatusFilterAnchor(statusFilterAnchor ? null : e.currentTarget);
+            }}
+          >
+            <FilterListIcon sx={{ fontSize: 16 }} aria-hidden />
+            Estado
+            {productVisibilityFilter.length > 0 ? (
+              <span className={styles.mobileControlCount}>{productVisibilityFilter.length}</span>
+            ) : null}
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.mobileControlSection}>
+        <span className={styles.mobileControlHeading}>Ordenar</span>
+        <div className={styles.mobileControlRow}>
+          <button
+            type="button"
+            className={`${styles.mobileControlBtn} ${productPriceSort !== 'none' ? styles.mobileControlBtnActive : ''}`}
+            onClick={() => setProductPriceSort((s) => cycleColumnSort(s))}
+          >
+            Precio{sortLabel(productPriceSort)}
+          </button>
+          <button
+            type="button"
+            className={`${styles.mobileControlBtn} ${productDiscountSort !== 'none' ? styles.mobileControlBtnActive : ''}`}
+            onClick={() => setProductDiscountSort((s) => cycleColumnSort(s))}
+          >
+            Descuento{sortLabel(productDiscountSort)}
+          </button>
+          <button
+            type="button"
+            className={`${styles.mobileControlBtn} ${productTotalSort !== 'none' ? styles.mobileControlBtnActive : ''}`}
+            onClick={() => setProductTotalSort((s) => cycleColumnSort(s))}
+          >
+            Total{sortLabel(productTotalSort)}
+          </button>
+        </div>
+      </div>
+
+      {productCategoryFilterIds.length > 0 || selectedStatusTags.length > 0 ? (
+        <div className={styles.mobileActiveFilters}>
+          {productCategoryFilterIds.map((id) => {
+            const name = categories.find((c) => c.id === id)?.name ?? id;
+            return (
+              <span key={id} className={styles.mobileFilterBadge}>
+                <span className={styles.mobileFilterBadgeText}>{name}</span>
+                <button
+                  type="button"
+                  className={styles.mobileFilterBadgeRemove}
+                  aria-label={`Quitar filtro ${name}`}
+                  onClick={() => removeCategoryFilter(id)}
+                >
+                  <CloseIcon sx={{ fontSize: 14 }} />
+                </button>
+              </span>
+            );
+          })}
+          {selectedStatusTags.map((t) => (
+            <span key={t.key} className={styles.mobileFilterBadge}>
+              <span className={styles.mobileFilterBadgeText}>{t.label}</span>
+              <button
+                type="button"
+                className={styles.mobileFilterBadgeRemove}
+                aria-label={`Quitar filtro ${t.label}`}
+                onClick={() => removeStatusTag(t.key)}
+              >
+                <CloseIcon sx={{ fontSize: 14 }} />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {productFiltersActive ? (
+        <button type="button" className={styles.mobileClearFiltersBtn} onClick={onClearFilters}>
+          Limpiar filtros
+        </button>
+      ) : null}
+    </div>
   );
 }
 
