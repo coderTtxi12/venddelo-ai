@@ -37,8 +37,11 @@ def model_import_draft(
         return literal
 
     provider = llm or build_llm_provider()
-    prompt = build_modeling_prompt(context)
-    literal_json = json.dumps(literal.model_dump(), ensure_ascii=False, indent=2)
+    full_context = {
+        **context,
+        "menu_json": literal.model_dump(),
+    }
+    prompt = build_modeling_prompt(full_context)
     data = _collect_chat_json(
         provider,
         ChatCompletionRequest(
@@ -46,7 +49,7 @@ def model_import_draft(
                 ChatCompletionMessage(role="system", content=prompt),
                 ChatCompletionMessage(
                     role="user",
-                    content=f"Literal OCR draft:\n\n{literal_json}",
+                    content="Return the complete updated menu JSON.",
                 ),
             ],
             response_format="json_object",
