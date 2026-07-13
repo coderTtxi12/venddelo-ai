@@ -103,7 +103,7 @@ class AssistantProfileService:
             return record
 
         entitlements = self._entitlements_for_restaurant(restaurant_id)
-        enabled = sorted(resolve_granted_skill_ids(entitlements))
+        enabled = sorted(set(resolve_granted_skill_ids(entitlements)) | {"menu_import"})
         created = self._profile_repo.create(
             restaurant_id=restaurant_id,
             # identity_markdown=default_identity_markdown(),
