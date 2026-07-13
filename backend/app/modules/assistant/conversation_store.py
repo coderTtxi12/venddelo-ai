@@ -76,11 +76,13 @@ def load_recent_history(
     conversation_id: uuid.UUID,
     *,
     settings: Settings | None = None,
+    message_limit: int | None = None,
 ) -> list[AssistantChatHistoryMessage]:
     resolved = settings or get_settings()
+    limit = message_limit if message_limit is not None else resolved.assistant_llm_context_message_limit
     rows = repo.list_recent_messages_for_context(
         conversation_id,
-        limit=resolved.assistant_llm_context_message_limit,
+        limit=limit,
     )
     return [_history_message(row) for row in rows]
 
