@@ -18,6 +18,7 @@ from app.modules.assistant.skills.menu_import.batching import (
 )
 from app.modules.assistant.skills.menu_import.draft_enrich import enrich_import_draft
 from app.modules.assistant.skills.menu_import.draft_merge import merge_draft_batches
+from app.modules.assistant.skills.menu_import.draft_modeling import model_import_draft
 from app.modules.assistant.skills.menu_import.menu_reconcile import (
     ReconciliationPlan,
     build_reconciliation_plan,
@@ -30,8 +31,13 @@ from app.modules.assistant.skills.menu_import.extraction import (
     merge_page_drafts,
 )
 from app.modules.assistant.skills.menu_import.public_menu_url import build_public_menu_url
+from app.modules.assistant.skills.menu_import.live_menu_to_draft import capture_live_menu_import_draft
 from app.modules.assistant.skills.menu_import.session_draft_store import (
+    get_ocr_original,
+    list_open_questions,
     persist_extraction_snapshots,
+    set_working_batch,
+    unanswered_question_ids,
     validate_working_batch,
 )
 from app.modules.assistant.skills.menu_import.session_repository import MenuImportSessionRepository
@@ -39,17 +45,25 @@ from app.modules.assistant.skills.menu_import.session_schemas import MenuImportS
 from app.modules.menu.service import MenuService
 
 
+MENU_IMPORT_APPLY_ENABLED = False
+"""When False, OCR extraction does not apply to live; apply_full_import stays hidden from tools."""
+
+MENU_IMPORT_APPLY_AFTER_MODELING_ENABLED = True
+"""When True, a successful model_working_draft with no open questions applies draft_batches to live."""
+
+_BASE_INTERNAL_TOOL_NAMES: tuple[str, ...] = (
+    "start_menu_import_session",
+    "get_import_session",
+    "save_menu_context",
+    "register_menu_source_file",
+    "start_menu_extraction_batch",
+    "model_working_draft",
+    "get_extraction_status",
+    "update_menu_knowledge",
+)
+_APPLY_TOOL_NAMES: tuple[str, ...] = ("apply_full_import",) if MENU_IMPORT_APPLY_ENABLED else ()
 MENU_IMPORT_INTERNAL_TOOL_NAMES: frozenset[str] = frozenset(
-    {
-        "start_menu_import_session",
-        "get_import_session",
-        "save_menu_context",
-        "register_menu_source_file",
-        "start_menu_extraction_batch",
-        "get_extraction_status",
-        "apply_full_import",
-        "update_menu_knowledge",
-    }
+    _BASE_INTERNAL_TOOL_NAMES + _APPLY_TOOL_NAMES
 )
 
 
@@ -88,6 +102,33 @@ def _extraction_context(session: MenuImportSession) -> dict[str, Any]:
     return {
         "discovery_answers": discovery,
         "menu_context": str(discovery.get("menu_context") or "").strip(),
+    }
+
+
+def _merge_clarification_answers(session: MenuImportSession, answers: dict[str, Any]) -> None:
+    merged = dict(session.clarification_answers or {})
+    for key, value in answers.items():
+        text = str(value).strip()
+        if text:
+            merged[str(key)] = text
+    session.clarification_answers = merged
+
+
+def _build_modeling_context(
+    session: MenuImportSession,
+    *,
+    owner_instructions: str = "",
+) -> dict[str, Any]:
+    discovery = dict(session.discovery_answers or {})
+    instructions = owner_instructions.strip()
+    if instructions:
+        discovery["last_owner_instructions"] = instructions
+    return {
+        **_extraction_context(session),
+        "discovery_answers": discovery,
+        "clarification_answers": session.clarification_answers or {},
+        "open_questions": [question.model_dump() for question in list_open_questions(session)],
+        "owner_instructions": instructions or str(discovery.get("last_owner_instructions") or ""),
     }
 
 
@@ -190,6 +231,68 @@ def _apply_draft_to_live_menu(
     return result, working, reconciliation
 
 
+def _merge_extraction_metadata(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    if not runs:
+        settings = get_settings()
+        return {
+            "extraction_mode": None,
+            "vision_provider": settings.vision_provider,
+            "configured_vision_model": settings.openai_vision_model,
+            "configured_text_model": settings.openai_model,
+            "models_used": [],
+            "runs": [],
+        }
+
+    models_used: list[str] = []
+    for run in runs:
+        models_used.extend(run.get("models_used") or [])
+
+    primary = runs[-1]
+    return {
+        "extraction_mode": primary.get("extraction_mode"),
+        "vision_provider": primary.get("vision_provider"),
+        "configured_vision_model": primary.get("configured_vision_model"),
+        "configured_text_model": primary.get("configured_text_model"),
+        "llm_provider": primary.get("llm_provider"),
+        "models_used": models_used,
+        "provider_class": primary.get("provider_class"),
+        "source_file_count": len(runs),
+        "runs": runs,
+    }
+
+
+def _persist_extraction_metadata(session: MenuImportSession, metadata: dict[str, Any]) -> None:
+    discovery = dict(session.discovery_answers or {})
+    discovery["last_extraction_metadata"] = metadata
+    session.discovery_answers = discovery
+
+
+def _extraction_result_data(
+    session: MenuImportSession,
+    batch: ImportBatch,
+    *,
+    ctx: AgentContext | None = None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    data: dict[str, Any] = {
+        **_session_summary(session),
+        "extracted_products": count_batch_products(batch),
+        "working_batch_products": count_batch_products(batch),
+        "working_batch_categories": len(batch.categories),
+        "global_rules": batch.global_rules,
+        "apply_enabled": MENU_IMPORT_APPLY_ENABLED,
+    }
+    discovery = session.discovery_answers or {}
+    metadata = discovery.get("last_extraction_metadata")
+    if isinstance(metadata, dict):
+        data["extraction_metadata"] = metadata
+    if ctx is not None:
+        data["public_menu_url"] = _public_menu_url(ctx)
+    if extra:
+        data.update(extra)
+    return data
+
+
 def _build_import_notes(session: MenuImportSession, notes: str | None) -> str:
     parts: list[str] = ["## Notas de importación", ""]
     if notes and notes.strip():
@@ -217,7 +320,11 @@ class MenuImportSkill:
     id = "menu_import"
 
     def tool_definitions(self) -> list[ToolDefinition]:
-        return [
+        extraction_description = (
+            "Run literal OCR/vision extraction on all registered menu source files and persist "
+            "ocr_original + draft_batches. No modeling pass and no live-menu apply."
+        )
+        tools: list[ToolDefinition] = [
             ToolDefinition(
                 name="start_menu_import_session",
                 description=(
@@ -246,8 +353,8 @@ class MenuImportSkill:
             ToolDefinition(
                 name="save_menu_context",
                 description=(
-                    "Save owner-provided menu context BEFORE OCR (structure hints, category groupings, "
-                    "naming conventions, promos). Injected into the extraction/mapping prompt."
+                    "Save owner-provided menu context for a future modeling pass. "
+                    "Not used while menu import runs OCR-only."
                 ),
                 effect="mutate",
                 input_schema={
@@ -280,12 +387,38 @@ class MenuImportSkill:
             ),
             ToolDefinition(
                 name="start_menu_extraction_batch",
-                description=(
-                    "Run OCR/vision extraction on all registered menu source files, persist ocr_original "
-                    "and draft_batches, then apply the full menu to the live catalog in one step."
-                ),
+                description=extraction_description,
                 effect="mutate",
                 input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
+                name="model_working_draft",
+                description=(
+                    "Rewrite the editable OCR clone (draft_batches) using owner clarification "
+                    "answers and/or additional instructions. Always models from frozen "
+                    "ocr_original; never changes ocr_original or the live menu."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "clarification_answers": {
+                            "type": "object",
+                            "description": (
+                                "Map of open_question id → owner answer text "
+                                "(e.g. {\"q_1\": \"Sí\"})."
+                            ),
+                            "additionalProperties": {"type": "string"},
+                        },
+                        "owner_instructions": {
+                            "type": "string",
+                            "description": (
+                                "Free-text restructuring instructions from the owner for this turn."
+                            ),
+                        },
+                    },
+                    "required": [],
+                },
             ),
             ToolDefinition(
                 name="get_extraction_status",
@@ -304,26 +437,31 @@ class MenuImportSkill:
                     "required": [],
                 },
             ),
-            ToolDefinition(
-                name="apply_full_import",
-                description=(
-                    "Apply the editable working draft (draft_batches) to the live menu. "
-                    "Normally called automatically by start_menu_extraction_batch; use manually "
-                    "only to re-apply an existing unapplied draft."
-                ),
-                effect="mutate",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "confirmed": {
-                            "type": "boolean",
-                            "description": "Must be true to apply.",
-                            "default": False,
+        ]
+        if MENU_IMPORT_APPLY_ENABLED:
+            tools.append(
+                ToolDefinition(
+                    name="apply_full_import",
+                    description=(
+                        "Apply the editable working draft (draft_batches) to the live menu. "
+                        "Normally called automatically by start_menu_extraction_batch; use manually "
+                        "only to re-apply an existing unapplied draft."
+                    ),
+                    effect="mutate",
+                    input_schema={
+                        "type": "object",
+                        "properties": {
+                            "confirmed": {
+                                "type": "boolean",
+                                "description": "Must be true to apply.",
+                                "default": False,
+                            },
                         },
+                        "required": [],
                     },
-                    "required": [],
-                },
-            ),
+                )
+            )
+        tools.append(
             ToolDefinition(
                 name="update_menu_knowledge",
                 description=(
@@ -340,8 +478,9 @@ class MenuImportSkill:
                     },
                     "required": [],
                 },
-            ),
-        ]
+            )
+        )
+        return tools
 
     def execute(self, tool_name: str, args: dict[str, Any], ctx: AgentContext) -> ToolResult:
         try:
@@ -449,6 +588,17 @@ class MenuImportSkill:
                 )
 
             if batches and not batches[0].get("applied_at"):
+                batch = ImportBatch.model_validate(batches[0])
+                if not MENU_IMPORT_APPLY_ENABLED:
+                    product_count = count_batch_products(batch)
+                    return ToolResult(
+                        ok=True,
+                        summary=(
+                            f"Menu already extracted ({product_count} product(s)); "
+                            "not applied to live menu"
+                        ),
+                        data=_extraction_result_data(session, batch),
+                    )
                 try:
                     apply_result, working, reconciliation = _apply_draft_to_live_menu(ctx, session)
                 except ValueError as exc:
@@ -477,8 +627,8 @@ class MenuImportSkill:
                 return ToolResult(ok=apply_result.ok, summary=summary, data=data)
 
             context = _extraction_context(session)
-            literal: ImportDraft | None = None
-            page_drafts: list[ImportDraft] = []
+            page_literals: list[ImportDraft] = []
+            extraction_runs: list[dict[str, Any]] = []
             for entry in _pending_source_files(source_files):
                 path = str(entry.get("path") or "").strip()
                 mime = str(entry.get("mime_type") or "").strip()
@@ -487,30 +637,64 @@ class MenuImportSkill:
                 validate_import_asset_path(ctx.restaurant_id, path, kind="menu_source")
                 payload = load_menu_source_from_storage(path, mime)
                 if payload.pages:
-                    ocr, modeled = extract_from_pages(payload.pages, context)
+                    ocr, run_metadata = extract_from_pages(payload.pages, context)
                 elif payload.text:
-                    ocr, modeled = extract_from_text(payload.text, context)
+                    ocr, run_metadata = extract_from_text(payload.text, context)
                 else:
                     continue
-                if literal is None:
-                    literal = ocr
-                else:
-                    literal = merge_page_drafts([literal, ocr])
-                page_drafts.append(modeled)
+                page_literals.append(ocr)
+                extraction_runs.append(run_metadata)
                 entry["extracted_at"] = datetime.now(UTC).isoformat()
 
-            merged = merge_page_drafts(page_drafts) if page_drafts else ImportDraft()
+            merged = merge_page_drafts(page_literals) if page_literals else ImportDraft()
             merged = enrich_import_draft(merged)
             batch = single_batch_from_draft(merged)
+            extraction_metadata = _merge_extraction_metadata(extraction_runs)
             persist_extraction_snapshots(
                 session,
-                ocr_original=literal or ImportDraft(),
+                ocr_original=merged,
                 working_batch=batch,
             )
+            _persist_extraction_metadata(session, extraction_metadata)
             session.source_files = source_files
+
+            post_extraction_extra: dict[str, Any] = {}
+            pending_questions = list_open_questions(session)
+            if pending_questions:
+                session.status = MenuImportSessionStatus.CLARIFYING.value
+                post_extraction_extra["open_questions_count"] = len(pending_questions)
+                post_extraction_extra["awaiting_clarification"] = True
+            else:
+                live_snapshot = capture_live_menu_import_draft(ctx)
+                session.live_menu_snapshot = live_snapshot
+                live_draft = live_snapshot.get("import_draft") or {}
+                live_categories = live_draft.get("categories") or []
+                live_product_count = sum(
+                    len(category.get("products") or [])
+                    for category in live_categories
+                    if isinstance(category, dict)
+                )
+                post_extraction_extra["live_menu_captured"] = True
+                post_extraction_extra["live_menu_products"] = live_product_count
+                post_extraction_extra["live_menu_promotions"] = len(
+                    live_draft.get("promotions") or []
+                )
+
             _repo(ctx).update(session)
 
             product_count = count_batch_products(batch)
+            if not MENU_IMPORT_APPLY_ENABLED:
+                return ToolResult(
+                    ok=True,
+                    summary=f"Extracted {product_count} product(s) from menu source (OCR only)",
+                    data=_extraction_result_data(
+                        session,
+                        batch,
+                        ctx=ctx,
+                        extra=post_extraction_extra,
+                    ),
+                )
+
             try:
                 apply_result, working, reconciliation = _apply_draft_to_live_menu(ctx, session)
             except ValueError as exc:
@@ -551,6 +735,129 @@ class MenuImportSkill:
             )
             return ToolResult(ok=apply_result.ok, summary=summary, data=data)
 
+        if tool_name == "model_working_draft":
+            ocr_original = get_ocr_original(session)
+            if ocr_original is None:
+                return ToolResult(
+                    ok=False,
+                    summary="No OCR original in session — run start_menu_extraction_batch first",
+                )
+
+            raw_answers = args.get("clarification_answers")
+            if isinstance(raw_answers, dict):
+                _merge_clarification_answers(session, raw_answers)
+
+            owner_instructions = str(args.get("owner_instructions") or "").strip()
+            if not (session.clarification_answers or {}) and not owner_instructions:
+                return ToolResult(
+                    ok=False,
+                    summary=(
+                        "Provide clarification_answers and/or owner_instructions "
+                        "to model the working draft"
+                    ),
+                )
+
+            modeling_context = _build_modeling_context(
+                session,
+                owner_instructions=owner_instructions,
+            )
+            if owner_instructions:
+                discovery = dict(session.discovery_answers or {})
+                discovery["last_owner_instructions"] = owner_instructions
+                session.discovery_answers = discovery
+
+            modeled = model_import_draft(ocr_original, modeling_context)
+            modeled = enrich_import_draft(modeled)
+            working = single_batch_from_draft(modeled)
+            set_working_batch(session, working)
+
+            remaining_questions = len(unanswered_question_ids(session))
+            post_modeling_extra: dict[str, Any] = {
+                "modeled_products": count_batch_products(working),
+                "open_questions_remaining": remaining_questions,
+            }
+            if remaining_questions == 0:
+                if not session.live_menu_snapshot:
+                    session.live_menu_snapshot = capture_live_menu_import_draft(ctx)
+                live_draft = (session.live_menu_snapshot or {}).get("import_draft") or {}
+                post_modeling_extra["live_menu_captured"] = bool(live_draft)
+
+                if MENU_IMPORT_APPLY_AFTER_MODELING_ENABLED:
+                    try:
+                        apply_result, _working_applied, reconciliation = _apply_draft_to_live_menu(
+                            ctx, session
+                        )
+                    except ValueError as exc:
+                        session.status = MenuImportSessionStatus.OPTIMIZING.value
+                        _repo(ctx).update(session)
+                        return ToolResult(
+                            ok=False,
+                            summary=f"Modeled working draft but apply failed: {exc}",
+                            data=_extraction_result_data(
+                                session,
+                                working,
+                                ctx=ctx,
+                                extra=post_modeling_extra,
+                            ),
+                        )
+
+                    post_modeling_extra.update(
+                        {
+                            "applied_to_live": apply_result.ok,
+                            "batches_applied": apply_result.batches_applied,
+                            "categories": apply_result.categories,
+                            "products": apply_result.products,
+                            "option_groups": apply_result.option_groups,
+                            "option_items": apply_result.option_items,
+                            "promotions": apply_result.promotions,
+                        }
+                    )
+                    if reconciliation is not None:
+                        post_modeling_extra["reconciliation"] = {
+                            "new_categories": reconciliation.new_categories,
+                            "reused_categories": reconciliation.reused_categories,
+                            "new_products": reconciliation.new_products,
+                            "updated_products": reconciliation.updated_products,
+                        }
+                    if not apply_result.ok:
+                        session.status = MenuImportSessionStatus.OPTIMIZING.value
+                        _repo(ctx).update(session)
+                    summary = (
+                        f"Modeled and applied {apply_result.products} product(s) to live menu; "
+                        f"0 open question(s) remaining"
+                        if apply_result.ok
+                        else f"Modeled working draft but apply failed: {apply_result.summary}"
+                    )
+                    return ToolResult(
+                        ok=apply_result.ok,
+                        summary=summary,
+                        data=_extraction_result_data(
+                            session,
+                            working,
+                            ctx=ctx,
+                            extra=post_modeling_extra,
+                        ),
+                    )
+
+                session.status = MenuImportSessionStatus.OPTIMIZING.value
+            else:
+                session.status = MenuImportSessionStatus.CLARIFYING.value
+
+            _repo(ctx).update(session)
+            return ToolResult(
+                ok=True,
+                summary=(
+                    f"Modeled working draft ({count_batch_products(working)} product(s)); "
+                    f"{remaining_questions} open question(s) remaining"
+                ),
+                data=_extraction_result_data(
+                    session,
+                    working,
+                    ctx=ctx,
+                    extra=post_modeling_extra,
+                ),
+            )
+
         if tool_name == "get_extraction_status":
             batches = _batch_entries(session)
             batch_index = args.get("batch_index")
@@ -567,6 +874,10 @@ class MenuImportSkill:
                     for index, batch in enumerate(batches)
                 ],
             }
+            discovery = session.discovery_answers or {}
+            metadata = discovery.get("last_extraction_metadata")
+            if isinstance(metadata, dict):
+                payload["extraction_metadata"] = metadata
             if batch_index is not None:
                 index = int(batch_index)
                 if index < 0 or index >= len(batches):
@@ -584,6 +895,11 @@ class MenuImportSkill:
             )
 
         if tool_name == "apply_full_import":
+            if not MENU_IMPORT_APPLY_ENABLED:
+                return ToolResult(
+                    ok=False,
+                    summary="apply_full_import is temporarily disabled while OCR is being validated",
+                )
             try:
                 confirmed = bool(args.get("confirmed", False))
                 if not confirmed:
