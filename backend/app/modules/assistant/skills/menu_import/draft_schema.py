@@ -122,6 +122,7 @@ class ImportCategory(BaseModel):
     name: str
     description: str | None = None
     sort_order: int = 0
+    constraints_notes: str | None = None
     display_layout: DisplayLayout | None = None
     products: list[ImportProduct] = Field(default_factory=list)
 
