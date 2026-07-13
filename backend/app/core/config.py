@@ -42,10 +42,13 @@ class Settings(BaseSettings):
     assistant_profile_cache_ttl_seconds: int = 3600
     assistant_lane_lock_ttl_seconds: int = 600
     assistant_llm_context_message_limit: int = 40
+    assistant_router_llm_context_message_limit: int = 12
     assistant_context_compression_enabled: bool = True
     assistant_context_max_tokens: int = 8000
     assistant_context_compression_threshold_ratio: float = 0.70
     assistant_context_recent_window_turns: int = 6
+    assistant_context_compression_model: str | None = None
+    assistant_context_compression_max_output_tokens: int = 1500
     assistant_max_tool_iterations: int = 32
     menu_import_batch_max_products: int = 15
     menu_import_full_max_products: int = 200
@@ -60,7 +63,10 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_model: str = "gpt-5-nano-2025-08-07"
     openai_image_model: str = "gpt-image-2"
-    openai_vision_model: str = "gpt-5.4-nano-2026-03-17"
+    openai_vision_model: str = Field(
+        default="gpt-5.4-nano-2026-03-17",
+        validation_alias="OPENAI_VISION_MODEL",
+    )
     llm_provider: str = "stub"
     image_provider: str = "openai"
     vision_provider: str = "openai"
