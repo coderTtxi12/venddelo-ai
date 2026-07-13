@@ -14,7 +14,14 @@ from app.modules.assistant.agent.workflow.schemas import (
     WorkflowEvaluation,
     WorkflowRouteDecision,
 )
-from app.modules.assistant.chat_attachments import format_user_message_with_attachments
+from app.modules.assistant.chat_attachment_describer import describe_chat_attachments
+from app.modules.assistant.chat_attachments import (
+    append_attachment_descriptions,
+    build_agent_user_request,
+    describe_attachments_for_history,
+    format_chat_attachments_block,
+    strip_chat_attachments_block,
+)
 from app.modules.assistant.context.compressor import compress_history_for_llm
 from app.modules.assistant.conversation_store import (
     assistant_repository,
@@ -29,8 +36,9 @@ from app.modules.assistant.profile.service import AssistantProfileService
 from app.modules.assistant.schemas import AssistantChatHistoryMessage, ChatAttachmentRef
 from app.modules.assistant.skills.discovery import discover_skill_executors
 from app.modules.assistant.skills.markdown import load_skill_metadata
+from app.modules.assistant.skills.menu_import.response_schema import MenuImportQuizQuestion
 from app.modules.assistant.skills.menu_import.session_context import (
-    build_import_session_context,
+    build_full_import_session_context,
     get_active_import_for_conversation,
 )
 from app.modules.assistant.skills.menu_import.session_handoff import (
@@ -53,6 +61,7 @@ class WorkflowContext:
     system_prompt: str
     conversation_history: str
     assistant_display_name: str
+    current_turn_attachments_context: str | None = None
     menu_import_conversation_history: str = EMPTY_CONVERSATION_HISTORY
     menu_import_enabled: bool = False
     menu_source_attachment_count: int = 0
@@ -112,8 +121,38 @@ def _format_history(messages: list[AssistantChatHistoryMessage]) -> str:
     lines: list[str] = []
     for item in messages:
         speaker = "Usuario" if item.role == "user" else "Asistente"
-        lines.append(f"{speaker}: {item.content}")
+        content = item.content
+        if item.role == "user":
+            content = strip_chat_attachments_block(content)
+        lines.append(f"{speaker}: {content}")
     return "\n\n".join(lines)
+
+
+async def _build_conversation_history(
+    repo,
+    conversation_id: uuid.UUID,
+    *,
+    settings: Settings,
+    system_prompt: str,
+    user_message: str,
+    message_limit: int,
+    apply_compression: bool,
+) -> str:
+    history = load_recent_history(
+        repo,
+        conversation_id,
+        settings=settings,
+        message_limit=message_limit,
+    )
+    if apply_compression and settings.assistant_context_compression_enabled:
+        compressed = await compress_history_for_llm(
+            history,
+            settings=settings,
+            system_prompt=system_prompt,
+            user_message=user_message,
+        )
+        history = compressed.history
+    return _format_history(history)
 
 
 def build_menu_import_registry() -> SkillRegistry | None:
@@ -123,7 +162,7 @@ def build_menu_import_registry() -> SkillRegistry | None:
     return SkillRegistry(executors)
 
 
-def load_workflow_runtime(
+async def load_workflow_runtime(
     *,
     uow: SqlAlchemyUnitOfWork,
     restaurant_id: uuid.UUID,
@@ -134,12 +173,31 @@ def load_workflow_runtime(
     rollout_skill_ids: tuple[str, ...] | None = None,
 ) -> WorkflowRuntimeBundle:
     resolved_settings = settings or get_settings()
-    cleaned = format_user_message_with_attachments(user_message, attachments or [])
+    attachment_list = attachments or []
+    user_text = user_message.strip()
+    if attachment_list:
+        descriptions = await describe_chat_attachments(
+            attachment_list,
+            settings=resolved_settings,
+        )
+        user_text = append_attachment_descriptions(
+            user_text,
+            attachment_list,
+            descriptions,
+        )
+    if not user_text and attachment_list:
+        user_text = describe_attachments_for_history(attachment_list)
+    if not user_text and not attachment_list:
+        raise ValueError("message or attachments required")
+
+    current_turn_attachments_context = (
+        format_chat_attachments_block(attachment_list) or None
+    )
 
     resolved_conversation_id = ensure_conversation_committed(
         restaurant_id=restaurant_id,
         conversation_id=conversation_id,
-        first_message=cleaned,
+        first_message=user_text,
     )
 
     profile_service = _profile_service(uow, resolved_settings)
@@ -157,23 +215,23 @@ def load_workflow_runtime(
         ).effective_skill_ids,
         rollout_skill_ids=rollout_skill_ids,
     )
-    menu_import_enabled = "menu_import" in effective_skill_ids
+    menu_import_enabled = "menu_import" in _discovered_skill_ids()
     menu_import_registry = build_menu_import_registry() if menu_import_enabled else None
-    menu_sources = menu_source_attachments(attachments or [])
+    menu_sources = menu_source_attachments(attachment_list)
 
     replace_import_session_if_needed(
         restaurant_id=restaurant_id,
-        attachments=attachments or [],
+        attachments=attachment_list,
     )
 
     import_session_context: str | None = None
+    active_import = None
     if menu_import_enabled:
         active_import = get_active_import_for_conversation(
             uow,
             restaurant_id=restaurant_id,
             conversation_id=resolved_conversation_id,
         )
-        import_session_context = build_import_session_context(active_import)
 
     effective_skill_ids = [
         skill_id
@@ -188,39 +246,49 @@ def load_workflow_runtime(
     )
     system_prompt = compose_system_prompt(profile, effective_skill_ids=effective_skill_ids)
 
+    repo = assistant_repository(uow)
+    conversation_history = await _build_conversation_history(
+        repo,
+        resolved_conversation_id,
+        settings=resolved_settings,
+        system_prompt=system_prompt,
+        user_message=user_text,
+        message_limit=resolved_settings.assistant_router_llm_context_message_limit,
+        apply_compression=False,
+    )
+
     menu_import_conversation_history = EMPTY_CONVERSATION_HISTORY
     if menu_import_enabled:
-        repo = assistant_repository(uow)
-        import_history = load_recent_history(
+        menu_import_conversation_history = await _build_conversation_history(
             repo,
             resolved_conversation_id,
             settings=resolved_settings,
+            system_prompt=system_prompt,
+            user_message=user_text,
+            message_limit=resolved_settings.assistant_llm_context_message_limit,
+            apply_compression=True,
         )
-        if resolved_settings.assistant_context_compression_enabled:
-            compressed = compress_history_for_llm(
-                import_history,
-                system_prompt=system_prompt,
-                user_message=cleaned,
-                max_context_tokens=resolved_settings.assistant_context_max_tokens,
-                threshold_ratio=resolved_settings.assistant_context_compression_threshold_ratio,
-                recent_window_turns=resolved_settings.assistant_context_recent_window_turns,
-            )
-            import_history = compressed.history
-        menu_import_conversation_history = _format_history(import_history)
+
+    if menu_import_enabled:
+        import_session_context = build_full_import_session_context(
+            active_import,
+            user_message=user_text,
+        )
 
     context = WorkflowContext(
-        user_message=cleaned,
+        user_message=user_text,
         restaurant_id=restaurant_id,
         conversation_id=resolved_conversation_id,
         effective_skill_ids=effective_skill_ids,
         skill_catalog=build_skill_catalog(registry, effective_skill_ids),
         system_prompt=system_prompt,
-        conversation_history=EMPTY_CONVERSATION_HISTORY,
+        conversation_history=conversation_history,
         assistant_display_name=profile.display_name.strip(),
         menu_import_conversation_history=menu_import_conversation_history,
         menu_import_enabled=menu_import_enabled,
         menu_source_attachment_count=len(menu_sources),
         import_session_context=import_session_context,
+        current_turn_attachments_context=current_turn_attachments_context,
     )
 
     # Commit profile/entitlements/conversation setup before the long-lived SSE stream.
@@ -240,17 +308,6 @@ def router_input(context: WorkflowContext) -> str:
         f"## Conversation history\n\n{context.conversation_history}",
         f"## User request\n\n{context.user_message}",
     ]
-    if context.menu_import_enabled:
-        parts.append("## Menu import capability\n\nDisponible para este restaurante.")
-        if context.menu_source_attachment_count:
-            parts.append(
-                f"El usuario adjuntó **{context.menu_source_attachment_count}** archivo(s) "
-                "de menú (`menu_source`) en este mensaje."
-            )
-            parts.append(
-                "Con archivos `menu_source`, la subida/importación del menú va a "
-                "**menu_import** — no al executor de altas manuales."
-            )
     if context.import_session_context:
         parts.append(f"## Active menu import session\n\n{context.import_session_context}")
     return "\n\n".join(parts)
@@ -259,7 +316,13 @@ def router_input(context: WorkflowContext) -> str:
 def menu_import_input(context: WorkflowContext, route: WorkflowRouteDecision) -> str:
     parts = [
         f"## Conversation history\n\n{context.menu_import_conversation_history}",
-        f"## User request\n\n{context.user_message}",
+        (
+            "## User request\n\n"
+            + build_agent_user_request(
+                context.user_message,
+                context.current_turn_attachments_context,
+            )
+        ),
         f"## User goal\n\n{route.goal}",
     ]
     if context.import_session_context:
@@ -276,6 +339,8 @@ def menu_import_responder_input(
     context: WorkflowContext,
     route: WorkflowRouteDecision,
     execution: ExecutionRecord,
+    *,
+    pending_quiz: list[MenuImportQuizQuestion] | None = None,
 ) -> str:
     parts = [
         f"## Conversation history\n\n{context.menu_import_conversation_history}",
@@ -285,6 +350,15 @@ def menu_import_responder_input(
     ]
     if context.import_session_context:
         parts.append(f"## Import session\n\n{context.import_session_context}")
+    if pending_quiz:
+        payload = [question.model_dump() for question in pending_quiz]
+        parts.append(
+            "## Pending clarification questions\n\n"
+            "Copia **exactamente** este arreglo en el campo `questions` de tu respuesta "
+            "(sin modificar ids, textos ni opciones). El dueño verá el cuestionario debajo "
+            "de `message`.\n\n"
+            f"```json\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n```"
+        )
     return "\n\n".join(parts) + "\n"
 
 
@@ -297,7 +371,13 @@ def executor_input(
 ) -> str:
     parts = [
         f"## Conversation history\n\n{context.conversation_history}",
-        f"## User request\n\n{context.user_message}",
+        (
+            "## User request\n\n"
+            + build_agent_user_request(
+                context.user_message,
+                context.current_turn_attachments_context,
+            )
+        ),
         f"## User goal\n\n{route.goal}",
     ]
     if previous_execution is not None and evaluation is not None:
