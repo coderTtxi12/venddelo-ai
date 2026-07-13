@@ -41,7 +41,12 @@ from app.modules.assistant.agent.workflow.schemas import (
     adjust_evaluation_for_execution,
     clear_execution_approval_gates,
 )
-from app.modules.assistant.agent.workflow.sse import agent_thought_event, evaluation_event, phase_event
+from app.modules.assistant.agent.workflow.sse import (
+    agent_thought_event,
+    evaluation_event,
+    menu_import_quiz_event,
+    phase_event,
+)
 from app.modules.assistant.agent.workflow.stream_mapping import (
     RouterReasonStreamParser,
     map_agent_stream_event,
@@ -52,10 +57,21 @@ from app.modules.assistant.skills.menu_import.onboarding_agent import (
     build_menu_import_executor_agent,
     build_menu_import_responder_agent,
 )
-from app.modules.assistant.skills.menu_import.response_schema import MenuImportUserResponse
+from app.modules.assistant.skills.menu_import.quiz_bridge import (
+    format_menu_import_assistant_turn_for_history,
+    open_questions_to_quiz,
+)
+from app.modules.assistant.skills.menu_import.response_schema import (
+    MenuImportQuizQuestion,
+    MenuImportUserResponse,
+)
 from app.modules.assistant.skills.menu_import.session_context import (
-    build_import_session_context,
+    build_full_import_session_context,
     get_active_import_for_conversation,
+)
+from app.modules.assistant.skills.menu_import.session_draft_store import (
+    list_open_questions,
+    unanswered_question_ids,
 )
 from app.modules.assistant.skills.registry import SkillRegistry
 
@@ -68,6 +84,22 @@ def _workflow_trace(name: str, *, settings: Settings):
     if assistant_tracing_active(settings):
         return trace(name, run_type="chain")
     return nullcontext()
+
+
+def _pending_menu_import_quiz(session: object | None) -> list[MenuImportQuizQuestion]:
+    if session is None:
+        return []
+    unanswered = set(unanswered_question_ids(session))
+    if not unanswered:
+        return []
+    pending = [
+        question
+        for question in list_open_questions(session)
+        if question.id in unanswered
+    ]
+    if not pending:
+        return []
+    return open_questions_to_quiz(pending)
 
 
 class WorkflowOrchestrator:
@@ -144,7 +176,7 @@ class WorkflowOrchestrator:
         yield ChatStreamEvent(event="agent.status", data={"status": "processing"})
         yield phase_event("context")
 
-        runtime = load_workflow_runtime(
+        runtime = await load_workflow_runtime(
             uow=uow,
             restaurant_id=restaurant_id,
             conversation_id=conversation_id,
@@ -200,19 +232,19 @@ class WorkflowOrchestrator:
             evaluation = WorkflowEvaluation(ok=True, issues=[])
 
             if route.is_menu_import and workflow_context.menu_import_enabled and menu_import_registry:
-                menu_import_context = workflow_context
-                if workflow_context.import_session_context:
-                    active_import = get_active_import_for_conversation(
-                        uow,
-                        restaurant_id=restaurant_id,
-                        conversation_id=resolved_conversation_id,
-                        fresh=True,
-                    )
-                    if active_import is not None:
-                        menu_import_context = replace(
-                            workflow_context,
-                            import_session_context=build_import_session_context(active_import),
-                        )
+                active_import = get_active_import_for_conversation(
+                    uow,
+                    restaurant_id=restaurant_id,
+                    conversation_id=resolved_conversation_id,
+                    fresh=True,
+                )
+                menu_import_context = replace(
+                    workflow_context,
+                    import_session_context=build_full_import_session_context(
+                        active_import,
+                        user_message=workflow_context.user_message,
+                    ),
+                )
                 yield ChatStreamEvent(
                     event="agent.phase",
                     data={"phase": "executing", "label": "Importando menú"},
@@ -251,12 +283,22 @@ class WorkflowOrchestrator:
                     "conversation_id": str(resolved_conversation_id),
                     "content": final_output,
                 }
+                if response.questions:
+                    complete_data["menu_import"] = {
+                        "questions": [
+                            question.model_dump() for question in response.questions
+                        ],
+                    }
                 yield ChatStreamEvent(event="message.complete", data=complete_data)
-                if final_output:
+                persisted_assistant_message = format_menu_import_assistant_turn_for_history(
+                    final_output,
+                    response.questions,
+                )
+                if persisted_assistant_message:
                     schedule_persist_turn(
                         conversation_id=resolved_conversation_id,
                         user_message=workflow_context.user_message,
-                        assistant_message=final_output,
+                        assistant_message=persisted_assistant_message,
                     )
                 return
 
@@ -520,14 +562,23 @@ class WorkflowOrchestrator:
             conversation_id=workflow_context.conversation_id,
             fresh=True,
         )
+        quiz_questions = _pending_menu_import_quiz(active_import)
         responder_context = replace(
             workflow_context,
-            import_session_context=build_import_session_context(active_import),
+            import_session_context=build_full_import_session_context(
+                active_import,
+                user_message=workflow_context.user_message,
+            ),
         )
 
         responder_streamed = Runner.run_streamed(
             responder,
-            menu_import_responder_input(responder_context, route, execution),
+            menu_import_responder_input(
+                responder_context,
+                route,
+                execution,
+                pending_quiz=quiz_questions or None,
+            ),
             context=run_context,
             max_turns=1,
         )
@@ -550,7 +601,12 @@ class WorkflowOrchestrator:
                 MenuImportUserResponse,
                 raise_if_incorrect_type=True,
             )
+            if quiz_questions and not response.questions:
+                response = response.model_copy(update={"questions": quiz_questions})
             response_box.append(response)
+
+            if response.questions:
+                yield menu_import_quiz_event(response.questions)
 
             if response.message:
                 content_parts.clear()
