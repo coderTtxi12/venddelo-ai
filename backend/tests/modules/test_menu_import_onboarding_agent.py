@@ -21,7 +21,8 @@ def test_menu_import_internal_tool_names_match_skill():
     names = {tool.name for tool in skill.tool_definitions()}
     assert names == MENU_IMPORT_INTERNAL_TOOL_NAMES
     assert "analyze_import_vs_live" not in names
-    assert len(names) == 9
+    assert "apply_full_import" not in names
+    assert len(names) == 8
 
 
 def test_executor_excludes_menu_import_tools():

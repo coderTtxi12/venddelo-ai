@@ -135,18 +135,25 @@ def test_menu_import_full_flow_stub(session):
         extracted = _run(registry, "start_menu_extraction_batch", {}, ctx)
         assert extracted.ok is True
         assert extracted.data["draft_batches_total"] == 1
-        assert extracted.data["draft_batches_applied"] == 1
-        assert extracted.data["status"] == MenuImportSessionStatus.ENRICHING.value
-        assert extracted.data["products"] == 1
+        assert extracted.data["draft_batches_applied"] == 0
+        assert extracted.data["status"] == MenuImportSessionStatus.EXTRACTING.value
+        assert extracted.data["extracted_products"] == 1
+        assert extracted.data["apply_enabled"] is False
+        assert extracted.data["extraction_metadata"]["models_used"] == ["stub"]
+        assert extracted.data["extraction_metadata"]["configured_vision_model"]
 
-        closed = _run(registry, "update_menu_knowledge", {"notes": "Import OK"}, ctx)
-        assert closed.ok is True
-        assert closed.data["status"] == MenuImportSessionStatus.COMPLETED.value
+        assert extracted.data.get("live_menu_captured") is True
+        assert extracted.data.get("live_menu_products") == 0
+
+        status = _run(registry, "get_extraction_status", {"batch_index": 0}, ctx)
+        assert status.ok is True
+        assert status.data["preview"]["batch"]["categories"][0]["products"][0]["name"] == "Taco al Pastor"
 
     menu = MenuService(ctx.uow.menu)
     products = menu.list_products(restaurant_id, PaginationParams(limit=10, cursor=None))
-    assert len(products.items) == 1
-    assert products.items[0].name == "Taco al Pastor"
+    assert len(products.items) == 0
 
     active = ctx.uow.menu_import_sessions.get_active_for_restaurant(restaurant_id)
-    assert active is None
+    assert active is not None
+    assert active.live_menu_snapshot.get("source") == "live_menu"
+    assert active.live_menu_snapshot.get("import_draft") is not None

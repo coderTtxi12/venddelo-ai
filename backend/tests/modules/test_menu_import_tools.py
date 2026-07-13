@@ -22,7 +22,7 @@ def test_menu_import_skill_registered():
     assert "preview_full_import" not in names
     assert "optimize_import_draft" not in names
     assert "preview_description_enhancements" not in names
-    assert "apply_full_import" in names
+    assert "apply_full_import" not in names
     # Legacy per-section tools are removed so the whole menu applies in one shot.
     assert "apply_menu_batch" not in names
     assert "preview_import_batch" not in names
@@ -34,7 +34,7 @@ def test_menu_import_skill_exposes_expected_tool_effects():
     by_name = {tool.name: tool.effect for tool in skill.tool_definitions()}
     assert "load_menu_best_practices" not in by_name
     assert by_name["get_import_session"] == "read"
-    assert by_name["apply_full_import"] == "mutate"
+    assert "apply_full_import" not in by_name
     assert by_name["update_menu_knowledge"] == "mutate"
 
 @requires_db

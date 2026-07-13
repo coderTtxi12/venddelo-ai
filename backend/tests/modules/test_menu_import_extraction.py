@@ -142,14 +142,14 @@ def test_literal_ocr_prompt_does_not_apply_owner_context():
     prompt = build_literal_ocr_prompt(
         {"menu_context": "Consolidate all wing sizes into one product"}
     )
-    assert "Do NOT consolidate" in prompt
+    assert "Owner instructions" not in prompt
     assert "Consolidate all wing sizes" not in prompt
 
 
 def test_modeling_prompt_includes_owner_context():
-    prompt = build_modeling_prompt({"menu_context": "One product per dish with Tamaño group"})
+    prompt = build_modeling_prompt({"owner_instructions": "One product per dish with Tamaño group"})
     assert "One product per dish with Tamaño group" in prompt
-    assert "PRIMARY" in prompt
+    assert "ADDITIONAL OWNER INSTRUCTIONS:" in prompt
 
 
 def test_extraction_prompt_is_modeling_alias():
@@ -158,16 +158,17 @@ def test_extraction_prompt_is_modeling_alias():
 
 def test_extraction_prompt_includes_product_modeling_rules():
     prompt = build_modeling_prompt({})
-    assert "Product modeling" in prompt
+    assert "RESTRUCTURING" in prompt
     assert "price_delta_mxn" in prompt
-    assert "one product" in prompt
+    assert "option_groups" in prompt
 
 
 def test_extraction_prompt_includes_discovery_context():
     prompt = build_modeling_prompt(
         {"discovery_answers": {"currency": "USD", "cuisine_type": "taqueria"}}
     )
-    assert "USD" in prompt
+    assert "MXN" in prompt
+    assert "USD" not in prompt
     assert "taqueria" in prompt
     assert "price_mxn" in prompt
 
@@ -183,41 +184,43 @@ def test_model_import_draft_restructures_literal():
     assert modeled.categories[0].products[0].option_groups[0].title == "Cantidad"
 
 
-def test_extract_from_pages_runs_literal_then_modeling():
+def test_extract_from_pages_runs_literal_ocr_only():
     vision = FixtureVisionProvider([LITERAL_ALITAS_FIXTURE])
     llm = FixtureLLMProvider(MODELED_ALITAS_FIXTURE)
-    literal, modeled = extract_from_pages(
+    draft, metadata = extract_from_pages(
         [VisionPage(image_bytes=b"fake-png", media_type="image/png")],
         context={"menu_context": "Consolidate sizes"},
         vision=vision,
         llm=llm,
     )
-    assert "Do NOT consolidate" in vision.calls[0].prompt
-    assert literal.categories[0].products[0].name == "8 piezas"
-    assert modeled.categories[0].products[0].name == "Alitas"
-    assert len(llm.requests) == 1
+    assert "menu OCR and catalog mapping engine" in vision.calls[0].prompt
+    assert draft.categories[0].products[0].name == "8 piezas"
+    assert len(llm.requests) == 0
+    assert metadata["models_used"] == ["fixture"]
+    assert metadata["provider_class"] == "FixtureVisionProvider"
 
 
 def test_extraction_parses_taqueria_fixture():
-    literal, modeled = extract_from_pages(
+    draft, metadata = extract_from_pages(
         [VisionPage(image_bytes=b"fake-png", media_type="image/png")],
         context={},
         vision=FixtureVisionProvider(),
         llm=FixtureLLMProvider(TAQUERIA_FIXTURE),
     )
-    assert literal.categories[0].products[0].price_mxn == 85
-    assert modeled.categories[0].products[0].price_mxn == 85
-    assert modeled.categories[0].products[0].name == "Pastor"
+    assert draft.categories[0].products[0].price_mxn == 85
+    assert draft.categories[0].products[0].name == "Pastor"
+    assert metadata["extraction_mode"] == "vision"
 
 
-def test_extract_from_text_uses_literal_then_modeling():
-    literal, modeled = extract_from_text(
+def test_extract_from_text_uses_literal_ocr_only():
+    draft, metadata = extract_from_text(
         "Tacos\nPastor $85",
         context={"discovery_answers": {"currency": "MXN"}},
         llm=FixtureLLMProvider([TAQUERIA_FIXTURE, TAQUERIA_FIXTURE]),
     )
-    assert len(literal.categories) == 1
-    assert modeled.categories[0].products[0].price_mxn == 85
+    assert len(draft.categories) == 1
+    assert draft.categories[0].products[0].price_mxn == 85
+    assert metadata["extraction_mode"] == "text"
 
 
 def test_merge_page_drafts_empty():
@@ -264,20 +267,20 @@ def test_merge_page_drafts_dedupes_categories_by_name():
 def test_modeling_prompt_separates_description_from_selection_rules():
     prompt = build_modeling_prompt({})
     assert "description" in prompt.casefold()
-    assert "selection limits" in prompt.casefold()
+    assert "min_selections" in prompt.casefold()
     assert "global_rules" in prompt
 
 
 def test_literal_ocr_prompt_captures_footnotes_for_description():
     prompt = build_literal_ocr_prompt({})
     assert "global_rules" in prompt
-    assert "footnotes" in prompt.casefold()
+    assert "menu-wide" in prompt.casefold() or "global" in prompt.casefold()
 
 
 def test_modeling_prompt_requires_full_literal_passthrough():
-    prompt = build_modeling_prompt({"menu_context": "only restructure product X"})
+    prompt = build_modeling_prompt({"owner_instructions": "only restructure product X"})
     assert "every" in prompt.casefold() and "category" in prompt.casefold()
-    assert "pass through" in prompt.casefold()
+    assert "never silently omit" in prompt.casefold()
 
 
 def test_extract_literal_from_pages_uses_literal_prompt():
@@ -287,4 +290,4 @@ def test_extract_literal_from_pages_uses_literal_prompt():
         context={},
         vision=vision,
     )
-    assert "Do NOT consolidate" in vision.calls[0].prompt
+    assert "menu OCR and catalog mapping engine" in vision.calls[0].prompt
