@@ -39,38 +39,6 @@
   gap: 0.75rem;
 }
 
-.iconButton {
-  position: relative;
-  background: none;
-  border: none;
-  padding: 0.4rem;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-  border-radius: var(--radius);
-  transition: background 0.15s;
-}
-
-.iconButton:hover {
-  background: #f1f5f9;
-}
-
-.notifBadge {
-  position: absolute;
-  top: 0;
-  right: 0;
-  background: #ef4444;
-  color: #fff;
-  font-size: 0.6rem;
-  font-weight: 700;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-}
-
 .userInfo {
   display: flex;
   align-items: center;
