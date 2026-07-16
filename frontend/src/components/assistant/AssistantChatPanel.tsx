@@ -14,6 +14,7 @@ import MenuImportQuiz, {
 import { useAssistantChat } from '@/contexts/AssistantChatContext';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useChatAutoScroll } from '@/hooks/useChatAutoScroll';
 import { useChatPanelResize } from '@/hooks/useChatPanelResize';
 import { resetAssistantConversation, streamAssistantChat } from '@/lib/api/assistant';
 import type { MenuImportQuizPayload } from '@/lib/api/assistant';
@@ -105,27 +106,30 @@ export default function AssistantChatPanel() {
     Record<string, MenuImportQuizAnswers>
   >({});
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const messagesContentRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingAttachmentsRef = useRef<ChatAttachment[]>([]);
   const sendInFlightRef = useRef(false);
   const streamAbortRef = useRef<AbortController | null>(null);
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
-  }, []);
+  const { pinToBottom, handleScroll } = useChatAutoScroll(
+    messagesContainerRef,
+    messagesContentRef,
+    [messages, streamingMessageId, agentActivity, agentProcessing],
+    { enabled: isOpen },
+  );
 
   useEffect(() => {
     if (isOpen) {
-      scrollToBottom();
-      window.setTimeout(() => textareaRef.current?.focus(), 280);
+      pinToBottom('auto');
+      window.setTimeout(() => {
+        pinToBottom('auto');
+        textareaRef.current?.focus();
+      }, 280);
     }
-  }, [isOpen, scrollToBottom]);
-
-  useEffect(() => {
-    scrollToBottom(streamingMessageId ? 'auto' : 'smooth');
-  }, [messages, streamingMessageId, scrollToBottom]);
+  }, [isOpen, pinToBottom]);
 
   useEffect(() => {
     pendingAttachmentsRef.current = pendingAttachments;
@@ -198,6 +202,7 @@ export default function AssistantChatPanel() {
 
       sendInFlightRef.current = true;
       setIsBusy(true);
+      pinToBottom('auto');
 
       const releaseSendLock = () => {
         sendInFlightRef.current = false;
@@ -461,7 +466,7 @@ export default function AssistantChatPanel() {
         finishStream();
       }
     },
-    [accessToken, clearPendingAttachments, conversationId, pendingAttachments, restaurantId],
+    [accessToken, clearPendingAttachments, conversationId, pendingAttachments, pinToBottom, restaurantId],
   );
 
   const submitMenuImportQuiz = useCallback(
@@ -664,7 +669,15 @@ export default function AssistantChatPanel() {
         </div>
       </header>
 
-      <div className={styles.messages} role="log" aria-live="polite" aria-relevant="additions">
+      <div
+        ref={messagesContainerRef}
+        className={styles.messages}
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions"
+        onScroll={handleScroll}
+      >
+        <div ref={messagesContentRef} className={styles.messagesInner}>
         {messages.map((message) => {
           const isUser = message.role === 'user';
           const isStreaming = streamingMessageId === message.id;
@@ -764,8 +777,7 @@ export default function AssistantChatPanel() {
             </div>
           );
         })}
-
-        <div ref={messagesEndRef} />
+        </div>
       </div>
 
       <div className={styles.composer}>
