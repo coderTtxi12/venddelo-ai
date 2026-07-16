@@ -17,3 +17,4 @@ openai-agents==0.18.2
 langsmith[openai-agents]>=0.3.15
 pymupdf>=1.24.0
 python-docx>=1.1.2
+Pillow>=11.0.0
