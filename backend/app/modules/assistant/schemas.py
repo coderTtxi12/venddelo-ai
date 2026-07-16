@@ -51,7 +51,7 @@ class ChatAttachmentRef(BaseModel):
     storage_path: str = Field(min_length=1, max_length=512)
     original_name: str = Field(min_length=1, max_length=255)
     mime_type: str = Field(min_length=1, max_length=128)
-    kind: Literal["menu_source", "product_photo"]
+    kind: Literal["document", "image", "menu_source", "product_photo"]
     size_bytes: int = Field(ge=1, le=20_000_000)
 
 
@@ -95,4 +95,4 @@ class ImportAssetUploadDTO(BaseModel):
     mime_type: str
     size_bytes: int
     original_name: str
-    kind: Literal["menu_source", "product_photo"]
+    kind: Literal["document", "image", "menu_source", "product_photo"]

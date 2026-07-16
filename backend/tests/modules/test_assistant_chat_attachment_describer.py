@@ -8,10 +8,10 @@ from app.modules.assistant.schemas import ChatAttachmentRef
 
 def test_describe_chat_attachments_uses_vision_for_images():
     attachment = ChatAttachmentRef(
-        storage_path="restaurants/abc/import/menu_source/menu.png",
+        storage_path="restaurants/abc/import/inbox/menu.webp",
         original_name="menu.png",
-        mime_type="image/png",
-        kind="menu_source",
+        mime_type="image/webp",
+        kind="image",
         size_bytes=1200,
     )
 

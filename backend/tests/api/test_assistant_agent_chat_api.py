@@ -90,10 +90,10 @@ def test_assistant_chat_accepts_attachments_only_payload(client, engine):
                 "message": "",
                 "attachments": [
                     {
-                        "storage_path": f"restaurants/{restaurant.id}/import/menu_source/menu.pdf",
+                        "storage_path": f"restaurants/{restaurant.id}/import/inbox/menu.pdf",
                         "original_name": "menu.pdf",
                         "mime_type": "application/pdf",
-                        "kind": "menu_source",
+                        "kind": "document",
                         "size_bytes": 128,
                     }
                 ],

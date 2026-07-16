@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import require_owned_restaurant
@@ -32,15 +32,13 @@ def _agent_service() -> AssistantAgentService:
     status_code=status.HTTP_201_CREATED,
 )
 def upload_assistant_import_asset(
-    kind: str = Query(...),
     file: UploadFile = File(...),
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
 ) -> ImportAssetUploadDTO:
-    """Upload a menu document or product photo for assistant import workflows."""
+    """Upload a chat attachment into the restaurant import inbox (WebP for images)."""
     content = file.file.read()
     return upload_import_asset(
         restaurant.id,
-        kind,
         file.filename or "upload",
         content,
         file.content_type or "application/octet-stream",

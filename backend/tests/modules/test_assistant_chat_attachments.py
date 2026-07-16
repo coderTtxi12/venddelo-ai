@@ -10,10 +10,10 @@ from app.modules.assistant.schemas import ChatAttachmentRef
 
 def _menu_png_attachment() -> ChatAttachmentRef:
     return ChatAttachmentRef(
-        storage_path="restaurants/abc/import/menu_source/menu.png",
+        storage_path="restaurants/abc/import/inbox/menu.webp",
         original_name="menu.png",
-        mime_type="image/png",
-        kind="menu_source",
+        mime_type="image/webp",
+        kind="image",
         size_bytes=3417523,
     )
 
@@ -24,7 +24,7 @@ def test_format_user_message_with_attachments_appends_block():
     assert "Quiero importar mi menú" in result
     assert "## Chat attachments" in result
     assert "menu.png" in result
-    assert "restaurants/abc/import/menu_source/menu.png" in result
+    assert "restaurants/abc/import/inbox/menu.webp" in result
 
 
 def test_format_user_message_attachments_only():
@@ -37,8 +37,8 @@ def test_strip_chat_attachments_block_keeps_user_text():
     raw = (
         "sube estos esye menu\n\n"
         "## Chat attachments\n\n"
-        "- **menu.png** (`menu_source`)\n"
-        "  - storage_path: `restaurants/abc/import/menu_source/menu.png`"
+        "- **menu.png** (`image`)\n"
+        "  - storage_path: `restaurants/abc/import/inbox/menu.webp`"
     )
     assert strip_chat_attachments_block(raw) == "sube estos esye menu"
 
@@ -46,8 +46,8 @@ def test_strip_chat_attachments_block_keeps_user_text():
 def test_strip_chat_attachments_block_summarizes_attachment_only_messages():
     raw = (
         "## Chat attachments\n\n"
-        "- **menu.png** (`menu_source`)\n"
-        "  - storage_path: `restaurants/abc/import/menu_source/menu.png`"
+        "- **menu.png** (`image`)\n"
+        "  - storage_path: `restaurants/abc/import/inbox/menu.webp`"
     )
     assert strip_chat_attachments_block(raw) == "[Adjuntos: menu.png]"
 
@@ -64,10 +64,10 @@ def test_append_attachment_descriptions_combines_user_text_and_summaries():
     from app.modules.assistant.chat_attachments import append_attachment_descriptions
 
     attachment = ChatAttachmentRef(
-        storage_path="restaurants/abc/import/menu_source/menu.png",
+        storage_path="restaurants/abc/import/inbox/menu.webp",
         original_name="menu.png",
         mime_type="image/png",
-        kind="menu_source",
+        kind="image",
         size_bytes=10,
     )
     rendered = append_attachment_descriptions(
