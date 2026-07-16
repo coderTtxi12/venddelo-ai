@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MenuImportQuizAnswers } from '@/components/assistant/MenuImportQuiz';
 import type { MenuImportQuizPayload } from '@/lib/api/assistant';
 import {
+  areAllMenuImportQuizQuestionsAnswered,
   composeMenuImportUserTurn,
   findPendingMenuImportQuiz,
   formatMenuImportQuizSubmission,
@@ -63,5 +64,15 @@ describe('menuImportQuizSubmit', () => {
   it('returns only extra text when there are no quiz answers', () => {
     expect(composeMenuImportUserTurn('solo texto', quiz, {})).toBe('solo texto');
     expect(hasMenuImportQuizAnswers({})).toBe(false);
+  });
+
+  it('detects when every quiz question is answered', () => {
+    expect(areAllMenuImportQuizQuestionsAnswered(quiz, answers)).toBe(false);
+    expect(
+      areAllMenuImportQuizQuestionsAnswered(quiz, {
+        ...answers,
+        q_2: { optionId: 'opt_1', label: 'No' },
+      }),
+    ).toBe(true);
   });
 });

@@ -19,6 +19,15 @@ export function hasMenuImportQuizAnswers(answers: MenuImportQuizAnswers): boolea
   return Object.values(answers).some((answer) => answer.label.trim().length > 0);
 }
 
+export function areAllMenuImportQuizQuestionsAnswered(
+  quiz: MenuImportQuizPayload,
+  answers: MenuImportQuizAnswers,
+): boolean {
+  return quiz.questions.every(
+    (question) => (answers[question.id]?.label?.trim().length ?? 0) > 0,
+  );
+}
+
 export function findPendingMenuImportQuiz(
   messages: ChatMessageLike[],
 ): PendingMenuImportQuiz | null {
