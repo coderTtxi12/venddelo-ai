@@ -420,26 +420,28 @@ def apply_import_batch(
     promo_service = PromotionService(ctx.uow.promotions)
     ref_map = _accumulated_ref_map(draft_batches)
 
+    # Nested savepoint: roll back only live-menu mutations on failure so the
+    # modeled working draft / clarification_answers in this UoW survive.
     try:
-        categories_created = _apply_categories(
-            menu, ctx, batch.categories, ref_map, reconciliation
-        )
-        products_created = _apply_products(
-            menu, ctx, batch.categories, ref_map, reconciliation
-        )
-        _apply_product_order(menu, ctx, batch.categories, ref_map)
-        groups_created, items_created = _apply_option_groups(
-            menu, ctx, batch.categories, ref_map, reconciliation
-        )
-        promotions_created = _apply_promotions(
-            promo_service, ctx, batch.promotions, ref_map
-        )
-        catalog_discounts_created = _apply_catalog_discounts(
-            promo_service, ctx, batch.categories, ref_map
-        )
-        promotions_created += catalog_discounts_created
+        with ctx.uow.session.begin_nested():
+            categories_created = _apply_categories(
+                menu, ctx, batch.categories, ref_map, reconciliation
+            )
+            products_created = _apply_products(
+                menu, ctx, batch.categories, ref_map, reconciliation
+            )
+            _apply_product_order(menu, ctx, batch.categories, ref_map)
+            groups_created, items_created = _apply_option_groups(
+                menu, ctx, batch.categories, ref_map, reconciliation
+            )
+            promotions_created = _apply_promotions(
+                promo_service, ctx, batch.promotions, ref_map
+            )
+            catalog_discounts_created = _apply_catalog_discounts(
+                promo_service, ctx, batch.categories, ref_map
+            )
+            promotions_created += catalog_discounts_created
     except ValidationError as exc:
-        ctx.uow.rollback()
         return ApplyBatchResult(ok=False, summary=str(exc))
 
     invalidate_restaurant_menu_cache(ctx.uow, ctx.restaurant_id)
