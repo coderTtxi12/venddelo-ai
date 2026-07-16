@@ -43,6 +43,7 @@ import { restaurantPublicMenuUrl } from '@/lib/restaurantSubdomain';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
 import { useAuth } from '@/hooks/useAuth';
+import { useDigitalMenuPreviewSocket } from '@/lib/digital-menu/useDigitalMenuPreviewSocket';
 import { resolveSupplierIdByEmail } from '@/services/db';
 import { legacyDb as db } from '@/services/legacyDb';
 import styles from './DigitalMenuPage.module.css';
@@ -75,6 +76,9 @@ export default function DigitalMenuPage() {
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
 
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const reloadPreviewTimerRef = useRef<number | null>(null);
+  const dragCategoryIdRef = useRef<string | null>(null);
+  const productDragTargetRef = useRef<ProductDragTarget>(null);
 
   const menuTheme = useMemo(() => getDigitalMenuThemeOrDefault(themeId), [themeId]);
   const menuThemeStyle = useMemo(() => digitalMenuThemeToStyle(menuTheme), [menuTheme]);
@@ -194,6 +198,62 @@ export default function DigitalMenuPage() {
       cancelled = true;
     };
   }, [accessToken, authLoading, firebaseUser?.email]);
+
+  const reloadPreviewData = useCallback(async () => {
+    if (!accessToken || !restaurantId) return;
+
+    try {
+      const [restaurantData, categoryRows, productRows, promotionRows, scheduleRows] =
+        await Promise.all([
+          getRestaurant(accessToken, restaurantId),
+          fetchAllPages((cursor) => listCategories(accessToken, restaurantId, 100, cursor)),
+          fetchAllPages((cursor) => listProducts(accessToken, restaurantId, 100, cursor)),
+          listAllPromotions(accessToken, restaurantId),
+          listRestaurantSchedules(accessToken, restaurantId),
+        ]);
+
+      setRestaurant(restaurantData);
+      setSchedules(scheduleRows);
+      setEnabledServices(resolveRestaurantServices(restaurantData));
+      setThemeId(getDigitalMenuThemeOrDefault(restaurantData.digital_menu_theme_id).id);
+      setCategories(sortCategories(categoryRows));
+      setProducts(productRows);
+      setPromotions(promotionRows);
+    } catch (error) {
+      console.warn('digital menu preview reload failed', error);
+    }
+  }, [accessToken, restaurantId]);
+
+  const schedulePreviewReload = useCallback(() => {
+    if (reloadPreviewTimerRef.current != null) {
+      window.clearTimeout(reloadPreviewTimerRef.current);
+    }
+    reloadPreviewTimerRef.current = window.setTimeout(() => {
+      reloadPreviewTimerRef.current = null;
+      void reloadPreviewData();
+    }, 300);
+  }, [reloadPreviewData]);
+
+  useDigitalMenuPreviewSocket(restaurantId, accessToken, () => {
+    if (dragCategoryIdRef.current || productDragTargetRef.current) return;
+    schedulePreviewReload();
+  });
+
+  useEffect(() => {
+    dragCategoryIdRef.current = dragCategoryId;
+  }, [dragCategoryId]);
+
+  useEffect(() => {
+    productDragTargetRef.current = productDragTarget;
+  }, [productDragTarget]);
+
+  useEffect(() => {
+    return () => {
+      if (reloadPreviewTimerRef.current != null) {
+        window.clearTimeout(reloadPreviewTimerRef.current);
+      }
+    };
+  }, []);
 
   const previewProducts = useMemo(
     () => filterPublicMenuProducts(products),
