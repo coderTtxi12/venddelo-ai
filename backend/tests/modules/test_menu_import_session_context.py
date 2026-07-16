@@ -3,6 +3,8 @@ from app.modules.assistant.skills.menu_import.session_context import (
     build_full_import_session_context,
     build_import_clarification_context,
     build_import_session_context,
+    build_router_import_session_context,
+    import_session_needs_router_attention,
 )
 
 
@@ -116,3 +118,97 @@ def test_build_full_import_session_context_combines_session_clarification_and_ow
     assert "Preguntas pendientes" in payload
     assert "Owner turn (call model_working_draft)" in payload
     assert "Bolas de helado" in payload
+
+
+def test_import_session_needs_router_attention_false_after_apply_without_questions():
+    session = _session(
+        status="enriching",
+        draft_batches=[
+            {
+                "batch_index": 0,
+                "categories": [
+                    {
+                        "ref": "cat_1",
+                        "name": "Tacos",
+                        "products": [
+                            {"ref": "prod_1", "name": "Pastor", "price_mxn": 120},
+                        ],
+                    }
+                ],
+                "applied_at": "2026-07-15T21:00:00+00:00",
+            }
+        ],
+        open_questions=[],
+        clarification_answers={},
+    )
+
+    assert import_session_needs_router_attention(session) is False
+    assert build_router_import_session_context(session) is None
+
+
+def test_import_session_needs_router_attention_true_while_clarifying():
+    session = _session(
+        status="clarifying",
+        ocr_original={"categories": [], "promotions": [], "open_questions": []},
+        open_questions=[
+            {
+                "id": "q_1",
+                "question_es": "¿Incluye bebida?",
+                "suggested_answers": ["Sí", "No"],
+            }
+        ],
+    )
+
+    assert import_session_needs_router_attention(session) is True
+    assert build_router_import_session_context(session) is not None
+
+
+def test_router_hides_import_context_after_apply_even_without_applied_at_flag():
+    """ENRICHING means apply finished; router must not see import blocks."""
+    session = _session(
+        status="enriching",
+        ocr_original={"categories": [], "promotions": [], "open_questions": []},
+        draft_batches=[
+            {
+                "batch_index": 0,
+                "categories": [
+                    {
+                        "ref": "cat_1",
+                        "name": "Tacos",
+                        "products": [
+                            {"ref": "prod_1", "name": "Pastor", "price_mxn": 120},
+                        ],
+                    }
+                ],
+            }
+        ],
+        open_questions=[],
+        clarification_answers={},
+        live_menu_snapshot={"captured_at": "now", "import_draft": {"categories": []}},
+    )
+    user_message = "cuantos productos tengo que no tienenn imagen?"
+
+    assert import_session_needs_router_attention(session) is False
+    assert build_router_import_session_context(session, user_message=user_message) is None
+
+
+def test_router_still_shows_clarification_for_pending_questions_with_free_text():
+    session = _session(
+        status="clarifying",
+        ocr_original={"categories": [], "promotions": [], "open_questions": []},
+        open_questions=[
+            {
+                "id": "q_1",
+                "question_es": "¿Incluye bebida?",
+                "suggested_answers": ["Sí", "No"],
+            }
+        ],
+    )
+    user_message = "consolida los tamaños de alitas en un solo producto"
+
+    payload = build_router_import_session_context(session, user_message=user_message)
+
+    assert payload is not None
+    assert "Preguntas pendientes" in payload
+    assert "consolida los tamaños" in payload
+    assert "model_working_draft" in payload
