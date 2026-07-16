@@ -1,0 +1,1220 @@
+{
+  "categories": [
+    {
+      "ref": "cat_1",
+      "name": "ALITAS",
+      "products": [
+        {
+          "ref": "prod_1",
+          "name": "8 piezas",
+          "currency": "MXN",
+          "price_mxn": 125,
+          "sort_order": 0,
+          "description": "Incluye guarnición. 1 solo sabor.",
+          "is_available": true,
+          "option_groups": [
+            {
+              "ref": "og_1",
+              "items": [
+                {
+                  "ref": "oi_1",
+                  "label": "Pica Gula",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_2",
+                  "label": "Chiltepin",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_3",
+                  "label": "Piña habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_4",
+                  "label": "Mango habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_5",
+                  "label": "Buffalo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_6",
+                  "label": "Tamarindo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_7",
+                  "label": "BBQ",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_8",
+                  "label": "Parmesano",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Sabor",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_guarnicion",
+              "items": [
+                {
+                  "ref": "oi_g1",
+                  "label": "Zanahoria",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_g2",
+                  "label": "Pepino",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Guarnición",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_extras",
+              "items": [
+                {
+                  "ref": "oi_e1",
+                  "label": "Sabor extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                },
+                {
+                  "ref": "oi_e2",
+                  "label": "Aderezo ranch extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                }
+              ],
+              "title": "Extras",
+              "required": false,
+              "selection": "multi",
+              "sort_order": 0,
+              "max_selections": null,
+              "min_selections": 0
+            }
+          ],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        },
+        {
+          "ref": "prod_2",
+          "name": "12 piezas",
+          "currency": "MXN",
+          "price_mxn": 175,
+          "sort_order": 0,
+          "description": "Incluye guarnición. Hasta 2 sabores.",
+          "is_available": true,
+          "option_groups": [
+            {
+              "ref": "og_2",
+              "items": [
+                {
+                  "ref": "oi_9",
+                  "label": "Pica Gula",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_10",
+                  "label": "Chiltepin",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_11",
+                  "label": "Piña habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_12",
+                  "label": "Mango habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_13",
+                  "label": "Buffalo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_14",
+                  "label": "Tamarindo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_15",
+                  "label": "BBQ",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_16",
+                  "label": "Parmesano",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Sabor",
+              "required": true,
+              "selection": "multi",
+              "sort_order": 0,
+              "max_selections": 2,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_guarnicion",
+              "items": [
+                {
+                  "ref": "oi_g1",
+                  "label": "Zanahoria",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_g2",
+                  "label": "Pepino",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Guarnición",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_extras",
+              "items": [
+                {
+                  "ref": "oi_e1",
+                  "label": "Sabor extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                },
+                {
+                  "ref": "oi_e2",
+                  "label": "Aderezo ranch extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                }
+              ],
+              "title": "Extras",
+              "required": false,
+              "selection": "multi",
+              "sort_order": 0,
+              "max_selections": null,
+              "min_selections": 0
+            }
+          ],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        },
+        {
+          "ref": "prod_3",
+          "name": "16 piezas",
+          "currency": "MXN",
+          "price_mxn": 215,
+          "sort_order": 0,
+          "description": "Incluye guarnición. Hasta 2 sabores.",
+          "is_available": true,
+          "option_groups": [
+            {
+              "ref": "og_3",
+              "items": [
+                {
+                  "ref": "oi_17",
+                  "label": "Pica Gula",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_18",
+                  "label": "Chiltepin",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_19",
+                  "label": "Piña habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_20",
+                  "label": "Mango habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_21",
+                  "label": "Buffalo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_22",
+                  "label": "Tamarindo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_23",
+                  "label": "BBQ",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_24",
+                  "label": "Parmesano",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Sabor",
+              "required": true,
+              "selection": "multi",
+              "sort_order": 0,
+              "max_selections": 2,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_guarnicion",
+              "items": [
+                {
+                  "ref": "oi_g1",
+                  "label": "Zanahoria",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_g2",
+                  "label": "Pepino",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Guarnición",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_extras",
+              "items": [
+                {
+                  "ref": "oi_e1",
+                  "label": "Sabor extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                },
+                {
+                  "ref": "oi_e2",
+                  "label": "Aderezo ranch extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                }
+              ],
+              "title": "Extras",
+              "required": false,
+              "selection": "multi",
+              "sort_order": 0,
+              "max_selections": null,
+              "min_selections": 0
+            }
+          ],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        },
+        {
+          "ref": "prod_4",
+          "name": "24 piezas",
+          "currency": "MXN",
+          "price_mxn": 285,
+          "sort_order": 0,
+          "description": "Incluye guarnición. Hasta 3 sabores.",
+          "is_available": true,
+          "option_groups": [
+            {
+              "ref": "og_4",
+              "items": [
+                {
+                  "ref": "oi_25",
+                  "label": "Pica Gula",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_26",
+                  "label": "Chiltepin",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_27",
+                  "label": "Piña habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_28",
+                  "label": "Mango habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_29",
+                  "label": "Buffalo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_30",
+                  "label": "Tamarindo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_31",
+                  "label": "BBQ",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_32",
+                  "label": "Parmesano",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Sabor",
+              "required": true,
+              "selection": "multi",
+              "sort_order": 0,
+              "max_selections": 3,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_guarnicion",
+              "items": [
+                {
+                  "ref": "oi_g1",
+                  "label": "Zanahoria",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_g2",
+                  "label": "Pepino",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Guarnición",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_extras",
+              "items": [
+                {
+                  "ref": "oi_e1",
+                  "label": "Sabor extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                },
+                {
+                  "ref": "oi_e2",
+                  "label": "Aderezo ranch extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                }
+              ],
+              "title": "Extras",
+              "required": false,
+              "selection": "multi",
+              "sort_order": 0,
+              "max_selections": null,
+              "min_selections": 0
+            }
+          ],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        },
+        {
+          "ref": "prod_5",
+          "name": "1 kg",
+          "currency": "MXN",
+          "price_mxn": 245,
+          "sort_order": 0,
+          "description": "Incluye guarnición. Hasta 2 sabores.",
+          "is_available": true,
+          "option_groups": [
+            {
+              "ref": "og_5",
+              "items": [
+                {
+                  "ref": "oi_33",
+                  "label": "Pica Gula",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_34",
+                  "label": "Chiltepin",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_35",
+                  "label": "Piña habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_36",
+                  "label": "Mango habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_37",
+                  "label": "Buffalo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_38",
+                  "label": "Tamarindo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_39",
+                  "label": "BBQ",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_40",
+                  "label": "Parmesano",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Sabor",
+              "required": true,
+              "selection": "multi",
+              "sort_order": 0,
+              "max_selections": 2,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_guarnicion",
+              "items": [
+                {
+                  "ref": "oi_g1",
+                  "label": "Zanahoria",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_g2",
+                  "label": "Pepino",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Guarnición",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_extras",
+              "items": [
+                {
+                  "ref": "oi_e1",
+                  "label": "Sabor extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                },
+                {
+                  "ref": "oi_e2",
+                  "label": "Aderezo ranch extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                }
+              ],
+              "title": "Extras",
+              "required": false,
+              "selection": "multi",
+              "sort_order": 0,
+              "max_selections": null,
+              "min_selections": 0
+            }
+          ],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        }
+      ],
+      "sort_order": 0,
+      "description": null,
+      "display_layout": null,
+      "constraints_notes": "Todas las alitas y boneless incluyen guarnición de zanahoria o pepino y aderezo ranch."
+    },
+    {
+      "ref": "cat_2",
+      "name": "BONELESS",
+      "products": [
+        {
+          "ref": "prod_6",
+          "name": "300 gr",
+          "currency": "MXN",
+          "price_mxn": 179,
+          "sort_order": 0,
+          "description": "1 solo sabor. Incluye guarnición.",
+          "is_available": true,
+          "option_groups": [
+            {
+              "ref": "og_6",
+              "items": [
+                {
+                  "ref": "oi_41",
+                  "label": "Pica Gula",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_42",
+                  "label": "Chiltepin",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_43",
+                  "label": "Piña habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_44",
+                  "label": "Mango habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_45",
+                  "label": "Buffalo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_46",
+                  "label": "Tamarindo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_47",
+                  "label": "BBQ",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_48",
+                  "label": "Parmesano",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Sabor",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_guarnicion",
+              "items": [
+                {
+                  "ref": "oi_g1",
+                  "label": "Zanahoria",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_g2",
+                  "label": "Pepino",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Guarnición",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_extras",
+              "items": [
+                {
+                  "ref": "oi_e1",
+                  "label": "Sabor extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                },
+                {
+                  "ref": "oi_e2",
+                  "label": "Aderezo ranch extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                }
+              ],
+              "title": "Extras",
+              "required": false,
+              "selection": "multi",
+              "sort_order": 0,
+              "max_selections": null,
+              "min_selections": 0
+            }
+          ],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        },
+        {
+          "ref": "prod_7",
+          "name": "500 gr",
+          "currency": "MXN",
+          "price_mxn": 249,
+          "sort_order": 0,
+          "description": "1 solo sabor. Incluye guarnición.",
+          "is_available": true,
+          "option_groups": [
+            {
+              "ref": "og_7",
+              "items": [
+                {
+                  "ref": "oi_49",
+                  "label": "Pica Gula",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_50",
+                  "label": "Chiltepin",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_51",
+                  "label": "Piña habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_52",
+                  "label": "Mango habanero",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_53",
+                  "label": "Buffalo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_54",
+                  "label": "Tamarindo",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_55",
+                  "label": "BBQ",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_56",
+                  "label": "Parmesano",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Sabor",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_guarnicion",
+              "items": [
+                {
+                  "ref": "oi_g1",
+                  "label": "Zanahoria",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_g2",
+                  "label": "Pepino",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Guarnición",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            },
+            {
+              "ref": "og_shared_extras",
+              "items": [
+                {
+                  "ref": "oi_e1",
+                  "label": "Sabor extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                },
+                {
+                  "ref": "oi_e2",
+                  "label": "Aderezo ranch extra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 20
+                }
+              ],
+              "title": "Extras",
+              "required": false,
+              "selection": "multi",
+              "sort_order": 0,
+              "max_selections": null,
+              "min_selections": 0
+            }
+          ],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        }
+      ],
+      "sort_order": 1,
+      "description": null,
+      "display_layout": null,
+      "constraints_notes": "Todas las alitas y boneless incluyen guarnición de zanahoria o pepino y aderezo ranch."
+    },
+    {
+      "ref": "cat_3",
+      "name": "A LA PLANCHA",
+      "products": [
+        {
+          "ref": "prod_8",
+          "name": "Gula tacos",
+          "currency": "MXN",
+          "price_mxn": 50,
+          "sort_order": 0,
+          "description": "Roast beef, arrachera, chorizo argentino, chorizo campestre, chistorra. Guarnición: Guacamole, cebolla cambray, chile toreado.",
+          "is_available": true,
+          "option_groups": [
+            {
+              "ref": "og_8",
+              "items": [
+                {
+                  "ref": "oi_m1",
+                  "label": "Roast beef",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_m2",
+                  "label": "Arrachera",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_m3",
+                  "label": "Chorizo argentino",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_m4",
+                  "label": "Chorizo campestre",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_m5",
+                  "label": "Chistorra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Carne",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            }
+          ],
+          "catalog_discount": null,
+          "constraints_notes": "Precio indicado por unidad (c/u).",
+          "has_catalog_discount": false
+        },
+        {
+          "ref": "prod_9",
+          "name": "Gula taco combinado",
+          "currency": "MXN",
+          "price_mxn": 60,
+          "sort_order": 0,
+          "description": "2 carnes a elegir.",
+          "is_available": true,
+          "option_groups": [
+            {
+              "ref": "og_9",
+              "items": [
+                {
+                  "ref": "oi_m1b",
+                  "label": "Roast beef",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_m2b",
+                  "label": "Arrachera",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_m3b",
+                  "label": "Chorizo argentino",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_m4b",
+                  "label": "Chorizo campestre",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_m5b",
+                  "label": "Chistorra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Carnes (elige 2)",
+              "required": true,
+              "selection": "multi",
+              "sort_order": 0,
+              "max_selections": 2,
+              "min_selections": 2
+            }
+          ],
+          "catalog_discount": null,
+          "constraints_notes": "Precio indicado por unidad (c/u).",
+          "has_catalog_discount": false
+        },
+        {
+          "ref": "prod_10",
+          "name": "Burrito pechugón",
+          "currency": "MXN",
+          "price_mxn": 129,
+          "sort_order": 0,
+          "description": "Pechuga de pollo con sazón de la casa, pimiento morrón, guacamole, frijoles, arroz, mix de quesos.",
+          "is_available": true,
+          "option_groups": [],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        },
+        {
+          "ref": "prod_11",
+          "name": "Burrito de arrachera",
+          "currency": "MXN",
+          "price_mxn": 149,
+          "sort_order": 0,
+          "description": "Arrachera, cebollitas con sazón de la casa, guacamole, frijoles, arroz, mix de quesos.",
+          "is_available": true,
+          "option_groups": [],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        },
+        {
+          "ref": "prod_12",
+          "name": "Papa Ranch",
+          "currency": "MXN",
+          "price_mxn": 149,
+          "sort_order": 0,
+          "description": "Papa al horno sazonada con especias de la casa, gravy, tocino crispy, mix de quesos. Carne a elegir (roast beef o arrachera).",
+          "is_available": true,
+          "option_groups": [
+            {
+              "ref": "og_10",
+              "items": [
+                {
+                  "ref": "oi_c1",
+                  "label": "Roast beef",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_c2",
+                  "label": "Arrachera",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Carne a elegir",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            }
+          ],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        },
+        {
+          "ref": "prod_13",
+          "name": "Burrada",
+          "currency": "MXN",
+          "price_mxn": 165,
+          "sort_order": 0,
+          "description": "Chuleta ahumada, salchicha ahumada, tocino ahumado, guacamole, frijoles, arroz, mix de quesos, una carne a elegir (arrachera, roast beef, chistorra, chorizo argentino, chorizo campestre).",
+          "is_available": true,
+          "option_groups": [
+            {
+              "ref": "og_11",
+              "items": [
+                {
+                  "ref": "oi_b1",
+                  "label": "Arrachera",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_b2",
+                  "label": "Roast beef",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_b3",
+                  "label": "Chistorra",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_b4",
+                  "label": "Chorizo argentino",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_b5",
+                  "label": "Chorizo campestre",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Carne a elegir",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            }
+          ],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        }
+      ],
+      "sort_order": 2,
+      "description": null,
+      "display_layout": null,
+      "constraints_notes": null
+    },
+    {
+      "ref": "cat_4",
+      "name": "POSTRES",
+      "products": [
+        {
+          "ref": "prod_14",
+          "name": "Bolas de helado",
+          "currency": "MXN",
+          "price_mxn": 50,
+          "sort_order": 0,
+          "description": null,
+          "is_available": true,
+          "option_groups": [],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        },
+        {
+          "ref": "prod_15",
+          "name": "Pan de elote",
+          "currency": "MXN",
+          "price_mxn": 65,
+          "sort_order": 0,
+          "description": null,
+          "is_available": true,
+          "option_groups": [],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        },
+        {
+          "ref": "prod_16",
+          "name": "Churros",
+          "currency": "MXN",
+          "price_mxn": 70,
+          "sort_order": 0,
+          "description": "Sabor a elegir: Lechera, cajeta o chocolate.",
+          "is_available": true,
+          "option_groups": [
+            {
+              "ref": "og_12",
+              "items": [
+                {
+                  "ref": "oi_ch1",
+                  "label": "Lechera",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_ch2",
+                  "label": "Cajeta",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_ch3",
+                  "label": "Chocolate",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Sabor",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            }
+          ],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        },
+        {
+          "ref": "prod_17",
+          "name": "Gula cookies",
+          "currency": "MXN",
+          "price_mxn": 70,
+          "sort_order": 0,
+          "description": null,
+          "is_available": true,
+          "option_groups": [],
+          "catalog_discount": null,
+          "constraints_notes": null,
+          "has_catalog_discount": false
+        }
+      ],
+      "sort_order": 3,
+      "description": null,
+      "display_layout": null,
+      "constraints_notes": null
+    }
+  ],
+  "promotions": [],
+  "global_rules": [],
+  "unmapped_text": [],
+  "open_questions": [
+    {
+      "id": "q_1",
+      "context": "El texto bajo 'Gula tacos' muestra: 'Roast beef, arrachera, chorizo argentino, chorizo campestre, chistorra' pero no especifica si son opciones o todos los ingredientes.",
+      "question_es": "En 'Gula tacos' la lista de carnes aparece seguida por varias carnes: ¿el cliente debe elegir UNA de esas carnes o el plato incluye todas las carnes mencionadas?",
+      "related_refs": ["prod_8"],
+      "suggested_answers": [
+        "El cliente elige una carne",
+        "Incluye todas las carnes listadas"
+      ]
+    },
+    {
+      "id": "q_2",
+      "context": "El menú indica 'Sabor extra: $20' debajo de la lista de sabores; no especifica si aplica por sabor adicional o por pedido.",
+      "question_es": "¿La opción 'Sabor extra' ($20) se cobra por cada sabor adicional elegido o es un cargo único por pedido?",
+      "related_refs": [
+        "prod_1",
+        "prod_2",
+        "prod_3",
+        "prod_4",
+        "prod_5",
+        "prod_6",
+        "prod_7"
+      ],
+      "suggested_answers": [
+        "$20 por cada sabor extra",
+        "$20 cargo único por pedido"
+      ]
+    }
+  ]
+}
