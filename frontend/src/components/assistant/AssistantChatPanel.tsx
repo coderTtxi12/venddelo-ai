@@ -21,7 +21,6 @@ import type { MenuImportQuizPayload } from '@/lib/api/assistant';
 import { isFetchAbortError } from '@/lib/api/assistantStream';
 import {
   CHAT_ATTACHMENT_ACCEPT,
-  inferChatAttachmentKind,
   MAX_CHAT_ATTACHMENTS,
   uploadImportAsset,
   type ChatAttachmentRef,
@@ -232,8 +231,7 @@ export default function AssistantChatPanel() {
               if (!file) {
                 throw new Error(`Falta el archivo ${attachment.name}`);
               }
-              const kind = inferChatAttachmentKind(file);
-              const uploaded = await uploadImportAsset(accessToken, restaurantId, file, kind);
+              const uploaded = await uploadImportAsset(accessToken, restaurantId, file);
               return {
                 storage_path: uploaded.path,
                 original_name: uploaded.original_name,
@@ -727,7 +725,11 @@ export default function AssistantChatPanel() {
                 >
                   {isUser ? (
                     <>
-                      {message.content ? <p className={styles.userText}>{message.content}</p> : null}
+                      {message.content ? (
+                        <div className={styles.userText}>
+                          <ChatMarkdown content={message.content} className={styles.userMarkdown} />
+                        </div>
+                      ) : null}
                       {message.attachments && message.attachments.length > 0 ? (
                         <ChatAttachmentList
                           attachments={message.attachments}
@@ -749,7 +751,9 @@ export default function AssistantChatPanel() {
                       {message.content ? (
                         isStreaming ? (
                           <>
-                            <p className={styles.streamingText}>{message.content}</p>
+                            <div className={styles.streamingText}>
+                              <ChatMarkdown content={message.content} />
+                            </div>
                             <span className={styles.cursor} aria-hidden />
                           </>
                         ) : (

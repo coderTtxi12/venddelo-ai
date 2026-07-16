@@ -268,9 +268,50 @@
   font-size: 0.875rem;
   line-height: 1.55;
   color: inherit;
-  white-space: pre-wrap;
   word-break: break-word;
   text-align: left;
+}
+
+.userMarkdown {
+  color: inherit;
+}
+
+.userMarkdown p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.userMarkdown a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.userMarkdown a:hover {
+  opacity: 0.92;
+}
+
+.userMarkdown :global(.chatColorSwatch) {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.userMarkdown :global(.chatColorSwatchHex) {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.streamingText {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.streamingText p {
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 .messageBodyUserImage {
@@ -284,15 +325,6 @@
 .assistantText {
   width: 100%;
   min-width: 0;
-}
-
-.streamingText {
-  margin: 0;
-  font-size: 0.875rem;
-  line-height: 1.6;
-  color: var(--color-text);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .messageAvatar {
