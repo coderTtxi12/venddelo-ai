@@ -1,10 +1,18 @@
 import { memo, type ReactNode } from 'react';
 import { parseBlocks } from '@/components/assistant/chatMarkdownParser';
+import { enrichPlainText } from '@/components/assistant/chatPlainText';
+import { ChatMessageLink } from '@/components/assistant/chatMessageLink';
 import styles from './ChatMarkdown.module.css';
 
 type ChatMarkdownProps = {
   content: string;
+  className?: string;
 };
+
+function appendPlainText(nodes: ReactNode[], text: string, keyPrefix: string): void {
+  const enriched = enrichPlainText(text, keyPrefix, styles.colorSwatch);
+  nodes.push(...enriched);
+}
 
 function parseInline(text: string, keyPrefix: string): ReactNode[] {
   const pattern =
@@ -16,7 +24,8 @@ function parseInline(text: string, keyPrefix: string): ReactNode[] {
 
   while ((match = pattern.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index));
+      appendPlainText(nodes, text.slice(lastIndex, match.index), `${keyPrefix}-plain-${partIndex}`);
+      partIndex += 1;
     }
 
     const token = match[0];
@@ -36,9 +45,9 @@ function parseInline(text: string, keyPrefix: string): ReactNode[] {
       const linkMatch = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(token);
       if (linkMatch) {
         nodes.push(
-          <a key={key} href={linkMatch[2]} target="_blank" rel="noopener noreferrer">
+          <ChatMessageLink key={key} href={linkMatch[2]}>
             {linkMatch[1]}
-          </a>,
+          </ChatMessageLink>,
         );
       } else {
         nodes.push(token);
@@ -51,7 +60,7 @@ function parseInline(text: string, keyPrefix: string): ReactNode[] {
   }
 
   if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
+    appendPlainText(nodes, text.slice(lastIndex), `${keyPrefix}-plain-${partIndex}`);
   }
 
   return nodes.length > 0 ? nodes : [text];
@@ -133,11 +142,12 @@ function renderTable(headers: string[], rows: string[][], key: string): ReactNod
   );
 }
 
-function ChatMarkdown({ content }: ChatMarkdownProps) {
+function ChatMarkdown({ content, className }: ChatMarkdownProps) {
   const blocks = parseBlocks(content);
+  const rootClassName = className ? `${styles.markdown} ${className}` : styles.markdown;
 
   return (
-    <div className={styles.markdown}>
+    <div className={rootClassName}>
       {blocks.map((block, blockIndex) => {
         const key = `block-${blockIndex}`;
 

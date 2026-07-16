@@ -106,6 +106,35 @@
   color: var(--color-primary-hover);
 }
 
+.colorSwatch:global(.chatColorSwatch),
+.colorSwatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0.1rem;
+  padding: 0.1rem 0.35rem 0.1rem 0.2rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 92%, var(--color-surface));
+  vertical-align: middle;
+  line-height: 1.2;
+}
+
+.colorSwatch :global(.chatColorSwatchDot) {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+}
+
+.colorSwatch :global(.chatColorSwatchHex) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
 .markdown hr {
   margin: 0.75rem 0;
   border: none;
