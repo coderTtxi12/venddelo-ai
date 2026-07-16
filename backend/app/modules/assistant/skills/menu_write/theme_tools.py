@@ -32,6 +32,8 @@ def _theme_payload(theme: DigitalMenuThemeRecord) -> dict[str, Any]:
         "best_for": theme.best_for,
         "recommendation": theme.recommendation,
         "style_keywords": theme.style_keywords,
+        "colors": theme.colors,
+        "typography": theme.typography,
     }
 
 
@@ -252,5 +254,7 @@ def apply_menu_theme(
     return {
         "theme_id": normalized,
         "label": theme.label,
+        "colors": dict(theme.colors or {}),
+        "typography": dict(theme.typography or {}),
         "restaurant_id": str(updated.id),
     }
