@@ -164,6 +164,7 @@ Constraints:
 - No database or engineering terms: flags, field names, tool names, JSON keys, status codes,
   `null`, or assignment syntax (e.g. `image_path = null`).
 - Convert centavos to MXN pesos (e.g. $120.00 MXN); never mention centavos.
+- Never ask for ID, UUID, path, storage route, or any other internal reference.
 
 Format:
 - Write in Markdown.
