@@ -48,6 +48,7 @@ import {
   MIN_CHAT_PANEL_WIDTH,
 } from '@/lib/assistant/chatPanelWidth';
 import {
+  areAllMenuImportQuizQuestionsAnswered,
   composeMenuImportUserTurn,
   findPendingMenuImportQuiz,
   hasMenuImportQuizAnswers,
@@ -467,55 +468,73 @@ export default function AssistantChatPanel() {
     [accessToken, clearPendingAttachments, conversationId, pendingAttachments, pinToBottom, restaurantId],
   );
 
+  const submitComposer = useCallback(
+    (overrides?: {
+      quizMessageId?: string;
+      quizAnswers?: MenuImportQuizAnswers;
+      requireAllQuizAnswers?: boolean;
+    }) => {
+      if (isBusy || sendInFlightRef.current) return;
+
+      const pendingQuiz = findPendingMenuImportQuiz(messages);
+      const quizMessageId = overrides?.quizMessageId ?? pendingQuiz?.messageId;
+      const targetMessage = quizMessageId
+        ? messages.find((message) => message.id === quizMessageId)
+        : undefined;
+      if (targetMessage?.menuImportQuizSubmitted) {
+        return;
+      }
+
+      const quiz = targetMessage?.menuImportQuiz ?? pendingQuiz?.quiz;
+      const answers =
+        overrides?.quizAnswers ??
+        (quizMessageId ? quizAnswersByMessageId[quizMessageId] : undefined) ??
+        (pendingQuiz ? quizAnswersByMessageId[pendingQuiz.messageId] : undefined);
+
+      const includeQuiz = Boolean(
+        quiz?.questions.length &&
+          answers &&
+          hasMenuImportQuizAnswers(answers) &&
+          (!overrides?.requireAllQuizAnswers ||
+            areAllMenuImportQuizQuestionsAnswered(quiz, answers)),
+      );
+
+      const outgoingText = composeMenuImportUserTurn(
+        draft,
+        includeQuiz ? quiz : null,
+        includeQuiz ? answers : undefined,
+      );
+      if (!outgoingText.trim() && pendingAttachments.length === 0) return;
+
+      if (includeQuiz && quizMessageId && answers) {
+        setQuizAnswersByMessageId((current) => ({
+          ...current,
+          [quizMessageId]: answers,
+        }));
+      }
+
+      void sendMessage(
+        outgoingText,
+        pendingAttachments,
+        includeQuiz ? quizMessageId : undefined,
+      );
+    },
+    [draft, isBusy, messages, pendingAttachments, quizAnswersByMessageId, sendMessage],
+  );
+
   const submitMenuImportQuiz = useCallback(
     (messageId: string, answers: MenuImportQuizAnswers) => {
-      let submissionText = '';
-      setMessages((prev) => {
-        const target = prev.find((message) => message.id === messageId);
-        if (!target?.menuImportQuiz || target.menuImportQuizSubmitted) {
-          return prev;
-        }
-        submissionText = composeMenuImportUserTurn(draft, target.menuImportQuiz, answers);
-        return prev.map((message) =>
-          message.id === messageId
-            ? { ...message, menuImportQuizSubmitted: true }
-            : message,
-        );
+      submitComposer({
+        quizMessageId: messageId,
+        quizAnswers: answers,
+        requireAllQuizAnswers: true,
       });
-      if (submissionText) {
-        setDraft('');
-        setQuizAnswersByMessageId((current) => {
-          const next = { ...current };
-          delete next[messageId];
-          return next;
-        });
-        void sendMessage(submissionText);
-      }
     },
-    [draft, sendMessage],
+    [submitComposer],
   );
 
   const handleSubmit = () => {
-    if (isBusy || sendInFlightRef.current) return;
-    const pendingQuiz = findPendingMenuImportQuiz(messages);
-    const pendingAnswers = pendingQuiz
-      ? quizAnswersByMessageId[pendingQuiz.messageId]
-      : undefined;
-    const includeQuiz =
-      Boolean(pendingQuiz) &&
-      Boolean(pendingAnswers) &&
-      hasMenuImportQuizAnswers(pendingAnswers ?? {});
-    const outgoingText = composeMenuImportUserTurn(
-      draft,
-      includeQuiz ? pendingQuiz?.quiz : null,
-      pendingAnswers,
-    );
-    if (!outgoingText.trim() && pendingAttachments.length === 0) return;
-    void sendMessage(
-      outgoingText,
-      pendingAttachments,
-      includeQuiz ? pendingQuiz?.messageId : undefined,
-    );
+    submitComposer();
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
