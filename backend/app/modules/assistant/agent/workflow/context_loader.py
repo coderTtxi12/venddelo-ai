@@ -330,7 +330,7 @@ def menu_import_input(context: WorkflowContext, route: WorkflowRouteDecision) ->
         parts.append(f"## Import session\n\n{context.import_session_context}")
     if context.menu_source_attachment_count:
         parts.append(
-            "Registra en esta sesión **solo** los archivos `menu_source` listados en "
+            "Registra en esta sesión **solo** los archivos de menú (PDF/DOCX) listados en "
             "## User request de este turno."
         )
     return "\n\n".join(parts)
@@ -342,6 +342,7 @@ def menu_import_responder_input(
     execution: ExecutionRecord,
     *,
     pending_quiz: list[MenuImportQuizQuestion] | None = None,
+    public_menu_url: str | None = None,
 ) -> str:
     parts = [
         f"## Conversation history\n\n{context.menu_import_conversation_history}",
@@ -349,6 +350,12 @@ def menu_import_responder_input(
         f"## User goal\n\n{route.goal}",
         f"## Execution findings\n\n{_format_execution_findings(execution)}",
     ]
+    if public_menu_url:
+        from app.modules.assistant.skills.menu_import.public_menu_url import (
+            format_public_menu_link_block,
+        )
+
+        parts.append(format_public_menu_link_block(public_menu_url))
     if context.import_session_context:
         parts.append(f"## Import session\n\n{context.import_session_context}")
     if pending_quiz:

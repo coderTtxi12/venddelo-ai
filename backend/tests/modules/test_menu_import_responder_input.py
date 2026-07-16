@@ -40,3 +40,28 @@ def test_menu_import_responder_input_includes_pending_quiz_block():
     assert "## Pending clarification questions" in text
     assert '"id": "q_combo"' in text
     assert "copia **exactamente** este arreglo en el campo `questions`" in text.lower() or "Copia **exactamente**" in text
+
+
+def test_menu_import_responder_input_includes_public_menu_link():
+    context = WorkflowContext(
+        user_message="importa mi menú",
+        restaurant_id=uuid.uuid4(),
+        conversation_id=uuid.uuid4(),
+        effective_skill_ids=["menu_import"],
+        skill_catalog="",
+        system_prompt="",
+        conversation_history="",
+        assistant_display_name="Asistente",
+    )
+    route = WorkflowRouteDecision(route="menu_import", goal="Importar menú")
+    execution = ExecutionRecord(summary="Menú aplicado al live", status="success")
+
+    text = menu_import_responder_input(
+        context,
+        route,
+        execution,
+        public_menu_url="https://tacos.localhost:3000",
+    )
+
+    assert "## Public menu link" in text
+    assert "https://tacos.localhost:3000" in text

@@ -57,6 +57,10 @@ from app.modules.assistant.skills.menu_import.onboarding_agent import (
     build_menu_import_executor_agent,
     build_menu_import_responder_agent,
 )
+from app.modules.assistant.skills.menu_import.public_menu_url import (
+    build_public_menu_url,
+    should_inject_public_menu_url_for_responder,
+)
 from app.modules.assistant.skills.menu_import.quiz_bridge import (
     format_menu_import_assistant_turn_for_history,
     open_questions_to_quiz,
@@ -73,6 +77,7 @@ from app.modules.assistant.skills.menu_import.session_draft_store import (
     list_open_questions,
     unanswered_question_ids,
 )
+from app.modules.restaurants.service import RestaurantService
 from app.modules.assistant.skills.registry import SkillRegistry
 
 MAX_EXECUTOR_RETRIES = 2
@@ -535,6 +540,7 @@ class WorkflowOrchestrator:
 
         trace_ctx = _workflow_trace("menu_import_executor", settings=self._settings)
         execution = ExecutionRecord()
+        tools_used: list[str] = []
 
         with trace_ctx:
             async for event in executor_streamed.stream_events():
@@ -545,11 +551,15 @@ class WorkflowOrchestrator:
                     include_text_deltas=False,
                 )
                 if mapped is not None:
+                    if mapped.event == "tool.start" and isinstance(mapped.data.get("tool"), str):
+                        tools_used.append(mapped.data["tool"])
                     yield mapped
 
             execution = clear_execution_approval_gates(
                 executor_streamed.final_output_as(ExecutionRecord, raise_if_incorrect_type=True)
             )
+            if not execution.tools_used:
+                execution.tools_used = tools_used
 
         yield ChatStreamEvent(
             event="agent.phase",
@@ -563,6 +573,18 @@ class WorkflowOrchestrator:
             fresh=True,
         )
         quiz_questions = _pending_menu_import_quiz(active_import)
+        public_menu_url: str | None = None
+        if should_inject_public_menu_url_for_responder(
+            active_import,
+            pending_quiz=bool(quiz_questions),
+            execution_status=execution.status,
+            tools_used=execution.tools_used,
+        ):
+            restaurant = RestaurantService(uow.restaurants).get(restaurant_id)
+            url = build_public_menu_url(restaurant.subdomain, settings=self._settings)
+            if url:
+                public_menu_url = url
+
         responder_context = replace(
             workflow_context,
             import_session_context=build_full_import_session_context(
@@ -578,6 +600,7 @@ class WorkflowOrchestrator:
                 route,
                 execution,
                 pending_quiz=quiz_questions or None,
+                public_menu_url=public_menu_url,
             ),
             context=run_context,
             max_turns=1,
