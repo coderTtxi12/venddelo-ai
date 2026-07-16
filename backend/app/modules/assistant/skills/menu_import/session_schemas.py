@@ -27,6 +27,16 @@ TERMINAL_STATUSES: frozenset[MenuImportSessionStatus] = frozenset(
     }
 )
 
+# Post-apply phases: import is done from the router's perspective.
+IMPORT_ROUTER_IDLE_STATUSES: frozenset[str] = frozenset(
+    {
+        MenuImportSessionStatus.ENRICHING.value,
+        MenuImportSessionStatus.COLLECTING_IMAGES.value,
+        MenuImportSessionStatus.MATCHING_IMAGES.value,
+        MenuImportSessionStatus.ENHANCING.value,
+    }
+)
+
 
 def is_active_status(status: MenuImportSessionStatus | str) -> bool:
     value = status.value if isinstance(status, MenuImportSessionStatus) else status
