@@ -11,6 +11,7 @@ from app.core.logging import configure_logging
 from app.core.request_context import RequestIdMiddleware
 from app.infra.llm.factory import build_llm_provider
 from app.infra.llm.tracing import flush_langsmith_traces, log_tracing_status
+from app.infra.realtime.digital_menu_hub import get_digital_menu_realtime_hub
 from app.infra.realtime.order_hub import get_order_realtime_hub
 from app.middleware.rate_limit import RateLimitMiddleware
 
@@ -33,11 +34,13 @@ def create_app() -> FastAPI:
     async def lifespan(app: FastAPI):
         import asyncio
 
-        hub = get_order_realtime_hub()
-        hub.bind_loop(asyncio.get_running_loop())
+        loop = asyncio.get_running_loop()
+        get_order_realtime_hub().bind_loop(loop)
+        get_digital_menu_realtime_hub().bind_loop(loop)
         yield
         flush_langsmith_traces()
-        await hub.shutdown()
+        await get_order_realtime_hub().shutdown()
+        await get_digital_menu_realtime_hub().shutdown()
 
     app = FastAPI(title="Vendelo AI API", version=settings.app_version, lifespan=lifespan)
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
