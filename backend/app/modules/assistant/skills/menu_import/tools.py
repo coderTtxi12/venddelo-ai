@@ -8,7 +8,7 @@ from typing import Any
 from app.core.config import get_settings
 from app.core.exceptions import NotFoundError, ValidationError
 from app.db.models.menu_import_session import MenuImportSession
-from app.modules.assistant.skills.context import AgentContext
+from app.modules.assistant.skills.context import AgentContext, commit_agent_mutation
 from app.modules.assistant.import_asset_paths import validate_menu_import_source_path
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
 from app.modules.assistant.skills.menu_import.apply_batch import ApplyFullResult, apply_full_import
@@ -17,6 +17,7 @@ from app.modules.assistant.skills.menu_import.batching import (
     single_batch_from_draft,
 )
 from app.modules.assistant.skills.menu_import.draft_enrich import enrich_import_draft
+from app.modules.assistant.skills.menu_import.draft_refs import ensure_unique_import_refs
 from app.modules.assistant.skills.menu_import.draft_merge import merge_draft_batches
 from app.modules.assistant.skills.menu_import.draft_modeling import model_import_draft
 from app.modules.assistant.skills.menu_import.menu_reconcile import (
@@ -850,7 +851,7 @@ class MenuImportSkill:
                 session.discovery_answers = discovery
 
             modeled = model_import_draft(ocr_original, modeling_context)
-            modeled = enrich_import_draft(modeled)
+            modeled = ensure_unique_import_refs(enrich_import_draft(modeled))
             working = single_batch_from_draft(modeled)
             set_working_batch(session, working)
 
@@ -866,6 +867,11 @@ class MenuImportSkill:
                 post_modeling_extra["live_menu_captured"] = bool(live_draft)
 
                 if MENU_IMPORT_APPLY_AFTER_MODELING_ENABLED:
+                    # Persist modeled draft before live apply so apply failures cannot
+                    # discard transformation output (apply uses a nested savepoint).
+                    session.status = MenuImportSessionStatus.OPTIMIZING.value
+                    _repo(ctx).update(session)
+                    commit_agent_mutation(ctx)
                     try:
                         apply_result, _working_applied, reconciliation = _apply_draft_to_live_menu(
                             ctx, session
