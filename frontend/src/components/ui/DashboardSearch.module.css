@@ -1,0 +1,211 @@
+.root {
+  position: relative;
+  flex: 1;
+  max-width: 420px;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f1f5f9;
+  border-radius: var(--radius);
+  padding: 0.5rem 0.85rem;
+  border: 1px solid transparent;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.searchBoxOpen {
+  background: var(--color-surface);
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.searchIcon {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.searchInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  width: 100%;
+}
+
+.searchInput::placeholder {
+  color: #94a3b8;
+}
+
+.shortcutHint {
+  display: none;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.12rem 0.35rem;
+  background: var(--color-surface);
+}
+
+@media (min-width: 901px) {
+  .shortcutHint {
+    display: inline-flex;
+  }
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius) + 4px);
+  box-shadow: var(--shadow-md), 0 16px 40px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+}
+
+.dropdownInner {
+  max-height: min(420px, 60dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.statusRow,
+.emptyState {
+  padding: 0.85rem 1rem;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.emptyState strong {
+  display: block;
+  color: var(--color-text);
+  font-size: 0.88rem;
+  margin-bottom: 0.25rem;
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.65rem 1rem 0.85rem;
+}
+
+.suggestionChip {
+  border: 1px solid var(--color-border);
+  background: #f8fafc;
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.suggestionChip:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 6%, #f8fafc);
+}
+
+.group {
+  padding: 0.35rem 0;
+}
+
+.group + .group {
+  border-top: 1px solid var(--color-border);
+}
+
+.groupLabel {
+  padding: 0.45rem 1rem 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.resultList {
+  list-style: none;
+}
+
+.resultItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 1rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+
+.resultItem:hover,
+.resultItemActive {
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface));
+}
+
+.resultItem:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.resultIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #f1f5f9;
+  color: var(--color-text-secondary);
+}
+
+.resultBody {
+  min-width: 0;
+  flex: 1;
+}
+
+.resultTitle {
+  display: block;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resultSubtitle {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 900px) {
+  .root {
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .searchBox,
+  .resultItem,
+  .suggestionChip {
+    transition: none;
+  }
+}
