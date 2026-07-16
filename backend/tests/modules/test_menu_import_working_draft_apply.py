@@ -228,3 +228,135 @@ def test_model_working_draft_skips_apply_while_questions_remain():
     assert session.status == "clarifying"
     apply_mock.assert_not_called()
     repo_mock.return_value.update.assert_called_once()
+
+
+def _extracted_session_without_questions() -> MenuImportSession:
+    batch = ImportBatch(
+        batch_index=0,
+        categories=[
+            ImportCategory(
+                ref="cat_1",
+                name="Tacos",
+                products=[ImportProduct(ref="prod_1", name="Pastor", price_mxn=120)],
+            )
+        ],
+        promotions=[],
+        open_questions=[],
+    )
+    ocr = ImportDraft(
+        categories=batch.categories,
+        open_questions=[],
+    )
+    return MenuImportSession(
+        id=uuid.uuid4(),
+        status="optimizing",
+        ocr_original=ocr.model_dump(),
+        draft_batches=[batch.model_dump()],
+        open_questions=[],
+        clarification_answers={},
+        discovery_answers={},
+        source_files=[{"path": "menu.pdf", "mime_type": "application/pdf"}],
+        live_menu_snapshot=None,
+        reconciliation_snapshot=None,
+    )
+
+
+def test_start_menu_extraction_batch_applies_when_no_open_questions():
+    session = _extracted_session_without_questions()
+    apply_result = ApplyFullResult(
+        ok=True,
+        summary="Applied",
+        batches_applied=1,
+        categories=1,
+        products=1,
+    )
+    working = ImportBatch.model_validate(session.draft_batches[0])
+
+    def _fake_apply(_ctx, import_session):
+        import_session.status = "enriching"
+        return apply_result, working, None
+
+    ctx = AgentContext(
+        restaurant_id=uuid.uuid4(),
+        conversation_id=uuid.uuid4(),
+        uow=MagicMock(),
+        effective_skill_ids=["menu_import"],
+    )
+    skill = MenuImportSkill()
+
+    with (
+        patch(
+            "app.modules.assistant.skills.menu_import.tools._get_active_session",
+            return_value=session,
+        ),
+        patch(
+            "app.modules.assistant.skills.menu_import.tools._apply_draft_to_live_menu",
+            side_effect=_fake_apply,
+        ) as apply_mock,
+        patch(
+            "app.modules.assistant.skills.menu_import.tools._public_menu_url",
+            return_value="https://menu.example.com",
+        ),
+    ):
+        result = skill.execute("start_menu_extraction_batch", {}, ctx)
+
+    assert result.ok is True
+    assert "applied" in result.summary.lower()
+    assert result.data["products"] == 1
+    assert result.data["status"] == "enriching"
+    apply_mock.assert_called_once()
+
+
+def test_model_working_draft_applies_existing_draft_without_inputs_when_no_questions():
+    session = _extracted_session_without_questions()
+    working = ImportBatch.model_validate(session.draft_batches[0])
+    apply_result = ApplyFullResult(
+        ok=True,
+        summary="Applied",
+        batches_applied=1,
+        categories=1,
+        products=1,
+    )
+
+    def _fake_apply(_ctx, import_session):
+        import_session.status = "enriching"
+        return apply_result, working, None
+
+    ctx = AgentContext(
+        restaurant_id=uuid.uuid4(),
+        conversation_id=uuid.uuid4(),
+        uow=MagicMock(),
+        effective_skill_ids=["menu_import"],
+    )
+    skill = MenuImportSkill()
+
+    with (
+        patch(
+            "app.modules.assistant.skills.menu_import.tools._get_active_session",
+            return_value=session,
+        ),
+        patch(
+            "app.modules.assistant.skills.menu_import.tools.capture_live_menu_import_draft",
+            return_value={"captured_at": "now", "import_draft": {}},
+        ),
+        patch(
+            "app.modules.assistant.skills.menu_import.tools._apply_draft_to_live_menu",
+            side_effect=_fake_apply,
+        ) as apply_mock,
+        patch(
+            "app.modules.assistant.skills.menu_import.tools.model_import_draft",
+        ) as model_mock,
+        patch("app.modules.assistant.skills.menu_import.tools._repo") as repo_mock,
+        patch(
+            "app.modules.assistant.skills.menu_import.tools._public_menu_url",
+            return_value="https://menu.example.com",
+        ),
+    ):
+        result = skill.execute("model_working_draft", {}, ctx)
+
+    assert result.ok is True
+    assert result.data["applied_to_live"] is True
+    assert result.data["open_questions_remaining"] == 0
+    model_mock.assert_not_called()
+    apply_mock.assert_called_once()
+    repo_mock.return_value.update.assert_not_called()
