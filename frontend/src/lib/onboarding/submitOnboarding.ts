@@ -44,6 +44,7 @@ export async function submitOnboarding(
     owner_phone: buildOwnerPhoneE164(data),
     takeout_enabled: data.takeoutEnabled,
     delivery_enabled: data.deliveryEnabled,
+    branch_count: data.branchCount,
   });
 
   const restaurantId = restaurant.id;

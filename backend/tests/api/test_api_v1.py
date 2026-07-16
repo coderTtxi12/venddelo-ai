@@ -36,6 +36,33 @@ AUTH = {"Authorization": "Bearer valid-token"}
 
 
 @requires_db
+def test_create_restaurant_with_branch_count(client):
+    resp = client.post(
+        "/api/v1/restaurants",
+        json={"name": "Sucursales", "subdomain": "sucursales-api", "branch_count": 3},
+        headers=AUTH,
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["branch_count"] == 3
+
+    get_resp = client.get(f"/api/v1/restaurants/{body['id']}", headers=AUTH)
+    assert get_resp.status_code == 200
+    assert get_resp.json()["branch_count"] == 3
+
+
+@requires_db
+def test_create_restaurant_without_branch_count_is_null(client):
+    resp = client.post(
+        "/api/v1/restaurants",
+        json={"name": "Sin Sucursales", "subdomain": "sin-sucursales-api"},
+        headers=AUTH,
+    )
+    assert resp.status_code == 201
+    assert resp.json()["branch_count"] is None
+
+
+@requires_db
 def test_create_and_get_restaurant(client):
     resp = client.post(
         "/api/v1/restaurants",

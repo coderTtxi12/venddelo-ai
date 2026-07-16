@@ -46,6 +46,7 @@ export type Restaurant = {
   color_palette: string | null;
   takeout_enabled: boolean;
   delivery_enabled: boolean;
+  branch_count: number | null;
   owner_id: string | null;
   is_active: boolean;
   created_at: string;

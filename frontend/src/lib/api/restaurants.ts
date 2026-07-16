@@ -32,6 +32,7 @@ export function createRestaurant(
     owner_phone?: string | null;
     takeout_enabled?: boolean;
     delivery_enabled?: boolean;
+    branch_count?: number | null;
   },
 ) {
   return apiRequest<Restaurant>('/restaurants', {

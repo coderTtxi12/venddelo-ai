@@ -54,6 +54,7 @@ class RestaurantCreate(BaseModel):
     takeout_enabled: bool = True
     delivery_enabled: bool = True
     timezone: str = "America/Mexico_City"
+    branch_count: int | None = Field(default=None, ge=1, le=999)
 
 
 class RestaurantUpdate(BaseModel):
@@ -80,6 +81,7 @@ class RestaurantUpdate(BaseModel):
     takeout_enabled: bool | None = None
     delivery_enabled: bool | None = None
     timezone: str | None = None
+    branch_count: int | None = Field(default=None, ge=1, le=999)
 
 
 class SubdomainAvailabilityDTO(BaseModel):
@@ -117,6 +119,7 @@ class RestaurantDTO(BaseModel):
     takeout_enabled: bool = True
     delivery_enabled: bool = True
     timezone: str = "America/Mexico_City"
+    branch_count: int | None = None
     is_active: bool
     created_at: datetime
     updated_at: datetime

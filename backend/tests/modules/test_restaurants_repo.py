@@ -13,6 +13,22 @@ from tests.conftest import requires_db
 
 
 @requires_db
+def test_add_with_branch_count(session):
+    repo = SqlAlchemyRestaurantRepository(session)
+    dto = repo.add(
+        RestaurantCreate(name="R", subdomain="branch-count", branch_count=5),
+    )
+    assert repo.get(dto.id).branch_count == 5
+
+
+@requires_db
+def test_add_without_branch_count_is_null(session):
+    repo = SqlAlchemyRestaurantRepository(session)
+    dto = repo.add(RestaurantCreate(name="R", subdomain="no-branch-count"))
+    assert repo.get(dto.id).branch_count is None
+
+
+@requires_db
 def test_add_and_get(session):
     repo = SqlAlchemyRestaurantRepository(session)
     dto = repo.add(RestaurantCreate(name="R", subdomain="r1"))

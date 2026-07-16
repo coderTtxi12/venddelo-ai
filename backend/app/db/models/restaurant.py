@@ -58,6 +58,7 @@ class Restaurant(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     timezone: Mapped[str] = mapped_column(
         String(64), nullable=False, server_default="America/Mexico_City"
     )
+    branch_count: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     owner_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
