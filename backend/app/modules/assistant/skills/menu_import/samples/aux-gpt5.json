@@ -1,0 +1,822 @@
+{
+    "categories": [
+      {
+        "ref": "cat_1",
+        "name": "ALITAS",
+        "sort_order": 0,
+        "constraints_notes": "Todas las alitas incluyen guarnición de zanahoria o pepino y aderezo ranch.",
+        "products": [
+          {
+            "ref": "prod_1",
+            "name": "Alitas 8 piezas",
+            "description": "8 alitas. Incluye guarnición de zanahoria o pepino y aderezo ranch.",
+            "price_mxn": 125,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [
+              {
+                "ref": "og_1",
+                "title": "Sabor",
+                "selection": "single",
+                "required": true,
+                "min_selections": 1,
+                "max_selections": 1,
+                "items": [
+                  {
+                    "ref": "oi_1",
+                    "label": "Pica Gula",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_2",
+                    "label": "Chiltepin",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_3",
+                    "label": "Piña habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_4",
+                    "label": "Mango habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_5",
+                    "label": "Buffalo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_6",
+                    "label": "Tamarindo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_7",
+                    "label": "BBQ",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_8",
+                    "label": "Parmesano",
+                    "price_delta_mxn": 0
+                  }
+                ]
+              },
+              {
+                "ref": "og_2",
+                "title": "Extras",
+                "selection": "multi",
+                "required": false,
+                "min_selections": 0,
+                "max_selections": null,
+                "items": [
+                  {
+                    "ref": "oi_9",
+                    "label": "Sabor extra",
+                    "price_delta_mxn": 20
+                  },
+                  {
+                    "ref": "oi_10",
+                    "label": "Aderezo ranch extra",
+                    "price_delta_mxn": 20
+                  }
+                ]
+              }
+            ],
+            "constraints_notes": "1 solo sabor."
+          },
+          {
+            "ref": "prod_2",
+            "name": "Alitas 12 piezas",
+            "description": "12 alitas. Incluye guarnición de zanahoria o pepino y aderezo ranch.",
+            "price_mxn": 175,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [
+              {
+                "ref": "og_3",
+                "title": "Sabores",
+                "selection": "multi",
+                "required": true,
+                "min_selections": 1,
+                "max_selections": 2,
+                "items": [
+                  {
+                    "ref": "oi_11",
+                    "label": "Pica Gula",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_12",
+                    "label": "Chiltepin",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_13",
+                    "label": "Piña habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_14",
+                    "label": "Mango habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_15",
+                    "label": "Buffalo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_16",
+                    "label": "Tamarindo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_17",
+                    "label": "BBQ",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_18",
+                    "label": "Parmesano",
+                    "price_delta_mxn": 0
+                  }
+                ]
+              },
+              {
+                "ref": "og_4",
+                "title": "Extras",
+                "selection": "multi",
+                "required": false,
+                "min_selections": 0,
+                "max_selections": null,
+                "items": [
+                  {
+                    "ref": "oi_19",
+                    "label": "Sabor extra",
+                    "price_delta_mxn": 20
+                  },
+                  {
+                    "ref": "oi_20",
+                    "label": "Aderezo ranch extra",
+                    "price_delta_mxn": 20
+                  }
+                ]
+              }
+            ],
+            "constraints_notes": "Hasta 2 sabores."
+          },
+          {
+            "ref": "prod_3",
+            "name": "Alitas 16 piezas",
+            "description": "16 alitas. Incluye guarnición de zanahoria o pepino y aderezo ranch.",
+            "price_mxn": 215,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [
+              {
+                "ref": "og_5",
+                "title": "Sabores",
+                "selection": "multi",
+                "required": true,
+                "min_selections": 1,
+                "max_selections": 2,
+                "items": [
+                  {
+                    "ref": "oi_21",
+                    "label": "Pica Gula",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_22",
+                    "label": "Chiltepin",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_23",
+                    "label": "Piña habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_24",
+                    "label": "Mango habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_25",
+                    "label": "Buffalo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_26",
+                    "label": "Tamarindo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_27",
+                    "label": "BBQ",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_28",
+                    "label": "Parmesano",
+                    "price_delta_mxn": 0
+                  }
+                ]
+              },
+              {
+                "ref": "og_6",
+                "title": "Extras",
+                "selection": "multi",
+                "required": false,
+                "min_selections": 0,
+                "max_selections": null,
+                "items": [
+                  {
+                    "ref": "oi_29",
+                    "label": "Sabor extra",
+                    "price_delta_mxn": 20
+                  },
+                  {
+                    "ref": "oi_30",
+                    "label": "Aderezo ranch extra",
+                    "price_delta_mxn": 20
+                  }
+                ]
+              }
+            ],
+            "constraints_notes": "Hasta 2 sabores."
+          },
+          {
+            "ref": "prod_4",
+            "name": "Alitas 24 piezas",
+            "description": "24 alitas. Incluye guarnición de zanahoria o pepino y aderezo ranch.",
+            "price_mxn": 285,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [
+              {
+                "ref": "og_7",
+                "title": "Sabores",
+                "selection": "multi",
+                "required": true,
+                "min_selections": 1,
+                "max_selections": 3,
+                "items": [
+                  {
+                    "ref": "oi_31",
+                    "label": "Pica Gula",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_32",
+                    "label": "Chiltepin",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_33",
+                    "label": "Piña habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_34",
+                    "label": "Mango habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_35",
+                    "label": "Buffalo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_36",
+                    "label": "Tamarindo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_37",
+                    "label": "BBQ",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_38",
+                    "label": "Parmesano",
+                    "price_delta_mxn": 0
+                  }
+                ]
+              },
+              {
+                "ref": "og_8",
+                "title": "Extras",
+                "selection": "multi",
+                "required": false,
+                "min_selections": 0,
+                "max_selections": null,
+                "items": [
+                  {
+                    "ref": "oi_39",
+                    "label": "Sabor extra",
+                    "price_delta_mxn": 20
+                  },
+                  {
+                    "ref": "oi_40",
+                    "label": "Aderezo ranch extra",
+                    "price_delta_mxn": 20
+                  }
+                ]
+              }
+            ],
+            "constraints_notes": "Hasta 3 sabores."
+          },
+          {
+            "ref": "prod_5",
+            "name": "Alitas 1 kg",
+            "description": "Alitas por kilogramo. Incluye guarnición de zanahoria o pepino y aderezo ranch.",
+            "price_mxn": 245,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [
+              {
+                "ref": "og_9",
+                "title": "Sabores",
+                "selection": "multi",
+                "required": true,
+                "min_selections": 1,
+                "max_selections": 2,
+                "items": [
+                  {
+                    "ref": "oi_41",
+                    "label": "Pica Gula",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_42",
+                    "label": "Chiltepin",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_43",
+                    "label": "Piña habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_44",
+                    "label": "Mango habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_45",
+                    "label": "Buffalo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_46",
+                    "label": "Tamarindo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_47",
+                    "label": "BBQ",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_48",
+                    "label": "Parmesano",
+                    "price_delta_mxn": 0
+                  }
+                ]
+              },
+              {
+                "ref": "og_10",
+                "title": "Extras",
+                "selection": "multi",
+                "required": false,
+                "min_selections": 0,
+                "max_selections": null,
+                "items": [
+                  {
+                    "ref": "oi_49",
+                    "label": "Sabor extra",
+                    "price_delta_mxn": 20
+                  },
+                  {
+                    "ref": "oi_50",
+                    "label": "Aderezo ranch extra",
+                    "price_delta_mxn": 20
+                  }
+                ]
+              }
+            ],
+            "constraints_notes": "Hasta 2 sabores."
+          }
+        ]
+      },
+      {
+        "ref": "cat_2",
+        "name": "BONELESS",
+        "sort_order": 1,
+        "constraints_notes": "Todos los boneless incluyen guarnición de zanahoria o pepino y aderezo ranch.",
+        "products": [
+          {
+            "ref": "prod_6",
+            "name": "Boneless 300 gr",
+            "description": "Boneless de pollo. Incluye guarnición de zanahoria o pepino y aderezo ranch.",
+            "price_mxn": 179,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [
+              {
+                "ref": "og_11",
+                "title": "Sabor",
+                "selection": "single",
+                "required": true,
+                "min_selections": 1,
+                "max_selections": 1,
+                "items": [
+                  {
+                    "ref": "oi_51",
+                    "label": "Pica Gula",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_52",
+                    "label": "Chiltepin",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_53",
+                    "label": "Piña habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_54",
+                    "label": "Mango habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_55",
+                    "label": "Buffalo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_56",
+                    "label": "Tamarindo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_57",
+                    "label": "BBQ",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_58",
+                    "label": "Parmesano",
+                    "price_delta_mxn": 0
+                  }
+                ]
+              }
+            ],
+            "constraints_notes": "1 solo sabor."
+          },
+          {
+            "ref": "prod_7",
+            "name": "Boneless 500 gr",
+            "description": "Boneless de pollo. Incluye guarnición de zanahoria o pepino y aderezo ranch.",
+            "price_mxn": 249,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [
+              {
+                "ref": "og_12",
+                "title": "Sabor",
+                "selection": "single",
+                "required": true,
+                "min_selections": 1,
+                "max_selections": 1,
+                "items": [
+                  {
+                    "ref": "oi_59",
+                    "label": "Pica Gula",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_60",
+                    "label": "Chiltepin",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_61",
+                    "label": "Piña habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_62",
+                    "label": "Mango habanero",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_63",
+                    "label": "Buffalo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_64",
+                    "label": "Tamarindo",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_65",
+                    "label": "BBQ",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_66",
+                    "label": "Parmesano",
+                    "price_delta_mxn": 0
+                  }
+                ]
+              }
+            ],
+            "constraints_notes": "1 solo sabor."
+          }
+        ]
+      },
+      {
+        "ref": "cat_3",
+        "name": "A LA PLANCHA",
+        "sort_order": 2,
+        "constraints_notes": null,
+        "products": [
+          {
+            "ref": "prod_8",
+            "name": "Gula tacos",
+            "description": "Roast beef, arrachera, chorizo argentino, chorizo campestre, chistorra. Guarnición: guacamole, cebolla cambray y chile toreado.",
+            "price_mxn": 50,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [],
+            "constraints_notes": "Precio por pieza."
+          },
+          {
+            "ref": "prod_9",
+            "name": "Gula taco combinado",
+            "description": "Taco combinado con 2 carnes a elegir.",
+            "price_mxn": 60,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [
+              {
+                "ref": "og_13",
+                "title": "Carnes",
+                "selection": "multi",
+                "required": true,
+                "min_selections": 2,
+                "max_selections": 2,
+                "items": [
+                  {
+                    "ref": "oi_67",
+                    "label": "Roast beef",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_68",
+                    "label": "Arrachera",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_69",
+                    "label": "Chorizo argentino",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_70",
+                    "label": "Chorizo campestre",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_71",
+                    "label": "Chistorra",
+                    "price_delta_mxn": 0
+                  }
+                ]
+              }
+            ],
+            "constraints_notes": "Precio por pieza."
+          },
+          {
+            "ref": "prod_10",
+            "name": "Burrito pechugón",
+            "description": "Pechuga de pollo con sazón de la casa, pimiento morrón, guacamole, frijoles, arroz y mix de quesos.",
+            "price_mxn": 129,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [],
+            "constraints_notes": null
+          },
+          {
+            "ref": "prod_11",
+            "name": "Burrito de arrachera",
+            "description": "Arrachera, cebollitas con sazón de la casa, guacamole, frijoles, arroz y mix de quesos.",
+            "price_mxn": 149,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [],
+            "constraints_notes": null
+          },
+          {
+            "ref": "prod_12",
+            "name": "Papa Ranch",
+            "description": "Papa al horno sazonada con especias de la casa, gravy, tocino crispy, mix de quesos y carne a elegir.",
+            "price_mxn": 149,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [
+              {
+                "ref": "og_14",
+                "title": "Carne",
+                "selection": "single",
+                "required": true,
+                "min_selections": 1,
+                "max_selections": 1,
+                "items": [
+                  {
+                    "ref": "oi_72",
+                    "label": "Roast beef",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_73",
+                    "label": "Arrachera",
+                    "price_delta_mxn": 0
+                  }
+                ]
+              }
+            ],
+            "constraints_notes": null
+          },
+          {
+            "ref": "prod_13",
+            "name": "Burrada",
+            "description": "Chuleta ahumada, salchicha ahumada, tocino ahumado, guacamole, frijoles, arroz, mix de quesos y una carne a elegir.",
+            "price_mxn": 165,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [
+              {
+                "ref": "og_15",
+                "title": "Carne",
+                "selection": "single",
+                "required": true,
+                "min_selections": 1,
+                "max_selections": 1,
+                "items": [
+                  {
+                    "ref": "oi_74",
+                    "label": "Arrachera",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_75",
+                    "label": "Roast beef",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_76",
+                    "label": "Chistorra",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_77",
+                    "label": "Chorizo argentino",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_78",
+                    "label": "Chorizo campestre",
+                    "price_delta_mxn": 0
+                  }
+                ]
+              }
+            ],
+            "constraints_notes": null
+          }
+        ]
+      },
+      {
+        "ref": "cat_4",
+        "name": "POSTRES",
+        "sort_order": 3,
+        "constraints_notes": null,
+        "products": [
+          {
+            "ref": "prod_14",
+            "name": "Bolas de helado",
+            "description": null,
+            "price_mxn": 50,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [],
+            "constraints_notes": null
+          },
+          {
+            "ref": "prod_15",
+            "name": "Pan de elote",
+            "description": null,
+            "price_mxn": 65,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [],
+            "constraints_notes": null
+          },
+          {
+            "ref": "prod_16",
+            "name": "Churros",
+            "description": null,
+            "price_mxn": 70,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [
+              {
+                "ref": "og_16",
+                "title": "Sabor",
+                "selection": "single",
+                "required": true,
+                "min_selections": 1,
+                "max_selections": 1,
+                "items": [
+                  {
+                    "ref": "oi_79",
+                    "label": "Lechera",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_80",
+                    "label": "Cajeta",
+                    "price_delta_mxn": 0
+                  },
+                  {
+                    "ref": "oi_81",
+                    "label": "Chocolate",
+                    "price_delta_mxn": 0
+                  }
+                ]
+              }
+            ],
+            "constraints_notes": null
+          },
+          {
+            "ref": "prod_17",
+            "name": "Gula cookies",
+            "description": null,
+            "price_mxn": 70,
+            "currency": "MXN",
+            "is_available": true,
+            "catalog_discount": null,
+            "option_groups": [],
+            "constraints_notes": null
+          }
+        ]
+      }
+    ],
+    "promotions": [],
+    "global_rules": [
+      "Todas las alitas y boneless incluyen guarnición de zanahoria o pepino y aderezo ranch.",
+      "Sabor extra: $20.",
+      "Aderezo ranch extra: $20."
+    ],
+    "unmapped_text": [
+      "Indicadores de nivel de picante mostrados mediante íconos de fuego para los sabores."
+    ],
+    "open_questions": [
+      {
+        "id": "q1",
+        "question_es": "¿Los tacos Gula permiten elegir una sola carne o incluyen todas las carnes listadas en la descripción?",
+        "context": "La descripción enumera varias carnes, pero no especifica si son opciones o ingredientes incluidos.",
+        "related_refs": [
+          "prod_8"
+        ],
+        "suggested_answers": [
+          "Se elige una carne",
+          "Incluye todas las carnes"
+        ]
+      }
+    ]
+  }
