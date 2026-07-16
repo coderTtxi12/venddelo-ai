@@ -1,0 +1,26 @@
+.wrap {
+  width: 100%;
+}
+
+.tooltip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.tooltip strong {
+  color: var(--color-text);
+}
+
+.empty {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}

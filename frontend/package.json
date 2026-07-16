@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "export:digital-menu-themes": "tsx scripts/export-digital-menu-themes.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -15,11 +16,12 @@
     "@mui/material": "^9.1.1",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
-    "next": "16.2.9",
     "jspdf": "^3.0.1",
+    "next": "16.2.9",
     "qr-code-styling": "^1.9.2",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "recharts": "^3.9.2"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -27,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "tsx": "^4.20.3",
     "typescript": "^5"
   }
 }
