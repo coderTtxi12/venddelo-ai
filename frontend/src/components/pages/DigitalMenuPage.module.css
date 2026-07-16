@@ -1099,6 +1099,7 @@
 
 /* Marker: applied only in tablet band (768–1023px) via JS */
 .publicTablet {
+  --dm-tablet-hero-height: clamp(188px, 24vw, 208px);
   /* styles scoped in sibling modules via .publicTablet descendant selectors */
 }
 
@@ -1112,26 +1113,49 @@
 
 .phone.publicRoot.publicTablet .menuHero {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  min-height: 220px;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  height: var(--dm-tablet-hero-height);
+  min-height: 0;
+  overflow: hidden;
   border-bottom: 1px solid var(--dm-border, #eef2f7);
 }
 
 .phone.publicRoot.publicTablet .coverWrap {
   height: 100%;
-  min-height: 220px;
+  min-height: 0;
+  align-self: stretch;
+}
+
+.phone.publicRoot.publicTablet .coverImage,
+.phone.publicRoot.publicTablet .coverPlaceholder {
+  min-height: 100%;
+  object-position: center center;
 }
 
 .phone.publicRoot.publicTablet .restaurantHeader {
   margin-top: 0;
-  padding: 20px 24px 16px;
+  padding: 14px 20px 12px;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  gap: 6px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .phone.publicRoot.publicTablet .logoRow {
   align-items: center;
+}
+
+.phone.publicRoot.publicTablet .logoWrap {
+  width: 56px;
+  height: 56px;
+}
+
+.phone.publicRoot.publicTablet .restaurantDescriptionStatic {
+  margin-top: 0;
+  -webkit-line-clamp: 2;
 }
 
 .phone.publicRoot.publicTablet .categoryBar {
