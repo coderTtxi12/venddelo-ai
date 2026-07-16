@@ -8,6 +8,7 @@ import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
+import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
 import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
@@ -30,6 +31,7 @@ const navItems: NavItem[] = [
   { label: 'Productos', path: '/products', icon: <Inventory2OutlinedIcon fontSize="small" /> },
   { label: 'Menú Digital', path: '/digital-menu', icon: <QrCode2OutlinedIcon fontSize="small" /> },
   { label: 'Horario', path: '/hours', icon: <AccessTimeOutlinedIcon fontSize="small" /> },
+  { label: 'Analíticas', path: '/analytics', icon: <BarChartOutlinedIcon fontSize="small" /> },
   { label: 'Marketing', path: '/marketing', icon: <CampaignOutlinedIcon fontSize="small" /> },
   { label: 'Configuración', path: '/settings', icon: <SettingsOutlinedIcon fontSize="small" /> },
 ];
