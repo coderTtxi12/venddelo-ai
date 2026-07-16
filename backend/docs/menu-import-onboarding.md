@@ -14,7 +14,7 @@ Guía para dueños de restaurante y desarrolladores.
 | 2 | Extracción + discovery | Responde dudas si hay `open_questions` | `start_menu_extraction_batch`, `save_clarification_answers` |
 | 3 | Optimización + preview | Lee propuesta única (incluye complementos obligatorio/opcional) | `optimize_import_draft`, `preview_full_import` |
 | 4 | Publicar | Confirma una vez | `apply_full_import`, `apply_menu_theme`, `generate_promotion_banner` (NxM) |
-| 5 | Fotos | Sube fotos de platillos | `match_product_photos`, `bulk_assign_product_images` |
+| 5 | Fotos | Sube fotos de platillos | `bulk_assign_product_images` |
 | 6 | Cierre | — | `update_menu_knowledge` |
 
 **Skills al inicio:** `menu_write` + `menu_best_practices` + `menu_import`.

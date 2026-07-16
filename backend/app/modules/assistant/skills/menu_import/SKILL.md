@@ -95,6 +95,6 @@ After import succeeds:
 
 ## Integrations
 
-- **Upload API:** `POST .../assistant/import/assets?kind=menu_source`
+- **Upload API:** `POST .../assistant/import/assets` (no `kind`; PDF/DOCX → inbox as-is; images → WebP in inbox)
 - **menu_write:** post-import edits
 - **promotions:** NxM banner generation after apply

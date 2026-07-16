@@ -9,7 +9,7 @@ from app.core.config import get_settings
 from app.core.exceptions import NotFoundError, ValidationError
 from app.db.models.menu_import_session import MenuImportSession
 from app.modules.assistant.skills.context import AgentContext
-from app.modules.assistant.import_assets import validate_import_asset_path
+from app.modules.assistant.import_asset_paths import validate_menu_import_source_path
 from app.modules.assistant.skills.base import ToolDefinition, ToolResult
 from app.modules.assistant.skills.menu_import.apply_batch import ApplyFullResult, apply_full_import
 from app.modules.assistant.skills.menu_import.batching import (
@@ -557,7 +557,7 @@ class MenuImportSkill:
             original_name = str(args.get("original_name") or "").strip() or storage_path.rsplit("/", 1)[-1]
             if not storage_path or not mime_type:
                 return ToolResult(ok=False, summary="storage_path and mime_type are required")
-            validate_import_asset_path(ctx.restaurant_id, storage_path, kind="menu_source")
+            validate_menu_import_source_path(ctx.restaurant_id, storage_path, mime_type)
             source_files = list(session.source_files or [])
             source_files.append(
                 {
@@ -645,7 +645,7 @@ class MenuImportSkill:
                 mime = str(entry.get("mime_type") or "").strip()
                 if not path or not mime:
                     continue
-                validate_import_asset_path(ctx.restaurant_id, path, kind="menu_source")
+                validate_menu_import_source_path(ctx.restaurant_id, path, mime)
                 payload = load_menu_source_from_storage(path, mime)
                 if payload.pages:
                     ocr, run_metadata = extract_from_pages(payload.pages, context)

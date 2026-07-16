@@ -6,12 +6,22 @@ import uuid
 from typing import Any
 
 from app.db.uow import SqlAlchemyUnitOfWork
+from app.modules.assistant.import_assets import MENU_DOCUMENT_MIMES
 from app.modules.assistant.schemas import ChatAttachmentRef
 from app.modules.assistant.skills.menu_import.session_repository import MenuImportSessionRepository
 
 
+def _is_menu_import_document(attachment: ChatAttachmentRef) -> bool:
+    if attachment.kind == "document":
+        return True
+    if attachment.kind == "menu_source" and attachment.mime_type in MENU_DOCUMENT_MIMES:
+        return True
+    return attachment.mime_type in MENU_DOCUMENT_MIMES
+
+
 def menu_source_attachments(attachments: list[ChatAttachmentRef]) -> list[ChatAttachmentRef]:
-    return [attachment for attachment in attachments if attachment.kind == "menu_source"]
+    """Menu PDF/DOCX uploads that should register as import sources."""
+    return [attachment for attachment in attachments if _is_menu_import_document(attachment)]
 
 
 def registered_source_paths(session: Any | None) -> set[str]:

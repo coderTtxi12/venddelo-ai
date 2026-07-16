@@ -14,7 +14,7 @@ def _attachment(path: str) -> ChatAttachmentRef:
         storage_path=path,
         original_name=path.rsplit("/", 1)[-1],
         mime_type="application/pdf",
-        kind="menu_source",
+        kind="document",
         size_bytes=1024,
     )
 
@@ -25,14 +25,14 @@ class _FakeSession:
         self.draft_batches = draft_batches or []
 
 
-def test_menu_source_attachments_filters_kind():
+def test_menu_source_attachments_filters_documents_only():
     attachments = [
         _attachment("restaurants/x/menu/a.pdf"),
         ChatAttachmentRef(
-            storage_path="restaurants/x/photos/p.jpg",
-            original_name="p.jpg",
-            mime_type="image/jpeg",
-            kind="product_photo",
+            storage_path="restaurants/x/import/inbox/p.webp",
+            original_name="p.webp",
+            mime_type="image/webp",
+            kind="image",
             size_bytes=512,
         ),
     ]
@@ -94,7 +94,7 @@ def test_replace_import_session_if_needed_uses_committed_cancel(monkeypatch):
             storage_path="restaurants/x/menu/new.png",
             original_name="new.png",
             mime_type="image/png",
-            kind="menu_source",
+            kind="document",
             size_bytes=100,
         )
     ]
