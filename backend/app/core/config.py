@@ -52,10 +52,6 @@ class Settings(BaseSettings):
     assistant_max_tool_iterations: int = 32
     menu_import_batch_max_products: int = 15
     menu_import_full_max_products: int = 200
-    menu_import_photo_match_confidence_threshold: float = Field(
-        default=0.72,
-        validation_alias="MENU_IMPORT_PHOTO_MATCH_THRESHOLD",
-    )
     menu_import_max_source_bytes: int = 15 * 1024 * 1024
     menu_import_max_photo_bytes: int = 5 * 1024 * 1024
     rate_limit_requests: int = 60
