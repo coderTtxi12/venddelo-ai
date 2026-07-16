@@ -1,6 +1,8 @@
 import uuid
-from unittest.mock import MagicMock
+from contextlib import contextmanager
+from unittest.mock import MagicMock, patch
 
+from app.core.exceptions import ValidationError
 from app.core.pagination import PaginationParams
 from app.db.models.assistant import AssistantConversation
 from app.db.models.restaurant import Restaurant
@@ -39,6 +41,60 @@ def test_apply_import_batch_rejects_unconfirmed_without_db():
     result = apply_import_batch(ctx, session, 0, confirmed=False)
     assert isinstance(result, ApplyBatchResult)
     assert result.ok is False
+
+
+def test_apply_import_batch_validation_error_preserves_modeled_draft():
+    """Apply failures must not wipe modeled draft_batches / clarification_answers."""
+    modeled_batch = {
+        "batch_index": 0,
+        "categories": [
+            {
+                "ref": "cat_1",
+                "name": "Tacos",
+                "products": [
+                    {"ref": "prod_1", "name": "Pastor Modelado", "price_mxn": 125}
+                ],
+            }
+        ],
+        "promotions": [],
+        "open_questions": [],
+    }
+    session = MagicMock()
+    session.draft_batches = [modeled_batch]
+    session.clarification_answers = {"q_1": "Sí"}
+
+    uow = MagicMock()
+    nested_entered = {"count": 0}
+
+    @contextmanager
+    def _begin_nested():
+        nested_entered["count"] += 1
+        yield
+
+    uow.session.begin_nested.side_effect = _begin_nested
+    ctx = AgentContext(
+        restaurant_id=uuid.uuid4(),
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_import"],
+    )
+
+    with patch(
+        "app.modules.assistant.skills.menu_import.apply_batch._apply_categories",
+        side_effect=ValidationError(
+            "product_ids contains products not linked to category"
+        ),
+    ):
+        result = apply_import_batch(ctx, session, 0, confirmed=True)
+
+    assert result.ok is False
+    assert "product_ids contains products not linked to category" in result.summary
+    assert nested_entered["count"] == 1
+    uow.rollback.assert_not_called()
+    assert session.draft_batches[0]["categories"][0]["products"][0]["name"] == (
+        "Pastor Modelado"
+    )
+    assert session.clarification_answers == {"q_1": "Sí"}
 
 
 def _create_restaurant_and_conversation(session) -> tuple[uuid.UUID, uuid.UUID]:
