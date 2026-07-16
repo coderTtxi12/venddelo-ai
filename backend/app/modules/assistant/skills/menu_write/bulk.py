@@ -25,6 +25,7 @@ class BulkRowResult:
     label: str | None = None
     error: str | None = None
     changed_fields: list[str] | None = None
+    image_path: str | None = None
 
 
 def _coerce_items_array(raw: Any) -> list[dict[str, Any]] | None:
