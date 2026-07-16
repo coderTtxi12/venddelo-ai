@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveMyRestaurantAccess } from '@/lib/api/restaurants';
+import { markOpenAssistantAfterOnboarding } from '@/lib/onboarding/storage';
 import styles from './onboarding.module.css';
 
 export default function OnboardingPage() {
@@ -29,7 +30,8 @@ export default function OnboardingPage() {
     <OnboardingWizard
       userId={user.uid}
       onComplete={() => {
-        router.replace('/orders');
+        markOpenAssistantAfterOnboarding();
+        router.replace('/digital-menu');
         router.refresh();
       }}
     />

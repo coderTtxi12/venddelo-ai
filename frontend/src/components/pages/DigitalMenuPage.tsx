@@ -43,6 +43,7 @@ import { restaurantPublicMenuUrl } from '@/lib/restaurantSubdomain';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
 import { useAuth } from '@/hooks/useAuth';
+import { useOpenAssistantAfterOnboarding } from '@/hooks/useOpenAssistantAfterOnboarding';
 import { useDigitalMenuPreviewSocket } from '@/lib/digital-menu/useDigitalMenuPreviewSocket';
 import { resolveSupplierIdByEmail } from '@/services/db';
 import { legacyDb as db } from '@/services/legacyDb';
@@ -56,6 +57,7 @@ function pickRandomLayout(): CategoryDisplayLayout {
 
 export default function DigitalMenuPage() {
   const { firebaseUser, accessToken, loading: authLoading } = useAuth();
+  useOpenAssistantAfterOnboarding();
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

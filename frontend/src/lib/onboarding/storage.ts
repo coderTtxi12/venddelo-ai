@@ -2,6 +2,7 @@ import { createDefaultOnboardingData } from './defaults';
 import type { OnboardingData, OnboardingProgress, OnboardingStepId, PersistedOnboardingState } from './types';
 
 const STORAGE_PREFIX = 'venddelo:onboarding:';
+const POST_ONBOARDING_CHAT_KEY = 'venddelo:open-assistant-after-onboarding';
 
 function storageKey(userId: string): string {
   return `${STORAGE_PREFIX}${userId}`;
@@ -53,6 +54,19 @@ export function saveOnboardingState(
 export function clearOnboardingState(userId: string): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(storageKey(userId));
+}
+
+/** One-shot flag: open assistant chat after landing on /digital-menu post-onboarding. */
+export function markOpenAssistantAfterOnboarding(): void {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem(POST_ONBOARDING_CHAT_KEY, '1');
+}
+
+export function consumeOpenAssistantAfterOnboarding(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (sessionStorage.getItem(POST_ONBOARDING_CHAT_KEY) !== '1') return false;
+  sessionStorage.removeItem(POST_ONBOARDING_CHAT_KEY);
+  return true;
 }
 
 export const ONBOARDING_STEP_ORDER: OnboardingStepId[] = [
