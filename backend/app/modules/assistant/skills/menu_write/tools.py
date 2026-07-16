@@ -43,7 +43,18 @@ from app.modules.assistant.skills.menu_write.category_bulk import (
 from app.modules.assistant.skills.menu_write.product_photos import (
     assign_product_image,
     bulk_assign_product_images,
-    match_product_photos,
+    bulk_remove_product_images,
+    remove_product_image,
+)
+from app.modules.assistant.skills.menu_write.restaurant_settings_tools import (
+    assign_restaurant_cover,
+    assign_restaurant_logo,
+    get_restaurant_name,
+    get_restaurant_public_menu_url,
+    get_restaurant_schedules,
+    remove_restaurant_cover,
+    remove_restaurant_logo,
+    set_restaurant_schedules,
 )
 from app.modules.assistant.skills.menu_write.theme_tools import (
     apply_menu_theme,
@@ -1144,8 +1155,7 @@ class MenuWriteSkill:
                 name="bulk_assign_product_images",
                 description=(
                     "Assign MANY uploaded product photos in one call. Each row needs storage_path "
-                    "(or image_path) plus product_id or product name. Up to 50 per call. "
-                    "Use after match_product_photos when the owner confirms mappings."
+                    "(or image_path) plus product_id or product name. Up to 50 per call."
                 ),
                 effect="mutate",
                 input_schema={
@@ -1171,37 +1181,161 @@ class MenuWriteSkill:
                 },
             ),
             ToolDefinition(
-                name="match_product_photos",
+                name="remove_product_image",
                 description=(
-                    "Match MANY uploaded product photos to live menu products using vision AI. "
-                    "Returns matched, uncertain, and unmatched groups with product_id suggestions. "
-                    "Does not mutate — follow with bulk_assign_product_images after owner confirms."
+                    "Remove the photo from ONE product (clears image_path in DB; does not delete "
+                    "storage files). Identify product by product_id or name. Requires owner "
+                    "confirmation."
                 ),
-                effect="read",
+                effect="mutate",
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "image_paths": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
-                        "storage_paths": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Alias for image_paths.",
-                        },
-                        "original_names": {
-                            "type": "object",
-                            "description": "Optional map of storage_path → original filename.",
-                        },
+                        "product_id": {"type": "string"},
+                        "name": {"type": "string"},
+                        "product_name": {"type": "string"},
                     },
                     "required": [],
                 },
             ),
             ToolDefinition(
+                name="bulk_remove_product_images",
+                description=(
+                    "Remove photos from MANY products in one call (clears image_path only). "
+                    "Each row needs product_id or name. Up to 50 per call."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "product_id": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "product_name": {"type": "string"},
+                                },
+                            },
+                        },
+                    },
+                    "required": ["items"],
+                },
+            ),
+            ToolDefinition(
+                name="get_restaurant_name",
+                description="Read the restaurant display name.",
+                effect="read",
+                input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
+                name="get_restaurant_public_menu_url",
+                description=(
+                    "Read the public digital menu URL for this restaurant (share link for customers)."
+                ),
+                effect="read",
+                input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
+                name="get_restaurant_schedules",
+                description=(
+                    "Read opening hours. Returns schedule rows with service_type (takeout|delivery), "
+                    "day_of_week (0=Mon..6=Sun), opens_at, closes_at."
+                ),
+                effect="read",
+                input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
+                name="set_restaurant_schedules",
+                description=(
+                    "Replace ALL restaurant schedule rows. Pass schedules[] with service_type, "
+                    "day_of_week (0=Mon..6=Sun), opens_at and closes_at (HH:MM). Confirm with owner."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "schedules": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "service_type": {
+                                        "type": "string",
+                                        "enum": ["takeout", "delivery"],
+                                    },
+                                    "day_of_week": {"type": "integer", "minimum": 0, "maximum": 6},
+                                    "opens_at": {"type": "string"},
+                                    "closes_at": {"type": "string"},
+                                },
+                                "required": [
+                                    "service_type",
+                                    "day_of_week",
+                                    "opens_at",
+                                    "closes_at",
+                                ],
+                            },
+                        },
+                    },
+                    "required": ["schedules"],
+                },
+            ),
+            ToolDefinition(
+                name="assign_restaurant_logo",
+                description=(
+                    "Set the restaurant logo from an uploaded image (storage_path from chat inbox). "
+                    "Copies into restaurants/{id}/logo/ when needed. Requires owner confirmation."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "storage_path": {"type": "string"},
+                        "image_path": {"type": "string", "description": "Alias for storage_path."},
+                    },
+                    "required": [],
+                },
+            ),
+            ToolDefinition(
+                name="remove_restaurant_logo",
+                description=(
+                    "Remove the restaurant logo (clears logo_path in DB; does not delete storage). "
+                    "Requires owner confirmation."
+                ),
+                effect="mutate",
+                input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
+                name="assign_restaurant_cover",
+                description=(
+                    "Set the restaurant cover/header image from chat upload (storage_path). "
+                    "Copies into restaurants/{id}/cover/ when needed. Requires owner confirmation."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "storage_path": {"type": "string"},
+                        "image_path": {"type": "string", "description": "Alias for storage_path."},
+                    },
+                    "required": [],
+                },
+            ),
+            ToolDefinition(
+                name="remove_restaurant_cover",
+                description=(
+                    "Remove the restaurant cover image (clears cover_path in DB; does not delete "
+                    "storage). Requires owner confirmation."
+                ),
+                effect="mutate",
+                input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
                 name="list_menu_themes",
                 description=(
-                    "List active digital menu themes from the database catalog. "
+                    "List active digital menu themes from the database catalog, including "
+                    "colors (hex tokens) and typography (heading/body fonts). "
                     "Use before apply_menu_theme when the owner wants to change the menu look."
                 ),
                 effect="read",
@@ -1209,7 +1343,9 @@ class MenuWriteSkill:
             ),
             ToolDefinition(
                 name="get_current_menu_theme",
-                description="Read the restaurant's current digital_menu_theme_id and catalog label.",
+                description=(
+                    "Read the restaurant's current digital menu theme id, label, colors, and typography."
+                ),
                 effect="read",
                 input_schema={"type": "object", "properties": {}, "required": []},
             ),
@@ -1695,8 +1831,37 @@ class MenuWriteSkill:
             return bulk_assign_product_images(
                 service, ctx, args, invalidate=_finalize_menu_mutation
             )
-        if tool_name == "match_product_photos":
-            return match_product_photos(service, ctx, args)
+        if tool_name == "remove_product_image":
+            return remove_product_image(
+                service, ctx, args, invalidate=_finalize_menu_mutation
+            )
+        if tool_name == "bulk_remove_product_images":
+            return bulk_remove_product_images(
+                service, ctx, args, invalidate=_finalize_menu_mutation
+            )
+
+        if tool_name == "get_restaurant_name":
+            return get_restaurant_name(ctx)
+        if tool_name == "get_restaurant_public_menu_url":
+            return get_restaurant_public_menu_url(ctx)
+        if tool_name == "get_restaurant_schedules":
+            return get_restaurant_schedules(ctx)
+        if tool_name == "set_restaurant_schedules":
+            return set_restaurant_schedules(
+                ctx, args, invalidate=_finalize_menu_mutation
+            )
+        if tool_name == "assign_restaurant_logo":
+            return assign_restaurant_logo(
+                ctx, args, invalidate=_finalize_menu_mutation
+            )
+        if tool_name == "remove_restaurant_logo":
+            return remove_restaurant_logo(ctx, invalidate=_finalize_menu_mutation)
+        if tool_name == "assign_restaurant_cover":
+            return assign_restaurant_cover(
+                ctx, args, invalidate=_finalize_menu_mutation
+            )
+        if tool_name == "remove_restaurant_cover":
+            return remove_restaurant_cover(ctx, invalidate=_finalize_menu_mutation)
 
         if tool_name == "list_menu_themes":
             themes = list_menu_themes(ctx)

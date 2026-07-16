@@ -63,8 +63,22 @@ TOOL_GROUPS: list[tuple[str, list[str]]] = [
         [
             "assign_product_image",
             "bulk_assign_product_images",
-            "match_product_photos",
+            "remove_product_image",
+            "bulk_remove_product_images",
             "generate_product_image",
+        ],
+    ),
+    (
+        "Restaurant settings",
+        [
+            "get_restaurant_name",
+            "get_restaurant_public_menu_url",
+            "get_restaurant_schedules",
+            "set_restaurant_schedules",
+            "assign_restaurant_logo",
+            "remove_restaurant_logo",
+            "assign_restaurant_cover",
+            "remove_restaurant_cover",
         ],
     ),
     (
@@ -153,12 +167,22 @@ TOOL_RETURNS_HINTS: dict[str, str] = {
     # Product photos
     "assign_product_image": "product_id, image_path assignment confirmation.",
     "bulk_assign_product_images": "updated, failed, results[] per row.",
-    "match_product_photos": "matches[] (storage_path → product suggestions, read-only).",
+    "remove_product_image": "product_id, image_path cleared confirmation.",
+    "bulk_remove_product_images": "updated, failed, results[] per row.",
     "generate_product_image": "storage_path, product context (generated asset).",
+    # Restaurant settings
+    "get_restaurant_name": "name, restaurant_id.",
+    "get_restaurant_public_menu_url": "public_menu_url, subdomain, name.",
+    "get_restaurant_schedules": "schedules[] (service_type, day_of_week, opens_at, closes_at).",
+    "set_restaurant_schedules": "schedules[] replaced (full replace-all).",
+    "assign_restaurant_logo": "restaurant_id, logo_path.",
+    "remove_restaurant_logo": "restaurant_id, logo_path null.",
+    "assign_restaurant_cover": "restaurant_id, cover_path.",
+    "remove_restaurant_cover": "restaurant_id, cover_path null.",
     # Menu themes
-    "list_menu_themes": "themes[] (theme_id, label, active).",
-    "get_current_menu_theme": "theme (current digital_menu_theme_id) or null.",
-    "apply_menu_theme": "theme (applied digital_menu_theme_id).",
+    "list_menu_themes": "themes[] (id, label, colors{}, typography{}, style_keywords[]).",
+    "get_current_menu_theme": "theme (id, label, colors{}, typography{}) or null.",
+    "apply_menu_theme": "theme (applied id, label, colors{}, typography{}).",
     # Menu intelligence
     "analyze_product_image": "analysis (quality, suggestions; read-only).",
     # Promotions

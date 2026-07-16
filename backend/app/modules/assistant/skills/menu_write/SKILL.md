@@ -119,11 +119,11 @@ You:  [create_product] Listo, ya está en tu menú.
 
 ## Fotos de productos (subidas por el dueño)
 
-When the owner **uploads product photos** in chat (`kind: product_photo` via the import assets API)
+When the owner **uploads files** in chat (generic import inbox — images stored as WebP, documents as PDF/DOCX)
 or already has images in storage:
 
 Each upload appears in the user message under **## Chat attachments** with `storage_path`,
-`kind`, and `original_name`. Use those paths directly in tools — **never ask the owner for
+`kind` (`document` | `image`), and `original_name`. Use those paths directly in tools — **never ask the owner for
 storage_path**.
 
 ### One photo → one product
@@ -132,14 +132,38 @@ storage_path**.
 
 ### Many photos
 
-1. **`match_product_photos`** — vision AI suggests `product_id` per image (matched / uncertain / unmatched).
-2. Owner confirms uncertain rows.
-3. **`bulk_assign_product_images`** — `items[]` with `storage_path` + `product_id` or name (up to 50).
+Use **`bulk_assign_product_images`** — `items[]` with `storage_path` + `product_id` or name (up to 50).
+Confirm mappings with the owner before assigning.
 
-Paths must be under `restaurants/{id}/import/product_photo/` or `restaurants/{id}/products/`.
+To **remove** photos (unlink from DB, storage files stay): `remove_product_image` or
+`bulk_remove_product_images` with `product_id` or name.
+
+Paths must be under `restaurants/{id}/import/inbox/`, legacy `import/product_photo/`, or `restaurants/{id}/products/`.
+On assign, inbox images are copied into `products/` automatically.
 Pass `force=true` to replace an existing `image_path`.
 
 For **AI-generated** food photos (no upload), use skill **`menu_media`** → `generate_product_image`.
+
+---
+
+## Perfil del restaurante (nombre, horario, logo, portada)
+
+### Nombre
+
+- **`get_restaurant_name`** — read current display name.
+- **`get_restaurant_public_menu_url`** — public link to the digital menu (for sharing with customers).
+
+### Horario
+
+- **`get_restaurant_schedules`** — read rows (`service_type`: `takeout`|`delivery`, `day_of_week`: 0=Mon..6=Sun, `opens_at`/`closes_at` as HH:MM).
+- **`set_restaurant_schedules`** — **replace-all** schedule rows after owner confirms.
+
+### Logo y portada (cover)
+
+Chat uploads (`kind: image` in inbox) → assign tools copy into `restaurants/{id}/logo/` or `cover/`:
+
+- **`assign_restaurant_logo`** / **`assign_restaurant_cover`** — set from `storage_path`.
+- **`remove_restaurant_logo`** / **`remove_restaurant_cover`** — clear DB path only (no storage delete).
 
 ---
 
@@ -193,12 +217,21 @@ When the owner wants to **change how the public menu looks** — "cambia el tema
 | `bulk_add_option_groups` | Create up to 50 complement groups across products (`title` + optional `items[]`) |
 | `delete_option_item` | Permanently remove one complement (`expected_label` + `product_id` + `item_id`; `group_id` optional) |
 | `bulk_delete_option_items` | Remove up to 50 complements from **one** product (`product_id`/name + `items[]` with `expected_label`; `group_id` optional per row) |
-| `list_menu_themes` | List active digital menu themes from the catalog |
-| `get_current_menu_theme` | Read the restaurant's current theme id and label |
+| `list_menu_themes` | List active digital menu themes (includes `colors` hex map and `typography` fonts) |
+| `get_current_menu_theme` | Read current theme id, label, colors, and typography |
 | `apply_menu_theme` | Set `digital_menu_theme_id` after owner confirms (`theme_id` from catalog) |
 | `assign_product_image` | Assign one uploaded photo (`storage_path`) to a product by id or name |
 | `bulk_assign_product_images` | Assign up to 50 uploaded photos (`items[]` with `storage_path` + product) |
-| `match_product_photos` | Vision-match many uploaded photos to live menu products (read-only suggestions) |
+| `remove_product_image` | Clear `image_path` on one product (DB only; storage unchanged) |
+| `bulk_remove_product_images` | Clear photos on up to 50 products by id or name |
+| `get_restaurant_name` | Read restaurant display name |
+| `get_restaurant_public_menu_url` | Read public digital menu URL (customer share link) |
+| `get_restaurant_schedules` | Read opening hours schedule rows |
+| `set_restaurant_schedules` | Replace-all restaurant schedule rows |
+| `assign_restaurant_logo` | Set logo from chat upload (`storage_path`) |
+| `remove_restaurant_logo` | Clear logo_path (DB only) |
+| `assign_restaurant_cover` | Set cover/header from chat upload |
+| `remove_restaurant_cover` | Clear cover_path (DB only) |
 
 Prices are always in **cents** (e.g. $24.40 → `2440`).
 
