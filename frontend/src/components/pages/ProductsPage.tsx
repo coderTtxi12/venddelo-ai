@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import styles from './ProductsPage.module.css';
 import CloseIcon from '@mui/icons-material/Close';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
@@ -28,6 +29,7 @@ import {
 import { ProductVisibilitySelect } from '@/components/products/ProductVisibilitySelect';
 import { ListPagination } from '@/components/ui/ListPagination';
 import { paginateItems } from '@/lib/paginate';
+import { parseProductsPageFilter } from '@/lib/search/productsPageFilter';
 import {
   CATEGORIES_PAGE_SIZE,
   fetchAllSupplierCategories,
@@ -287,6 +289,8 @@ function CatalogLoadingState({
 
 export default function ProductsPage() {
   const { firebaseUser, accessToken, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'categories' | 'products'>('products');
 
   // supplierId is the supplier doc id in `suppliers/`
@@ -379,6 +383,25 @@ export default function ProductsPage() {
 
   const [categorySearch, setCategorySearch] = useState('');
   const [productNameFilter, setProductNameFilter] = useState('');
+  const appliedProductsPageFilterRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const filter = parseProductsPageFilter(searchParams);
+    if (!filter) return;
+
+    const filterKey = `${filter.tab}:${filter.query}`;
+    if (appliedProductsPageFilterRef.current === filterKey) return;
+    appliedProductsPageFilterRef.current = filterKey;
+
+    setActiveTab(filter.tab);
+    if (filter.tab === 'categories') {
+      setCategorySearch(filter.query);
+    } else {
+      setProductNameFilter(filter.query);
+    }
+
+    router.replace('/products', { scroll: false });
+  }, [router, searchParams]);
   const [productCategoryFilterIds, setProductCategoryFilterIds] = useState<Id[]>([]);
   const [productPriceSort, setProductPriceSort] = useState<ColumnSort>('none');
   const [productDiscountSort, setProductDiscountSort] = useState<ColumnSort>('none');
