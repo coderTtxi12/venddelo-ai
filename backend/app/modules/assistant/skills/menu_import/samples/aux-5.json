@@ -2,463 +2,7 @@
   "categories": [
     {
       "ref": "cat_1",
-      "name": "chunky cookies",
-      "products": [
-        {
-          "ref": "prod_1",
-          "name": "red velvet",
-          "currency": "MXN",
-          "price_mxn": 50,
-          "sort_order": 0,
-          "description": "Rellena de queso y cereza, chispas de chocolate y trozos de pastel red velvet",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: clásicas",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_2",
-          "name": "limón",
-          "currency": "MXN",
-          "price_mxn": 50,
-          "sort_order": 0,
-          "description": "Relleno cremoso, glaseado de queso y crumble",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: clásicas",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_3",
-          "name": "avena",
-          "currency": "MXN",
-          "price_mxn": 50,
-          "sort_order": 0,
-          "description": "Con arándanos y nuez",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: clásicas",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_4",
-          "name": "conejito turin",
-          "currency": "MXN",
-          "price_mxn": 55,
-          "sort_order": 0,
-          "description": "Con trozos de turín y ganache de chocolate de leche",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: favoritas",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_5",
-          "name": "cookies & cream",
-          "currency": "MXN",
-          "price_mxn": 55,
-          "sort_order": 0,
-          "description": "Relleno de oreo, chispas y ganache de chocolate blanco",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: favoritas",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_6",
-          "name": "gloria",
-          "currency": "MXN",
-          "price_mxn": 55,
-          "sort_order": 0,
-          "description": "Rellena de dulce de leche y gloria, con trozos de nuez",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: favoritas",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_7",
-          "name": "chocolate",
-          "currency": "MXN",
-          "price_mxn": 55,
-          "sort_order": 0,
-          "description": "Con trozos de chocolate semiamargo y ganache",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: favoritas",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_8",
-          "name": "kinderella",
-          "currency": "MXN",
-          "price_mxn": 60,
-          "sort_order": 0,
-          "description": "Relleno cremoso, trozos de chocolate, kinder delice y kinder bueno",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: de temporada",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_9",
-          "name": "dubai",
-          "currency": "MXN",
-          "price_mxn": 60,
-          "sort_order": 0,
-          "description": "Relleno de pistache y kataifi, con ganache de chocolate y trozos de pistache",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: de temporada",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_10",
-          "name": "lotus biscoff",
-          "currency": "MXN",
-          "price_mxn": 60,
-          "sort_order": 0,
-          "description": "Rellena de crema de Lotus y trozos de chocolate blanco",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: de temporada",
-          "has_catalog_discount": false
-        }
-      ],
-      "sort_order": 0,
-      "description": null,
-      "display_layout": null,
-      "constraints_notes": null
-    },
-    {
-      "ref": "cat_2",
-      "name": "chunky rolls",
-      "products": [
-        {
-          "ref": "prod_11",
-          "name": "canela",
-          "currency": "MXN",
-          "price_mxn": 60,
-          "sort_order": 0,
-          "description": "Rol de canela suave y esponjoso, cubierto con glaseado de queso crema y crumble",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: clásico",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_12",
-          "name": "berries",
-          "currency": "MXN",
-          "price_mxn": 70,
-          "sort_order": 0,
-          "description": "Rol de canela relleno de frutos rojos, cubierto con glaseado de queso crema y crumble",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: favoritos",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_13",
-          "name": "nutella",
-          "currency": "MXN",
-          "price_mxn": 70,
-          "sort_order": 0,
-          "description": "Rol de canela relleno de Nutella, cubierto con glaseado de queso crema y avellana",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: favoritos",
-          "has_catalog_discount": false
-        }
-      ],
-      "sort_order": 1,
-      "description": null,
-      "display_layout": null,
-      "constraints_notes": "Subcategorías impresas: clásico (canela $60) y favoritos (otras variedades $70)"
-    },
-    {
-      "ref": "cat_3",
-      "name": "cheesecakes",
-      "products": [
-        {
-          "ref": "prod_14",
-          "name": "dulce de leche",
-          "currency": "MXN",
-          "price_mxn": 90,
-          "sort_order": 0,
-          "description": "Pastel cremoso con dulce de leche, trozos de blondie y galleta Lotus",
-          "is_available": true,
-          "option_groups": [
-            {
-              "ref": "og_1",
-              "items": [
-                {
-                  "ref": "oi_1",
-                  "label": "Porción",
-                  "sort_order": 0,
-                  "price_delta_mxn": 0
-                },
-                {
-                  "ref": "oi_2",
-                  "label": "Completo 10 porciones",
-                  "sort_order": 0,
-                  "price_delta_mxn": 410
-                },
-                {
-                  "ref": "oi_3",
-                  "label": "Completo 20 porciones",
-                  "sort_order": 0,
-                  "price_delta_mxn": 610
-                }
-              ],
-              "title": "Presentación",
-              "required": true,
-              "selection": "single",
-              "sort_order": 0,
-              "max_selections": 1,
-              "min_selections": 1
-            }
-          ],
-          "catalog_discount": null,
-          "constraints_notes": "Completo por pedido. Precios completos impresos: 10 porciones $500, 20 porciones $700",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_15",
-          "name": "conejito turin",
-          "currency": "MXN",
-          "price_mxn": 90,
-          "sort_order": 0,
-          "description": "Con ganache de turín de leche, trozos de blondie y conejito",
-          "is_available": true,
-          "option_groups": [
-            {
-              "ref": "og_2",
-              "items": [
-                {
-                  "ref": "oi_4",
-                  "label": "Porción",
-                  "sort_order": 0,
-                  "price_delta_mxn": 0
-                },
-                {
-                  "ref": "oi_5",
-                  "label": "Completo 10 porciones",
-                  "sort_order": 0,
-                  "price_delta_mxn": 410
-                },
-                {
-                  "ref": "oi_6",
-                  "label": "Completo 20 porciones",
-                  "sort_order": 0,
-                  "price_delta_mxn": 610
-                }
-              ],
-              "title": "Presentación",
-              "required": true,
-              "selection": "single",
-              "sort_order": 0,
-              "max_selections": 1,
-              "min_selections": 1
-            }
-          ],
-          "catalog_discount": null,
-          "constraints_notes": "Completo por pedido. Precios completos impresos: 10 porciones $500, 20 porciones $700",
-          "has_catalog_discount": false
-        }
-      ],
-      "sort_order": 2,
-      "description": null,
-      "display_layout": null,
-      "constraints_notes": "Por pedido: cheesecake completo 10 porciones $500, 20 porciones $700"
-    },
-    {
-      "ref": "cat_4",
-      "name": "otros",
-      "products": [
-        {
-          "ref": "prod_16",
-          "name": "blondie",
-          "currency": "MXN",
-          "price_mxn": 45,
-          "sort_order": 0,
-          "description": "Suave y húmedo, con dulce de leche y Lotus, con una textura parecida a un brownie",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": null,
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_17",
-          "name": "pan de elote",
-          "currency": "MXN",
-          "price_mxn": 45,
-          "sort_order": 0,
-          "description": "Pan suave y húmedo, con una textura cremosa como la de un flan",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": null,
-          "has_catalog_discount": false
-        }
-      ],
-      "sort_order": 3,
-      "description": null,
-      "display_layout": null,
-      "constraints_notes": null
-    },
-    {
-      "ref": "cat_5",
-      "name": "minicakes",
-      "products": [
-        {
-          "ref": "prod_18",
-          "name": "red velvet",
-          "currency": "MXN",
-          "price_mxn": 70,
-          "sort_order": 0,
-          "description": "Pan suave y húmedo con capas de glaseado de queso crema y crumble",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: favoritos",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_19",
-          "name": "carrot",
-          "currency": "MXN",
-          "price_mxn": 70,
-          "sort_order": 0,
-          "description": "Pan húmedo de zanahoria con capas de glaseado de queso crema y crumble",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: favoritos",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_20",
-          "name": "limón",
-          "currency": "MXN",
-          "price_mxn": 70,
-          "sort_order": 0,
-          "description": "Pan suave y húmedo con capas de crema de limón y crumble",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: favoritos",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_21",
-          "name": "tiramisú",
-          "currency": "MXN",
-          "price_mxn": 70,
-          "sort_order": 0,
-          "description": "Pan suave con capas de glaseado de queso, amaretto y cocoa",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: favoritos",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_22",
-          "name": "mango",
-          "currency": "MXN",
-          "price_mxn": 75,
-          "sort_order": 0,
-          "description": "Pan suave y húmedo con capas de crema de mango y crumble",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: de temporada",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_23",
-          "name": "3 leches rompope",
-          "currency": "MXN",
-          "price_mxn": 75,
-          "sort_order": 0,
-          "description": "Pan suave con 3 leches, capas de crema de rompope y crumble",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "Subcategoría: de temporada",
-          "has_catalog_discount": false
-        }
-      ],
-      "sort_order": 4,
-      "description": null,
-      "display_layout": null,
-      "constraints_notes": "Para pasteles completos, consulte precios en barra"
-    },
-    {
-      "ref": "cat_6",
-      "name": "tarta vasca",
-      "products": [
-        {
-          "ref": "prod_24",
-          "name": "tarta vasca",
-          "currency": "MXN",
-          "price_mxn": 120,
-          "sort_order": 0,
-          "description": "Tarta de queso crema con textura suave y cremosa con un toque tostado",
-          "is_available": true,
-          "option_groups": [
-            {
-              "ref": "og_3",
-              "items": [
-                {
-                  "ref": "oi_7",
-                  "label": "Individual (16cm)",
-                  "sort_order": 0,
-                  "price_delta_mxn": 0
-                },
-                {
-                  "ref": "oi_8",
-                  "label": "Grande (25cm)",
-                  "sort_order": 0,
-                  "price_delta_mxn": 90
-                }
-              ],
-              "title": "Tamaño",
-              "required": true,
-              "selection": "single",
-              "sort_order": 0,
-              "max_selections": 1,
-              "min_selections": 1
-            }
-          ],
-          "catalog_discount": null,
-          "constraints_notes": "Grande (25cm) por pedido. Precios impresos: individual (16cm) $120, grande (25cm) $210",
-          "has_catalog_discount": false
-        }
-      ],
-      "sort_order": 5,
-      "description": null,
-      "display_layout": null,
-      "constraints_notes": null
-    },
-    {
-      "ref": "cat_1",
-      "name": "bebidas frías",
+      "name": "bebidas frias",
       "products": [
         {
           "ref": "prod_1",
@@ -479,7 +23,7 @@
           "currency": "MXN",
           "price_mxn": 25,
           "sort_order": 0,
-          "description": "12 oz",
+          "description": "12 oz. Nota en el menú: \"almendra o soya $30\"",
           "is_available": true,
           "option_groups": [
             {
@@ -487,27 +31,27 @@
               "items": [
                 {
                   "ref": "oi_1",
-                  "label": "Leche regular (12 oz)",
+                  "label": "almendra",
                   "sort_order": 0,
-                  "price_delta_mxn": 0
+                  "price_delta_mxn": 5
                 },
                 {
                   "ref": "oi_2",
-                  "label": "Almendra o soya (12 oz)",
+                  "label": "soya",
                   "sort_order": 0,
                   "price_delta_mxn": 5
                 }
               ],
-              "title": "Tipo de leche",
-              "required": true,
+              "title": "Sustitución a almendra/soya",
+              "required": false,
               "selection": "single",
               "sort_order": 0,
               "max_selections": 1,
-              "min_selections": 1
+              "min_selections": 0
             }
           ],
           "catalog_discount": null,
-          "constraints_notes": "En el menú aparece “almendra o soya $30” como alternativa de precio.",
+          "constraints_notes": null,
           "has_catalog_discount": false
         },
         {
@@ -516,7 +60,7 @@
           "currency": "MXN",
           "price_mxn": 65,
           "sort_order": 0,
-          "description": "café americano con crema ligera y hielo. 16 oz (Cream coffee)",
+          "description": "café americano con crema ligera y hielo. (Se muestra bajo el encabezado 'cream coffee') 16 oz",
           "is_available": true,
           "option_groups": [],
           "catalog_discount": null,
@@ -529,7 +73,7 @@
           "currency": "MXN",
           "price_mxn": 65,
           "sort_order": 0,
-          "description": "café americano con crema ligera y hielo. 16 oz (Cream coffee)",
+          "description": "café americano con crema ligera y hielo. (Se muestra bajo el encabezado 'cream coffee') 16 oz",
           "is_available": true,
           "option_groups": [],
           "catalog_discount": null,
@@ -538,78 +82,61 @@
         },
         {
           "ref": "prod_5",
-          "name": "berry",
+          "name": "iced latte",
           "currency": "MXN",
           "price_mxn": 70,
           "sort_order": 0,
-          "description": "café, leche, frutos rojos, cold foam de vainilla y hielo. 16 oz (Iced latte)",
+          "description": "Iced latte 16 oz. Sabores (cada sabor con su composición indicada en el menú):\n- berry: café, leche, frutos rojos, cold foam de vainilla y hielo\n- flan: café, leche, flan casero, cold foam de vainilla y hielo\n- dirty chai: café, leche, te chai, cold foam de vainilla y hielo\n- biscoff lotus: café, leche, biscoff, cold foam de vainilla y hielo\n- taro latte: leche, taro, cold foam de vainilla y hielo (en el menú tiene precio distinto)\n- moka chocolate abuelita: café, leche, chocolate abuelita, cold foam de vainilla y hielo\nPrecio base indicado en el menú: $70 (16 oz). El taro latte se muestra con precio $75 en el menú (ver opción con price_delta).",
           "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": null,
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_6",
-          "name": "flan",
-          "currency": "MXN",
-          "price_mxn": 70,
-          "sort_order": 0,
-          "description": "café, leche, flan casero, cold foam de vainilla y hielo. 16 oz (Iced latte)",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": null,
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_7",
-          "name": "dirty chai",
-          "currency": "MXN",
-          "price_mxn": 70,
-          "sort_order": 0,
-          "description": "café, leche, té chai, cold foam de vainilla y hielo. 16 oz (Iced latte)",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": null,
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_8",
-          "name": "biscoff lotus",
-          "currency": "MXN",
-          "price_mxn": 70,
-          "sort_order": 0,
-          "description": "café, leche, biscoff, cold foam de vainilla y hielo. 16 oz (Iced latte)",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": null,
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_9",
-          "name": "taro latte",
-          "currency": "MXN",
-          "price_mxn": 75,
-          "sort_order": 0,
-          "description": "leche, taro, cold foam de vainilla y hielo. 16 oz (Iced latte)",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": null,
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_10",
-          "name": "moka chocolate abuelita",
-          "currency": "MXN",
-          "price_mxn": 70,
-          "sort_order": 0,
-          "description": "café, leche, chocolate abuelita, cold foam de vainilla y hielo. 16 oz (Iced latte)",
-          "is_available": true,
-          "option_groups": [],
+          "option_groups": [
+            {
+              "ref": "og_2",
+              "items": [
+                {
+                  "ref": "oi_3",
+                  "label": "berry",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_4",
+                  "label": "flan",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_5",
+                  "label": "dirty chai",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_6",
+                  "label": "biscoff lotus",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_7",
+                  "label": "taro latte",
+                  "sort_order": 0,
+                  "price_delta_mxn": 5
+                },
+                {
+                  "ref": "oi_8",
+                  "label": "moka chocolate abuelita",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Sabor",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            }
+          ],
           "catalog_discount": null,
           "constraints_notes": null,
           "has_catalog_discount": false
@@ -625,7 +152,7 @@
       "name": "malteadas",
       "products": [
         {
-          "ref": "prod_11",
+          "ref": "prod_6",
           "name": "mazapán",
           "currency": "MXN",
           "price_mxn": 85,
@@ -634,27 +161,27 @@
           "is_available": true,
           "option_groups": [
             {
-              "ref": "og_2",
+              "ref": "og_3",
               "items": [
                 {
-                  "ref": "oi_3",
+                  "ref": "oi_9",
                   "label": "Con crema batida",
                   "sort_order": 0,
                   "price_delta_mxn": 0
                 },
                 {
-                  "ref": "oi_4",
+                  "ref": "oi_10",
                   "label": "Sin crema batida",
                   "sort_order": 0,
                   "price_delta_mxn": 0
                 }
               ],
               "title": "Crema batida",
-              "required": true,
+              "required": false,
               "selection": "single",
               "sort_order": 0,
               "max_selections": 1,
-              "min_selections": 1
+              "min_selections": 0
             }
           ],
           "catalog_discount": null,
@@ -662,7 +189,7 @@
           "has_catalog_discount": false
         },
         {
-          "ref": "prod_12",
+          "ref": "prod_7",
           "name": "biscoff lotus",
           "currency": "MXN",
           "price_mxn": 85,
@@ -671,27 +198,27 @@
           "is_available": true,
           "option_groups": [
             {
-              "ref": "og_3",
+              "ref": "og_4",
               "items": [
                 {
-                  "ref": "oi_5",
+                  "ref": "oi_11",
                   "label": "Con crema batida",
                   "sort_order": 0,
                   "price_delta_mxn": 0
                 },
                 {
-                  "ref": "oi_6",
+                  "ref": "oi_12",
                   "label": "Sin crema batida",
                   "sort_order": 0,
                   "price_delta_mxn": 0
                 }
               ],
               "title": "Crema batida",
-              "required": true,
+              "required": false,
               "selection": "single",
               "sort_order": 0,
               "max_selections": 1,
-              "min_selections": 1
+              "min_selections": 0
             }
           ],
           "catalog_discount": null,
@@ -699,7 +226,7 @@
           "has_catalog_discount": false
         },
         {
-          "ref": "prod_13",
+          "ref": "prod_8",
           "name": "conejito turin",
           "currency": "MXN",
           "price_mxn": 95,
@@ -708,71 +235,81 @@
           "is_available": true,
           "option_groups": [
             {
-              "ref": "og_4",
+              "ref": "og_5",
               "items": [
                 {
-                  "ref": "oi_7",
+                  "ref": "oi_13",
                   "label": "Con crema batida",
                   "sort_order": 0,
                   "price_delta_mxn": 0
                 },
                 {
-                  "ref": "oi_8",
+                  "ref": "oi_14",
                   "label": "Sin crema batida",
                   "sort_order": 0,
                   "price_delta_mxn": 0
                 }
               ],
               "title": "Crema batida",
-              "required": true,
+              "required": false,
               "selection": "single",
               "sort_order": 0,
               "max_selections": 1,
-              "min_selections": 1
+              "min_selections": 0
             }
           ],
           "catalog_discount": null,
           "constraints_notes": null,
           "has_catalog_discount": false
-        },
+        }
+      ],
+      "sort_order": 1,
+      "description": null,
+      "display_layout": null,
+      "constraints_notes": "*Pueden ir con o sin crema batida*"
+    },
+    {
+      "ref": "cat_3",
+      "name": "refreshers",
+      "products": [
         {
-          "ref": "prod_14",
+          "ref": "prod_9",
           "name": "refreshers",
           "currency": "MXN",
           "price_mxn": 65,
           "sort_order": 0,
-          "description": "bebidas gaseosas con hielo y sabores frutales. 16 oz",
+          "description": "Refreshers 16 oz. Bebidas gaseosas con hielo y sabores frutales. Sabores disponibles: manzana guanábana; mango piña; blueberry arándano; mandarina mango; frambuesa lima.",
           "is_available": true,
           "option_groups": [
             {
-              "ref": "og_5",
+              "ref": "og_6",
               "items": [
                 {
-                  "ref": "oi_9",
+                  "ref": "oi_15",
                   "label": "manzana guanábana",
                   "sort_order": 0,
                   "price_delta_mxn": 0
                 },
                 {
-                  "ref": "oi_10",
+                  "ref": "oi_16",
                   "label": "mango piña",
                   "sort_order": 0,
                   "price_delta_mxn": 0
                 },
                 {
-                  "ref": "oi_11",
+                  "ref": "oi_17",
                   "label": "blueberry arándano",
                   "sort_order": 0,
                   "price_delta_mxn": 0
                 },
                 {
-                  "ref": "oi_12",
+                  "ref": "oi_18",
                   "label": "mandarina mango",
                   "sort_order": 0,
                   "price_delta_mxn": 0
                 },
                 {
-                  "ref": "oi_13",
+                  "ref": "oi_19",
                   "label": "frambuesa lima",
                   "sort_order": 0,
                   "price_delta_mxn": 0
@@ -791,17 +328,17 @@
           "has_catalog_discount": false
         }
       ],
-      "sort_order": 1,
+      "sort_order": 2,
       "description": null,
       "display_layout": null,
-      "constraints_notes": "*Pueden ir con o sin crema batida*"
+      "constraints_notes": null
     },
     {
-      "ref": "cat_3",
+      "ref": "cat_4",
       "name": "bebidas calientes",
       "products": [
         {
-          "ref": "prod_15",
+          "ref": "prod_10",
           "name": "americano",
           "currency": "MXN",
           "price_mxn": 35,
@@ -814,25 +351,12 @@
           "has_catalog_discount": false
         },
         {
-          "ref": "prod_16",
+          "ref": "prod_11",
           "name": "chocolate",
           "currency": "MXN",
           "price_mxn": 65,
           "sort_order": 0,
-          "description": null,
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": "12 oz",
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_17",
-          "name": "avellana",
-          "currency": "MXN",
-          "price_mxn": 60,
-          "sort_order": 0,
-          "description": "café con leche cremosa y un toque de avellana. 12 oz (latte)",
+          "description": "",
           "is_available": true,
           "option_groups": [],
           "catalog_discount": null,
@@ -840,59 +364,62 @@
           "has_catalog_discount": false
         },
         {
-          "ref": "prod_18",
-          "name": "moka chocolate abuelita",
+          "ref": "prod_12",
+          "name": "latte",
           "currency": "MXN",
           "price_mxn": 60,
           "sort_order": 0,
-          "description": "café con leche cremosa y chocolate abuelita. 12 oz (latte)",
+          "description": "Latte 12 oz. Sabores y descripciones según el menú: avellana (café con leche cremosa y un toque de avellana); moka chocolate abuelita (café con leche cremosa y chocolate abuelita); dirty chai (café con leche cremosa y té chai); biscof lotus (café con leche cremosa y biscoff); tiramisú (café con leche y un toque de amaretto y almendra). Precio base indicado: $60 (12 oz).",
           "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": null,
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_19",
-          "name": "dirty chai",
-          "currency": "MXN",
-          "price_mxn": 60,
-          "sort_order": 0,
-          "description": "café con leche cremosa y té chai. 12 oz (latte)",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": null,
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_20",
-          "name": "biscof lotus",
-          "currency": "MXN",
-          "price_mxn": 60,
-          "sort_order": 0,
-          "description": "café con leche cremosa y biscoff. 12 oz (latte)",
-          "is_available": true,
-          "option_groups": [],
-          "catalog_discount": null,
-          "constraints_notes": null,
-          "has_catalog_discount": false
-        },
-        {
-          "ref": "prod_21",
-          "name": "tiramisú",
-          "currency": "MXN",
-          "price_mxn": 60,
-          "sort_order": 0,
-          "description": "café con leche y un toque de amaretto y almendra. 12 oz (latte)",
-          "is_available": true,
-          "option_groups": [],
+          "option_groups": [
+            {
+              "ref": "og_7",
+              "items": [
+                {
+                  "ref": "oi_20",
+                  "label": "avellana",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_21",
+                  "label": "moka chocolate abuelita",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_22",
+                  "label": "dirty chai",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_23",
+                  "label": "biscof lotus",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                },
+                {
+                  "ref": "oi_24",
+                  "label": "tiramisú",
+                  "sort_order": 0,
+                  "price_delta_mxn": 0
+                }
+              ],
+              "title": "Sabor",
+              "required": true,
+              "selection": "single",
+              "sort_order": 0,
+              "max_selections": 1,
+              "min_selections": 1
+            }
+          ],
           "catalog_discount": null,
           "constraints_notes": null,
           "has_catalog_discount": false
         }
       ],
-      "sort_order": 2,
+      "sort_order": 3,
       "description": null,
       "display_layout": null,
       "constraints_notes": null
@@ -901,5 +428,19 @@
   "promotions": [],
   "global_rules": [],
   "unmapped_text": [],
-  "open_questions": []
+  "open_questions": [
+    {
+      "id": "q_1",
+      "context": "El menú presenta 'leche fria $25 12 oz' y justo debajo 'almendra o soya $30'. No queda claro si almendra/soya son sustituciones con +$5 o productos separados con precio $30.",
+      "question_es": "En 'leche fria' el menú muestra $25 (12 oz) y además 'almendra o soya $30'. ¿Cómo deben cobrarse exactamente la almendra y la soya?",
+      "related_refs": [
+        "prod_2"
+      ],
+      "suggested_answers": [
+        "Almendra/soya son sustituciones: cobrar $5 extra (total $30).",
+        "Almendra y soya son productos separados cuyo precio base es $30 (no aplicar $25).",
+        "Siempre cobrar $30 si el cliente pide almendra o soya (no hay opción de leche normal)."
+      ]
+    }
+  ]
 }
