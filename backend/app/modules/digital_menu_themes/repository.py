@@ -18,6 +18,8 @@ class DigitalMenuThemeRecord:
     best_for: list[str]
     recommendation: str
     style_keywords: list[str]
+    colors: dict[str, Any]
+    typography: dict[str, Any]
     is_active: bool
     sort_order: int
 
@@ -30,6 +32,8 @@ def _to_record(obj: DigitalMenuTheme) -> DigitalMenuThemeRecord:
         best_for=list(obj.best_for or []),
         recommendation=obj.recommendation,
         style_keywords=list(obj.style_keywords or []),
+        colors=dict(obj.colors or {}),
+        typography=dict(obj.typography or {}),
         is_active=obj.is_active,
         sort_order=obj.sort_order,
     )
@@ -54,7 +58,9 @@ class DigitalMenuThemeRepository:
             "description": data["description"],
             "best_for": list(data.get("best_for") or data.get("bestFor") or []),
             "recommendation": data.get("recommendation") or "",
-            "style_keywords": list(data.get("style_keywords") or []),
+            "style_keywords": list(data.get("style_keywords") or data.get("styleKeywords") or []),
+            "colors": dict(data.get("colors") or {}),
+            "typography": dict(data.get("typography") or {}),
             "is_active": data.get("is_active", True),
             "sort_order": int(data.get("sort_order", 0)),
         }
@@ -69,6 +75,8 @@ class DigitalMenuThemeRepository:
                     "best_for": values["best_for"],
                     "recommendation": values["recommendation"],
                     "style_keywords": values["style_keywords"],
+                    "colors": values["colors"],
+                    "typography": values["typography"],
                     "is_active": values["is_active"],
                     "sort_order": values["sort_order"],
                 },

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import Boolean, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -16,5 +18,7 @@ class DigitalMenuTheme(Base):
     best_for: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default="[]")
     recommendation: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     style_keywords: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default="[]")
+    colors: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
+    typography: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
