@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 
+from app.api.cache_helpers import notify_digital_menu_preview_changed
 from app.api.deps import (
     get_synced_user,
     pagination_params,
@@ -195,6 +196,7 @@ def update_restaurant(
 ) -> RestaurantDTO:
     updated = service.update(restaurant.id, data)
     _maybe_request_mexy_delivery_on_enable(restaurant, updated, partnership)
+    notify_digital_menu_preview_changed(restaurant.id)
     return updated
 
 
@@ -213,6 +215,7 @@ def set_schedules(
     service: RestaurantService = Depends(_service),
 ) -> None:
     service.set_schedules(restaurant.id, schedules)
+    notify_digital_menu_preview_changed(restaurant.id)
 
 
 @router.get("/{restaurant_id}/schedules", response_model=list[ScheduleDTO])
