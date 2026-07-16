@@ -39,6 +39,7 @@ from app.modules.assistant.skills.markdown import load_skill_metadata
 from app.modules.assistant.skills.menu_import.response_schema import MenuImportQuizQuestion
 from app.modules.assistant.skills.menu_import.session_context import (
     build_full_import_session_context,
+    build_router_import_session_context,
     get_active_import_for_conversation,
 )
 from app.modules.assistant.skills.menu_import.session_handoff import (
@@ -270,7 +271,7 @@ async def load_workflow_runtime(
         )
 
     if menu_import_enabled:
-        import_session_context = build_full_import_session_context(
+        import_session_context = build_router_import_session_context(
             active_import,
             user_message=user_text,
         )

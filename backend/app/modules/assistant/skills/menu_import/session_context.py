@@ -13,7 +13,35 @@ from app.modules.assistant.skills.menu_import.session_draft_store import (
     list_open_questions,
     unanswered_question_ids,
 )
-from app.modules.assistant.skills.menu_import.session_schemas import is_active_status
+from app.modules.assistant.skills.menu_import.session_schemas import (
+    IMPORT_ROUTER_IDLE_STATUSES,
+    is_active_status,
+)
+
+
+def _parse_owner_turn_inputs(
+    session: Any,
+    user_message: str | None,
+) -> tuple[dict[str, str], str]:
+    """Quiz answers and import-only instructions; ignore normal menu chat."""
+    if not user_message:
+        return {}, ""
+
+    from app.modules.assistant.skills.menu_import.clarification_input import (
+        QUIZ_SUBMISSION_PREFIX,
+        split_owner_turn_message,
+    )
+
+    answers, instructions = split_owner_turn_message(
+        user_message,
+        list_open_questions(session),
+    )
+    if (
+        QUIZ_SUBMISSION_PREFIX not in user_message
+        and not unanswered_question_ids(session)
+    ):
+        instructions = ""
+    return answers, instructions
 
 
 def build_owner_turn_tool_hint(
@@ -21,23 +49,16 @@ def build_owner_turn_tool_hint(
     session: Any | None,
 ) -> str | None:
     """Parse quiz answers / free-text instructions for the executor."""
-    if session is None:
+    if session is None or not import_session_needs_router_attention(session):
         return None
-    from app.modules.assistant.skills.menu_import.clarification_input import (
-        split_owner_turn_message,
-    )
     from app.modules.assistant.skills.menu_import.session_draft_store import (
         get_ocr_original,
-        list_open_questions,
     )
 
     if get_ocr_original(session) is None:
         return None
 
-    answers, instructions = split_owner_turn_message(
-        user_message,
-        list_open_questions(session),
-    )
+    answers, instructions = _parse_owner_turn_inputs(session, user_message)
     if not answers and not instructions:
         return None
 
@@ -139,20 +160,45 @@ def _format_suggested_answers(labels: list[str]) -> str:
     return ", ".join(visible) if visible else "(sin opciones sugeridas)"
 
 
+def import_session_needs_router_attention(session: Any | None) -> bool:
+    """Whether the router should see an active menu import session on this turn."""
+    if session is None or not is_active_status(session.status):
+        return False
+
+    status = session.status.value if hasattr(session.status, "value") else str(session.status)
+    if status in IMPORT_ROUTER_IDLE_STATUSES:
+        return False
+
+    batches = session.draft_batches or []
+    applied = any(
+        isinstance(entry, dict) and entry.get("applied_at") for entry in batches
+    )
+    if applied and not unanswered_question_ids(session):
+        return False
+    return True
+
+
+def build_router_import_session_context(
+    session: Any | None,
+    *,
+    user_message: str | None = None,
+) -> str | None:
+    """Import context for the workflow router; omitted once the draft is applied."""
+    if not import_session_needs_router_attention(session):
+        return None
+    return build_full_import_session_context(session, user_message=user_message)
+
+
 def build_import_clarification_context(
     session: Any | None,
     *,
     user_message: str | None = None,
 ) -> str | None:
     """Quiz Q&A for the router — not persisted in chat history, lives on the session."""
-    if session is None or not is_active_status(session.status):
+    if session is None or not import_session_needs_router_attention(session):
         return None
     if get_ocr_original(session) is None:
         return None
-
-    from app.modules.assistant.skills.menu_import.clarification_input import (
-        split_owner_turn_message,
-    )
 
     open_questions = list_open_questions(session)
     stored_answers = (
@@ -161,13 +207,7 @@ def build_import_clarification_context(
     pending_ids = set(unanswered_question_ids(session))
     pending_questions = [question for question in open_questions if question.id in pending_ids]
 
-    parsed_answers: dict[str, str] = {}
-    owner_instructions = ""
-    if user_message:
-        parsed_answers, owner_instructions = split_owner_turn_message(
-            user_message,
-            open_questions,
-        )
+    parsed_answers, owner_instructions = _parse_owner_turn_inputs(session, user_message)
 
     if (
         not open_questions
