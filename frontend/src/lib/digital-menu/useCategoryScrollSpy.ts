@@ -104,14 +104,32 @@ export function useCategoryScrollSpy({
 
   useEffect(() => {
     if (!enabled) return;
-    const root = scrollRootRef.current;
-    if (!root) return;
 
-    root.addEventListener('scroll', handleScroll, { passive: true });
-    syncActiveCategory();
+    let attachedRoot: HTMLElement | null = null;
+    let waitFrame: number | null = null;
+
+    const attach = (root: HTMLElement) => {
+      attachedRoot = root;
+      root.addEventListener('scroll', handleScroll, { passive: true });
+      syncActiveCategory();
+    };
+
+    const tryAttach = () => {
+      const root = scrollRootRef.current;
+      if (root) {
+        attach(root);
+        return;
+      }
+      waitFrame = requestAnimationFrame(tryAttach);
+    };
+
+    tryAttach();
 
     return () => {
-      root.removeEventListener('scroll', handleScroll);
+      if (waitFrame != null) cancelAnimationFrame(waitFrame);
+      if (attachedRoot) {
+        attachedRoot.removeEventListener('scroll', handleScroll);
+      }
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
   }, [enabled, handleScroll, syncActiveCategory, scrollRootRef]);
