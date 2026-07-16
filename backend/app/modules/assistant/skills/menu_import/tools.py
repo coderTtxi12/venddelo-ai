@@ -114,6 +114,17 @@ def _merge_clarification_answers(session: MenuImportSession, answers: dict[str, 
     session.clarification_answers = merged
 
 
+def _should_auto_apply_working_draft(session: MenuImportSession) -> bool:
+    """Apply when owner clarification is complete (no unanswered open questions)."""
+    if not MENU_IMPORT_APPLY_AFTER_MODELING_ENABLED:
+        return False
+    return len(unanswered_question_ids(session)) == 0
+
+
+def _should_apply_draft_on_extraction(session: MenuImportSession) -> bool:
+    return MENU_IMPORT_APPLY_ENABLED or _should_auto_apply_working_draft(session)
+
+
 def _build_modeling_context(
     session: MenuImportSession,
     *,
@@ -589,7 +600,7 @@ class MenuImportSkill:
 
             if batches and not batches[0].get("applied_at"):
                 batch = ImportBatch.model_validate(batches[0])
-                if not MENU_IMPORT_APPLY_ENABLED:
+                if not _should_apply_draft_on_extraction(session):
                     product_count = count_batch_products(batch)
                     return ToolResult(
                         ok=True,
@@ -665,6 +676,7 @@ class MenuImportSkill:
                 post_extraction_extra["open_questions_count"] = len(pending_questions)
                 post_extraction_extra["awaiting_clarification"] = True
             else:
+                session.status = MenuImportSessionStatus.OPTIMIZING.value
                 live_snapshot = capture_live_menu_import_draft(ctx)
                 session.live_menu_snapshot = live_snapshot
                 live_draft = live_snapshot.get("import_draft") or {}
@@ -683,7 +695,7 @@ class MenuImportSkill:
             _repo(ctx).update(session)
 
             product_count = count_batch_products(batch)
-            if not MENU_IMPORT_APPLY_ENABLED:
+            if not _should_apply_draft_on_extraction(session):
                 return ToolResult(
                     ok=True,
                     summary=f"Extracted {product_count} product(s) from menu source (OCR only)",
@@ -748,12 +760,83 @@ class MenuImportSkill:
                 _merge_clarification_answers(session, raw_answers)
 
             owner_instructions = str(args.get("owner_instructions") or "").strip()
-            if not (session.clarification_answers or {}) and not owner_instructions:
+            has_modeling_inputs = bool(session.clarification_answers) or bool(owner_instructions)
+            if not has_modeling_inputs:
+                if unanswered_question_ids(session):
+                    return ToolResult(
+                        ok=False,
+                        summary=(
+                            "Provide clarification_answers and/or owner_instructions "
+                            "to model the working draft"
+                        ),
+                    )
+                if _should_auto_apply_working_draft(session):
+                    try:
+                        working = validate_working_batch(session)
+                    except ValueError as exc:
+                        return ToolResult(ok=False, summary=str(exc))
+                    if not session.live_menu_snapshot:
+                        session.live_menu_snapshot = capture_live_menu_import_draft(ctx)
+                    try:
+                        apply_result, working_applied, reconciliation = _apply_draft_to_live_menu(
+                            ctx, session
+                        )
+                    except ValueError as exc:
+                        session.status = MenuImportSessionStatus.OPTIMIZING.value
+                        _repo(ctx).update(session)
+                        return ToolResult(
+                            ok=False,
+                            summary=f"Apply working draft failed: {exc}",
+                            data=_extraction_result_data(
+                                session,
+                                working,
+                                ctx=ctx,
+                                extra={"open_questions_remaining": 0},
+                            ),
+                        )
+                    extra: dict[str, Any] = {
+                        "modeled_products": count_batch_products(working_applied),
+                        "open_questions_remaining": 0,
+                        "applied_to_live": apply_result.ok,
+                        "live_menu_captured": bool(session.live_menu_snapshot),
+                        "batches_applied": apply_result.batches_applied,
+                        "categories": apply_result.categories,
+                        "products": apply_result.products,
+                        "option_groups": apply_result.option_groups,
+                        "option_items": apply_result.option_items,
+                        "promotions": apply_result.promotions,
+                    }
+                    if reconciliation is not None:
+                        extra["reconciliation"] = {
+                            "new_categories": reconciliation.new_categories,
+                            "reused_categories": reconciliation.reused_categories,
+                            "new_products": reconciliation.new_products,
+                            "updated_products": reconciliation.updated_products,
+                        }
+                    summary = (
+                        f"Applied {apply_result.products} product(s) to live menu; "
+                        "0 open question(s) remaining"
+                        if apply_result.ok
+                        else f"Apply working draft failed: {apply_result.summary}"
+                    )
+                    return ToolResult(
+                        ok=apply_result.ok,
+                        summary=summary,
+                        data=_extraction_result_data(
+                            session,
+                            working_applied,
+                            ctx=ctx,
+                            extra=extra,
+                        ),
+                    )
                 return ToolResult(
-                    ok=False,
-                    summary=(
-                        "Provide clarification_answers and/or owner_instructions "
-                        "to model the working draft"
+                    ok=True,
+                    summary="No clarification needed; working draft unchanged",
+                    data=_extraction_result_data(
+                        session,
+                        validate_working_batch(session),
+                        ctx=ctx,
+                        extra={"open_questions_remaining": 0},
                     ),
                 )
 
