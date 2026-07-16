@@ -380,6 +380,7 @@ export default function PublicDigitalMenuPage({
   }, [displayCategories]);
 
   const mobileScrollSpyEnabled =
+    isInteractive &&
     !isDesktopLayout &&
     !selectedProductId &&
     !selectedPromotionId &&
