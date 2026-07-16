@@ -101,10 +101,12 @@ def _merge_products(existing: list[ImportProduct], incoming: list[ImportProduct]
 
 def merge_page_drafts(drafts: list[ImportDraft]) -> ImportDraft:
     """Merge per-page extraction results, deduplicating categories by normalized name."""
+    from app.modules.assistant.skills.menu_import.draft_refs import ensure_unique_import_refs
+
     if not drafts:
         return ImportDraft()
     if len(drafts) == 1:
-        return drafts[0]
+        return ensure_unique_import_refs(drafts[0])
 
     categories_by_name: dict[str, ImportCategory] = {}
     category_order: list[str] = []
@@ -134,12 +136,14 @@ def merge_page_drafts(drafts: list[ImportDraft]) -> ImportDraft:
                 }
             )
 
-    return ImportDraft(
-        categories=[categories_by_name[key] for key in category_order],
-        promotions=promotions,
-        global_rules=_dedupe_strings(global_rules),
-        unmapped_text=_dedupe_strings(unmapped_text),
-        open_questions=_dedupe_open_questions(open_questions),
+    return ensure_unique_import_refs(
+        ImportDraft(
+            categories=[categories_by_name[key] for key in category_order],
+            promotions=promotions,
+            global_rules=_dedupe_strings(global_rules),
+            unmapped_text=_dedupe_strings(unmapped_text),
+            open_questions=_dedupe_open_questions(open_questions),
+        )
     )
 
 
