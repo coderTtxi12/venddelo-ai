@@ -20,22 +20,27 @@ python start.py
 
 ## Docker (local stack)
 
-`backend/docker-compose.yml` runs only the API container (no DB/Redis duplication).
-Use `infra/docker-compose.yml` for Postgres + Redis.
+**Recomendado — stack completo desde la raíz del repo** (Postgres, Redis, API, frontend, delivery-dashboard):
 
 ```bash
-cd infra
-docker compose up -d
+# desde venddelo-ai/
+./scripts/docker-dev-setup.sh   # primera vez
+docker compose up --build
+```
 
+Ver [DOCKER.md](../DOCKER.md) para URLs y variables.
+
+**Solo API en Docker** (`backend/docker-compose.yml` + infra en el host):
+
+```bash
+cd infra && docker compose up -d
 cd ../backend
-cp .env.docker.example .env   # first time only
+cp .env.example .env   # first time only
 docker compose up --build
 # health: http://localhost:8080/api/v1/health
 ```
 
-The API container connects to host services via `host.docker.internal`:
-- Postgres: `localhost:5434`
-- Redis: `localhost:6379`
+El contenedor API usa `host.docker.internal` para Postgres (`localhost:5434`) y Redis (`localhost:6379`).
 
 Migrations run automatically on API startup (`RUN_MIGRATIONS=true`). Set `RUN_MIGRATIONS=false` for Cloud Run (run migrations in CI instead).
 
