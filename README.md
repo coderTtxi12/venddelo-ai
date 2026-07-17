@@ -13,6 +13,62 @@ Plataforma para que restaurantes **creen, optimicen y publiquen un menú digital
 | API | `backend/` | `:8080` | FastAPI modular monolith — dominio + Copilot de Operaciones |
 | Infra local | `infra/` | `:5434` / `:6379` | Postgres + PostGIS, Redis |
 
+---
+
+## Scaffolding del proyecto
+
+```
+venddelo-ai/
+├── docker-compose.yml          # Stack completo (infra + api + frontends)
+├── .env.example                # Variables compartidas de Compose
+│
+├── frontend/                   # Panel restaurante + menú público (Next.js)
+│   └── src/
+│       ├── app/                # Rutas App Router
+│       ├── components/         # UI del panel y menú digital
+│       └── lib/                # API client, utilidades    
+│
+├── delivery-dashboard/         # Ops de delivery (Next.js)
+│   └── src/
+│       ├── app/                # Rutas App Router
+│       ├── components/         # UI del panel courier (mapas, tarifas, pedidos)
+│       └── lib/                # API client, utilidades
+│
+├── backend/                    # API FastAPI (modular monolith)
+│   ├── app/
+│   │   ├── api/                # Routers agregados
+│   │   ├── core/               # Config, auth, ports
+│   │   ├── db/                 # Models SQLAlchemy
+│   │   ├── infra/              # Redis, storage, repos compartidos
+│   │   ├── middleware/         # Rate limit, etc.
+│   │   └── modules/            # Dominio por módulo
+│   │       ├── assistant/      # Copilot de Operaciones
+│   │       │   ├── agent/      # Workflow router/executor/responder
+│   │       │   ├── skills/     # menu_read, menu_write, menu_import, …
+│   │       │   ├── context/    # Compresión de historial
+│   │       │   └── entitlements/
+│   │       ├── menu/
+│   │       ├── orders/
+│   │       ├── promotions/
+│   │       ├── restaurants/
+│   │       ├── delivery_providers/
+│   │       ├── public/         # Menú público + pedidos guest
+│   │       └── …
+│   ├── migrations/             # Alembic
+│   ├── tests/
+│   └── scripts/                # entrypoint.sh, utilidades
+│
+├── infra/                      # Postgres + PostGIS + Redis (local)
+│   ├── docker-compose.yml
+│   └── postgres-init/
+│
+└── docs/                       # Producto, arquitectura, specs
+    ├── PROJECT_CONTEXT.es.md
+    ├── TECH_ARCHITECTURE.es.md
+    └── superpowers/
+        ├── specs/              # Diseños aprobados
+        └── plans/              # Planes de implementación
+```
 
 ---
 
@@ -66,27 +122,7 @@ cd delivery-dashboard && pnpm install && pnpm dev
 ```
 ---
 
-## Arquitectura del monorepo
-
-```mermaid
-flowchart LR
-  FE[frontend :3000]
-  DD[delivery-dashboard :3001]
-  API[FastAPI :8080]
-  PG[(Postgres + PostGIS)]
-  RD[(Redis)]
-  SB[Supabase Auth + Storage]
-  LLM[OpenAI / Agents SDK]
-
-  FE --> API
-  DD --> API
-  FE --> SB
-  DD --> SB
-  API --> PG
-  API --> RD
-  API --> SB
-  API --> LLM
-```
+## Stack
 
 | App | Stack |
 |-----|--------|
