@@ -6,9 +6,11 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 AnalyticsGranularity = Literal["daily", "weekly", "monthly"]
+AnalyticsPreset = Literal["7d", "4w", "12m", "custom"]
 
 
 class AnalyticsPeriod(BaseModel):
+    preset: AnalyticsPreset
     granularity: AnalyticsGranularity
     timezone: str
     start: datetime
