@@ -98,7 +98,7 @@ export default function InteractiveHorizontalBarChart({
             <LabelList
               dataKey="value"
               position="right"
-              formatter={(value: number) => formatValue(value)}
+              formatter={(label) => formatValue(Number(label) || 0)}
               className={styles.barLabel}
             />
           </Bar>
