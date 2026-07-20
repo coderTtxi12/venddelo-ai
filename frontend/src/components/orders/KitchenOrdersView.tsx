@@ -32,6 +32,7 @@ import {
   KITCHEN_VIEW_FILTER_OPTIONS,
   KITCHEN_WORKFLOW_FILTER_OPTIONS,
   ORDER_STATUS_META,
+  type OrderStatusFilter,
   type OrderStatusFilterOption,
   type OrderStatusMeta,
 } from '@/lib/orders/orderStatus';
@@ -220,7 +221,7 @@ function OrderItemCard({
     item.selected_options != null && Object.keys(item.selected_options).length > 0;
   const optionsPending =
     productsLoading &&
-    Boolean(item.product_id) &&
+    item.product_id != null &&
     !productsById.has(item.product_id);
   const imageUrl = storagePublicUrl(item.product_image_path);
   const product = item.product_id ? productsById.get(item.product_id) : undefined;
