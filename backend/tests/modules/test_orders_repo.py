@@ -72,6 +72,80 @@ def test_list_by_restaurant_status_filter_and_pagination(session):
 
 
 @requires_db
+def test_list_by_restaurant_eager_loads_items_bounded_queries(session, engine):
+    from sqlalchemy import event
+
+    r = _restaurant(session, "ord5")
+    repo = SqlAlchemyOrderRepository(session)
+    for index in range(3):
+        repo.add(
+            _order(
+                r.id,
+                items=[
+                    OrderItemCreate(
+                        product_name=f"Item {index}",
+                        quantity=1,
+                        unit_price_cents=1000,
+                        line_total_cents=1000,
+                    )
+                ],
+            )
+        )
+
+    query_count = {"n": 0}
+
+    def before_cursor_execute(
+        conn, cursor, statement, parameters, context, executemany
+    ) -> None:
+        query_count["n"] += 1
+
+    event.listen(engine, "before_cursor_execute", before_cursor_execute)
+    try:
+        page = repo.list_by_restaurant(r.id, PaginationParams(limit=10))
+        assert len(page.items) == 3
+        assert all(len(order.items) == 1 for order in page.items)
+        assert query_count["n"] <= 3
+    finally:
+        event.remove(engine, "before_cursor_execute", before_cursor_execute)
+
+
+@requires_db
+def test_list_by_restaurant_view_active_and_archive(session):
+    r = _restaurant(session, "ord6")
+    repo = SqlAlchemyOrderRepository(session)
+    repo.add(_order(r.id, status="pending"))
+    repo.add(_order(r.id, status="confirmed"))
+    repo.add(_order(r.id, status="delivered"))
+    repo.add(_order(r.id, status="cancelled"))
+
+    active = repo.list_by_restaurant(r.id, PaginationParams(limit=10), view="active")
+    archive = repo.list_by_restaurant(r.id, PaginationParams(limit=10), view="archive")
+
+    assert len(active.items) == 2
+    assert {item.status for item in active.items} == {"pending", "confirmed"}
+    assert len(archive.items) == 2
+    assert {item.status for item in archive.items} == {"delivered", "cancelled"}
+
+
+@requires_db
+def test_status_summary_counts(session):
+    r = _restaurant(session, "ord7")
+    repo = SqlAlchemyOrderRepository(session)
+    repo.add(_order(r.id, status="pending"))
+    repo.add(_order(r.id, status="pending"))
+    repo.add(_order(r.id, status="ready"))
+    repo.add(_order(r.id, status="delivered"))
+
+    summary = repo.status_summary(r.id)
+
+    assert summary.pending == 2
+    assert summary.ready == 1
+    assert summary.delivered == 1
+    assert summary.active == 3
+    assert summary.total == 4
+
+
+@requires_db
 def test_get_by_idempotency_key(session):
     r = _restaurant(session, "ord4")
     repo = SqlAlchemyOrderRepository(session)
