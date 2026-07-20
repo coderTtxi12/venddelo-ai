@@ -1,0 +1,296 @@
+.socialSection {
+  margin-top: 4px;
+  padding: 16px 16px 24px;
+  border-top: 1px solid var(--dm-border, #e2e8f0);
+  background: var(--dm-surface, #fff);
+}
+
+.socialSectionCartBarInset {
+  /* Match PublicMenuCartBar: bottom offset + button height + clearance */
+  padding-bottom: calc(0.85rem + 52px + 1rem + env(safe-area-inset-bottom, 0px));
+}
+
+.socialSectionSidebar {
+  margin-top: 0;
+  padding: 0 16px 20px;
+  border-top: none;
+  background: transparent;
+}
+
+.socialSectionSidebar .socialHeader {
+  margin-bottom: 8px;
+}
+
+.socialSectionSidebar .socialTitle {
+  font-size: 0.88rem;
+}
+
+/* Debajo del encabezado: fila compacta integrada al brand */
+.socialSectionIntro {
+  margin: 10px 0 0;
+  padding: 0;
+  border-top: none;
+  background: transparent;
+}
+
+.socialSectionIntro .socialLinksRow {
+  gap: 8px;
+}
+
+.socialSectionIntro .socialLink {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+}
+
+.socialSectionIntro .socialLinkIcon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Desktop sidebar: alinear con el gutter de marca (16px), no al borde ni a la derecha */
+.socialSectionIntroSidebar {
+  padding: 0 16px;
+  margin-top: 0;
+  align-self: stretch;
+  box-sizing: border-box;
+}
+
+.socialSectionIntroSidebar .socialLinksRow {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+/* Sobre la portada: overlay inferior derecho (evita chocar con el logo) */
+.socialSectionCover {
+  position: absolute;
+  right: 12px;
+  left: auto;
+  bottom: 12px;
+  z-index: 3;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  pointer-events: none;
+}
+
+.socialSectionCover .socialLinksRow {
+  pointer-events: auto;
+}
+
+.socialLinksRowCover {
+  gap: 8px;
+}
+
+.socialSectionCover .socialLink {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.22);
+}
+
+.socialLinkOnCover {
+  border-color: rgba(255, 255, 255, 0.55) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  backdrop-filter: blur(8px);
+}
+
+.socialLinkOnCover:hover {
+  background: #fff !important;
+  border-color: #fff !important;
+}
+
+/* Antes de categorías: franja separadora ligera */
+.socialSectionBeforeMenu {
+  margin: 0;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--dm-border, #e2e8f0);
+  border-bottom: 1px solid var(--dm-border, #e2e8f0);
+  background: color-mix(in srgb, var(--dm-surface, #fff) 88%, var(--dm-bg, #f8fafc) 12%);
+}
+
+.socialSectionBeforeMenu .socialHeader {
+  margin-bottom: 8px;
+}
+
+.socialSectionBeforeMenu .socialTitle {
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.socialSectionBeforeMenu .socialHeaderIcon {
+  font-size: 1rem !important;
+}
+
+.socialSectionBeforeMenu .socialLinksRow {
+  gap: 8px;
+}
+
+.socialSectionBeforeMenu .socialLink {
+  width: 40px;
+  height: 40px;
+}
+
+/* Desktop main: alinear con .section / PromotionShortcutBanners (40px) */
+.socialSectionBeforeMenu.socialSectionBeforeMenuDesktop {
+  padding: 12px 40px 14px;
+}
+
+.socialSectionBeforeMenuDesktop .socialLinksRow {
+  justify-content: flex-start;
+}
+
+/* Mobile/tablet stacked footer: sit closer to location block */
+.socialSection:not(.socialSectionSidebar):not(.socialSectionIntro):not(.socialSectionCover):not(
+    .socialSectionBeforeMenu
+  ):not(.socialSectionCartBarInset) {
+  margin-top: 0;
+  padding-top: 10px;
+  padding-bottom: 20px;
+}
+
+.socialSection:not(.socialSectionSidebar):not(.socialSectionIntro):not(.socialSectionCover):not(
+    .socialSectionBeforeMenu
+  ).socialSectionCartBarInset {
+  margin-top: 0;
+  padding-top: 10px;
+}
+
+.socialSection:not(.socialSectionSidebar):not(.socialSectionIntro):not(.socialSectionCover) .socialHeader {
+  margin-bottom: 8px;
+}
+
+.socialHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.socialHeaderIcon {
+  font-size: 1.1rem !important;
+  color: var(--dm-primary, #6366f1);
+  margin-top: 2px;
+}
+
+.socialHeading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.socialTitle {
+  margin: 0;
+  font-family: var(--dm-font-heading, inherit);
+  font-size: 1rem;
+  font-weight: var(--dm-font-heading-weight, 700);
+  color: var(--dm-text, #0f172a);
+}
+
+.socialHint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--dm-text-secondary, #64748b);
+}
+
+.socialLinksRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.socialLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--dm-radius-ui, 12px);
+  border: 1px solid var(--dm-border, #e2e8f0);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.socialLink:focus-visible {
+  outline: 2px solid var(--dm-primary, #6366f1);
+  outline-offset: 2px;
+}
+
+.socialLinkIcon {
+  width: 20px;
+  height: 20px;
+}
+
+.socialLinkFacebook {
+  color: #1877f2;
+  border-color: color-mix(in srgb, #1877f2 34%, var(--dm-border, #e2e8f0) 66%);
+  background: color-mix(in srgb, #1877f2 16%, var(--dm-surface, #fff) 84%);
+}
+
+.socialLinkFacebook:hover {
+  border-color: #1877f2;
+  background: color-mix(in srgb, #1877f2 24%, var(--dm-surface, #fff) 76%);
+}
+
+.socialLinkInstagram {
+  color: #e4405f;
+  border-color: color-mix(in srgb, #e4405f 34%, var(--dm-border, #e2e8f0) 66%);
+  background: color-mix(in srgb, #e4405f 16%, var(--dm-surface, #fff) 84%);
+}
+
+.socialLinkInstagram:hover {
+  border-color: #e4405f;
+  background: color-mix(in srgb, #e4405f 24%, var(--dm-surface, #fff) 76%);
+}
+
+.socialLinkWhatsApp {
+  color: #25d366;
+  border-color: color-mix(in srgb, #25d366 34%, var(--dm-border, #e2e8f0) 66%);
+  background: color-mix(in srgb, #25d366 16%, var(--dm-surface, #fff) 84%);
+}
+
+.socialLinkWhatsApp:hover {
+  border-color: #25d366;
+  background: color-mix(in srgb, #25d366 24%, var(--dm-surface, #fff) 76%);
+}
+
+/* Tablet: más aire y alineación con el layout de 2 columnas del hero */
+@media (min-width: 720px) {
+  .socialSectionIntro .socialLink {
+    width: 42px;
+    height: 42px;
+  }
+
+  .socialSectionBeforeMenu:not(.socialSectionBeforeMenuDesktop) {
+    padding: 14px 24px 16px;
+  }
+
+  .socialSectionBeforeMenu .socialLinksRow {
+    gap: 10px;
+  }
+
+  .socialSectionCover {
+    right: 16px;
+    left: auto;
+    bottom: 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .socialSectionCover .socialLink {
+    width: 38px;
+    height: 38px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .socialLink {
+    transition: none;
+  }
+}
