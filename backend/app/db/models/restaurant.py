@@ -47,6 +47,23 @@ class Restaurant(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
         Text, nullable=False, server_default="Por tiempo limitado"
     )
     whatsapp_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    live_menu_social_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    live_menu_social_facebook_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    live_menu_social_instagram_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    live_menu_social_whatsapp_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    live_menu_social_placement: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="footer"
+    )
+    facebook_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    instagram_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     owner_contact_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     owner_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     subdomain: Mapped[str] = mapped_column(String(63), nullable=False)
