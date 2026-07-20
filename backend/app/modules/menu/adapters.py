@@ -327,6 +327,10 @@ class SqlAlchemyMenuRepository(MenuRepository):
         stmt = (
             select(Product)
             .where(Product.restaurant_id == restaurant_id)
+            .options(
+                selectinload(Product.categories),
+                selectinload(Product.option_groups).selectinload(OptionGroup.items),
+            )
             .order_by(Product.created_at, Product.id)
             .limit(params.limit + 1)
         )
@@ -345,7 +349,7 @@ class SqlAlchemyMenuRepository(MenuRepository):
         rows = rows[: params.limit]
         next_cursor = encode_keyset_cursor(rows[-1].created_at, rows[-1].id) if has_more else None
         return CursorPage(
-            items=[_product_to_dto(r, self._session) for r in rows],
+            items=_products_to_dtos(self._session, rows),
             next_cursor=next_cursor,
             has_more=has_more,
         )

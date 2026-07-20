@@ -1,3 +1,4 @@
+from app.core.pagination import PaginationParams
 from app.modules.menu.adapters import (
     SqlAlchemyMenuRepository,
     _category_sort_indices,
@@ -314,6 +315,53 @@ def test_set_option_group_item_order_active_only_when_inactive_linked(session):
     assert items[0].is_active is True
     assert items[1].label == "Cebolla"
     assert items[1].is_active is False
+
+
+@requires_db
+def test_list_products_bounded_query_count(session, engine):
+    from sqlalchemy import event
+
+    r = _restaurant(session, "menu-list-query-count")
+    repo = SqlAlchemyMenuRepository(session)
+    cat = repo.add_category(CategoryCreate(restaurant_id=r.id, name="Cat"))
+
+    for index in range(5):
+        product = repo.add_product(
+            ProductCreate(
+                restaurant_id=r.id,
+                name=f"Product {index}",
+                price_cents=1000 + index,
+                status="active",
+                category_ids=[cat.id],
+            )
+        )
+        repo.add_option_group(
+            product.id,
+            OptionGroupCreate(
+                title="Extras",
+                selection="single",
+                items=[
+                    OptionItemCreate(label="A", price_delta_cents=0),
+                    OptionItemCreate(label="B", price_delta_cents=100),
+                ],
+            ),
+        )
+
+    query_count = {"n": 0}
+
+    def before_cursor_execute(
+        conn, cursor, statement, parameters, context, executemany
+    ) -> None:
+        query_count["n"] += 1
+
+    event.listen(engine, "before_cursor_execute", before_cursor_execute)
+    try:
+        page = repo.list_products(r.id, PaginationParams(limit=5, cursor=None))
+        assert len(page.items) == 5
+        assert all(item.option_groups for item in page.items)
+        assert query_count["n"] <= 10
+    finally:
+        event.remove(engine, "before_cursor_execute", before_cursor_execute)
 
 
 @requires_db
