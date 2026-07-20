@@ -16,6 +16,8 @@ import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountd
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import { RestaurantHoursDisplay } from '@/components/digital-menu/RestaurantHoursDisplay';
 import { RestaurantLocationSection } from '@/components/digital-menu/RestaurantLocationSection';
+import { LiveMenuSocialLinks } from '@/components/digital-menu/LiveMenuSocialLinks';
+import socialStyles from '@/components/digital-menu/RestaurantSocialLinksSection.module.css';
 import { RestaurantOpenStatusBadge } from '@/components/digital-menu/RestaurantOpenStatusBadge';
 import { RestaurantServiceChips } from '@/components/digital-menu/RestaurantServiceChips';
 import {
@@ -96,6 +98,11 @@ export function PublicDesktopMenuLayout({
           ) : (
             <div className={styles.sidebarCoverPlaceholder} aria-hidden />
           )}
+          <LiveMenuSocialLinks
+            socialLinks={restaurant.social_links}
+            placement={restaurant.social_placement}
+            slot="cover"
+          />
         </div>
 
         <div className={styles.sidebarScroll}>
@@ -127,6 +134,13 @@ export function PublicDesktopMenuLayout({
                 />
               </div>
             ) : null}
+
+            <LiveMenuSocialLinks
+              socialLinks={restaurant.social_links}
+              placement={restaurant.social_placement}
+              slot="intro"
+              className={socialStyles.socialSectionIntroSidebar}
+            />
 
             {onOpenSearch ? (
               <div className={styles.searchWrap}>
@@ -181,12 +195,24 @@ export function PublicDesktopMenuLayout({
                 flat
               />
               <RestaurantLocationSection restaurant={restaurant} variant="sidebar" />
+              <LiveMenuSocialLinks
+                socialLinks={restaurant.social_links}
+                placement={restaurant.social_placement}
+                slot="footer"
+                variant="sidebar"
+              />
             </div>
           </div>
         </div>
       </aside>
 
       <main ref={scrollRef} className={styles.main} aria-label="Menú">
+        <LiveMenuSocialLinks
+          socialLinks={restaurant.social_links}
+          placement={restaurant.social_placement}
+          slot="before_menu"
+          className={socialStyles.socialSectionBeforeMenuDesktop}
+        />
         {children ?? (
           displayCategories.length === 0 ? (
             <p className={styles.empty}>Este menú aún no tiene categorías.</p>

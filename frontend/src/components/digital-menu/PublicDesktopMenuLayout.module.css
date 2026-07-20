@@ -20,6 +20,7 @@
 }
 
 .sidebarCover {
+  position: relative;
   flex-shrink: 0;
   height: var(--dm-cover-height, 168px);
   overflow: hidden;

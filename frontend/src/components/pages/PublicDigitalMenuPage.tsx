@@ -18,6 +18,8 @@ import {
 } from '@/components/digital-menu/menuProductUi';
 import { RestaurantHoursDisplay } from '@/components/digital-menu/RestaurantHoursDisplay';
 import { RestaurantLocationSection } from '@/components/digital-menu/RestaurantLocationSection';
+import { LiveMenuSocialLinks } from '@/components/digital-menu/LiveMenuSocialLinks';
+import { hasPublicSocialLinks, isSocialAtPlacement } from '@/lib/digital-menu/restaurantSocialLinks';
 import { RestaurantOpenStatusBadge } from '@/components/digital-menu/RestaurantOpenStatusBadge';
 import { RestaurantServiceChips } from '@/components/digital-menu/RestaurantServiceChips';
 import {
@@ -669,6 +671,9 @@ export default function PublicDigitalMenuPage({
   const cartCurrency = cart.lines[0]?.currency ?? products[0]?.currency ?? 'MXN';
   const showCartBar =
     !showCart && cart.itemCount > 0 && !selectedProduct;
+  const showSocialLinks = hasPublicSocialLinks(restaurant?.social_links);
+  const socialAtFooter =
+    showSocialLinks && isSocialAtPlacement(restaurant?.social_placement, 'footer');
   const detailHeroCollapsed = selectedProduct
     ? productHeroCollapsed
     : selectedPromotion
@@ -910,6 +915,11 @@ export default function PublicDigitalMenuPage({
                         </button>
                       </div>
                     </div>
+                    <LiveMenuSocialLinks
+                      socialLinks={restaurant.social_links}
+                      placement={restaurant.social_placement}
+                      slot="cover"
+                    />
                   </div>
 
                   <div className={menuStyles.restaurantHeader}>
@@ -932,9 +942,21 @@ export default function PublicDigitalMenuPage({
                       <p className={menuStyles.restaurantDescriptionStatic}>{restaurant.description}</p>
                     ) : null}
                     <RestaurantServiceChips services={enabledServices} />
+                    <LiveMenuSocialLinks
+                      socialLinks={restaurant.social_links}
+                      placement={restaurant.social_placement}
+                      slot="intro"
+                    />
                     <div ref={heroSentinelRef} className={menuStyles.heroSentinel} aria-hidden />
                   </div>
                 </section>
+
+                <LiveMenuSocialLinks
+                  socialLinks={restaurant.social_links}
+                  placement={restaurant.social_placement}
+                  slot="before_menu"
+                  className={isTabletLayout ? menuStyles.tabletInsetSection : undefined}
+                />
 
                 {categories.length === 0 ? (
                   <div className={menuStyles.emptyCategories}>Este menú aún no tiene categorías.</div>
@@ -986,6 +1008,13 @@ export default function PublicDigitalMenuPage({
                 />
                 <RestaurantLocationSection
                   restaurant={restaurant}
+                  cartBarInset={showCartBar && !socialAtFooter}
+                  className={isTabletLayout ? menuStyles.tabletInsetSection : undefined}
+                />
+                <LiveMenuSocialLinks
+                  socialLinks={restaurant.social_links}
+                  placement={restaurant.social_placement}
+                  slot="footer"
                   cartBarInset={showCartBar}
                   className={isTabletLayout ? menuStyles.tabletInsetSection : undefined}
                 />

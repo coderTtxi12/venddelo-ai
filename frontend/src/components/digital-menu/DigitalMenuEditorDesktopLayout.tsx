@@ -12,6 +12,12 @@ import {
 } from '@/components/digital-menu/SortableProductList';
 import { RestaurantHoursDisplay } from '@/components/digital-menu/RestaurantHoursDisplay';
 import { RestaurantLocationSection } from '@/components/digital-menu/RestaurantLocationSection';
+import { LiveMenuSocialLinks } from '@/components/digital-menu/LiveMenuSocialLinks';
+import socialStyles from '@/components/digital-menu/RestaurantSocialLinksSection.module.css';
+import {
+  buildRestaurantSocialLinks,
+  restaurantSocialLinkSourceFromRestaurant,
+} from '@/lib/digital-menu/restaurantSocialLinks';
 import { RestaurantOpenStatusBadge } from '@/components/digital-menu/RestaurantOpenStatusBadge';
 import { RestaurantServiceChips } from '@/components/digital-menu/RestaurantServiceChips';
 import {
@@ -100,6 +106,8 @@ export function DigitalMenuEditorDesktopLayout({
   onAssetUpload,
   children,
 }: DigitalMenuEditorDesktopLayoutProps) {
+  const socialLinks = buildRestaurantSocialLinks(restaurantSocialLinkSourceFromRestaurant(restaurant));
+
   return (
     <div className={desktopStyles.layout} style={themeStyle}>
       <aside className={desktopStyles.sidebar} aria-label="Información y categorías">
@@ -126,6 +134,11 @@ export function DigitalMenuEditorDesktopLayout({
               if (file) onAssetUpload('cover', file);
               e.target.value = '';
             }}
+          />
+          <LiveMenuSocialLinks
+            socialLinks={socialLinks}
+            placement={restaurant.live_menu_social_placement}
+            slot="cover"
           />
         </div>
 
@@ -186,9 +199,20 @@ export function DigitalMenuEditorDesktopLayout({
               />
             </div>
 
-            <RestaurantServiceChips
-              services={enabledServices}
-              className={desktopStyles.restaurantServiceList}
+            {enabledServices.length > 0 ? (
+              <div className={desktopStyles.restaurantMeta}>
+                <RestaurantServiceChips
+                  services={enabledServices}
+                  className={desktopStyles.restaurantServiceList}
+                />
+              </div>
+            ) : null}
+
+            <LiveMenuSocialLinks
+              socialLinks={socialLinks}
+              placement={restaurant.live_menu_social_placement}
+              slot="intro"
+              className={socialStyles.socialSectionIntroSidebar}
             />
 
             <div className={desktopStyles.searchWrap}>
@@ -284,12 +308,24 @@ export function DigitalMenuEditorDesktopLayout({
                 flat
               />
               <RestaurantLocationSection restaurant={restaurant} variant="sidebar" />
+              <LiveMenuSocialLinks
+                socialLinks={socialLinks}
+                placement={restaurant.live_menu_social_placement}
+                slot="footer"
+                variant="sidebar"
+              />
             </div>
           </div>
         </div>
       </aside>
 
       <main ref={scrollRef} className={desktopStyles.main} aria-label="Menú">
+        <LiveMenuSocialLinks
+          socialLinks={socialLinks}
+          placement={restaurant.live_menu_social_placement}
+          slot="before_menu"
+          className={socialStyles.socialSectionBeforeMenuDesktop}
+        />
         {children ??
           (displayCategories.length === 0 ? (
             <p className={desktopStyles.empty}>Crea categorías en Productos para ver tu menú aquí</p>

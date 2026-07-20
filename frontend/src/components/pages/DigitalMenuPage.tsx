@@ -28,6 +28,11 @@ import { arrayMove } from '@/lib/arrayMove';
 import { DigitalMenuEditorPreview } from '@/components/digital-menu/DigitalMenuEditorPreview';
 import { DigitalMenuQrDialog } from '@/components/digital-menu/DigitalMenuQrDialog';
 import { DigitalMenuSpecialCategoriesPanel } from '@/components/digital-menu/DigitalMenuSpecialCategoriesPanel';
+import {
+  DigitalMenuSocialLinksPanel,
+  digitalMenuSocialLinksConfigFromRestaurant,
+  type DigitalMenuSocialLinksConfig,
+} from '@/components/digital-menu/DigitalMenuSocialLinksPanel';
 import { DigitalMenuThemePicker } from '@/components/digital-menu/DigitalMenuThemePicker';
 import type { ProductDragTarget } from '@/components/digital-menu/SortableProductList';
 import { productsForCategory, sortCategories, categoryProductOrderWithDraftTail } from '@/components/digital-menu/menuProductUi';
@@ -39,6 +44,7 @@ import {
   digitalMenuThemeToStyle,
 } from '@/lib/digital-menu/themes';
 import { resolveRestaurantServices, type RestaurantServiceType } from '@/lib/restaurantServices';
+import { whatsappPhoneDigits } from '@/lib/digital-menu/checkout/formatWhatsAppOrderMessage';
 import { restaurantPublicMenuUrl } from '@/lib/restaurantSubdomain';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
@@ -76,6 +82,8 @@ export default function DigitalMenuPage() {
   const [enabledServices, setEnabledServices] = useState<RestaurantServiceType[]>([]);
   const [schedules, setSchedules] = useState<RestaurantSchedule[]>([]);
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [socialLinksError, setSocialLinksError] = useState<string | null>(null);
+  const [socialLinksSaving, setSocialLinksSaving] = useState(false);
 
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const reloadPreviewTimerRef = useRef<number | null>(null);
@@ -292,6 +300,18 @@ export default function DigitalMenuPage() {
     [restaurant],
   );
 
+  const socialLinksConfig = useMemo(
+    () => digitalMenuSocialLinksConfigFromRestaurant(restaurant),
+    [restaurant],
+  );
+
+  const whatsappConfigured = useMemo(
+    () =>
+      restaurant?.whatsapp_phone != null &&
+      whatsappPhoneDigits(restaurant.whatsapp_phone).length >= 8,
+    [restaurant?.whatsapp_phone],
+  );
+
   const promotionShortcuts = useMemo(
     () => listLivePromotionShortcuts(promotions, previewProducts, new Date(), promotionTimezone),
     [promotions, previewProducts, promotionTimezone],
@@ -332,6 +352,39 @@ export default function DigitalMenuPage() {
       }
     },
     [accessToken, restaurant, restaurantId, specialCategoryConfig],
+  );
+
+  const persistSocialLinksConfig = useCallback(
+    async (patch: Partial<DigitalMenuSocialLinksConfig>) => {
+      if (!accessToken || !restaurantId || !restaurant) return;
+
+      const nextConfig = { ...socialLinksConfig, ...patch };
+      setSocialLinksSaving(true);
+      setSocialLinksError(null);
+
+      try {
+        const updated = await updateRestaurant(accessToken, restaurantId, {
+          live_menu_social_enabled: nextConfig.enabled,
+          live_menu_social_facebook_enabled: nextConfig.facebookEnabled,
+          live_menu_social_instagram_enabled: nextConfig.instagramEnabled,
+          live_menu_social_whatsapp_enabled: nextConfig.whatsappEnabled,
+          live_menu_social_placement: nextConfig.placement,
+          facebook_url: nextConfig.facebookUrl.trim() || null,
+          instagram_url: nextConfig.instagramUrl.trim() || null,
+        });
+        setRestaurant(updated);
+      } catch (error) {
+        console.error(error);
+        setSocialLinksError(
+          error instanceof ApiError
+            ? error.message
+            : 'No se pudieron guardar las redes sociales. Intenta de nuevo.',
+        );
+      } finally {
+        setSocialLinksSaving(false);
+      }
+    },
+    [accessToken, restaurant, restaurantId, socialLinksConfig],
   );
 
   const persistCategoryOrder = useCallback(
@@ -673,6 +726,15 @@ export default function DigitalMenuPage() {
               const trimmed = name.trim();
               if (!trimmed || trimmed === specialCategoryConfig.limitedTimeCategoryName) return;
               void persistSpecialCategoryConfig({ limitedTimeCategoryName: trimmed });
+            }}
+          />
+          <DigitalMenuSocialLinksPanel
+            config={socialLinksConfig}
+            whatsappConfigured={whatsappConfigured}
+            saving={socialLinksSaving}
+            error={socialLinksError}
+            onChange={(patch) => {
+              void persistSocialLinksConfig(patch);
             }}
           />
         </aside>

@@ -6,7 +6,7 @@
 }
 
 .locationSectionCartBarInset {
-  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(0.85rem + 52px + 1rem + env(safe-area-inset-bottom, 0px));
 }
 
 .locationSectionSidebar {
@@ -30,6 +30,11 @@
 
 .locationSectionSidebar .mapsLink {
   font-size: 0.74rem;
+}
+
+/* Mobile/tablet stacked footer: tighter gap before social links */
+.locationSection:not(.locationSectionSidebar):not(.locationSectionCartBarInset) {
+  padding-bottom: 8px;
 }
 
 .locationHeader {

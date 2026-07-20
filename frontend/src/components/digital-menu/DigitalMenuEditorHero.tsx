@@ -4,8 +4,13 @@ import type { RefObject } from 'react';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import { DigitalMenuShareButton } from '@/components/digital-menu/DigitalMenuShareButton';
 import type { Restaurant, RestaurantSchedule } from '@/lib/api/types';
+import { LiveMenuSocialLinks } from '@/components/digital-menu/LiveMenuSocialLinks';
 import { RestaurantOpenStatusBadge } from '@/components/digital-menu/RestaurantOpenStatusBadge';
 import { RestaurantServiceChips } from '@/components/digital-menu/RestaurantServiceChips';
+import {
+  buildRestaurantSocialLinks,
+  restaurantSocialLinkSourceFromRestaurant,
+} from '@/lib/digital-menu/restaurantSocialLinks';
 import { PUBLIC_MENU_SCHEDULE_SERVICE_TYPES, type RestaurantServiceType } from '@/lib/restaurantServices';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 
@@ -40,6 +45,8 @@ export function DigitalMenuEditorHero({
   onDescriptionBlur,
   onAssetUpload,
 }: DigitalMenuEditorHeroProps) {
+  const socialLinks = buildRestaurantSocialLinks(restaurantSocialLinkSourceFromRestaurant(restaurant));
+
   return (
     <section className={menuStyles.menuHero} aria-label="Información del restaurante">
       <div className={menuStyles.coverWrap}>
@@ -83,6 +90,11 @@ export function DigitalMenuEditorHero({
             if (file) onAssetUpload('cover', file);
             e.target.value = '';
           }}
+        />
+        <LiveMenuSocialLinks
+          socialLinks={socialLinks}
+          placement={restaurant.live_menu_social_placement}
+          slot="cover"
         />
       </div>
 
@@ -141,6 +153,11 @@ export function DigitalMenuEditorHero({
           />
         </div>
         <RestaurantServiceChips services={enabledServices} />
+        <LiveMenuSocialLinks
+          socialLinks={socialLinks}
+          placement={restaurant.live_menu_social_placement}
+          slot="intro"
+        />
         <div ref={heroSentinelRef} className={menuStyles.heroSentinel} aria-hidden />
       </div>
     </section>

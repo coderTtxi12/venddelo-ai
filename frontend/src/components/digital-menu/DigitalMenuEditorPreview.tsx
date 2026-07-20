@@ -23,6 +23,11 @@ import { DigitalMenuEditorCategorySections } from '@/components/digital-menu/Dig
 import { DigitalMenuEditorDesktopLayout } from '@/components/digital-menu/DigitalMenuEditorDesktopLayout';
 import { DigitalMenuEditorHero } from '@/components/digital-menu/DigitalMenuEditorHero';
 import { RestaurantLocationSection } from '@/components/digital-menu/RestaurantLocationSection';
+import { LiveMenuSocialLinks } from '@/components/digital-menu/LiveMenuSocialLinks';
+import {
+  buildRestaurantSocialLinks,
+  restaurantSocialLinkSourceFromRestaurant,
+} from '@/lib/digital-menu/restaurantSocialLinks';
 import { RestaurantHoursDisplay } from '@/components/digital-menu/RestaurantHoursDisplay';
 import type { ProductDragTarget } from '@/components/digital-menu/SortableProductList';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
@@ -635,6 +640,15 @@ export function DigitalMenuEditorPreview({
                       onAssetUpload={onAssetUpload}
                     />
 
+                    <LiveMenuSocialLinks
+                      socialLinks={buildRestaurantSocialLinks(
+                        restaurantSocialLinkSourceFromRestaurant(restaurant),
+                      )}
+                      placement={restaurant.live_menu_social_placement}
+                      slot="before_menu"
+                      className={isTabletLayout ? menuStyles.tabletInsetSection : undefined}
+                    />
+
                     {displayCategories.length === 0 ? (
                       <div className={menuStyles.emptyCategories}>
                         Crea categorías en Productos para ver tu menú aquí
@@ -684,6 +698,14 @@ export function DigitalMenuEditorPreview({
                     />
                     <RestaurantLocationSection
                       restaurant={restaurant}
+                      className={isTabletLayout ? menuStyles.tabletInsetSection : undefined}
+                    />
+                    <LiveMenuSocialLinks
+                      socialLinks={buildRestaurantSocialLinks(
+                        restaurantSocialLinkSourceFromRestaurant(restaurant),
+                      )}
+                      placement={restaurant.live_menu_social_placement}
+                      slot="footer"
                       className={isTabletLayout ? menuStyles.tabletInsetSection : undefined}
                     />
                   </>

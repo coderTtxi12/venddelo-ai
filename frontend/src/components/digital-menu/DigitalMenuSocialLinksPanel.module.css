@@ -1,0 +1,173 @@
+.panel {
+  width: 100%;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 14px;
+  padding: 14px 16px 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.panelHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.panelTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text);
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.panelHint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+}
+
+.channelBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+
+.placementFieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.placementOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.placementOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+
+.placementOption:has(input:checked) {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border, #e2e8f0) 55%);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface, #fff) 92%);
+}
+
+.placementOption input {
+  margin-top: 2px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.placementCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.placementLabel {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.placementHint {
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.toggleRow input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.fieldLabel {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.textInput {
+  width: 100%;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  font-size: 0.84rem;
+  color: var(--color-text);
+  background: var(--color-surface, #fff);
+}
+
+.textInput:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.textInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.textInputError {
+  border-color: #dc2626;
+}
+
+.fieldHint {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+}
+
+.fieldError {
+  margin: 0;
+  font-size: 0.74rem;
+  color: #dc2626;
+  line-height: 1.35;
+}
