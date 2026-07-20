@@ -7,6 +7,12 @@ from pydantic import BaseModel, Field
 from app.modules.promotions.schemas import PromotionDTO
 
 
+class PublicRestaurantSocialLinksDTO(BaseModel):
+    facebook_url: str | None = None
+    instagram_url: str | None = None
+    whatsapp_url: str | None = None
+
+
 class PublicRestaurantDTO(BaseModel):
     name: str
     description: str | None = None
@@ -26,6 +32,8 @@ class PublicRestaurantDTO(BaseModel):
     digital_menu_limited_time_category_enabled: bool = True
     digital_menu_limited_time_category_name: str = "Por tiempo limitado"
     whatsapp_phone: str | None = None
+    social_links: PublicRestaurantSocialLinksDTO | None = None
+    social_placement: str = "footer"
     original_language: str
     timezone: str = "America/Mexico_City"
     server_now: datetime | None = None

@@ -31,8 +31,10 @@ from app.modules.public.schemas import (
     PublicDeliveryServiceDTO,
     PublicPromotionsContextDTO,
     PublicRestaurantDTO,
+    PublicRestaurantSocialLinksDTO,
 )
 from app.modules.restaurants.schemas import ScheduleDTO
+from app.modules.restaurants.social_links import build_public_social_links, normalize_live_menu_social_placement
 from app.modules.translations.service import TranslationService
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -100,6 +102,18 @@ def _public_restaurant(uow: SqlAlchemyUnitOfWork, subdomain: str):
 
 def _to_public_restaurant_dto(restaurant) -> PublicRestaurantDTO:
     now = datetime.now(UTC)
+    social_payload = build_public_social_links(
+        enabled=restaurant.live_menu_social_enabled,
+        facebook_enabled=restaurant.live_menu_social_facebook_enabled,
+        instagram_enabled=restaurant.live_menu_social_instagram_enabled,
+        whatsapp_enabled=restaurant.live_menu_social_whatsapp_enabled,
+        facebook_url=restaurant.facebook_url,
+        instagram_url=restaurant.instagram_url,
+        whatsapp_phone=restaurant.whatsapp_phone,
+    )
+    social_links = (
+        PublicRestaurantSocialLinksDTO(**social_payload) if social_payload is not None else None
+    )
     return PublicRestaurantDTO(
         name=restaurant.name,
         description=restaurant.description,
@@ -119,6 +133,8 @@ def _to_public_restaurant_dto(restaurant) -> PublicRestaurantDTO:
         digital_menu_limited_time_category_enabled=restaurant.digital_menu_limited_time_category_enabled,
         digital_menu_limited_time_category_name=restaurant.digital_menu_limited_time_category_name,
         whatsapp_phone=restaurant.whatsapp_phone,
+        social_links=social_links,
+        social_placement=normalize_live_menu_social_placement(restaurant.live_menu_social_placement),
         original_language=restaurant.original_language,
         timezone=restaurant.timezone,
         server_now=now,
