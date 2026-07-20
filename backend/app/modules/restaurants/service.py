@@ -22,6 +22,14 @@ from app.modules.restaurants.schemas import (
     ScheduleCreate,
     ScheduleDTO,
 )
+from app.modules.restaurants.social_links import (
+    is_facebook_url,
+    is_instagram_url,
+    is_valid_http_url,
+    normalize_live_menu_social_placement,
+    normalize_social_url,
+    whatsapp_contact_url,
+)
 
 _ADMIN_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -42,6 +50,90 @@ def _validate_digital_menu_theme_id(theme_id: str) -> None:
         raise ValidationError("digital_menu_theme_id must be 1-64 characters")
     if not _THEME_ID_RE.match(theme_id):
         raise ValidationError("Invalid digital_menu_theme_id format")
+
+
+def _validate_social_url_field(label: str, url: str | None, *, host_check) -> str | None:
+    normalized = normalize_social_url(url)
+    if normalized is None:
+        return None
+    if not is_valid_http_url(normalized):
+        raise ValidationError(f"El enlace de {label} no es válido")
+    if not host_check(normalized):
+        raise ValidationError(f"El enlace de {label} debe ser de {label}")
+    return normalized
+
+
+def _validate_live_menu_social_update(existing: RestaurantDTO, data: RestaurantUpdate) -> RestaurantUpdate:
+    enabled = (
+        data.live_menu_social_enabled
+        if data.live_menu_social_enabled is not None
+        else existing.live_menu_social_enabled
+    )
+    facebook_enabled = (
+        data.live_menu_social_facebook_enabled
+        if data.live_menu_social_facebook_enabled is not None
+        else existing.live_menu_social_facebook_enabled
+    )
+    instagram_enabled = (
+        data.live_menu_social_instagram_enabled
+        if data.live_menu_social_instagram_enabled is not None
+        else existing.live_menu_social_instagram_enabled
+    )
+    whatsapp_enabled = (
+        data.live_menu_social_whatsapp_enabled
+        if data.live_menu_social_whatsapp_enabled is not None
+        else existing.live_menu_social_whatsapp_enabled
+    )
+    facebook_source = (
+        data.facebook_url if "facebook_url" in data.model_fields_set else existing.facebook_url
+    )
+    instagram_source = (
+        data.instagram_url if "instagram_url" in data.model_fields_set else existing.instagram_url
+    )
+    placement_source = (
+        data.live_menu_social_placement
+        if "live_menu_social_placement" in data.model_fields_set
+        else existing.live_menu_social_placement
+    )
+    placement = normalize_live_menu_social_placement(placement_source)
+
+    normalized_fb = _validate_social_url_field("Facebook", facebook_source, host_check=is_facebook_url)
+    normalized_ig = _validate_social_url_field(
+        "Instagram", instagram_source, host_check=is_instagram_url
+    )
+    whatsapp_url = whatsapp_contact_url(existing.whatsapp_phone)
+
+    if facebook_enabled and not normalized_fb:
+        raise ValidationError("Agrega un enlace válido de Facebook o desactiva Facebook")
+    if instagram_enabled and not normalized_ig:
+        raise ValidationError("Agrega un enlace válido de Instagram o desactiva Instagram")
+    if whatsapp_enabled and not whatsapp_url:
+        raise ValidationError(
+            "Configura WhatsApp de pedidos en Configuración o desactiva WhatsApp"
+        )
+
+    if enabled:
+        has_visible_channel = (
+            (facebook_enabled and normalized_fb)
+            or (instagram_enabled and normalized_ig)
+            or (whatsapp_enabled and whatsapp_url)
+        )
+        if not has_visible_channel:
+            raise ValidationError("Activa al menos una red social con su enlace o WhatsApp configurado")
+
+    patch: dict[str, object] = {}
+    if "facebook_url" in data.model_fields_set or normalized_fb != existing.facebook_url:
+        patch["facebook_url"] = normalized_fb
+    if "instagram_url" in data.model_fields_set or normalized_ig != existing.instagram_url:
+        patch["instagram_url"] = normalized_ig
+    if (
+        "live_menu_social_placement" in data.model_fields_set
+        or placement != existing.live_menu_social_placement
+    ):
+        patch["live_menu_social_placement"] = placement
+    if not patch:
+        return data
+    return data.model_copy(update=patch)
 
 
 class RestaurantService:
@@ -112,6 +204,20 @@ class RestaurantService:
             if existing is not None and existing.id != restaurant_id:
                 raise ConflictError("Subdomain already taken")
             data = data.model_copy(update={"subdomain": subdomain})
+        social_fields = {
+            "live_menu_social_enabled",
+            "live_menu_social_facebook_enabled",
+            "live_menu_social_instagram_enabled",
+            "live_menu_social_whatsapp_enabled",
+            "live_menu_social_placement",
+            "facebook_url",
+            "instagram_url",
+        }
+        if social_fields.intersection(data.model_fields_set):
+            existing_restaurant = self._repo.get(restaurant_id)
+            if existing_restaurant is None:
+                raise NotFoundError("Restaurant not found")
+            data = _validate_live_menu_social_update(existing_restaurant, data)
         dto = self._repo.update(restaurant_id, data)
         if dto is None:
             raise NotFoundError("Restaurant not found")
