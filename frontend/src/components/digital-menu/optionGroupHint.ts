@@ -29,6 +29,16 @@ function sortOptionItemsForDisplay(items: OptionGroup['items']): OptionGroup['it
   return [...active.sort(bySortIndex), ...inactive.sort(bySortIndex)];
 }
 
+/** All groups and items for historical order display (includes inactive). */
+export function historicalOptionGroups(product: { option_groups: OptionGroup[] }): OptionGroup[] {
+  return [...product.option_groups]
+    .sort((a, b) => a.sort_index - b.sort_index)
+    .map((group) => ({
+      ...group,
+      items: [...group.items].sort((a, b) => a.sort_index - b.sort_index),
+    }));
+}
+
 /** Active groups and items only — cart, pricing, and validation. */
 export function activeOptionGroups(product: { option_groups: OptionGroup[] }): OptionGroup[] {
   return [...product.option_groups]

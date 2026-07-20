@@ -1,13 +1,26 @@
-import { activeOptionGroups } from '@/components/digital-menu/optionGroupHint';
+import { historicalOptionGroups } from '@/components/digital-menu/optionGroupHint';
 import type { AppliedOrderDiscount, Order, OrderItem, Product } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
 import { PAYMENT_METHOD_LABELS } from '@/lib/restaurantPaymentConfig';
 import { RESTAURANT_SERVICE_LABELS } from '@/lib/restaurantServices';
 
 export type ResolvedOrderOption = {
+  groupId: string;
   groupTitle: string;
   labels: string[];
 };
+
+function selectedOptionIdsForGroup(
+  selected: Record<string, unknown>,
+  groupId: string,
+): string[] {
+  const raw = selected[groupId];
+  if (Array.isArray(raw)) {
+    return raw.filter((id): id is string => typeof id === 'string' && id.length > 0);
+  }
+  if (typeof raw === 'string' && raw.length > 0) return [raw];
+  return [];
+}
 
 export function formatOrderShortId(orderId: string): string {
   return orderId.replace(/-/g, '').slice(0, 8).toUpperCase();
@@ -77,23 +90,17 @@ export function resolveOrderItemOptions(
   if (!selected || Object.keys(selected).length === 0) return [];
 
   const product = item.product_id ? productsById.get(item.product_id) : undefined;
-  if (!product) {
-    return Object.entries(selected).flatMap(([groupId, optionIds]) =>
-      optionIds.length > 0
-        ? [{ groupTitle: 'Opciones', labels: optionIds }]
-        : [],
-    );
-  }
+  if (!product) return [];
 
   const rows: ResolvedOrderOption[] = [];
-  for (const group of activeOptionGroups(product)) {
-    const optionIds = selected[group.id] ?? [];
+  for (const group of historicalOptionGroups(product)) {
+    const optionIds = selectedOptionIdsForGroup(selected, group.id);
     if (optionIds.length === 0) continue;
-    const labels = group.items
-      .filter((option) => optionIds.includes(option.id))
-      .map((option) => option.label);
+    const labels = optionIds
+      .map((optionId) => group.items.find((option) => option.id === optionId)?.label)
+      .filter((label): label is string => Boolean(label));
     if (labels.length > 0) {
-      rows.push({ groupTitle: group.title, labels });
+      rows.push({ groupId: group.id, groupTitle: group.title, labels });
     }
   }
   return rows;
