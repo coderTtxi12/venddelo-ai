@@ -1,0 +1,186 @@
+.periodControl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.periodTab {
+  padding: 0.4rem 0.75rem;
+  border: none;
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.periodTab:hover:not(:disabled) {
+  background: rgba(79, 70, 229, 0.05);
+  color: var(--color-text);
+}
+
+.periodTab:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.periodTab:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.periodTabActive {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.periodTabActive:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  color: #fff;
+}
+
+.popoverWrap {
+  position: relative;
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 20;
+  min-width: 320px;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.popoverTitle {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.popoverSummary {
+  margin: -0.35rem 0 0.75rem;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.calendar {
+  --rdp-accent-color: var(--color-primary);
+  --rdp-accent-background-color: rgba(79, 70, 229, 0.08);
+  --rdp-day-height: 36px;
+  --rdp-day-width: 36px;
+  --rdp-day_button-height: 34px;
+  --rdp-day_button-width: 34px;
+  --rdp-day_button-border-radius: var(--radius);
+  --rdp-nav_button-height: 2rem;
+  --rdp-nav_button-width: 2rem;
+  font-size: 0.82rem;
+}
+
+.calendar :global(.rdp-root) {
+  width: 100%;
+}
+
+.calendar :global(.rdp-month_caption) {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.calendar :global(.rdp-weekday) {
+  font-size: 0.68rem;
+  color: var(--color-text-secondary);
+}
+
+.calendar :global(.rdp-day_button) {
+  cursor: pointer;
+}
+
+.calendar :global(.rdp-day_button:focus-visible) {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.popoverError {
+  margin: 0.65rem 0 0;
+  font-size: 0.75rem;
+  color: #b91c1c;
+}
+
+.popoverActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.popoverButton {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.popoverButton:hover:not(:disabled) {
+  background: rgba(79, 70, 229, 0.05);
+  color: var(--color-text);
+}
+
+.popoverButtonPrimary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.popoverButtonPrimary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  color: #fff;
+}
+
+.popoverButton:disabled,
+.popoverButtonPrimary:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+@media (max-width: 768px) {
+  .periodControl {
+    width: 100%;
+  }
+
+  .periodTab {
+    flex: 1 1 auto;
+    text-align: center;
+    font-size: 0.7rem;
+    padding: 0.45rem 0.5rem;
+  }
+
+  .popover {
+    left: 0;
+    right: 0;
+    min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .periodTab,
+  .popoverButton {
+    transition: none;
+  }
+}

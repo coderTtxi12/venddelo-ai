@@ -1,0 +1,78 @@
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.35rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(79, 70, 229, 0.18);
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.06), rgba(59, 130, 246, 0.04));
+}
+
+.copy {
+  flex: 1;
+  min-width: 220px;
+}
+
+.kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.headline {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.55;
+  color: var(--color-text);
+}
+
+.subline {
+  margin: 0.45rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.headline strong,
+.subline strong {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.changeBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  min-width: 140px;
+}
+
+.changeBadge[data-up='true'] svg {
+  color: #059669;
+}
+
+.changeBadge[data-up='false'] svg {
+  color: #dc2626;
+}
+
+.changeValue {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.changeLabel {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}

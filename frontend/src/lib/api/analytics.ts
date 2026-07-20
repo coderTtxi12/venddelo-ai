@@ -1,8 +1,16 @@
 import { apiRequest } from './client';
 
 export type AnalyticsGranularity = 'daily' | 'weekly' | 'monthly';
+export type AnalyticsPreset = '7d' | '4w' | '12m' | 'custom';
+
+export type AnalyticsPeriodQuery = {
+  preset: AnalyticsPreset;
+  start?: string;
+  end?: string;
+};
 
 export type AnalyticsPeriod = {
+  preset: AnalyticsPreset;
   granularity: AnalyticsGranularity;
   timezone: string;
   start: string;
@@ -88,9 +96,13 @@ export type AnalyticsDashboard = {
 export function getRestaurantAnalytics(
   token: string,
   restaurantId: string,
-  granularity: AnalyticsGranularity = 'monthly',
+  query: AnalyticsPeriodQuery,
 ) {
-  const params = new URLSearchParams({ granularity });
+  const params = new URLSearchParams({ preset: query.preset });
+  if (query.preset === 'custom') {
+    if (query.start) params.set('start', query.start);
+    if (query.end) params.set('end', query.end);
+  }
   return apiRequest<AnalyticsDashboard>(
     `/restaurants/${restaurantId}/analytics?${params}`,
     { token },
