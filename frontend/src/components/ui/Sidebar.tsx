@@ -17,6 +17,8 @@ import { useAssistantChat } from '@/contexts/AssistantChatContext';
 import { MOBILE_DRAWER_MAX_WIDTH, useMobileSidebar } from '@/contexts/MobileSidebarContext';
 import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
+import { useAuth } from '@/hooks/useAuth';
+import { prefetchKitchenOrders } from '@/lib/orders/kitchenOrdersCache';
 import RestaurantSwitcher from '@/components/ui/RestaurantSwitcher';
 import styles from './Sidebar.module.css';
 
@@ -50,8 +52,10 @@ function shouldSidebarStartCollapsed(width: number): boolean {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { accessToken } = useAuth();
   const { pendingOrdersCount } = useRestaurantOrders();
-  const { selectedRestaurantName, canSwitchRestaurants } = useRestaurantAccess();
+  const { selectedRestaurantId, selectedRestaurantName, canSwitchRestaurants } =
+    useRestaurantAccess();
   const { isOpen: isChatOpen, openChat, closeChat } = useAssistantChat();
   const { isMobileDrawer, isDrawerOpen, closeDrawer } = useMobileSidebar();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -78,6 +82,11 @@ export default function Sidebar() {
 
   const showCollapsed = !isMobileDrawer && isCollapsed;
   const showLabels = isMobileDrawer || !isCollapsed;
+
+  const prefetchOrders = () => {
+    if (pathname.startsWith('/orders') || !accessToken || !selectedRestaurantId) return;
+    void prefetchKitchenOrders(accessToken, selectedRestaurantId);
+  };
 
   return (
     <>
@@ -167,6 +176,8 @@ export default function Sidebar() {
                 aria-label={
                   badgeCount != null ? `${item.label}, ${badgeCount} pedidos nuevos` : item.label
                 }
+                onMouseEnter={item.path === '/orders' ? prefetchOrders : undefined}
+                onFocus={item.path === '/orders' ? prefetchOrders : undefined}
                 onClick={() => {
                   if (isMobileDrawer) closeDrawer();
                 }}

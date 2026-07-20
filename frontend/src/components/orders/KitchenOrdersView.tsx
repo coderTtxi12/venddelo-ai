@@ -3,15 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlined';
-import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
-import { listProducts } from '@/lib/api/menu';
-import { listAllPromotions } from '@/lib/api/promotions';
 import { updateRestaurantOrderStatus } from '@/lib/api/orders';
-import { fetchAllPages } from '@/lib/api/pagination';
 import type { Order, OrderItem, OrderStatus, Product, Promotion } from '@/lib/api/types';
 import {
   countOrderItems,
@@ -32,18 +28,17 @@ import {
 import { collectOrderDiscountRows } from '@/lib/orders/orderItemDiscounts';
 import {
   canCancelOrder,
-  DEFAULT_KITCHEN_STATUS_FILTER,
-  buildOrderStatusFilterCounts,
-  matchesOrderStatusFilter,
   KITCHEN_ARCHIVE_FILTER_OPTIONS,
   KITCHEN_VIEW_FILTER_OPTIONS,
   KITCHEN_WORKFLOW_FILTER_OPTIONS,
   ORDER_STATUS_META,
-  type OrderStatusFilter,
   type OrderStatusFilterOption,
   type OrderStatusMeta,
 } from '@/lib/orders/orderStatus';
+import { useKitchenOrderProducts } from '@/lib/orders/useKitchenOrderProducts';
+import { useKitchenOrdersInfiniteScroll } from '@/lib/orders/useKitchenOrdersInfiniteScroll';
 import { OrderCancelDialog } from '@/components/orders/OrderCancelDialog';
+import { KitchenLiveIndicator } from '@/components/orders/KitchenLiveIndicator';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import {
   buildOrderAcceptedWhatsAppMessage,
@@ -53,6 +48,8 @@ import {
 } from '@/lib/orders/kitchenWhatsApp';
 import { formatOrderCustomerPhone } from '@/lib/digital-menu/checkout/customerPhone';
 import styles from './OrdersKitchen.module.css';
+
+const EMPTY_PROMOTIONS: Promotion[] = [];
 
 function statusClassName(tone: OrderStatusMeta['tone']): string {
   switch (tone) {
@@ -210,13 +207,21 @@ function OrderTicketCard({
 function OrderItemCard({
   item,
   productsById,
+  productsLoading,
   promotions,
 }: {
   item: OrderItem;
   productsById: ReadonlyMap<string, Product>;
+  productsLoading: boolean;
   promotions: Promotion[];
 }) {
   const options = resolveOrderItemOptions(item, productsById);
+  const hasSelectedOptions =
+    item.selected_options != null && Object.keys(item.selected_options).length > 0;
+  const optionsPending =
+    productsLoading &&
+    Boolean(item.product_id) &&
+    !productsById.has(item.product_id);
   const imageUrl = storagePublicUrl(item.product_image_path);
   const product = item.product_id ? productsById.get(item.product_id) : undefined;
   const itemDiscounts = resolveOrderItemDiscounts(item, { product, promotions });
@@ -240,15 +245,19 @@ function OrderItemCard({
             <span className={styles.itemTotal}>{formatCents(preDiscountCents)}</span>
           </div>
 
-          {options.length > 0 ? (
+          {optionsPending ? (
+            <p className={styles.itemOptionsLoading}>Cargando opciones…</p>
+          ) : options.length > 0 ? (
             <div className={styles.itemOptions}>
               {options.map((group) => (
-                <p key={`${item.id}-${group.groupTitle}`} className={styles.itemOptionRow}>
+                <p key={`${item.id}-${group.groupId}`} className={styles.itemOptionRow}>
                   <span className={styles.itemOptionGroup}>{group.groupTitle}: </span>
                   {group.labels.join(', ')}
                 </p>
               ))}
             </div>
+          ) : hasSelectedOptions ? (
+            <p className={styles.itemOptionsLoading}>Opciones no disponibles</p>
           ) : null}
 
           {itemDiscounts.length > 0 ? (
@@ -279,6 +288,7 @@ function OrderItemCard({
 function OrderDetailContent({
   order,
   productsById,
+  productsLoading,
   promotions,
   now,
   updating,
@@ -289,6 +299,7 @@ function OrderDetailContent({
 }: {
   order: Order;
   productsById: ReadonlyMap<string, Product>;
+  productsLoading: boolean;
   promotions: Promotion[];
   now: number;
   updating: boolean;
@@ -375,7 +386,8 @@ function OrderDetailContent({
               key={item.id}
               item={item}
               productsById={productsById}
-              promotions={promotions}
+              productsLoading={productsLoading}
+              promotions={EMPTY_PROMOTIONS}
             />
           ))}
         </section>
@@ -466,6 +478,7 @@ function OrderDetailContent({
 function OrderDetailPanel({
   order,
   productsById,
+  productsLoading,
   promotions,
   now,
   updating,
@@ -476,6 +489,7 @@ function OrderDetailPanel({
 }: {
   order: Order | null;
   productsById: ReadonlyMap<string, Product>;
+  productsLoading: boolean;
   promotions: Promotion[];
   now: number;
   updating: boolean;
@@ -490,6 +504,7 @@ function OrderDetailPanel({
         <OrderDetailContent
           order={order}
           productsById={productsById}
+          productsLoading={productsLoading}
           promotions={promotions}
           now={now}
           updating={updating}
@@ -517,20 +532,21 @@ export function KitchenOrdersView() {
   const {
     restaurantId,
     orders,
+    ordersHasMore,
+    kitchenFilter,
+    setKitchenFilter,
+    filterCounts,
     pendingOrdersCount,
     loading,
+    loadingMore,
     loadError,
-    refreshing,
-    socketLive,
+    socketStatus,
     refreshOrders,
+    loadMoreOrders,
     replaceOrder,
   } = useRestaurantOrders();
 
-  const [productsById, setProductsById] = useState<Map<string, Product>>(new Map());
-  const [promotions, setPromotions] = useState<Promotion[]>([]);
-  const [productsLoading, setProductsLoading] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>(DEFAULT_KITCHEN_STATUS_FILTER);
   const [updating, setUpdating] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -559,76 +575,54 @@ export function KitchenOrdersView() {
     };
   }, [isMobile, selectedOrderId]);
 
-  useEffect(() => {
-    if (!accessToken || !restaurantId) return;
-
-    let cancelled = false;
-    setProductsLoading(true);
-
-    void Promise.all([
-      fetchAllPages((cursor) => listProducts(accessToken, restaurantId, 100, cursor), 100),
-      listAllPromotions(accessToken, restaurantId),
-    ])
-      .then(([productRows, promotionRows]) => {
-        if (cancelled) return;
-        setProductsById(new Map(productRows.map((product) => [product.id, product])));
-        setPromotions(promotionRows);
-      })
-      .catch((error) => {
-        console.error(error);
-      })
-      .finally(() => {
-        if (!cancelled) setProductsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, restaurantId]);
-
-  const filteredOrders = useMemo(
-    () => orders.filter((order) => matchesOrderStatusFilter(order.status, statusFilter)),
-    [orders, statusFilter],
+  const loadMoreSentinelRef = useKitchenOrdersInfiniteScroll(
+    !loading,
+    ordersHasMore,
+    loadingMore,
+    loadMoreOrders,
   );
 
   useEffect(() => {
     setSelectedOrderId((current) => {
-      if (current && filteredOrders.some((order) => order.id === current)) return current;
+      if (current && orders.some((order) => order.id === current)) return current;
       const isWide =
         typeof window !== 'undefined' && window.matchMedia('(min-width: 901px)').matches;
-      return isWide ? filteredOrders[0]?.id ?? null : null;
+      return isWide ? orders[0]?.id ?? null : null;
     });
-  }, [filteredOrders, statusFilter]);
+  }, [orders, kitchenFilter]);
 
   const selectedOrder = useMemo(
     () => orders.find((order) => order.id === selectedOrderId) ?? null,
     [orders, selectedOrderId],
   );
 
-  const filterCounts = useMemo(() => buildOrderStatusFilterCounts(orders), [orders]);
+  const { productsById, isLoading: productsLoading } = useKitchenOrderProducts(
+    accessToken,
+    restaurantId,
+    selectedOrder,
+  );
 
   const activeCount = filterCounts.active;
 
   const headerSubtitle = useMemo(() => {
-    const liveSuffix = socketLive ? ' · en vivo' : '';
-    if (statusFilter === 'new') {
+    if (kitchenFilter === 'new') {
       if (pendingOrdersCount === 0) {
-        return `Sin pedidos nuevos · revisa Activos para el resto${liveSuffix}`;
+        return 'Sin pedidos nuevos · revisa Activos para el resto';
       }
       return pendingOrdersCount === 1
-        ? `1 pedido nuevo por confirmar${liveSuffix}`
-        : `${pendingOrdersCount} pedidos nuevos por confirmar${liveSuffix}`;
+        ? '1 pedido nuevo por confirmar'
+        : `${pendingOrdersCount} pedidos nuevos por confirmar`;
     }
     return activeCount === 1
-      ? `1 pedido activo · más recientes primero${liveSuffix}`
-      : `${activeCount} pedidos activos · más recientes primero${liveSuffix}`;
-  }, [statusFilter, pendingOrdersCount, activeCount, socketLive]);
+      ? '1 pedido activo · más recientes primero'
+      : `${activeCount} pedidos activos · más recientes primero`;
+  }, [kitchenFilter, pendingOrdersCount, activeCount]);
 
-  const listPanelTitle = statusFilter === 'new' ? 'Nuevos' : 'Pedidos';
+  const listPanelTitle = kitchenFilter === 'new' ? 'Nuevos' : 'Pedidos';
   const listEmptyTitle =
-    statusFilter === 'new' ? 'Sin pedidos nuevos' : 'Sin pedidos en este filtro';
+    kitchenFilter === 'new' ? 'Sin pedidos nuevos' : 'Sin pedidos en este filtro';
   const listEmptyText =
-    statusFilter === 'new'
+    kitchenFilter === 'new'
       ? 'Los pedidos recién llegados del menú en vivo aparecerán aquí hasta que los confirmes.'
       : 'Los nuevos pedidos del menú en vivo aparecerán automáticamente.';
 
@@ -690,7 +684,7 @@ export function KitchenOrdersView() {
     );
   };
 
-  if (loading || productsLoading) {
+  if (loading) {
     return (
       <div className={styles.kitchen}>
         <div className={styles.stateBox}>
@@ -723,19 +717,7 @@ export function KitchenOrdersView() {
           <p className={styles.subtitle}>{headerSubtitle}</p>
         </div>
         <div className={styles.headerActions}>
-          <button
-            type="button"
-            className={styles.refreshBtn}
-            onClick={refreshOrders}
-            disabled={refreshing}
-            aria-label="Actualizar pedidos"
-          >
-            <RefreshOutlinedIcon
-              fontSize="small"
-              className={refreshing ? styles.spinning : undefined}
-            />
-            Actualizar
-          </button>
+          <KitchenLiveIndicator status={socketStatus} />
         </div>
       </header>
 
@@ -750,9 +732,9 @@ export function KitchenOrdersView() {
               ) : null}
               <StatusFilterChip
                 option={option}
-                isActive={statusFilter === option.value}
+                isActive={kitchenFilter === option.value}
                 count={filterCounts[option.value]}
-                onSelect={setStatusFilter}
+                onSelect={setKitchenFilter}
               />
             </div>
           ))}
@@ -764,9 +746,9 @@ export function KitchenOrdersView() {
               <StatusFilterChip
                 key={option.value}
                 option={option}
-                isActive={statusFilter === option.value}
+                isActive={kitchenFilter === option.value}
                 count={filterCounts[option.value]}
-                onSelect={setStatusFilter}
+                onSelect={setKitchenFilter}
               />
             ))}
           </div>
@@ -776,9 +758,9 @@ export function KitchenOrdersView() {
               <StatusFilterChip
                 key={option.value}
                 option={option}
-                isActive={statusFilter === option.value}
+                isActive={kitchenFilter === option.value}
                 count={filterCounts[option.value]}
-                onSelect={setStatusFilter}
+                onSelect={setKitchenFilter}
               />
             ))}
           </div>
@@ -799,18 +781,18 @@ export function KitchenOrdersView() {
               {listPanelTitle}
             </h2>
             <span className={styles.listCount}>
-              {filteredOrders.length === 1 ? '1 pedido' : `${filteredOrders.length} pedidos`}
+              {orders.length === 1 ? '1 pedido' : `${orders.length} pedidos`}
             </span>
           </div>
 
           <div className={styles.listScroll}>
-            {filteredOrders.length === 0 ? (
+            {orders.length === 0 ? (
               <div className={styles.stateBox}>
                 <p className={styles.stateTitle}>{listEmptyTitle}</p>
                 <p className={styles.stateText}>{listEmptyText}</p>
               </div>
             ) : (
-              filteredOrders.map((order) => (
+              orders.map((order) => (
                 <OrderTicketCard
                   key={order.id}
                   order={order}
@@ -820,6 +802,10 @@ export function KitchenOrdersView() {
                 />
               ))
             )}
+            {loadingMore ? (
+              <p className={styles.stateText}>Cargando más pedidos…</p>
+            ) : null}
+            <div ref={loadMoreSentinelRef} aria-hidden className={styles.loadMoreSentinel} />
           </div>
         </section>
 
@@ -828,7 +814,8 @@ export function KitchenOrdersView() {
             <OrderDetailPanel
               order={selectedOrder}
               productsById={productsById}
-              promotions={promotions}
+              productsLoading={productsLoading}
+              promotions={EMPTY_PROMOTIONS}
               now={now}
               updating={updating}
               onAdvance={handleAdvance}
@@ -843,7 +830,8 @@ export function KitchenOrdersView() {
           <OrderDetailPanel
             order={selectedOrder}
             productsById={productsById}
-            promotions={promotions}
+            productsLoading={productsLoading}
+            promotions={EMPTY_PROMOTIONS}
             now={now}
             updating={updating}
             showBack
