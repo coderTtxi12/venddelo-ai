@@ -1,72 +1,29 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { resolveSupplierIdByEmail } from '@/services/db';
-import { legacyDb as db } from '@/services/legacyDb';
+import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import styles from './RestaurantGate.module.css';
 
 export function RestaurantGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { user, accessToken, loading: authLoading } = useAuth();
-  const [checking, setChecking] = useState(true);
-  const [hasRestaurant, setHasRestaurant] = useState(false);
-  const checkedTokenRef = useRef<string | null>(null);
+  const { accessToken, loading: authLoading } = useAuth();
+  const {
+    loading: accessLoading,
+    selectedRestaurantId,
+    loadError: accessError,
+  } = useRestaurantAccess();
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function check() {
-      if (authLoading) return;
-
-      if (!accessToken || !user?.uid) {
-        checkedTokenRef.current = null;
-        if (!cancelled) {
-          setChecking(false);
-          setHasRestaurant(false);
-        }
-        return;
-      }
-
-      if (checkedTokenRef.current === accessToken) {
-        if (!cancelled) setChecking(false);
-        return;
-      }
-
-      try {
-        const resolved = await resolveSupplierIdByEmail(
-          db,
-          user.email ?? '',
-          accessToken,
-          { userId: user.uid },
-        );
-        const found = 'supplierId' in resolved;
-        if (!cancelled) {
-          checkedTokenRef.current = accessToken;
-          setHasRestaurant(found);
-          if (!found) {
-            router.replace('/onboarding');
-          }
-        }
-      } catch (error) {
-        console.error(error);
-        if (!cancelled) {
-          setHasRestaurant(false);
-          router.replace('/onboarding');
-        }
-      } finally {
-        if (!cancelled) setChecking(false);
-      }
+    if (authLoading || accessLoading) return;
+    if (!accessToken) return;
+    if (!selectedRestaurantId) {
+      router.replace('/onboarding');
     }
+  }, [accessLoading, accessToken, authLoading, router, selectedRestaurantId]);
 
-    void check();
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, authLoading, user?.uid, user?.email]);
-
-  if (authLoading || checking) {
+  if (authLoading || accessLoading) {
     return (
       <div className={styles.loading} role="status" aria-live="polite">
         Cargando tu panel…
@@ -74,7 +31,23 @@ export function RestaurantGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!hasRestaurant) {
+  if (!accessToken) {
+    return (
+      <div className={styles.loading} role="status" aria-live="polite">
+        Cargando tu panel…
+      </div>
+    );
+  }
+
+  if (accessError && !selectedRestaurantId) {
+    return (
+      <div className={styles.loading} role="status" aria-live="polite">
+        {accessError}
+      </div>
+    );
+  }
+
+  if (!selectedRestaurantId) {
     return (
       <div className={styles.loading} role="status" aria-live="polite">
         Redirigiendo al registro…
