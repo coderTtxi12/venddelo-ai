@@ -41,6 +41,13 @@ export type Restaurant = {
   digital_menu_limited_time_category_enabled: boolean;
   digital_menu_limited_time_category_name: string;
   whatsapp_phone: string | null;
+  live_menu_social_enabled: boolean;
+  live_menu_social_facebook_enabled: boolean;
+  live_menu_social_instagram_enabled: boolean;
+  live_menu_social_whatsapp_enabled: boolean;
+  live_menu_social_placement: string;
+  facebook_url: string | null;
+  instagram_url: string | null;
   owner_contact_name: string | null;
   owner_phone: string | null;
   color_palette: string | null;
@@ -235,6 +242,17 @@ export type OrderStatus =
   | 'ready'
   | 'delivered'
   | 'cancelled';
+
+export type OrderStatusSummary = {
+  pending: number;
+  confirmed: number;
+  preparing: number;
+  ready: number;
+  delivered: number;
+  cancelled: number;
+  active: number;
+  total: number;
+};
 
 export type OrderItem = {
   id: string;

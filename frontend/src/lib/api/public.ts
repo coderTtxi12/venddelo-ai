@@ -2,6 +2,7 @@ import { apiRequest, type RequestOptions } from './client';
 import type { Category, Product, Promotion, RestaurantSchedule } from './types';
 import type { PaymentMethodKey } from '@/lib/restaurantPaymentConfig';
 import type { RestaurantServiceType } from '@/lib/restaurantServices';
+import type { PublicRestaurantSocialLinks } from '@/lib/digital-menu/restaurantSocialLinks';
 
 export type PublicRestaurant = {
   name: string;
@@ -22,6 +23,8 @@ export type PublicRestaurant = {
   digital_menu_limited_time_category_enabled: boolean;
   digital_menu_limited_time_category_name: string;
   whatsapp_phone: string | null;
+  social_links: PublicRestaurantSocialLinks | null;
+  social_placement: string;
   original_language: string;
   timezone: string;
   server_now: string | null;
