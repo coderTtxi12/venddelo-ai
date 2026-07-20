@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models.orders import Order, OrderItem
-from app.db.models.promotions import Promotion
+from app.db.models.promotions import Promotion, promotion_products
 from app.db.models.restaurant import Restaurant
 from app.modules.analytics.repository import AnalyticsRepository
 from app.modules.analytics.schemas import (
@@ -23,6 +23,11 @@ from app.modules.analytics.schemas import (
     AnalyticsTopProduct,
 )
 from app.modules.promotions.effective import effective_status, resolve_timezone
+from app.modules.promotions.pricing import (
+    CATALOG_DISCOUNT_PREFIX,
+    CATALOG_DISCOUNT_SNAPSHOT_LABEL,
+    promotion_display_name_from_raw,
+)
 from app.modules.promotions.schemas import PromotionDTO
 
 _PENDING_STATUSES = ("pending", "confirmed", "preparing", "ready")
@@ -257,27 +262,123 @@ class SqlAlchemyAnalyticsRepository(AnalyticsRepository):
         period_end: datetime,
         limit: int = 5,
     ) -> list[AnalyticsPromotionUsage]:
-        usage_stmt = (
-            select(
-                Promotion.id,
-                Promotion.name,
-                func.count(Order.id).label("usage_count"),
-                func.coalesce(func.sum(Order.discount_cents), 0).label("discount_cents"),
+        order_filters = (
+            Order.restaurant_id == restaurant_id,
+            Order.status == "delivered",
+            Order.created_at >= period_start,
+            Order.created_at <= period_end,
+        )
+
+        usage_rows: dict[uuid.UUID, dict[str, object]] = {}
+
+        def _record_usage(
+            promo_id: uuid.UUID | None,
+            order_id: uuid.UUID,
+            discount_cents: int,
+            promo_name: str,
+        ) -> None:
+            if promo_id is None:
+                return
+            row = usage_rows.setdefault(
+                promo_id,
+                {"name": promo_name, "order_ids": set(), "discount_cents": 0},
             )
-            .join(Order, Order.applied_order_promotion_id == Promotion.id)
+            order_ids = row["order_ids"]
+            assert isinstance(order_ids, set)
+            order_ids.add(order_id)
+            row["discount_cents"] = int(row["discount_cents"]) + int(discount_cents or 0)
+            row["name"] = promo_name
+
+        order_usage_stmt = (
+            select(
+                Order.applied_order_promotion_id,
+                Order.id,
+                Order.discount_cents,
+                Promotion.name,
+            )
+            .join(Promotion, Promotion.id == Order.applied_order_promotion_id)
+            .where(Order.applied_order_promotion_id.isnot(None), *order_filters)
+        )
+        for promo_id, order_id, discount_cents, promo_name in self._session.execute(
+            order_usage_stmt
+        ).all():
+            _record_usage(promo_id, order_id, discount_cents, promo_name)
+
+        promo_names_stmt = select(Promotion.id, Promotion.name).where(
+            Promotion.restaurant_id == restaurant_id,
+        )
+        promo_name_by_id: dict[uuid.UUID, str] = {}
+        promo_id_by_label: dict[str, uuid.UUID] = {}
+        for promo_id, promo_name in self._session.execute(promo_names_stmt).all():
+            promo_name_by_id[promo_id] = promo_name
+            promo_id_by_label[promo_name] = promo_id
+            promo_id_by_label[promotion_display_name_from_raw(promo_name)] = promo_id
+
+        catalog_product_stmt = (
+            select(Promotion.id, Promotion.name, promotion_products.c.product_id)
+            .join(
+                promotion_products,
+                promotion_products.c.promotion_id == Promotion.id,
+            )
             .where(
                 Promotion.restaurant_id == restaurant_id,
-                Order.status == "delivered",
-                Order.created_at >= period_start,
-                Order.created_at <= period_end,
+                Promotion.name.startswith(CATALOG_DISCOUNT_PREFIX),
             )
-            .group_by(Promotion.id, Promotion.name)
-            .order_by(func.count(Order.id).desc())
-            .limit(limit)
         )
-        usage_rows = {
-            row.id: row for row in self._session.execute(usage_stmt).all()
-        }
+        product_catalog: dict[uuid.UUID, tuple[uuid.UUID, str]] = {}
+        for promo_id, promo_name, product_id in self._session.execute(
+            catalog_product_stmt
+        ).all():
+            product_catalog[product_id] = (promo_id, promo_name)
+
+        item_rows_stmt = (
+            select(OrderItem, Order.id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .where(*order_filters)
+        )
+
+        def _resolve_snapshot_promo(
+            item: OrderItem,
+            label: str,
+        ) -> tuple[uuid.UUID, str] | None:
+            if label == CATALOG_DISCOUNT_SNAPSHOT_LABEL:
+                if item.product_id is not None and item.product_id in product_catalog:
+                    promo_id, promo_name = product_catalog[item.product_id]
+                    return promo_id, promo_name
+                if item.applied_promotion_id is not None:
+                    promo_name = promo_name_by_id.get(item.applied_promotion_id)
+                    if promo_name and promo_name.startswith(CATALOG_DISCOUNT_PREFIX):
+                        return item.applied_promotion_id, promo_name
+                return None
+            promo_id = promo_id_by_label.get(label)
+            if promo_id is None:
+                return None
+            return promo_id, promo_name_by_id[promo_id]
+
+        for item, order_id in self._session.execute(item_rows_stmt).all():
+            snapshots = item.applied_discounts or []
+            if snapshots:
+                for snap in snapshots:
+                    if not isinstance(snap, dict) or snap.get("applied") is False:
+                        continue
+                    discount_cents = int(snap.get("discount_cents") or 0)
+                    if discount_cents <= 0:
+                        continue
+                    label = str(snap.get("label") or "")
+                    resolved = _resolve_snapshot_promo(item, label)
+                    if resolved is None:
+                        continue
+                    promo_id, promo_name = resolved
+                    _record_usage(promo_id, order_id, discount_cents, promo_name)
+                continue
+
+            if item.applied_promotion_id is None or item.discount_cents <= 0:
+                continue
+            promo_id = item.applied_promotion_id
+            promo_name = promo_name_by_id.get(promo_id)
+            if promo_name is None:
+                continue
+            _record_usage(promo_id, order_id, item.discount_cents, promo_name)
 
         promo_stmt = (
             select(Promotion)
@@ -293,17 +394,27 @@ class SqlAlchemyAnalyticsRepository(AnalyticsRepository):
         tz = resolve_timezone(restaurant.timezone if restaurant else None)
         now = datetime.now(UTC)
 
+        def _usage_for(promo_id: uuid.UUID) -> tuple[int, int, str | None]:
+            usage = usage_rows.get(promo_id)
+            if not usage:
+                return 0, 0, None
+            order_ids = usage["order_ids"]
+            assert isinstance(order_ids, set)
+            name = usage["name"]
+            assert isinstance(name, str)
+            return len(order_ids), int(usage["discount_cents"]), name
+
         results: list[AnalyticsPromotionUsage] = []
         seen: set[uuid.UUID] = set()
         for promo in promos:
-            usage = usage_rows.get(promo.id)
+            usage_count, discount_cents, _ = _usage_for(promo.id)
             dto = PromotionDTO.model_validate(promo)
             results.append(
                 AnalyticsPromotionUsage(
                     promotion_id=str(promo.id),
-                    promotion_name=promo.name,
-                    usage_count=int(usage.usage_count) if usage else 0,
-                    discount_cents=int(usage.discount_cents) if usage else 0,
+                    promotion_name=promotion_display_name_from_raw(promo.name),
+                    usage_count=usage_count,
+                    discount_cents=discount_cents,
                     effective_status=effective_status(dto, now, tz),
                 )
             )
@@ -312,12 +423,16 @@ class SqlAlchemyAnalyticsRepository(AnalyticsRepository):
         for promo_id, usage in usage_rows.items():
             if promo_id in seen:
                 continue
+            order_ids = usage["order_ids"]
+            assert isinstance(order_ids, set)
+            name = usage["name"]
+            assert isinstance(name, str)
             results.append(
                 AnalyticsPromotionUsage(
                     promotion_id=str(promo_id),
-                    promotion_name=usage.name,
-                    usage_count=int(usage.usage_count or 0),
-                    discount_cents=int(usage.discount_cents or 0),
+                    promotion_name=promotion_display_name_from_raw(name),
+                    usage_count=len(order_ids),
+                    discount_cents=int(usage["discount_cents"]),
                     effective_status=None,
                 )
             )

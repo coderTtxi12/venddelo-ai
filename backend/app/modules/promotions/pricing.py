@@ -11,6 +11,19 @@ from app.modules.promotions.effective import is_promotion_effective
 from app.modules.promotions.schemas import PromotionDTO
 
 CATALOG_DISCOUNT_PREFIX = "__product_discount__"
+CATALOG_DISCOUNT_SNAPSHOT_LABEL = "Descuento de producto"
+
+
+def is_catalog_discount_name(raw_name: str) -> bool:
+    return raw_name.startswith(CATALOG_DISCOUNT_PREFIX)
+
+
+def promotion_display_name_from_raw(raw_name: str) -> str:
+    """Owner-facing promotion label (strips internal catalog-discount prefix)."""
+    if is_catalog_discount_name(raw_name):
+        stripped = raw_name[len(CATALOG_DISCOUNT_PREFIX) :].strip()
+        return stripped or "(descuento de producto)"
+    return raw_name
 BUNDLE_PAIRING_CROSS = "cross_product"
 BUNDLE_PAIRING_SAME = "same_product"
 PROMO_WARNING_COMPLEMENT_EXCLUDED = "complement_excluded"
