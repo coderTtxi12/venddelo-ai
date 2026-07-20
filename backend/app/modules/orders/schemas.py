@@ -119,3 +119,14 @@ class PublicOrderInput(BaseModel):
 class OrderStatusUpdate(BaseModel):
     status: str
     cancellation_reason: str | None = None
+
+
+class OrderStatusSummaryDTO(BaseModel):
+    pending: int = 0
+    confirmed: int = 0
+    preparing: int = 0
+    ready: int = 0
+    delivered: int = 0
+    cancelled: int = 0
+    active: int = 0
+    total: int = 0

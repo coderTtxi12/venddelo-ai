@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from app.api.deps import pagination_params, require_owned_restaurant
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
-from app.modules.orders.schemas import OrderDTO, OrderStatusUpdate
+from app.modules.orders.schemas import OrderDTO, OrderStatusSummaryDTO, OrderStatusUpdate
 from app.modules.orders.service import OrderService
 from app.modules.restaurants.schemas import RestaurantDTO
 
@@ -23,16 +23,28 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> OrderService:
 
 
 @router.get(
+    "/restaurants/{restaurant_id}/orders/summary",
+    response_model=OrderStatusSummaryDTO,
+)
+def order_status_summary(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: OrderService = Depends(_service),
+) -> OrderStatusSummaryDTO:
+    return service.get_status_summary(restaurant.id)
+
+
+@router.get(
     "/restaurants/{restaurant_id}/orders",
     response_model=CursorPage[OrderDTO],
 )
 def list_orders(
     params: PaginationParams = Depends(pagination_params),
     status: str | None = Query(default=None),
+    view: str | None = Query(default=None),
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: OrderService = Depends(_service),
 ) -> CursorPage[OrderDTO]:
-    return service.list_for_restaurant(restaurant.id, params, status=status)
+    return service.list_for_restaurant(restaurant.id, params, status=status, view=view)
 
 
 @router.get(

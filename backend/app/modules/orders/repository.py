@@ -4,7 +4,7 @@ import uuid
 from abc import ABC, abstractmethod
 
 from app.core.pagination import CursorPage, PaginationParams
-from app.modules.orders.schemas import OrderCreate, OrderDTO
+from app.modules.orders.schemas import OrderCreate, OrderDTO, OrderStatusSummaryDTO
 
 
 class OrderRepository(ABC):
@@ -21,7 +21,11 @@ class OrderRepository(ABC):
         params: PaginationParams,
         *,
         status: str | None = None,
+        view: str | None = None,
     ) -> CursorPage[OrderDTO]: ...
+
+    @abstractmethod
+    def status_summary(self, restaurant_id: uuid.UUID) -> OrderStatusSummaryDTO: ...
 
     @abstractmethod
     def update_status(

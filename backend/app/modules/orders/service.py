@@ -10,12 +10,14 @@ from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.core.idempotency import IdempotencyRepository
 from app.core.pagination import CursorPage, PaginationParams
 from app.modules.menu.repository import MenuRepository
+from app.modules.orders.constants import KITCHEN_ORDER_VIEWS
 from app.modules.orders.repository import OrderRepository
 from app.modules.orders.schemas import (
     AppliedDiscountSnapshot,
     OrderCreate,
     OrderDTO,
     OrderItemCreate,
+    OrderStatusSummaryDTO,
     PublicOrderInput,
 )
 from app.modules.promotions.effective import is_promotion_effective, resolve_timezone
@@ -219,8 +221,21 @@ class OrderService:
         params: PaginationParams,
         *,
         status: str | None = None,
+        view: str | None = None,
     ) -> CursorPage[OrderDTO]:
-        return self._orders.list_by_restaurant(restaurant_id, params, status=status)
+        if status is not None and view is not None:
+            raise ValidationError("Use either status or view, not both")
+        if view is not None and view not in KITCHEN_ORDER_VIEWS:
+            raise ValidationError(f"Unsupported view: {view}")
+        return self._orders.list_by_restaurant(
+            restaurant_id,
+            params,
+            status=status,
+            view=view,
+        )
+
+    def get_status_summary(self, restaurant_id: uuid.UUID) -> OrderStatusSummaryDTO:
+        return self._orders.status_summary(restaurant_id)
 
     def get(self, restaurant_id: uuid.UUID, order_id: uuid.UUID) -> OrderDTO:
         dto = self._orders.get(order_id)
