@@ -142,6 +142,7 @@ export function buildFilterCountsFromSummary(
 ): Record<OrderStatusFilter, number> {
   return {
     new: summary.pending,
+    pending: summary.pending,
     confirmed: summary.confirmed,
     preparing: summary.preparing,
     ready: summary.ready,
