@@ -332,7 +332,11 @@ class DeliveryProviderService:
     def update_pricing(
         self, user_id: uuid.UUID, data: DeliveryProviderPricingUpdate
     ) -> DeliveryProviderPricingResponse:
-        provider = self._require_provider(user_id)
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, member_role = found
+        require_write_provider_config(member_role)
         parsed = config_from_json(
             {
                 "inside_polygon": data.config.inside_polygon.model_dump(),
