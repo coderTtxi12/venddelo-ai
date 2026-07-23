@@ -2,8 +2,8 @@ import type { Category, OptionGroup, Product } from './types';
 import type { CategoryDraft, OptionGroupDraft, ProductDraft } from '@/services/db/supplierCatalogTypes';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 
-function imageFromPath(path: string | null) {
-  const previewUrl = storagePublicUrl(path);
+function imageFromPath(path: string | null | undefined, publicUrl?: string | null) {
+  const previewUrl = publicUrl ?? storagePublicUrl(path);
   if (!previewUrl) return null;
   return { previewUrl };
 }
@@ -46,7 +46,7 @@ export function mapProductToDraft(product: Product, discountUsd = 0): ProductDra
     description: product.description ?? '',
     price: { amount: product.price_cents / 100, currency: product.currency },
     discountUsd,
-    image: imageFromPath(product.image_path),
+    image: imageFromPath(product.image_path, product.image_url),
     categoryIds: product.category_ids,
     optionGroups: [...product.option_groups]
       .sort((a, b) => a.sort_index - b.sort_index)
