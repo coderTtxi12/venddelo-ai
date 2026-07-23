@@ -5,6 +5,7 @@ import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import CheckCircleOutlineOutlinedIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
+import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useAuth } from '@/hooks/useAuth';
 import {
   getMyDeliveryProviderPricing,
@@ -63,6 +64,8 @@ type BracketField = keyof Pick<
 
 export default function TariffsPage() {
   const { accessToken } = useAuth();
+  const { canWriteProviderConfig, canManageWeather, isOperator } = useDeliveryProviderAccess();
+  const tariffsReadOnly = !canWriteProviderConfig;
   const [config, setConfig] = useState<DeliveryProviderPricingConfig>(() =>
     createDefaultPricingConfig(),
   );
@@ -342,14 +345,16 @@ export default function TariffsPage() {
         subtitle: styles.subtitle,
       }}
       action={
-        <button
-          type="button"
-          className={styles.primaryBtn}
-          disabled={loading || saving || !isDirty}
-          onClick={() => void handleSave()}
-        >
-          {saving ? 'Guardando…' : 'Guardar tarifas'}
-        </button>
+        canWriteProviderConfig ? (
+          <button
+            type="button"
+            className={styles.primaryBtn}
+            disabled={loading || saving || !isDirty}
+            onClick={() => void handleSave()}
+          >
+            {saving ? 'Guardando…' : 'Guardar tarifas'}
+          </button>
+        ) : null
       }
     >
       {loading ? (
@@ -358,6 +363,12 @@ export default function TariffsPage() {
         </p>
       ) : (
         <>
+          {isOperator ? (
+            <div className={styles.operatorNotice} role="status">
+              Tu rol de Operador permite editar clima operativo y usar el simulador. Las tarifas
+              base son solo lectura.
+            </div>
+          ) : null}
           {error ? (
             <div className={styles.errorBanner} role="alert">
               {error}
@@ -385,7 +396,7 @@ export default function TariffsPage() {
                   className={`${styles.weatherBtn} ${
                     weatherMode === option.mode ? styles.weatherBtnActive : ''
                   } ${option.danger ? styles.weatherBtnDanger : ''}`}
-                  disabled={weatherSaving}
+                  disabled={weatherSaving || !canManageWeather}
                   aria-pressed={weatherMode === option.mode}
                   onClick={() => void handleWeatherChange(option.mode)}
                 >
@@ -408,6 +419,7 @@ export default function TariffsPage() {
             ) : null}
           </section>
 
+          <fieldset disabled={tariffsReadOnly} className={styles.readOnlyFieldset}>
           <section className={styles.panel} aria-labelledby="inside-tariffs-title">
             <h2 id="inside-tariffs-title" className={styles.panelTitle}>
               Dentro de cobertura (polígono)
@@ -560,6 +572,7 @@ export default function TariffsPage() {
               </table>
             </div>
           </section>
+          </fieldset>
 
           <section className={styles.panel} aria-labelledby="simulator-title">
             <h2 id="simulator-title" className={styles.panelTitle}>
