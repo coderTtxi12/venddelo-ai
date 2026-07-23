@@ -486,6 +486,7 @@ export default function ProductsPage() {
     router.replace('/products', { scroll: false });
   }, [router, searchParams]);
   const [productCategoryFilterIds, setProductCategoryFilterIds] = useState<Id[]>([]);
+  const [productCategoryActiveFilter, setProductCategoryActiveFilter] = useState<CategoryActiveFilter[]>([]);
   const [productPriceSort, setProductPriceSort] = useState<ColumnSort>('none');
   const [productDiscountSort, setProductDiscountSort] = useState<ColumnSort>('none');
   const [productTotalSort, setProductTotalSort] = useState<ColumnSort>('none');
@@ -506,10 +507,13 @@ export default function ProductsPage() {
     [categories]
   );
 
+  const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+
   const productFiltersActive = useMemo(() => {
     return (
       productNameFilter.trim().length > 0 ||
       productCategoryFilterIds.length > 0 ||
+      productCategoryActiveFilter.length > 0 ||
       productPriceSort !== 'none' ||
       productDiscountSort !== 'none' ||
       productTotalSort !== 'none' ||
@@ -518,6 +522,7 @@ export default function ProductsPage() {
   }, [
     productNameFilter,
     productCategoryFilterIds,
+    productCategoryActiveFilter,
     productPriceSort,
     productDiscountSort,
     productTotalSort,
@@ -559,6 +564,11 @@ export default function ProductsPage() {
     if (productCategoryFilterIds.length > 0) {
       rows = rows.filter((p) => p.categoryIds.some((id) => productCategoryFilterIds.includes(id)));
     }
+    if (productCategoryActiveFilter.length > 0) {
+      rows = rows.filter((p) =>
+        productMatchesCategoryActiveFilter(p, productCategoryActiveFilter, categoryById),
+      );
+    }
     if (productVisibilityFilter.length > 0) {
       rows = rows.filter((p) => productVisibilityFilter.includes(getProductVisibilityState(p)));
     }
@@ -588,6 +598,8 @@ export default function ProductsPage() {
     products,
     productNameFilter,
     productCategoryFilterIds,
+    productCategoryActiveFilter,
+    categoryById,
     productVisibilityFilter,
     productPriceSort,
     productDiscountSort,
@@ -632,6 +644,7 @@ export default function ProductsPage() {
   }, [
     productNameFilter,
     productCategoryFilterIds,
+    productCategoryActiveFilter,
     productPriceSort,
     productDiscountSort,
     productTotalSort,
@@ -641,6 +654,7 @@ export default function ProductsPage() {
   function clearProductTableFilters() {
     setProductNameFilter('');
     setProductCategoryFilterIds([]);
+    setProductCategoryActiveFilter([]);
     setProductPriceSort('none');
     setProductDiscountSort('none');
     setProductTotalSort('none');
@@ -662,6 +676,18 @@ export default function ProductsPage() {
       return { key: `v:${state}`, label: option?.label ?? state };
     });
   }, [productVisibilityFilter]);
+
+  const selectedCategoryStatusTags = useMemo(() => {
+    return productCategoryActiveFilter.map((status) => {
+      const option = CATEGORY_ACTIVE_FILTER_OPTIONS.find((entry) => entry.value === status);
+      return { key: `c:${status}`, label: option?.label ?? status };
+    });
+  }, [productCategoryActiveFilter]);
+
+  function removeCategoryStatusFilter(key: string) {
+    const status = key.replace(/^c:/, '') as CategoryActiveFilter;
+    setProductCategoryActiveFilter((prev) => prev.filter((value) => value !== status));
+  }
 
   function removeCategoryFilter(id: Id) {
     setProductCategoryFilterIds((prev) => prev.filter((x) => x !== id));
