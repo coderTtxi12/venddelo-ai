@@ -31,6 +31,7 @@ import {
 import { ProductVisibilitySelect } from '@/components/products/ProductVisibilitySelect';
 import { ListPagination } from '@/components/ui/ListPagination';
 import { paginateItems } from '@/lib/paginate';
+import { normalizeSearchText, tokenizeQuery } from '@/lib/search/fuzzyMatch';
 import { parseProductsPageFilter } from '@/lib/search/productsPageFilter';
 import {
   CATEGORIES_PAGE_SIZE,
