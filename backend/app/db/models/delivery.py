@@ -111,7 +111,7 @@ class DeliveryProviderMember(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("delivery_provider_id", "user_id"),
         CheckConstraint(
-            "member_role IN ('owner','admin','dispatcher','driver')",
+            "member_role IN ('owner','admin','operator','dispatcher','driver')",
             name="member_role_allowed",
         ),
     )
@@ -126,12 +126,17 @@ class DeliveryProviderAdminInvite(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
     )
     email: Mapped[str] = mapped_column(Text, nullable=False)
+    member_role: Mapped[str] = mapped_column(String, nullable=False, server_default="admin")
 
     delivery_provider: Mapped["DeliveryProvider"] = relationship(back_populates="admin_invites")
 
     __table_args__ = (
         UniqueConstraint("delivery_provider_id", "email"),
         Index("ix_delivery_provider_admin_invites_email", "email"),
+        CheckConstraint(
+            "member_role IN ('admin','operator')",
+            name="delivery_provider_admin_invites_member_role_allowed",
+        ),
     )
 
 
