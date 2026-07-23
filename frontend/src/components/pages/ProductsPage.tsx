@@ -428,7 +428,40 @@ export default function ProductsPage() {
             { cursor },
             catalogPromotionsRef.current ?? undefined,
             { view: 'summary' },
-          ),
+          );
+
+        let targetPage = page;
+        let p = 1;
+        while (p < targetPage) {
+          if (productsPageCursorsRef.current[p] != null) {
+            p += 1;
+            continue;
+          }
+          const chainCursor = p === 1 ? null : (productsPageCursorsRef.current[p - 1] ?? null);
+          if (p > 1 && chainCursor == null) {
+            resetProductsPagination();
+            targetPage = 1;
+            break;
+          }
+          const chainResult = await fetchPage(p, chainCursor);
+          if (requestId !== productsLoadRequestRef.current) return;
+          productsPageCacheRef.current.set(p, chainResult.items);
+          const chainCursors = productsPageCursorsRef.current.slice();
+          while (chainCursors.length <= p) chainCursors.push(null);
+          chainCursors[p] = chainResult.cursor;
+          productsPageCursorsRef.current = chainCursors;
+          p += 1;
+        }
+
+        if (targetPage > 1 && productsPageCursorsRef.current[targetPage - 1] == null) {
+          targetPage = 1;
+        }
+
+        const cursor =
+          targetPage === 1 ? null : (productsPageCursorsRef.current[targetPage - 1] ?? null);
+        const [countResult, pageResult] = await Promise.all([
+          targetPage === 1 ? getProductCount(accessToken, supplierId) : Promise.resolve(null),
+          fetchPage(targetPage, cursor),
         ]);
         if (requestId !== productsLoadRequestRef.current) return;
 
