@@ -196,6 +196,7 @@ export type Product = {
   price_cents: number;
   currency: string;
   image_path: string | null;
+  image_url?: string | null;
   status: ProductStatus;
   created_at: string;
   updated_at: string;
