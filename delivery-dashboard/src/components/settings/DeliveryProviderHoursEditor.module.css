@@ -315,6 +315,34 @@
   min-width: 0;
 }
 
+@media (max-width: 640px) {
+  .dayMeta {
+    flex-wrap: wrap;
+    row-gap: 0.45rem;
+  }
+
+  .slotRow {
+    flex-wrap: wrap;
+  }
+
+  .timeFields {
+    flex: 1 1 100%;
+  }
+
+  .removeSlotBtn {
+    margin-left: auto;
+  }
+
+  .footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .saveBtn {
+    width: 100%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .serviceToggle,
   .chevron,
