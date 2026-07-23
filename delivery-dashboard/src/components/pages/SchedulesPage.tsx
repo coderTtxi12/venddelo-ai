@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { DeliveryProviderHoursEditor } from '@/components/settings/DeliveryProviderHoursEditor';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
+import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useAuth } from '@/hooks/useAuth';
 import {
   listMyDeliveryProviderSchedules,
@@ -14,6 +15,7 @@ import styles from './SettingsPage.module.css';
 
 export default function SchedulesPage() {
   const { accessToken } = useAuth();
+  const { canWriteProviderConfig, isOperator } = useDeliveryProviderAccess();
   const [schedules, setSchedules] = useState<DeliveryProviderSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -104,10 +106,16 @@ export default function SchedulesPage() {
               {success}
             </div>
           ) : null}
+          {isOperator ? (
+            <div className={styles.operatorNotice} role="status">
+              Tu rol de Operador permite consultar los horarios, pero no editarlos.
+            </div>
+          ) : null}
           <div className={styles.hoursWrap}>
             <DeliveryProviderHoursEditor
               schedules={schedules}
               saving={saving}
+              readOnly={!canWriteProviderConfig}
               onSave={handleSaveSchedules}
             />
           </div>
