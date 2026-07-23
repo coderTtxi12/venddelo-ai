@@ -99,7 +99,8 @@ class DeliveryProviderService:
         if found is None:
             raise NotFoundError("No tienes un proveedor de delivery registrado")
 
-        provider, _member_role = found
+        provider, member_role = found
+        require_write_provider_config(member_role)
         polygon = data.service_zone_polygon
         if polygon.type != "Polygon":
             raise ValidationError("El cerco debe ser un polígono")
