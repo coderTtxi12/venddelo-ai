@@ -2252,6 +2252,7 @@ function ProductEditor({
 function ProductMobileControls({
   categories,
   productCategoryFilterIds,
+  productCategoryActiveFilter,
   productVisibilityFilter,
   productPriceSort,
   setProductPriceSort,
@@ -2264,13 +2265,16 @@ function ProductMobileControls({
   statusFilterAnchor,
   setStatusFilterAnchor,
   selectedStatusTags,
+  selectedCategoryStatusTags,
   removeCategoryFilter,
+  removeCategoryStatusFilter,
   removeStatusTag,
   productFiltersActive,
   onClearFilters,
 }: {
   categories: CategoryDraft[];
   productCategoryFilterIds: Id[];
+  productCategoryActiveFilter: CategoryActiveFilter[];
   productVisibilityFilter: ProductVisibilityFilter[];
   productPriceSort: ColumnSort;
   setProductPriceSort: React.Dispatch<React.SetStateAction<ColumnSort>>;
@@ -2283,11 +2287,15 @@ function ProductMobileControls({
   statusFilterAnchor: HTMLElement | null;
   setStatusFilterAnchor: React.Dispatch<React.SetStateAction<HTMLElement | null>>;
   selectedStatusTags: { key: string; label: string }[];
+  selectedCategoryStatusTags: { key: string; label: string }[];
   removeCategoryFilter: (id: Id) => void;
+  removeCategoryStatusFilter: (key: string) => void;
   removeStatusTag: (key: string) => void;
   productFiltersActive: boolean;
   onClearFilters: () => void;
 }) {
+  const categoryFilterCount = productCategoryFilterIds.length + productCategoryActiveFilter.length;
+
   function sortLabel(sort: ColumnSort): string {
     if (sort === 'asc') return ' ↑';
     if (sort === 'desc') return ' ↓';
@@ -2301,7 +2309,7 @@ function ProductMobileControls({
         <div className={styles.mobileControlRow}>
           <button
             type="button"
-            className={`${styles.mobileControlBtn} ${productCategoryFilterIds.length > 0 ? styles.mobileControlBtnActive : ''}`}
+            className={`${styles.mobileControlBtn} ${categoryFilterCount > 0 ? styles.mobileControlBtnActive : ''}`}
             aria-expanded={Boolean(categoryFilterAnchor)}
             aria-haspopup="dialog"
             onClick={(e) => {
@@ -2311,8 +2319,8 @@ function ProductMobileControls({
           >
             <FilterListIcon sx={{ fontSize: 16 }} aria-hidden />
             Categorías
-            {productCategoryFilterIds.length > 0 ? (
-              <span className={styles.mobileControlCount}>{productCategoryFilterIds.length}</span>
+            {categoryFilterCount > 0 ? (
+              <span className={styles.mobileControlCount}>{categoryFilterCount}</span>
             ) : null}
           </button>
           <button
@@ -2361,8 +2369,21 @@ function ProductMobileControls({
         </div>
       </div>
 
-      {productCategoryFilterIds.length > 0 || selectedStatusTags.length > 0 ? (
+      {categoryFilterCount > 0 || selectedStatusTags.length > 0 ? (
         <div className={styles.mobileActiveFilters}>
+          {selectedCategoryStatusTags.map((tag) => (
+            <span key={tag.key} className={styles.mobileFilterBadge}>
+              <span className={styles.mobileFilterBadgeText}>{tag.label}</span>
+              <button
+                type="button"
+                className={styles.mobileFilterBadgeRemove}
+                aria-label={`Quitar filtro ${tag.label}`}
+                onClick={() => removeCategoryStatusFilter(tag.key)}
+              >
+                <CloseIcon sx={{ fontSize: 14 }} />
+              </button>
+            </span>
+          ))}
           {productCategoryFilterIds.map((id) => {
             const name = categories.find((c) => c.id === id)?.name ?? id;
             return (
