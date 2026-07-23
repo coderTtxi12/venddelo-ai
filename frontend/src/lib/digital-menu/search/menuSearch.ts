@@ -115,10 +115,32 @@ function searchProducts(products: Product[], tokens: string[]): MenuSearchHit[] 
   return hits;
 }
 
+export function activeMenuSearchCategories(categories: Category[]): Category[] {
+  return categories.filter((category) => category.is_active);
+}
+
+function activeMenuSearchCategoryIds(categories: Category[]): Set<string> {
+  return new Set(
+    activeMenuSearchCategories(categories)
+      .filter((category) => !isDigitalMenuSpecialCategoryId(category.id))
+      .map((category) => category.id),
+  );
+}
+
+/** En menú / Inactivo, with at least one active (non-virtual) category. */
+export function filterMenuSearchProducts(products: Product[], categories: Category[]): Product[] {
+  const activeCategoryIds = activeMenuSearchCategoryIds(categories);
+  return products.filter(
+    (product) =>
+      isPublicMenuListed(product) &&
+      product.category_ids.some((categoryId) => activeCategoryIds.has(categoryId)),
+  );
+}
+
 function searchCategories(categories: Category[], tokens: string[]): MenuSearchHit[] {
   const hits: MenuSearchHit[] = [];
 
-  for (const category of categories) {
+  for (const category of activeMenuSearchCategories(categories)) {
     if (!textMatchesTokens(category.name, tokens)) continue;
 
     hits.push({
