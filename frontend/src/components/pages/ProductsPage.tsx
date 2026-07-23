@@ -1686,7 +1686,8 @@ export default function ProductsPage() {
                 ) : (
                 <ProductEditor
                   initial={productDraft}
-                  categories={activeCategories}
+                  activeCategories={activeCategories}
+                  inactiveCategories={inactiveCategoriesForEditor}
                   restaurantProducts={copySourceProducts ?? products}
                   onCancel={() => setProductDrawerOpen(false)}
                   supplierId={supplierId}
