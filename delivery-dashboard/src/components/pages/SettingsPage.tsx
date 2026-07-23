@@ -5,11 +5,14 @@ import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
 import MailOutlineOutlinedIcon from '@mui/icons-material/MailOutlineOutlined';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
+import WorkOutlineOutlinedIcon from '@mui/icons-material/WorkOutlineOutlined';
 import { DeliveryProviderHoursEditor } from '@/components/settings/DeliveryProviderHoursEditor';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
 import { ServiceZoneMapDrawer } from '@/components/onboarding/ServiceZoneMapDrawer';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
+import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useAuth } from '@/hooks/useAuth';
+import { memberRoleLabel } from '@/lib/access/deliveryProviderPermissions';
 import {
   addMyDeliveryProviderAdminInvite,
   getMyDeliveryProvider,
@@ -79,6 +82,7 @@ function memberSecondaryLabel(member: DeliveryProviderMember): string | null {
 
 export default function SettingsPage() {
   const { accessToken } = useAuth();
+  const { canManageMembers, canWriteProviderConfig, isOperator } = useDeliveryProviderAccess();
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<OnboardingData>(() => createDefaultOnboardingData());
@@ -98,13 +102,14 @@ export default function SettingsPage() {
   const [paymentsSaving, setPaymentsSaving] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [memberRole, setMemberRole] = useState<string | null>(null);
   const [adminMembers, setAdminMembers] = useState<DeliveryProviderMember[]>([]);
   const [adminMembersLoading, setAdminMembersLoading] = useState(false);
   const [adminInvites, setAdminInvites] = useState<DeliveryProviderAdminInvite[]>([]);
   const [adminInvitesLoading, setAdminInvitesLoading] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
+  const [operatorEmail, setOperatorEmail] = useState('');
   const [adminSaving, setAdminSaving] = useState(false);
+  const [operatorSaving, setOperatorSaving] = useState(false);
   const [adminError, setAdminError] = useState<string | null>(null);
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [removingInviteId, setRemovingInviteId] = useState<string | null>(null);
@@ -132,7 +137,6 @@ export default function SettingsPage() {
         setForm(profile);
         setInitialForm(profile);
         setSlug(response.provider?.slug ?? null);
-        setMemberRole(response.member_role ?? null);
       } catch (err) {
         console.error(err);
         if (!cancelled) {
@@ -153,7 +157,7 @@ export default function SettingsPage() {
     let cancelled = false;
 
     async function loadAdminData() {
-      if (!accessToken || memberRole !== 'owner') {
+      if (!accessToken || !canManageMembers) {
         setAdminMembers([]);
         setAdminInvites([]);
         return;
@@ -189,7 +193,7 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, memberRole]);
+  }, [accessToken, canManageMembers]);
 
   useEffect(() => {
     let cancelled = false;
@@ -400,7 +404,7 @@ export default function SettingsPage() {
     setAdminSuccess(null);
 
     try {
-      const created = await addMyDeliveryProviderAdminInvite(accessToken, trimmed);
+      const created = await addMyDeliveryProviderAdminInvite(accessToken, trimmed, 'admin');
       setAdminInvites((current) => [...current, created]);
       setAdminEmail('');
       setAdminSuccess('Administrador agregado. Podrá entrar cuando inicie sesión con ese correo.');
@@ -414,6 +418,50 @@ export default function SettingsPage() {
       }
     } finally {
       setAdminSaving(false);
+    }
+  };
+
+  const handleAddOperator = async () => {
+    if (!accessToken) {
+      setAdminError('No hay sesión activa. Inicia sesión de nuevo.');
+      return;
+    }
+
+    const trimmed = operatorEmail.trim();
+    if (!trimmed) {
+      setAdminError('Escribe un correo electrónico.');
+      return;
+    }
+
+    const normalized = trimmed.toLowerCase();
+    if (adminMembers.some((member) => member.email?.trim().toLowerCase() === normalized)) {
+      setAdminError('Ese correo ya pertenece al equipo.');
+      return;
+    }
+    if (adminInvites.some((invite) => invite.email.trim().toLowerCase() === normalized)) {
+      setAdminError('Ese correo ya tiene una invitación pendiente.');
+      return;
+    }
+
+    setOperatorSaving(true);
+    setAdminError(null);
+    setAdminSuccess(null);
+
+    try {
+      const created = await addMyDeliveryProviderAdminInvite(accessToken, trimmed, 'operator');
+      setAdminInvites((current) => [...current, created]);
+      setOperatorEmail('');
+      setAdminSuccess('Operador agregado. Podrá entrar cuando inicie sesión con ese correo.');
+      window.setTimeout(() => setAdminSuccess(null), 4000);
+    } catch (err) {
+      console.error(err);
+      if (err instanceof ApiError) {
+        setAdminError(err.message);
+      } else {
+        setAdminError('No se pudo agregar el operador.');
+      }
+    } finally {
+      setOperatorSaving(false);
     }
   };
 
@@ -460,14 +508,16 @@ export default function SettingsPage() {
         empty: styles.loading,
       }}
       action={
-        <button
-          type="button"
-          className={styles.primaryBtn}
-          disabled={loading || saving || !isDirty}
-          onClick={() => void handleSave()}
-        >
-          {saving ? 'Guardando…' : 'Guardar cambios'}
-        </button>
+        canWriteProviderConfig ? (
+          <button
+            type="button"
+            className={styles.primaryBtn}
+            disabled={loading || saving || !isDirty}
+            onClick={() => void handleSave()}
+          >
+            {saving ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+        ) : null
       }
     >
       {loading ? (
@@ -476,6 +526,12 @@ export default function SettingsPage() {
         </p>
       ) : (
         <>
+          {isOperator ? (
+            <div className={styles.operatorNotice} role="status">
+              Tu rol de Operador permite consultar la configuración del courier. Para editar
+              alianzas, clima operativo y simulador usa las secciones correspondientes del panel.
+            </div>
+          ) : null}
           {error ? (
             <div className={styles.errorBanner} role="alert">
               {error}
@@ -487,6 +543,7 @@ export default function SettingsPage() {
             </div>
           ) : null}
 
+          <fieldset disabled={!canWriteProviderConfig} className={styles.readOnlyFieldset}>
           <section className={styles.panel} aria-labelledby="settings-logo">
             <h2 id="settings-logo" className={styles.panelTitle}>
               Logo
@@ -637,16 +694,17 @@ export default function SettingsPage() {
               />
             </div>
           </section>
+          </fieldset>
 
-          {memberRole === 'owner' ? (
+          {canManageMembers ? (
             <section className={styles.panel} aria-labelledby="settings-admins">
               <h2 id="settings-admins" className={styles.panelTitle}>
-                Administradores
+                Equipo del panel
               </h2>
               <p className={styles.panelHint}>
-                Consulta quién tiene acceso al panel y agrega correos para nuevos
-                administradores. No necesitan cuenta previa: al iniciar sesión con Google
-                usando ese correo, entrarán directo al panel.
+                Agrega administradores con acceso completo u operadores con permisos limitados
+                (alianzas, clima operativo y simulador). No necesitan cuenta previa: al iniciar
+                sesión con Google usando ese correo, entrarán directo al panel.
               </p>
               {adminError ? (
                 <div className={styles.errorBanner} role="alert">
@@ -666,13 +724,24 @@ export default function SettingsPage() {
                     Cargando equipo…
                   </p>
                 ) : adminMembers.length === 0 ? (
-                  <p className={styles.empty}>Aún no hay administradores activos.</p>
+                  <p className={styles.empty}>Aún no hay miembros activos.</p>
                 ) : (
                   <ul className={styles.adminMemberList}>
                     {adminMembers.map((member) => {
                       const secondary = memberSecondaryLabel(member);
                       const joinedAt = formatMemberJoinedAt(member.created_at);
                       const isOwner = member.member_role === 'owner';
+                      const isOperator = member.member_role === 'operator';
+                      const badgeClass = isOwner
+                        ? styles.roleBadgeOwner
+                        : isOperator
+                          ? styles.roleBadgeOperator
+                          : styles.roleBadgeAdmin;
+                      const BadgeIcon = isOwner
+                        ? ShieldOutlinedIcon
+                        : isOperator
+                          ? WorkOutlineOutlinedIcon
+                          : PersonOutlineOutlinedIcon;
                       return (
                         <li key={member.id} className={styles.adminMemberCard}>
                           <div className={styles.adminMemberAvatar} aria-hidden="true">
@@ -683,17 +752,9 @@ export default function SettingsPage() {
                               <span className={styles.adminMemberName}>
                                 {memberPrimaryLabel(member)}
                               </span>
-                              <span
-                                className={
-                                  isOwner ? styles.roleBadgeOwner : styles.roleBadgeAdmin
-                                }
-                              >
-                                {isOwner ? (
-                                  <ShieldOutlinedIcon className={styles.roleBadgeIcon} />
-                                ) : (
-                                  <PersonOutlineOutlinedIcon className={styles.roleBadgeIcon} />
-                                )}
-                                {isOwner ? 'Propietario' : 'Administrador'}
+                              <span className={badgeClass}>
+                                <BadgeIcon className={styles.roleBadgeIcon} />
+                                {memberRoleLabel(member.member_role)}
                               </span>
                             </div>
                             {secondary ? (
@@ -742,6 +803,39 @@ export default function SettingsPage() {
               </div>
 
               <div className={styles.adminSection}>
+                <h3 className={styles.adminSectionTitle}>Invitar operador</h3>
+                <p className={styles.adminSectionHint}>
+                  Puede aceptar restaurantes, cambiar clima operativo y usar el simulador. El resto
+                  del panel es solo lectura.
+                </p>
+                <div className={styles.adminAddRow}>
+                  <input
+                    className={styles.input}
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    placeholder="operador@empresa.com"
+                    value={operatorEmail}
+                    onChange={(e) => setOperatorEmail(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void handleAddOperator();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className={styles.secondaryBtn}
+                    disabled={operatorSaving || adminInvitesLoading || adminMembersLoading}
+                    onClick={() => void handleAddOperator()}
+                  >
+                    {operatorSaving ? 'Agregando…' : 'Agregar'}
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.adminSection}>
                 <h3 className={styles.adminSectionTitle}>Invitaciones pendientes</h3>
                 {adminInvitesLoading ? (
                   <p className={styles.loading} role="status">
@@ -761,10 +855,20 @@ export default function SettingsPage() {
                           <div className={styles.adminInviteText}>
                             <span className={styles.adminEmail}>{invite.email}</span>
                             <span className={styles.adminInviteMeta}>
-                              Esperando primer inicio de sesión
+                              {invite.member_role === 'operator'
+                                ? 'Operador · esperando primer inicio de sesión'
+                                : 'Administrador · esperando primer inicio de sesión'}
                             </span>
                           </div>
-                          <span className={styles.roleBadgePending}>Pendiente</span>
+                          <span
+                            className={
+                              invite.member_role === 'operator'
+                                ? styles.roleBadgeOperator
+                                : styles.roleBadgePending
+                            }
+                          >
+                            {invite.member_role === 'operator' ? 'Operador' : 'Pendiente'}
+                          </span>
                         </div>
                         <button
                           type="button"
@@ -782,6 +886,7 @@ export default function SettingsPage() {
             </section>
           ) : null}
 
+          <fieldset disabled={!canWriteProviderConfig} className={styles.readOnlyFieldset}>
           <section className={styles.panel} aria-labelledby="settings-payments">
             <h2 id="settings-payments" className={styles.panelTitle}>
               Métodos de pago
@@ -863,11 +968,13 @@ export default function SettingsPage() {
                 <DeliveryProviderHoursEditor
                   schedules={schedules}
                   saving={schedulesSaving}
+                  readOnly={!canWriteProviderConfig}
                   onSave={handleSaveSchedules}
                 />
               </div>
             )}
           </section>
+          </fieldset>
         </>
       )}
     </PanelPageShell>
