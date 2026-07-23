@@ -2017,13 +2017,44 @@ function ProductEditor({
   const discountLeavesPositiveFinal = priceNum <= 0 || priceNum - discountUsdEffective > 0;
 
   useEffect(() => {
-    if (!initial && categoryIds.length === 0 && categories.length > 0) {
-      setCategoryIds([categories[0]!.id]);
+    if (!initial && categoryIds.length === 0 && activeCategories.length > 0) {
+      setCategoryIds([activeCategories[0]!.id]);
     }
-  }, [initial, categoryIds.length, categories]);
+  }, [initial, categoryIds.length, activeCategories]);
+
+  const inactiveCategoryIds = useMemo(
+    () => new Set(inactiveCategories.map((category) => category.id)),
+    [inactiveCategories],
+  );
+
+  const hasActiveCategorySelected = useMemo(
+    () => categoryIds.some((id) => activeCategories.some((category) => category.id === id)),
+    [categoryIds, activeCategories],
+  );
+
+  const hasInactiveCategorySelected = useMemo(
+    () => categoryIds.some((id) => inactiveCategoryIds.has(id)),
+    [categoryIds, inactiveCategoryIds],
+  );
+
+  const visibilityCategoryContext = useMemo(
+    () => ({
+      hasActiveCategory: hasActiveCategorySelected,
+      hasInactiveCategory: hasInactiveCategorySelected,
+    }),
+    [hasActiveCategorySelected, hasInactiveCategorySelected],
+  );
+
+  const visibilityMeta = useMemo(
+    () => (initial ? productVisibilityMeta(initial, visibilityCategoryContext) : null),
+    [initial, visibilityCategoryContext],
+  );
 
   const canSave =
-    name.trim().length > 0 && categoryIds.length > 0 && price >= 0 && discountLeavesPositiveFinal;
+    name.trim().length > 0 &&
+    categoryIds.length > 0 &&
+    price >= 0 &&
+    discountLeavesPositiveFinal;
 
   const activeOptionGroups = optionGroups.filter((g) => g.isActive);
 
