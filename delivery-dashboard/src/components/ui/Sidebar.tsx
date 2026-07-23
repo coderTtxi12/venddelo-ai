@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import HandshakeOutlinedIcon from '@mui/icons-material/HandshakeOutlined';
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import { MOBILE_DRAWER_MAX_WIDTH, useMobileSidebar } from '@/contexts/MobileSidebarContext';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
