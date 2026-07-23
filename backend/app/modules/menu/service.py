@@ -106,9 +106,16 @@ class MenuService:
         return prod
 
     def list_products(
-        self, restaurant_id: uuid.UUID, params: PaginationParams
+        self, restaurant_id: uuid.UUID, params: PaginationParams, *, include_options: bool = True
     ) -> CursorPage[ProductDTO]:
-        return self._repo.list_products(restaurant_id, params)
+        return self._repo.list_products(
+            restaurant_id,
+            params,
+            include_options=include_options,
+        )
+
+    def count_products(self, restaurant_id: uuid.UUID) -> int:
+        return self._repo.count_products(restaurant_id)
 
     def list_products_page(
         self,
@@ -116,6 +123,7 @@ class MenuService:
         params: PaginationParams,
         *,
         category_id: uuid.UUID | None = None,
+        include_options: bool = True,
     ) -> CursorPage[ProductDTO]:
         if category_id is not None:
             self.get_category(restaurant_id, category_id)
@@ -123,6 +131,7 @@ class MenuService:
             restaurant_id,
             params,
             category_id=category_id,
+            include_options=include_options,
         )
 
     def update_product(
