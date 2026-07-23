@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Sequence
 
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
+from app.modules.delivery_providers.permissions import require_manage_partnerships
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
@@ -186,18 +187,27 @@ class DeliveryPartnershipService:
     def accept_request(
         self, user_id: uuid.UUID, link_id: uuid.UUID
     ) -> DeliveryPartnershipRequestDTO:
+        self._require_partnership_manager(user_id)
         provider_id = self._require_delivery_provider_mexy_link(user_id, link_id)
         result = self._repo.accept_partnership_request(link_id, provider_id)
         self.seed_restaurant_delivery_payment_methods(result.restaurant.id)
         return result
 
     def reject_request(self, user_id: uuid.UUID, link_id: uuid.UUID) -> None:
+        self._require_partnership_manager(user_id)
         provider_id = self._require_delivery_provider_mexy_link(user_id, link_id)
         self._repo.reject_partnership_request(link_id, provider_id)
 
-    def _require_delivery_provider_member(self, user_id: uuid.UUID) -> None:
-        if self._repo.get_for_user(user_id) is None:
+    def _require_delivery_provider_member(self, user_id: uuid.UUID) -> str:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
             raise NotFoundError("No tienes un proveedor de delivery registrado")
+        _provider, member_role = found
+        return member_role
+
+    def _require_partnership_manager(self, user_id: uuid.UUID) -> None:
+        member_role = self._require_delivery_provider_member(user_id)
+        require_manage_partnerships(member_role)
 
     def _require_delivery_provider_mexy_link(
         self, user_id: uuid.UUID, link_id: uuid.UUID
