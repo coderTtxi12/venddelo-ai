@@ -191,6 +191,7 @@ function KindScheduleBlock({
 export function DeliveryProviderHoursEditor({
   schedules,
   saving = false,
+  readOnly = false,
   onSave,
 }: DeliveryProviderHoursEditorProps) {
   const [drafts, setDrafts] = useState<KindScheduleDraft[]>(() =>
