@@ -237,7 +237,11 @@ class DeliveryProviderService:
         user_id: uuid.UUID,
         methods: list[DeliveryProviderPaymentMethodCreate],
     ) -> list[DeliveryProviderPaymentMethodDTO]:
-        provider = self._require_provider(user_id)
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, member_role = found
+        require_write_provider_config(member_role)
         self._validate_payment_methods(methods)
         self._repo.set_payment_methods(provider.id, methods)
         return list(self._repo.list_payment_methods(provider.id))
