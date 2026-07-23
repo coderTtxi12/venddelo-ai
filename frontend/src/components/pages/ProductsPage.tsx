@@ -906,7 +906,11 @@ export default function ProductsPage() {
   );
 
   const categoriesTabLoading = authLoading || accessLoading || supplierPending || categoriesLoading;
-  const productsTabLoading = authLoading || accessLoading || supplierPending || productsLoading;
+  const productsTabLoading =
+    authLoading ||
+    accessLoading ||
+    supplierPending ||
+    (productsLoading && products.length === 0);
 
   const catalogLoadingTitle = supplierPending
     ? 'Conectando con tu restaurante…'
