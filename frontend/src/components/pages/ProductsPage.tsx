@@ -713,20 +713,14 @@ export default function ProductsPage() {
       productsTotalCount === 0 ? 0 : (productsPage - 1) * PRODUCTS_PAGE_SIZE + 1;
     const rangeEnd = Math.min(productsPage * PRODUCTS_PAGE_SIZE, productsTotalCount);
     return {
-      items: displayedProducts,
+      items: products,
       page: productsPage,
       totalPages,
       totalItems: productsTotalCount,
       rangeStart,
       rangeEnd,
     };
-  }, [
-    displayedProducts,
-    productFiltersActive,
-    productsCatalogLoaded,
-    productsPage,
-    productsTotalCount,
-  ]);
+  }, [displayedProducts, products, productsPage, productsTotalCount, usesClientProductPagination]);
 
   useEffect(() => {
     setCategoriesPage(1);
