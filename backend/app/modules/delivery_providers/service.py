@@ -85,8 +85,8 @@ class DeliveryProviderService:
             raise ConflictError("Ese correo ya pertenece al equipo")
         existing = [row for row in self._repo.list_admin_invites(provider_id) if row.email == normalized]
         if existing:
-            raise ConflictError("Ese correo ya está en la lista de administradores")
-        return self._repo.add_admin_invite(provider_id, normalized)
+            raise ConflictError("Ese correo ya tiene una invitación pendiente")
+        return self._repo.add_admin_invite(provider_id, normalized, data.member_role)
 
     def remove_admin_invite(self, user_id: uuid.UUID, invite_id: uuid.UUID) -> None:
         provider_id = self._require_owner_provider_id(user_id)
