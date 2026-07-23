@@ -33,9 +33,28 @@ function isNavActive(pathname: string, path: string): boolean {
   return pathname === path || pathname.startsWith(`${path}/`);
 }
 
+/** Por debajo de este ancho el sidebar arranca compactado (solo desktop/tablet landscape). */
+const SIDEBAR_COMPACT_MAX_WIDTH = 1024;
+
+function shouldSidebarStartCollapsed(width: number): boolean {
+  return width < SIDEBAR_COMPACT_MAX_WIDTH && width > MOBILE_DRAWER_MAX_WIDTH;
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const { isMobileDrawer, isDrawerOpen, closeDrawer } = useMobileSidebar();
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    setIsCollapsed(shouldSidebarStartCollapsed(window.innerWidth));
+  }, []);
+
+  useEffect(() => {
+    if (isMobileDrawer) closeDrawer();
+  }, [pathname, isMobileDrawer, closeDrawer]);
+
+  const showCollapsed = !isMobileDrawer && isCollapsed;
+  const showLabels = isMobileDrawer || !isCollapsed;
 
   return (
     <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}>
