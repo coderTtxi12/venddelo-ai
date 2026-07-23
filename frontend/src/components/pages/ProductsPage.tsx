@@ -1150,8 +1150,24 @@ export default function ProductsPage() {
                               <FilterListIcon sx={{ fontSize: 18 }} />
                             </button>
                           </div>
-                          {selectedCategoryLabels.length > 0 ? (
+                          {(selectedCategoryLabels.length > 0 || selectedCategoryStatusTags.length > 0) ? (
                             <div className={styles.thHeaderBadges}>
+                              {selectedCategoryStatusTags.map((tag) => (
+                                <span key={tag.key} className={styles.thHeaderBadge}>
+                                  <span className={styles.thHeaderBadgeText}>{tag.label}</span>
+                                  <button
+                                    type="button"
+                                    className={styles.thHeaderBadgeRemove}
+                                    aria-label={`Quitar filtro ${tag.label}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeCategoryStatusFilter(tag.key);
+                                    }}
+                                  >
+                                    <CloseIcon sx={{ fontSize: 14 }} />
+                                  </button>
+                                </span>
+                              ))}
                               {productCategoryFilterIds.map((id) => {
                                 const name = categories.find((c) => c.id === id)?.name ?? id;
                                 return (
