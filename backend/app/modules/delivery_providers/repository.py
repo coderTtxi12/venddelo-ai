@@ -179,7 +179,7 @@ class DeliveryProviderRepository(ABC):
 
     @abstractmethod
     def add_admin_invite(
-        self, provider_id: uuid.UUID, email: str
+        self, provider_id: uuid.UUID, email: str, member_role: str = "admin"
     ) -> DeliveryProviderAdminInviteDTO: ...
 
     @abstractmethod
