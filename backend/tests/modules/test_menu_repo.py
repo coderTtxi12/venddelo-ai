@@ -68,6 +68,33 @@ def test_update_product_replaces_categories(session):
 
 
 @requires_db
+def test_update_product_keeps_inactive_category(session):
+    from app.modules.menu.service import MenuService
+
+    r = _restaurant(session, "menu_inactive_cat_product")
+    repo = SqlAlchemyMenuRepository(session)
+    svc = MenuService(repo)
+    cat = repo.add_category(CategoryCreate(restaurant_id=r.id, name="Inactive Cat"))
+    prod = svc.create_product(
+        r.id,
+        ProductCreate(
+            restaurant_id=r.id,
+            name="P",
+            price_cents=1000,
+            category_ids=[cat.id],
+        ),
+    )
+    repo.update_category(cat.id, CategoryUpdate(is_active=False))
+    updated = svc.update_product(
+        r.id,
+        prod.id,
+        ProductUpdate(name="Updated name", category_ids=[cat.id]),
+    )
+    assert updated.name == "Updated name"
+    assert updated.category_ids == [cat.id]
+
+
+@requires_db
 def test_option_group_with_items(session):
     r = _restaurant(session, "menu4")
     repo = SqlAlchemyMenuRepository(session)
