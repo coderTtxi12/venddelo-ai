@@ -70,6 +70,7 @@ docker-compose.override.yml
 # Local agent / tooling state
 .cursor/
 .superpowers/
+scripts/apply-commits-copy-paste.sh
 
 # Misc
 *.pem
