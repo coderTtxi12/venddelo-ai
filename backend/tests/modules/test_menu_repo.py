@@ -408,3 +408,58 @@ def test_get_full_menu_bounded_query_count(session, engine):
         assert query_count["n"] <= 10
     finally:
         event.remove(engine, "before_cursor_execute", before_cursor_execute)
+
+
+@requires_db
+def test_list_products_summary_view_omits_option_groups(session):
+    r = _restaurant(session, "menu-list-summary")
+    repo = SqlAlchemyMenuRepository(session)
+    cat = repo.add_category(CategoryCreate(restaurant_id=r.id, name="Cat"))
+    product = repo.add_product(
+        ProductCreate(
+            restaurant_id=r.id,
+            name="Summary Product",
+            price_cents=1500,
+            status="active",
+            category_ids=[cat.id],
+            image_path="restaurants/demo/products/burger.jpg",
+        )
+    )
+    repo.add_option_group(
+        product.id,
+        OptionGroupCreate(
+            title="Extras",
+            selection="single",
+            items=[OptionItemCreate(label="A", price_delta_cents=0)],
+        ),
+    )
+
+    page = repo.list_products(
+        r.id,
+        PaginationParams(limit=10, cursor=None),
+        include_options=False,
+    )
+
+    assert len(page.items) == 1
+    assert page.items[0].option_groups == []
+    assert page.items[0].image_path == "restaurants/demo/products/burger.jpg"
+    assert page.items[0].image_url is not None
+
+
+@requires_db
+def test_count_products_returns_total(session):
+    r = _restaurant(session, "menu-count-products")
+    repo = SqlAlchemyMenuRepository(session)
+    cat = repo.add_category(CategoryCreate(restaurant_id=r.id, name="Cat"))
+    for index in range(3):
+        repo.add_product(
+            ProductCreate(
+                restaurant_id=r.id,
+                name=f"Product {index}",
+                price_cents=1000,
+                status="active",
+                category_ids=[cat.id],
+            )
+        )
+
+    assert repo.count_products(r.id) == 3
