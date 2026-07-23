@@ -86,7 +86,10 @@ export function isLiveMenuVisible(product: VisibilityFields): boolean {
   return product.status === 'active';
 }
 
-export function productVisibilityMeta(product: VisibilityFields): {
+export function productVisibilityMeta(
+  product: VisibilityFields,
+  categoryContext?: ProductVisibilityCategoryContext,
+): {
   state: ProductVisibilityState;
   label: string;
   tone: 'neutral' | 'info' | 'success' | 'danger';
@@ -98,7 +101,7 @@ export function productVisibilityMeta(product: VisibilityFields): {
     state,
     label: option.label,
     tone: state === 'live' ? 'success' : state === 'hidden' ? 'info' : 'neutral',
-    help: option.help,
+    help: resolveVisibilityHelp(state, option.help, categoryContext),
   };
 }
 
