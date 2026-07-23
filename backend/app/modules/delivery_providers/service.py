@@ -13,6 +13,10 @@ from app.modules.delivery_providers.pricing import (
     quote_delivery_fee,
     validate_pricing_config,
 )
+from app.modules.delivery_providers.permissions import (
+    require_manage_weather,
+    require_write_provider_config,
+)
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryProviderAdminInviteCreate,
