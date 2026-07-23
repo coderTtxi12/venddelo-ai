@@ -1100,6 +1100,7 @@ export default function ProductsPage() {
                   <ProductMobileControls
                     categories={categories}
                     productCategoryFilterIds={productCategoryFilterIds}
+                    productCategoryActiveFilter={productCategoryActiveFilter}
                     productVisibilityFilter={productVisibilityFilter}
                     productPriceSort={productPriceSort}
                     setProductPriceSort={setProductPriceSort}
@@ -1112,7 +1113,9 @@ export default function ProductsPage() {
                     statusFilterAnchor={statusFilterAnchor}
                     setStatusFilterAnchor={setStatusFilterAnchor}
                     selectedStatusTags={selectedStatusTags}
+                    selectedCategoryStatusTags={selectedCategoryStatusTags}
                     removeCategoryFilter={removeCategoryFilter}
+                    removeCategoryStatusFilter={removeCategoryStatusFilter}
                     removeStatusTag={removeStatusTag}
                     productFiltersActive={productFiltersActive}
                     onClearFilters={clearProductTableFilters}
