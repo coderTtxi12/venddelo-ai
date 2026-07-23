@@ -91,6 +91,13 @@ function productLineTotal(p: { price: { amount: number }; discountUsd: number })
 }
 type ProductVisibilityFilter = ProductVisibilityState;
 
+type CategoryActiveFilter = 'active' | 'inactive';
+
+const CATEGORY_ACTIVE_FILTER_OPTIONS: { value: CategoryActiveFilter; label: string }[] = [
+  { value: 'active', label: 'Activa' },
+  { value: 'inactive', label: 'Inactiva' },
+];
+
 type ColumnSort = 'none' | 'asc' | 'desc';
 
 function toggleInList<T>(list: T[], value: T): T[] {
@@ -250,6 +257,39 @@ function Pill({
   return (
     <span className={`${styles.pill} ${styles[`pill_${tone}`]}`} title={title}>
       {children}
+    </span>
+  );
+}
+
+function productMatchesCategoryActiveFilter(
+  product: ProductDraft,
+  statusFilter: CategoryActiveFilter[],
+  categoryLookup: Map<Id, CategoryDraft>,
+): boolean {
+  if (statusFilter.length === 0) return true;
+  const productCategories = product.categoryIds
+    .map((id) => categoryLookup.get(id))
+    .filter((category): category is CategoryDraft => Boolean(category));
+  if (productCategories.length === 0) return false;
+  return productCategories.some((category) =>
+    statusFilter.includes(category.isActive ? 'active' : 'inactive'),
+  );
+}
+
+function ProductCategoryChip({ category }: { category: CategoryDraft }) {
+  const statusLabel = category.isActive ? 'Activa' : 'Inactiva';
+  return (
+    <span
+      className={`${styles.categoryChip} ${category.isActive ? styles.categoryChipActive : styles.categoryChipInactive}`}
+      title={`${category.name} · categoría ${statusLabel.toLowerCase()}`}
+    >
+      <span className={styles.categoryChipName}>{category.name}</span>
+      <span
+        className={`${styles.categoryChipStatus} ${category.isActive ? styles.categoryChipStatusActive : styles.categoryChipStatusInactive}`}
+        aria-label={`Categoría ${statusLabel.toLowerCase()}`}
+      >
+        {statusLabel}
+      </span>
     </span>
   );
 }
