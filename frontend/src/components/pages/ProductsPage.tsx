@@ -262,6 +262,13 @@ function Pill({
   );
 }
 
+function productMatchesNameQuery(name: string, query: string): boolean {
+  const tokens = tokenizeQuery(query);
+  if (tokens.length === 0) return true;
+  const normalizedName = normalizeSearchText(name);
+  return tokens.every((token) => normalizedName.includes(token));
+}
+
 function productMatchesCategoryActiveFilter(
   product: ProductDraft,
   statusFilter: CategoryActiveFilter[],
