@@ -488,27 +488,41 @@ export default function ProductsPage() {
         }
       }
     },
-    [accessToken, supplierId],
+    [accessToken, resetProductsPagination, supplierId],
   );
 
   async function loadAllProductsForFilters() {
     if (!supplierId || !accessToken) return;
+
+    const cached = productsFilterCatalogRef.current;
+    if (cached) {
+      setProducts(cached);
+      setProductsTotalCount(cached.length);
+      setProductsPage(1);
+      return;
+    }
+
+    const requestId = productsLoadRequestRef.current;
     setProductsLoading(true);
     setProductsError(null);
     try {
       const result = await fetchAllSupplierProducts(accessToken, db, supplierId, { view: 'summary' });
+      if (requestId !== productsLoadRequestRef.current) return;
       catalogPromotionsRef.current = result.catalogPromotions;
+      markProductsFilterCatalogReady(result.items);
       setProducts(result.items);
       setProductsTotalCount(result.items.length);
-      setProductsCatalogLoaded(true);
       setProductsPage(1);
     } catch (e) {
+      if (requestId !== productsLoadRequestRef.current) return;
       console.error(e);
       setProductsError('No se pudieron cargar los productos. Intenta de nuevo.');
       setProducts([]);
       setProductsPage(1);
     } finally {
-      setProductsLoading(false);
+      if (requestId === productsLoadRequestRef.current) {
+        setProductsLoading(false);
+      }
     }
   }
 
