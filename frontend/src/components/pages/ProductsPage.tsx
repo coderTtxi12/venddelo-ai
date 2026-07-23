@@ -1443,6 +1443,29 @@ export default function ProductsPage() {
                     }}
                   >
                     <div className={styles.filterPopoverBody}>
+                      <p className={styles.filterPopoverTitle}>Estado de categoría</p>
+                      <div className={styles.filterPopoverChips} role="group" aria-label="Estado de categoría">
+                        {CATEGORY_ACTIVE_FILTER_OPTIONS.map(({ value, label }) => {
+                          const on = productCategoryActiveFilter.includes(value);
+                          return (
+                            <button
+                              key={value}
+                              type="button"
+                              role="checkbox"
+                              aria-checked={on}
+                              className={`${styles.filterChip} ${on ? styles.filterChipOn : ''} ${
+                                value === 'active' ? styles.filterChipCategoryActiveTone : styles.filterChipCategoryInactiveTone
+                              }`}
+                              onClick={() =>
+                                setProductCategoryActiveFilter((prev) => toggleInList(prev, value))
+                              }
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className={styles.filterPopoverTitle}>Categorías</p>
                       <p className={styles.filterPopoverHelp}>
                         Selecciona una o varias. El producto debe pertenecer al menos a una.
                       </p>
@@ -1452,18 +1475,31 @@ export default function ProductsPage() {
                         ) : (
                           categoriesForProductFilters.map((c) => {
                             const on = productCategoryFilterIds.includes(c.id);
+                            const statusLabel = c.isActive ? 'Activa' : 'Inactiva';
                             return (
                               <button
                                 key={c.id}
                                 type="button"
                                 role="checkbox"
                                 aria-checked={on}
-                                className={`${styles.filterChip} ${on ? styles.filterChipOn : ''}`}
+                                aria-label={`${c.name} (${statusLabel})`}
+                                className={`${styles.filterCategoryChip} ${on ? styles.filterCategoryChipOn : ''} ${
+                                  c.isActive ? styles.filterCategoryChipActive : styles.filterCategoryChipInactive
+                                }`}
                                 onClick={() =>
                                   setProductCategoryFilterIds((prev) => toggleInList(prev, c.id))
                                 }
                               >
-                                {c.name}
+                                <span className={styles.filterCategoryChipName}>{c.name}</span>
+                                <span
+                                  className={`${styles.filterCategoryChipStatus} ${
+                                    c.isActive
+                                      ? styles.filterCategoryChipStatusActive
+                                      : styles.filterCategoryChipStatusInactive
+                                  }`}
+                                >
+                                  {statusLabel}
+                                </span>
                               </button>
                             );
                           })
