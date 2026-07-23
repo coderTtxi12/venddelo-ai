@@ -161,7 +161,8 @@ export function searchMenu(input: MenuSearchInput): MenuSearchHit[] {
   const tokens = tokenizeQuery(input.query);
   if (tokens.length === 0) return [];
 
-  const productHits = searchProducts(input.products, tokens);
+  const searchableProducts = filterMenuSearchProducts(input.products, input.categories);
+  const productHits = searchProducts(searchableProducts, tokens);
   const categoryHits = searchCategories(input.categories, tokens);
 
   const deduped = new Map<string, MenuSearchHit>();
