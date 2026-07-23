@@ -209,26 +209,38 @@ export function DeliveryProviderHoursEditor({
 
   const updateBlock = useCallback(
     (scheduleKind: DeliveryProviderScheduleKind, days: DayScheduleDraft[]) => {
+      if (readOnly) return;
       setDrafts((prev) =>
         prev.map((block) => (block.scheduleKind === scheduleKind ? { ...block, days } : block)),
       );
       setDirty(true);
       setValidationError(null);
     },
-    [],
+    [readOnly],
   );
 
   const handleSave = async () => {
+    if (saveInFlightRef.current || saving || isSaving) return;
+
     const error = validateScheduleDrafts(drafts);
     if (error) {
       setValidationError(error);
       return;
     }
 
+    saveInFlightRef.current = true;
+    setIsSaving(true);
     setValidationError(null);
-    await onSave(scheduleDraftsToCreatePayload(drafts));
-    setDirty(false);
+    try {
+      await onSave(scheduleDraftsToCreatePayload(drafts));
+      setDirty(false);
+    } finally {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
+    }
   };
+
+  const savePending = saving || isSaving;
 
   return (
     <section className={styles.hoursSection} aria-labelledby="provider-hours-title">
