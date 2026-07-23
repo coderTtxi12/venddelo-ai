@@ -24,6 +24,7 @@ import styles from './DeliveryProviderHoursEditor.module.css';
 type DeliveryProviderHoursEditorProps = {
   schedules: DeliveryProviderSchedule[];
   saving?: boolean;
+  readOnly?: boolean;
   onSave: (payload: DeliveryProviderScheduleCreateInput[]) => Promise<void>;
 };
 
@@ -200,6 +201,8 @@ export function DeliveryProviderHoursEditor({
   const [expandedKind, setExpandedKind] = useState<DeliveryProviderScheduleKind | null>('regular');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const saveInFlightRef = useRef(false);
 
   useEffect(() => {
     setDrafts(buildScheduleDrafts(schedules, SCHEDULE_KIND_ORDER));
@@ -258,6 +261,7 @@ export function DeliveryProviderHoursEditor({
         </div>
       </div>
 
+      <fieldset disabled={readOnly} className={styles.readOnlyFieldset}>
       <div className={styles.hoursBlocks}>
         {drafts.map((block) => (
           <KindScheduleBlock
@@ -282,14 +286,16 @@ export function DeliveryProviderHoursEditor({
             {validationError}
           </p>
         ) : null}
-        <button
-          type="button"
-          className={styles.saveBtn}
-          disabled={saving || !dirty}
-          onClick={() => void handleSave()}
-        >
-          {saving ? 'Guardando horarios…' : 'Guardar horarios'}
-        </button>
+        {!readOnly ? (
+          <button
+            type="button"
+            className={styles.saveBtn}
+            disabled={savePending || !dirty}
+            onClick={() => void handleSave()}
+          >
+            {savePending ? 'Guardando horarios…' : 'Guardar horarios'}
+          </button>
+        ) : null}
       </div>
     </section>
   );
