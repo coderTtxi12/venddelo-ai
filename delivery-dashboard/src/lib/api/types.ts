@@ -51,6 +51,7 @@ export type DeliveryProviderMeResponse = {
 export type DeliveryProviderAdminInvite = {
   id: string;
   email: string;
+  member_role: 'admin' | 'operator';
   created_at: string;
 };
 
@@ -59,7 +60,7 @@ export type DeliveryProviderMember = {
   user_id: string;
   email: string | null;
   display_name: string | null;
-  member_role: 'owner' | 'admin' | 'dispatcher' | 'driver';
+  member_role: 'owner' | 'admin' | 'operator' | 'dispatcher' | 'driver';
   created_at: string;
 };
 
