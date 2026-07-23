@@ -1954,7 +1954,8 @@ function ProductEditor({
   visibilitySaving = false,
 }: {
   initial: ProductDraft | null;
-  categories: CategoryDraft[];
+  activeCategories: CategoryDraft[];
+  inactiveCategories: CategoryDraft[];
   restaurantProducts: ProductDraft[];
   onCancel: () => void;
   onVisibilityChange?: (state: ProductVisibilityState) => void;
