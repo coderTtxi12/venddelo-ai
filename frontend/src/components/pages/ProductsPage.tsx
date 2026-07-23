@@ -2159,27 +2159,16 @@ function ProductEditor({
         </div>
         <div className={styles.field}>
           <label className={styles.label}>Categorías (selecciona 1+)</label>
-          <div className={styles.multiSelect}>
-            {categories.map((c) => {
-              const checked = categoryIds.includes(c.id);
-              return (
-                <label key={c.id} className={styles.checkRow}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(e) => {
-                      const next = e.target.checked
-                        ? Array.from(new Set([...categoryIds, c.id]))
-                        : categoryIds.filter((id) => id !== c.id);
-                      setCategoryIds(next);
-                    }}
-                  />
-                  <span>{c.name}</span>
-                </label>
-              );
-            })}
+          <ProductCategoryPicker
+            activeCategories={activeCategories}
+            inactiveCategories={inactiveCategories}
+            categoryIds={categoryIds}
+            onChange={setCategoryIds}
+          />
+          <div className={styles.helpText}>
+            Un producto puede pertenecer a varias categorías. Las inactivas no aparecen en el menú
+            digital hasta que las reactives.
           </div>
-          <div className={styles.helpText}>Un producto puede pertenecer a varias categorías, pero debe pertenecer al menos a una.</div>
         </div>
       </div>
 
