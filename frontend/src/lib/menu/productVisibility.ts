@@ -7,6 +7,37 @@ type VisibilityFields = {
   status?: ProductStatus;
 };
 
+export type ProductVisibilityCategoryContext = {
+  hasActiveCategory?: boolean;
+  hasInactiveCategory?: boolean;
+};
+
+function resolveVisibilityHelp(
+  state: ProductVisibilityState,
+  baseHelp: string,
+  categoryContext?: ProductVisibilityCategoryContext,
+): string {
+  if (!categoryContext?.hasInactiveCategory) {
+    return baseHelp;
+  }
+
+  if (state === 'live') {
+    if (!categoryContext.hasActiveCategory) {
+      return 'No aparece en el menú público porque sus categorías están inactivas. Reactívalas o asigna una categoría activa.';
+    }
+    return 'Visible en categorías activas; las categorías inactivas no se muestran en el menú público.';
+  }
+
+  if (state === 'inactive') {
+    if (!categoryContext.hasActiveCategory) {
+      return 'No aparece en el menú público: el producto está inactivo y sus categorías están desactivadas.';
+    }
+    return 'Visible en categorías activas, pero no se puede vender. Las categorías inactivas no se muestran en el menú público.';
+  }
+
+  return baseHelp;
+}
+
 export const PRODUCT_VISIBILITY_OPTIONS: {
   value: ProductVisibilityState;
   label: string;
