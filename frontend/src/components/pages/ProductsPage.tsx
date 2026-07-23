@@ -598,37 +598,59 @@ export default function ProductsPage() {
     productVisibilityFilter,
   ]);
 
+  const usesClientProductPagination = useMemo(
+    () => productFiltersActive || productsFilterCatalogRef.current !== null,
+    [productFiltersActive, productsFilterCatalogVersion],
+  );
+
   const handleProductsPageChange = useCallback(
     (page: number) => {
-      if (productFiltersActive || productsCatalogLoaded) {
+      if (usesClientProductPagination) {
         setProductsPage(page);
         return;
       }
       void loadProductsTablePage(page);
     },
-    [loadProductsTablePage, productFiltersActive, productsCatalogLoaded],
+    [loadProductsTablePage, usesClientProductPagination],
   );
+
+  useEffect(() => {
+    invalidateProductsFilterCatalog();
+  }, [invalidateProductsFilterCatalog, supplierId]);
 
   useEffect(() => {
     if (!supplierId || !accessToken) return;
     if (productFiltersActive) {
-      if (!productsCatalogLoaded) {
-        void loadAllProductsForFilters();
-      }
+      productsLoadRequestRef.current += 1;
+      void loadAllProductsForFilters();
+      return;
+    }
+    if (productsFilterCatalogRef.current) {
+      productsLoadRequestRef.current += 1;
+      setProducts(productsFilterCatalogRef.current);
+      setProductsTotalCount(productsFilterCatalogRef.current.length);
+      setProductsPage(1);
       return;
     }
     productsLoadRequestRef.current += 1;
-    clearProductsPageCache();
-    setProductsCatalogLoaded(false);
+    resetProductsPagination();
     void loadProductsTablePage(1, { force: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierId, accessToken, productFiltersActive]);
 
+  const productsFilterCatalogPending =
+    productFiltersActive && productsFilterCatalogRef.current === null && productsLoading;
+
   const displayedProducts = useMemo(() => {
+    const catalogReady = productsFilterCatalogRef.current !== null;
+    if (productFiltersActive && !catalogReady) {
+      return [];
+    }
+
     let rows = products;
-    const nameQ = productNameFilter.trim().toLowerCase();
+    const nameQ = productNameFilter.trim();
     if (nameQ) {
-      rows = rows.filter((p) => p.name.toLowerCase().includes(nameQ));
+      rows = rows.filter((p) => productMatchesNameQuery(p.name, nameQ));
     }
     if (productCategoryFilterIds.length > 0) {
       rows = rows.filter((p) => p.categoryIds.some((id) => productCategoryFilterIds.includes(id)));
