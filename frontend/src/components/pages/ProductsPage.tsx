@@ -839,6 +839,13 @@ export default function ProductsPage() {
     setCategoryDrawerOpen(true);
   }
 
+  const inactiveCategoriesForEditor = useMemo(() => {
+    if (!editingProductId) return [];
+    return categories
+      .filter((category) => !category.isActive)
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  }, [categories, editingProductId]);
+
   function openNewProduct() {
     setEditingProductId(null);
     setEditingProductDraft(null);
