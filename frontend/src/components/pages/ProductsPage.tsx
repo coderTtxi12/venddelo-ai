@@ -1456,12 +1456,18 @@ export default function ProductsPage() {
                         <tr>
                           <td colSpan={6} className={styles.filterNoResults}>
                             <div className={styles.filterNoResultsInner}>
-                              <p>Ningún producto coincide con los filtros actuales.</p>
-                              {productFiltersActive ? (
-                                <button type="button" className={styles.secondaryBtn} onClick={clearProductTableFilters}>
-                                  Limpiar filtros
-                                </button>
-                              ) : null}
+                              {productsFilterCatalogPending ? (
+                                <p>Buscando productos…</p>
+                              ) : (
+                                <>
+                                  <p>Ningún producto coincide con los filtros actuales.</p>
+                                  {productFiltersActive ? (
+                                    <button type="button" className={styles.secondaryBtn} onClick={clearProductTableFilters}>
+                                      Limpiar filtros
+                                    </button>
+                                  ) : null}
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
