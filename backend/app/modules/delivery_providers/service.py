@@ -219,7 +219,8 @@ class DeliveryProviderService:
         if found is None:
             raise NotFoundError("No tienes un proveedor de delivery registrado")
 
-        provider, _member_role = found
+        provider, member_role = found
+        require_write_provider_config(member_role)
         self._validate_schedules(schedules)
         self._repo.set_schedules(provider.id, schedules)
 
