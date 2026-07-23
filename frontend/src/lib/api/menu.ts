@@ -18,18 +18,26 @@ export function listCategories(
   );
 }
 
+export type ProductListView = 'full' | 'summary';
+
 export function listProducts(
   token: string,
   restaurantId: string,
   limit: number,
   cursor?: string | null,
+  options?: { view?: ProductListView },
 ) {
   const params = new URLSearchParams({ limit: String(limit) });
   if (cursor) params.set('cursor', cursor);
+  if (options?.view === 'summary') params.set('view', 'summary');
   return apiRequest<CursorPage<Product>>(
     `/restaurants/${restaurantId}/products?${params}`,
     { token },
   );
+}
+
+export function getProductCount(token: string, restaurantId: string) {
+  return apiRequest<{ total: number }>(`/restaurants/${restaurantId}/products/count`, { token });
 }
 
 export function createCategory(
