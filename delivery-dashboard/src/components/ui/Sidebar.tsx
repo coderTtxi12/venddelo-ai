@@ -57,42 +57,80 @@ export default function Sidebar() {
   const showLabels = isMobileDrawer || !isCollapsed;
 
   return (
-    <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}>
-      <div className={styles.headerRow}>
-        <div className={styles.logo}>Mexy Dashboard</div>
+    <>
+      {isMobileDrawer && isDrawerOpen ? (
         <button
           type="button"
-          className={styles.toggleButton}
-          onClick={() => setIsCollapsed((prev) => !prev)}
-          aria-label={isCollapsed ? 'Expandir sidebar' : 'Contraer sidebar'}
-        >
-          <span className={styles.toggleIcon}>{isCollapsed ? '»' : '«'}</span>
-        </button>
-      </div>
+          className={styles.backdrop}
+          aria-label="Cerrar menú"
+          onClick={closeDrawer}
+        />
+      ) : null}
 
-      <nav className={styles.nav}>
-        {navItems.map((item) => {
-          const active = isNavActive(pathname, item.path);
-          return (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={`${styles.navItem} ${active ? styles.active : ''}`}
-              aria-current={active ? 'page' : undefined}
+      <aside
+        id="app-sidebar"
+        className={[
+          styles.sidebar,
+          showCollapsed ? styles.collapsed : '',
+          isMobileDrawer ? styles.mobileDrawer : '',
+          isMobileDrawer && isDrawerOpen ? styles.mobileDrawerOpen : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        aria-hidden={isMobileDrawer && !isDrawerOpen ? true : undefined}
+      >
+        <div className={styles.headerRow}>
+          <div className={styles.logo}>Mexy Dashboard</div>
+          {isMobileDrawer ? (
+            <button
+              type="button"
+              className={styles.closeButton}
+              onClick={closeDrawer}
+              aria-label="Cerrar menú"
             >
-              <span className={styles.icon}>{item.icon}</span>
-              <span className={styles.label}>{item.label}</span>
-              {item.badge != null && (
-                <span className={styles.badge}>{item.badge}</span>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
+              <CloseOutlinedIcon fontSize="small" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={styles.toggleButton}
+              onClick={() => setIsCollapsed((prev) => !prev)}
+              aria-label={isCollapsed ? 'Expandir sidebar' : 'Contraer sidebar'}
+            >
+              <span className={styles.toggleIcon}>{isCollapsed ? '»' : '«'}</span>
+            </button>
+          )}
+        </div>
 
-      <button type="button" className={styles.addButton}>
-        + Agregar
-      </button>
-    </aside>
+        <nav className={styles.nav}>
+          {navItems.map((item) => {
+            const active = isNavActive(pathname, item.path);
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={`${styles.navItem} ${active ? styles.active : ''}`}
+                aria-current={active ? 'page' : undefined}
+                onClick={() => {
+                  if (isMobileDrawer) closeDrawer();
+                }}
+              >
+                <span className={styles.icon}>{item.icon}</span>
+                {showLabels ? <span className={styles.label}>{item.label}</span> : null}
+                {item.badge != null && showLabels ? (
+                  <span className={styles.badge}>{item.badge}</span>
+                ) : null}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {!isMobileDrawer ? (
+          <button type="button" className={styles.addButton}>
+            + Agregar
+          </button>
+        ) : null}
+      </aside>
+    </>
   );
 }
