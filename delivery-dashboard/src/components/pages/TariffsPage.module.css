@@ -501,6 +501,14 @@
 }
 
 @media (max-width: 900px) {
+  .title {
+    font-size: 1.35rem;
+  }
+
+  .panel {
+    padding: 0.85rem;
+  }
+
   .grid2,
   .simGrid {
     grid-template-columns: 1fr;
