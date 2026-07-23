@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import styles from './ProductsPage.module.css';
 import CloseIcon from '@mui/icons-material/Close';
@@ -11,6 +11,8 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import Popover from '@mui/material/Popover';
 import { legacyDb as db, legacyStorage as storage } from '@/services/legacyDb';
 import { useAuth } from '@/hooks/useAuth';
+import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
+import { getProductCount } from '@/lib/api/menu';
 import { DEFAULT_CURRENCY, formatMoney } from '@/lib/currency';
 import {
   cloneOptionGroupForProduct,
@@ -36,7 +38,8 @@ import {
   normalizeOptionGroups,
   PRODUCTS_PAGE_SIZE,
   fetchAllSupplierProducts,
-  resolveSupplierIdByEmail,
+  fetchSupplierProductDetail,
+  fetchSupplierProductsPage,
   saveSupplierCategory,
   updateSupplierCategoryActive,
   saveSupplierProduct,
@@ -288,36 +291,15 @@ function CatalogLoadingState({
 }
 
 export default function ProductsPage() {
-  const { firebaseUser, accessToken, loading: authLoading } = useAuth();
+  const { accessToken, loading: authLoading } = useAuth();
+  const {
+    loading: accessLoading,
+    loadError: accessError,
+    selectedRestaurantId: supplierId,
+  } = useRestaurantAccess();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'categories' | 'products'>('products');
-
-  // supplierId is the supplier doc id in `suppliers/`
-  const [supplierId, setSupplierId] = useState<string | null>(null);
-  const [supplierIdError, setSupplierIdError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadSupplierId() {
-      setSupplierId(null);
-      setSupplierIdError(null);
-      const email = firebaseUser?.email ?? '';
-      const result = await resolveSupplierIdByEmail(db, email, accessToken, {
-        userId: firebaseUser?.uid,
-      });
-      if (cancelled) return;
-      if ('error' in result) {
-        setSupplierIdError(result.error);
-        return;
-      }
-      setSupplierId(result.supplierId);
-    }
-    void loadSupplierId();
-    return () => {
-      cancelled = true;
-    };
-  }, [firebaseUser?.email, accessToken]);
 
   // Categorías (todas las páginas; paginación en cliente)
   const [categories, setCategories] = useState<CategoryDraft[]>([]);
@@ -348,16 +330,82 @@ export default function ProductsPage() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [productsPage, setProductsPage] = useState(1);
+  const [productsTotalCount, setProductsTotalCount] = useState(0);
+  const [productsCatalogLoaded, setProductsCatalogLoaded] = useState(false);
   const catalogPromotionsRef = useRef<Promotion[] | null>(null);
+  const productsPageCacheRef = useRef<Map<number, ProductDraft[]>>(new Map());
+  const productsPageCursorsRef = useRef<(string | null)[]>([null]);
+  const productsLoadRequestRef = useRef(0);
 
-  async function loadProducts() {
+  const clearProductsPageCache = useCallback(() => {
+    productsPageCacheRef.current.clear();
+    productsPageCursorsRef.current = [null];
+  }, []);
+
+  const loadProductsTablePage = useCallback(
+    async (page: number, options?: { force?: boolean }) => {
+      if (!supplierId || !accessToken) return;
+
+      const cached = productsPageCacheRef.current.get(page);
+      if (cached && !options?.force) {
+        setProducts(cached);
+        setProductsPage(page);
+        return;
+      }
+
+      const requestId = ++productsLoadRequestRef.current;
+      setProductsLoading(true);
+      setProductsError(null);
+      try {
+        const cursor = page === 1 ? null : (productsPageCursorsRef.current[page - 1] ?? null);
+        const [countResult, pageResult] = await Promise.all([
+          page === 1 ? getProductCount(accessToken, supplierId) : Promise.resolve(null),
+          fetchSupplierProductsPage(
+            accessToken,
+            db,
+            supplierId,
+            { cursor },
+            catalogPromotionsRef.current ?? undefined,
+            { view: 'summary' },
+          ),
+        ]);
+        if (requestId !== productsLoadRequestRef.current) return;
+
+        if (countResult) {
+          setProductsTotalCount(countResult.total);
+        }
+        catalogPromotionsRef.current = pageResult.catalogPromotions;
+        productsPageCacheRef.current.set(page, pageResult.items);
+        const nextCursors = productsPageCursorsRef.current.slice();
+        nextCursors[page] = pageResult.cursor;
+        productsPageCursorsRef.current = nextCursors;
+        setProducts(pageResult.items);
+        setProductsPage(page);
+      } catch (e) {
+        if (requestId !== productsLoadRequestRef.current) return;
+        console.error(e);
+        setProductsError('No se pudieron cargar los productos. Intenta de nuevo.');
+        setProducts([]);
+        setProductsPage(1);
+      } finally {
+        if (requestId === productsLoadRequestRef.current) {
+          setProductsLoading(false);
+        }
+      }
+    },
+    [accessToken, supplierId],
+  );
+
+  async function loadAllProductsForFilters() {
     if (!supplierId || !accessToken) return;
     setProductsLoading(true);
     setProductsError(null);
     try {
-      const result = await fetchAllSupplierProducts(accessToken, db, supplierId);
+      const result = await fetchAllSupplierProducts(accessToken, db, supplierId, { view: 'summary' });
       catalogPromotionsRef.current = result.catalogPromotions;
       setProducts(result.items);
+      setProductsTotalCount(result.items.length);
+      setProductsCatalogLoaded(true);
       setProductsPage(1);
     } catch (e) {
       console.error(e);
@@ -368,11 +416,6 @@ export default function ProductsPage() {
       setProductsLoading(false);
     }
   }
-
-  useEffect(() => {
-    void loadProducts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supplierId]);
 
   useEffect(() => {
     void loadCategories();
@@ -441,6 +484,32 @@ export default function ProductsPage() {
     productVisibilityFilter,
   ]);
 
+  const handleProductsPageChange = useCallback(
+    (page: number) => {
+      if (productFiltersActive || productsCatalogLoaded) {
+        setProductsPage(page);
+        return;
+      }
+      void loadProductsTablePage(page);
+    },
+    [loadProductsTablePage, productFiltersActive, productsCatalogLoaded],
+  );
+
+  useEffect(() => {
+    if (!supplierId || !accessToken) return;
+    if (productFiltersActive) {
+      if (!productsCatalogLoaded) {
+        void loadAllProductsForFilters();
+      }
+      return;
+    }
+    productsLoadRequestRef.current += 1;
+    clearProductsPageCache();
+    setProductsCatalogLoaded(false);
+    void loadProductsTablePage(1, { force: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplierId, accessToken, productFiltersActive]);
+
   const displayedProducts = useMemo(() => {
     let rows = products;
     const nameQ = productNameFilter.trim().toLowerCase();
@@ -490,10 +559,29 @@ export default function ProductsPage() {
     [filteredCategories, categoriesPage],
   );
 
-  const paginatedProducts = useMemo(
-    () => paginateItems(displayedProducts, productsPage, PRODUCTS_PAGE_SIZE),
-    [displayedProducts, productsPage],
-  );
+  const paginatedProducts = useMemo(() => {
+    if (productFiltersActive || productsCatalogLoaded) {
+      return paginateItems(displayedProducts, productsPage, PRODUCTS_PAGE_SIZE);
+    }
+    const totalPages = Math.max(1, Math.ceil(productsTotalCount / PRODUCTS_PAGE_SIZE));
+    const rangeStart =
+      productsTotalCount === 0 ? 0 : (productsPage - 1) * PRODUCTS_PAGE_SIZE + 1;
+    const rangeEnd = Math.min(productsPage * PRODUCTS_PAGE_SIZE, productsTotalCount);
+    return {
+      items: displayedProducts,
+      page: productsPage,
+      totalPages,
+      totalItems: productsTotalCount,
+      rangeStart,
+      rangeEnd,
+    };
+  }, [
+    displayedProducts,
+    productFiltersActive,
+    productsCatalogLoaded,
+    productsPage,
+    productsTotalCount,
+  ]);
 
   useEffect(() => {
     setCategoriesPage(1);
@@ -576,11 +664,11 @@ export default function ProductsPage() {
 
   const [productDrawerOpen, setProductDrawerOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<Id | null>(null);
+  const [editingProductDraft, setEditingProductDraft] = useState<ProductDraft | null>(null);
+  const [editingProductLoading, setEditingProductLoading] = useState(false);
+  const [copySourceProducts, setCopySourceProducts] = useState<ProductDraft[] | null>(null);
 
-  const productDraft = useMemo(() => {
-    if (!editingProductId) return null;
-    return products.find((p) => p.id === editingProductId) ?? null;
-  }, [products, editingProductId]);
+  const productDraft = editingProductId ? editingProductDraft : null;
 
   function openNewCategory() {
     setEditingCategoryId(null);
@@ -594,21 +682,65 @@ export default function ProductsPage() {
 
   function openNewProduct() {
     setEditingProductId(null);
+    setEditingProductDraft(null);
     setProductDrawerOpen(true);
   }
 
   function openEditProduct(id: Id) {
     setEditingProductId(id);
+    setEditingProductDraft(null);
     setProductDrawerOpen(true);
+    if (!supplierId || !accessToken) return;
+    setEditingProductLoading(true);
+    void fetchSupplierProductDetail(
+      accessToken,
+      supplierId,
+      id,
+      catalogPromotionsRef.current ?? undefined,
+    )
+      .then((detail) => {
+        setEditingProductDraft(detail);
+      })
+      .catch((error) => {
+        console.error(error);
+        setProductsError('No se pudo cargar el detalle del producto.');
+        setProductDrawerOpen(false);
+        setEditingProductId(null);
+      })
+      .finally(() => {
+        setEditingProductLoading(false);
+      });
   }
 
+  useEffect(() => {
+    if (!productDrawerOpen || !supplierId || !accessToken || copySourceProducts) return;
+    let cancelled = false;
+    void fetchAllSupplierProducts(accessToken, db, supplierId, { view: 'full' })
+      .then((result) => {
+        if (!cancelled) {
+          setCopySourceProducts(result.items);
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [productDrawerOpen, supplierId, accessToken, copySourceProducts]);
+
+  useEffect(() => {
+    if (!productDrawerOpen) {
+      setCopySourceProducts(null);
+    }
+  }, [productDrawerOpen]);
+
   const supplierPending = Boolean(
-    !authLoading && firebaseUser && accessToken && !supplierId && !supplierIdError,
+    !authLoading && !accessLoading && accessToken && !supplierId && !accessError,
   );
 
-  const categoriesTabLoading = authLoading || supplierPending || categoriesLoading;
-  const productsTabLoading =
-    authLoading || supplierPending || categoriesLoading || productsLoading;
+  const categoriesTabLoading = authLoading || accessLoading || supplierPending || categoriesLoading;
+  const productsTabLoading = authLoading || accessLoading || supplierPending || productsLoading;
 
   const catalogLoadingTitle = supplierPending
     ? 'Conectando con tu restaurante…'
@@ -826,10 +958,10 @@ export default function ProductsPage() {
               initial={categoryDraft}
               onCancel={() => setCategoryDrawerOpen(false)}
               supplierId={supplierId}
-              supplierIdError={supplierIdError}
+              supplierIdError={accessError}
               onSave={async (payload) => {
                 if (!supplierId || !accessToken) {
-                  throw new Error(supplierIdError ?? 'No hay sesión o restaurante disponible.');
+                  throw new Error(accessError ?? 'No hay sesión o restaurante disponible.');
                 }
                 await saveSupplierCategory(accessToken, db, storage, supplierId, payload);
                 await loadCategories();
@@ -1299,7 +1431,8 @@ export default function ProductsPage() {
                   rangeEnd={paginatedProducts.rangeEnd}
                   pageSize={PRODUCTS_PAGE_SIZE}
                   itemLabel="productos"
-                  onPageChange={setProductsPage}
+                  onPageChange={handleProductsPageChange}
+                  loading={productsLoading}
                 />
               ) : null}
 
@@ -1308,13 +1441,19 @@ export default function ProductsPage() {
                 title={editingProductId ? 'Editar producto' : 'Nuevo producto'}
                 onClose={() => setProductDrawerOpen(false)}
               >
+                {editingProductId && editingProductLoading ? (
+                  <CatalogLoadingState
+                    title="Cargando producto…"
+                    subtitle="Obteniendo opciones y detalle del menú."
+                  />
+                ) : (
                 <ProductEditor
                   initial={productDraft}
                   categories={activeCategories}
-                  restaurantProducts={products}
+                  restaurantProducts={copySourceProducts ?? products}
                   onCancel={() => setProductDrawerOpen(false)}
                   supplierId={supplierId}
-                  supplierIdError={supplierIdError}
+                  supplierIdError={accessError}
                   visibilitySaving={productVisibilitySavingId === editingProductId}
                   onVisibilityChange={
                     editingProductId
@@ -1325,7 +1464,7 @@ export default function ProductsPage() {
                   }
                   onSave={async (payload) => {
                     if (!supplierId || !accessToken) {
-                      throw new Error(supplierIdError ?? 'No hay sesión o restaurante disponible.');
+                      throw new Error(accessError ?? 'No hay sesión o restaurante disponible.');
                     }
                     const { catalogPromotions, product } = await saveSupplierProduct(
                       accessToken,
@@ -1339,7 +1478,18 @@ export default function ProductsPage() {
                       },
                     );
                     catalogPromotionsRef.current = catalogPromotions;
+                    const listProduct: ProductDraft = { ...product, optionGroups: [] };
                     setProducts((prev) => {
+                      const index = prev.findIndex((item) => item.id === product.id);
+                      if (index >= 0) {
+                        const next = [...prev];
+                        next[index] = listProduct;
+                        return next;
+                      }
+                      return [listProduct, ...prev];
+                    });
+                    setCopySourceProducts((prev) => {
+                      if (!prev) return prev;
                       const index = prev.findIndex((item) => item.id === product.id);
                       if (index >= 0) {
                         const next = [...prev];
@@ -1348,9 +1498,16 @@ export default function ProductsPage() {
                       }
                       return [product, ...prev];
                     });
+                    if (productFiltersActive || productsCatalogLoaded) {
+                      setProductsCatalogLoaded(true);
+                    } else {
+                      clearProductsPageCache();
+                      void loadProductsTablePage(productsPage, { force: true });
+                    }
                     setProductDrawerOpen(false);
                   }}
                 />
+                )}
               </Drawer>
             </>
           )}
@@ -2120,6 +2277,81 @@ function ProductMobileControls({
   );
 }
 
+function formatMaxSelectionsInputValue(
+  maxSelections: number | null,
+  maxSelectable: number,
+): string {
+  if (maxSelections == null) return '';
+  return String(Math.min(maxSelections, maxSelectable));
+}
+
+function OptionGroupMaxSelectionsInput({
+  group,
+  maxSelectable,
+  onChange,
+}: {
+  group: OptionGroupDraft;
+  maxSelectable: number;
+  onChange: (next: OptionGroupDraft) => void;
+}) {
+  const [text, setText] = useState(() =>
+    formatMaxSelectionsInputValue(group.maxSelections, maxSelectable),
+  );
+  const focusedRef = useRef(false);
+
+  useEffect(() => {
+    if (focusedRef.current) return;
+    setText(formatMaxSelectionsInputValue(group.maxSelections, maxSelectable));
+  }, [group.id, group.maxSelections, maxSelectable]);
+
+  const commit = (rawText: string) => {
+    const raw = rawText.trim();
+    if (!raw) {
+      onChange({ ...group, maxSelections: null });
+      setText('');
+      return;
+    }
+    const parsed = Number(raw);
+    if (Number.isNaN(parsed)) {
+      setText(formatMaxSelectionsInputValue(group.maxSelections, maxSelectable));
+      return;
+    }
+    const nextMax = clampNumber(Math.round(parsed), 1, maxSelectable);
+    onChange({ ...group, maxSelections: nextMax });
+    setText(String(nextMax));
+  };
+
+  return (
+    <label className={styles.maxSelectionsField}>
+      <span>Máx. a elegir</span>
+      <input
+        className={styles.input}
+        type="number"
+        min={1}
+        max={maxSelectable}
+        step={1}
+        value={text}
+        placeholder="Sin límite"
+        onFocus={() => {
+          focusedRef.current = true;
+        }}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={(e) => {
+          focusedRef.current = false;
+          commit(e.target.value);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+        }}
+        aria-label="Cantidad máxima de opciones que puede elegir el cliente"
+      />
+    </label>
+  );
+}
+
 function optionGroupMobileSummary(group: OptionGroupDraft, activeItemCount: number): string {
   const requirement = group.required ? 'debe elegir' : 'puede omitir';
   if (group.selection === 'single') {
@@ -2212,28 +2444,11 @@ function OptionGroupEditor({
               </button>
             </div>
             {group.selection === 'multi' ? (
-              <label className={styles.maxSelectionsField}>
-                <span>Máx. a elegir</span>
-                <input
-                  className={styles.input}
-                  type="number"
-                  min={1}
-                  max={maxSelectable}
-                  step={1}
-                  value={group.maxSelections ?? ''}
-                  placeholder="Sin límite"
-                  onChange={(e) => {
-                    const raw = e.target.value.trim();
-                    if (!raw) {
-                      onChange({ ...group, maxSelections: null });
-                      return;
-                    }
-                    const nextMax = clampNumber(Math.round(Number(raw)), 1, maxSelectable);
-                    onChange({ ...group, maxSelections: nextMax });
-                  }}
-                  aria-label="Cantidad máxima de opciones que puede elegir el cliente"
-                />
-              </label>
+              <OptionGroupMaxSelectionsInput
+                group={group}
+                maxSelectable={maxSelectable}
+                onChange={onChange}
+              />
             ) : null}
           </div>
         </div>
