@@ -33,7 +33,7 @@ class MenuService:
         self, restaurant_id: uuid.UUID, category_ids: list[uuid.UUID]
     ) -> None:
         for cid in category_ids:
-            cat = self._repo.get_category(cid)
+            cat = self._repo.get_category_by_id(cid)
             if cat is None or cat.restaurant_id != restaurant_id:
                 raise ValidationError(f"Category {cid} not found in restaurant")
 
