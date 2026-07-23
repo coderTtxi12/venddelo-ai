@@ -1858,9 +1858,93 @@ function CategoryEditor({
   );
 }
 
+function ProductCategoryPicker({
+  activeCategories,
+  inactiveCategories,
+  categoryIds,
+  onChange,
+}: {
+  activeCategories: CategoryDraft[];
+  inactiveCategories: CategoryDraft[];
+  categoryIds: Id[];
+  onChange: (next: Id[]) => void;
+}) {
+  const toggleCategory = (categoryId: Id, checked: boolean) => {
+    onChange(
+      checked
+        ? Array.from(new Set([...categoryIds, categoryId]))
+        : categoryIds.filter((id) => id !== categoryId),
+    );
+  };
+
+  return (
+    <div className={styles.categoryPickerSections}>
+      <div className={styles.categoryPickerSection}>
+        <div className={styles.categoryPickerSectionHead}>
+          <span className={styles.categoryPickerSectionLabel}>Categorías activas</span>
+          <Pill tone="success">Disponibles en menú</Pill>
+        </div>
+        <div className={styles.multiSelect} role="group" aria-label="Categorías activas">
+          {activeCategories.length === 0 ? (
+            <span className={styles.categoryPickerEmpty}>No hay categorías activas.</span>
+          ) : (
+            activeCategories.map((category) => {
+              const checked = categoryIds.includes(category.id);
+              return (
+                <label key={category.id} className={styles.checkRow}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => toggleCategory(category.id, e.target.checked)}
+                  />
+                  <span>{category.name}</span>
+                </label>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {inactiveCategories.length > 0 ? (
+        <div className={`${styles.categoryPickerSection} ${styles.categoryPickerSectionInactive}`}>
+          <div className={styles.categoryPickerSectionHead}>
+            <span className={styles.categoryPickerSectionLabel}>Categorías inactivas</span>
+            <Pill tone="neutral">Fuera del menú</Pill>
+          </div>
+          <p className={styles.categoryPickerInactiveHint}>
+            No se muestran en el menú público mientras estén desactivadas. Puedes seguir editando y
+            guardando el producto.
+          </p>
+          <div
+            className={`${styles.multiSelect} ${styles.multiSelectInactive}`}
+            role="group"
+            aria-label="Categorías inactivas asignadas"
+          >
+            {inactiveCategories.map((category) => {
+              const checked = categoryIds.includes(category.id);
+              return (
+                <label key={category.id} className={`${styles.checkRow} ${styles.checkRowInactive}`}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => toggleCategory(category.id, e.target.checked)}
+                  />
+                  <span>{category.name}</span>
+                  <span className={styles.categoryPickerInactiveBadge}>Inactiva</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ProductEditor({
   initial,
-  categories,
+  activeCategories,
+  inactiveCategories,
   restaurantProducts,
   onCancel,
   onSave,
