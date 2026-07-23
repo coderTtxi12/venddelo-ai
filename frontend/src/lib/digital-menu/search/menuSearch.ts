@@ -181,8 +181,7 @@ export function searchMenu(input: MenuSearchInput): MenuSearchHit[] {
 }
 
 export function getMenuSearchSuggestions(categories: Category[], limit = 4): string[] {
-  return categories
-    .filter((category) => category.is_active)
+  return activeMenuSearchCategories(categories)
     .slice(0, limit)
     .map((category) => category.name);
 }
