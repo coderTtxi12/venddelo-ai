@@ -147,22 +147,14 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
       ? buildGoogleMapsRestaurantUrl(restaurantLocation)
       : null;
 
-  if (fulfillment.serviceType === 'delivery') {
-    parts.push(`${bold('Dirección:')} ${fulfillment.deliveryAddress.trim()}`);
-    const details = fulfillment.deliveryAddressDetails.trim();
-    if (details) {
-      parts.push(`${bold('Referencias:')} ${details}`);
-    }
-
-    if (deliveryMapsUrl) {
-      parts.push(
-        '',
-        '——————————————',
-        bold('Mapa de entrega (cliente)'),
-        deliveryMapsUrl,
-        '——————————————',
-      );
-    }
+  if (restaurantMapsUrl) {
+    parts.push(
+      '',
+      '——————————————',
+      bold('Ubicación del restaurante (recolección)'),
+      restaurantMapsUrl,
+      '——————————————',
+    );
   }
 
   parts.push('', '——————————————', bold('DETALLE DEL PEDIDO'), '');
@@ -226,14 +218,26 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
     }
   }
 
-  if (restaurantMapsUrl) {
+  if (fulfillment.serviceType === 'delivery') {
     parts.push(
       '',
       '——————————————',
-      bold('Mapa del restaurante (recolección)'),
-      restaurantMapsUrl,
-      '——————————————',
+      `${bold('Dirección de entrega:')} ${fulfillment.deliveryAddress.trim()}`,
     );
+    const details = fulfillment.deliveryAddressDetails.trim();
+    if (details) {
+      parts.push('', `${bold('Referencias:')} ${details}`);
+    }
+
+    if (deliveryMapsUrl) {
+      parts.push(
+        '',
+        '——————————————',
+        bold('Ubicación de entrega (cliente)'),
+        deliveryMapsUrl,
+        '——————————————',
+      );
+    }
   }
 
   return parts.join('\n');
