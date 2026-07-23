@@ -119,6 +119,10 @@ class ProductUpdate(BaseModel):
     category_ids: list[uuid.UUID] | None = None
 
 
+class ProductCountDTO(BaseModel):
+    total: int
+
+
 class ProductDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -134,6 +138,7 @@ class ProductDTO(BaseModel):
     updated_at: datetime
     category_ids: list[uuid.UUID] = []
     category_sort_indices: dict[str, int] = {}
+    image_url: str | None = None
     option_groups: list[OptionGroupDTO] = []
 
 
