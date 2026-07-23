@@ -223,12 +223,16 @@ export function RestaurantHoursFooter({
   }, []);
 
   const handleSave = async () => {
+    if (saveInFlightRef.current || saving || isSaving) return;
+
     const validationError = validateScheduleDrafts(drafts);
     if (validationError) {
       setError(validationError);
       return;
     }
 
+    saveInFlightRef.current = true;
+    setIsSaving(true);
     try {
       setError(null);
       await onSave(scheduleDraftsToCreatePayload(drafts));
