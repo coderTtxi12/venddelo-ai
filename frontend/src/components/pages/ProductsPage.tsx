@@ -794,11 +794,17 @@ export default function ProductsPage() {
     setProductVisibilityError(null);
     try {
       await updateSupplierProductVisibility(accessToken, db, supplierId, productId, nextState);
-      setProducts((prev) =>
-        prev.map((product) =>
+      setProducts((prev) => {
+        const next = prev.map((product) =>
           product.id === productId ? applyVisibilityStateToDraft(product, nextState) : product,
-        ),
-      );
+        );
+        if (productFiltersActive) {
+          productsFilterCatalogRef.current = next;
+        } else {
+          invalidateProductsFilterCatalog();
+        }
+        return next;
+      });
     } catch (err) {
       console.error(err);
       setProductVisibilityError('No se pudo cambiar el estado del producto. Intenta de nuevo.');
