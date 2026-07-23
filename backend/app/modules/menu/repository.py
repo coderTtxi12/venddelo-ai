@@ -67,7 +67,11 @@ class MenuRepository(ABC):
         *,
         published_only: bool = False,
         category_id: uuid.UUID | None = None,
+        include_options: bool = True,
     ) -> CursorPage[ProductDTO]: ...
+
+    @abstractmethod
+    def count_products(self, restaurant_id: uuid.UUID) -> int: ...
 
     @abstractmethod
     def update_product(self, id: uuid.UUID, data: ProductUpdate) -> ProductDTO | None: ...
