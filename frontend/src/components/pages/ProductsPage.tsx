@@ -469,12 +469,13 @@ export default function ProductsPage() {
           setProductsTotalCount(countResult.total);
         }
         catalogPromotionsRef.current = pageResult.catalogPromotions;
-        productsPageCacheRef.current.set(page, pageResult.items);
+        productsPageCacheRef.current.set(targetPage, pageResult.items);
         const nextCursors = productsPageCursorsRef.current.slice();
-        nextCursors[page] = pageResult.cursor;
+        while (nextCursors.length <= targetPage) nextCursors.push(null);
+        nextCursors[targetPage] = pageResult.cursor;
         productsPageCursorsRef.current = nextCursors;
         setProducts(pageResult.items);
-        setProductsPage(page);
+        setProductsPage(targetPage);
       } catch (e) {
         if (requestId !== productsLoadRequestRef.current) return;
         console.error(e);
