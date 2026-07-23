@@ -1719,12 +1719,20 @@ export default function ProductsPage() {
                     const listProduct: ProductDraft = { ...product, optionGroups: [] };
                     setProducts((prev) => {
                       const index = prev.findIndex((item) => item.id === product.id);
+                      let next: ProductDraft[];
                       if (index >= 0) {
-                        const next = [...prev];
+                        next = [...prev];
                         next[index] = listProduct;
-                        return next;
+                      } else {
+                        next = [listProduct, ...prev];
                       }
-                      return [listProduct, ...prev];
+                      if (productFiltersActive) {
+                        productsFilterCatalogRef.current = next;
+                        setProductsTotalCount(next.length);
+                      } else {
+                        invalidateProductsFilterCatalog();
+                      }
+                      return next;
                     });
                     setCopySourceProducts((prev) => {
                       if (!prev) return prev;
