@@ -13,6 +13,7 @@ from app.core.pagination import (
     encode_keyset_cursor,
 )
 from app.db.models.menu import Category, OptionGroup, OptionItem, Product, product_categories
+from app.infra.storage.factory import build_storage
 from app.modules.menu.repository import MenuRepository
 from app.modules.menu.schemas import (
     CategoryCreate,
@@ -120,28 +121,68 @@ def _resolve_active_first_entity_order(
     raise ValueError(" ".join(parts))
 
 
+def _product_image_url(image_path: str | None) -> str | None:
+    if not image_path:
+        return None
+    if image_path.startswith(("http://", "https://", "memory://", "blob:", "data:")):
+        return image_path
+    try:
+        return build_storage().get_public_url(image_path)
+    except Exception:
+        return None
+
+
 def _product_to_dto(
     obj: Product,
     session: Session | None = None,
     *,
     category_sort_indices: dict[str, int] | None = None,
+    include_options: bool = True,
 ) -> ProductDTO:
-    dto = ProductDTO.model_validate(obj)
-    dto.category_ids = [c.id for c in obj.categories]
     if category_sort_indices is not None:
-        dto.category_sort_indices = category_sort_indices
+        sort_indices = category_sort_indices
     else:
         if session is None:
             raise ValueError("session is required when category_sort_indices is not provided")
-        dto.category_sort_indices = _category_sort_indices(session, obj.id)
-    dto.option_groups = [OptionGroupDTO.model_validate(g) for g in obj.option_groups]
-    return dto
+        sort_indices = _category_sort_indices(session, obj.id)
+
+    option_groups = (
+        [OptionGroupDTO.model_validate(group) for group in obj.option_groups]
+        if include_options
+        else []
+    )
+
+    return ProductDTO(
+        id=obj.id,
+        restaurant_id=obj.restaurant_id,
+        name=obj.name,
+        description=obj.description,
+        price_cents=obj.price_cents,
+        currency=obj.currency,
+        image_path=obj.image_path,
+        image_url=_product_image_url(obj.image_path),
+        status=obj.status,
+        created_at=obj.created_at,
+        updated_at=obj.updated_at,
+        category_ids=[category.id for category in obj.categories],
+        category_sort_indices=sort_indices,
+        option_groups=option_groups,
+    )
 
 
-def _products_to_dtos(session: Session, products: list[Product]) -> list[ProductDTO]:
+def _products_to_dtos(
+    session: Session,
+    products: list[Product],
+    *,
+    include_options: bool = True,
+) -> list[ProductDTO]:
     sort_map = _category_sort_indices_batch(session, [product.id for product in products])
     return [
-        _product_to_dto(product, category_sort_indices=sort_map.get(product.id, {}))
+        _product_to_dto(
+            product,
+            category_sort_indices=sort_map.get(product.id, {}),
+            include_options=include_options,
+        )
         for product in products
     ]
 
@@ -309,12 +350,19 @@ class SqlAlchemyMenuRepository(MenuRepository):
         return _product_to_dto(obj, self._session)
 
     def get_product(self, id: uuid.UUID) -> ProductDTO | None:
-        obj = self._session.get(Product, id)
+        stmt = (
+            select(Product)
+            .where(Product.id == id)
+            .options(
+                selectinload(Product.categories),
+                selectinload(Product.option_groups).selectinload(OptionGroup.items),
+            )
+        )
+        obj = self._session.scalar(stmt)
         return _product_to_dto(obj, self._session) if obj else None
 
     def get_product_by_id(self, id: uuid.UUID) -> ProductDTO | None:
-        obj = self._session.get(Product, id)
-        return _product_to_dto(obj, self._session) if obj else None
+        return self.get_product(id)
 
     def list_products(
         self,
@@ -323,14 +371,17 @@ class SqlAlchemyMenuRepository(MenuRepository):
         *,
         published_only: bool = False,
         category_id: uuid.UUID | None = None,
+        include_options: bool = True,
     ) -> CursorPage[ProductDTO]:
+        load_options = [selectinload(Product.categories)]
+        if include_options:
+            load_options.append(
+                selectinload(Product.option_groups).selectinload(OptionGroup.items),
+            )
         stmt = (
             select(Product)
             .where(Product.restaurant_id == restaurant_id)
-            .options(
-                selectinload(Product.categories),
-                selectinload(Product.option_groups).selectinload(OptionGroup.items),
-            )
+            .options(*load_options)
             .order_by(Product.created_at, Product.id)
             .limit(params.limit + 1)
         )
@@ -349,10 +400,20 @@ class SqlAlchemyMenuRepository(MenuRepository):
         rows = rows[: params.limit]
         next_cursor = encode_keyset_cursor(rows[-1].created_at, rows[-1].id) if has_more else None
         return CursorPage(
-            items=_products_to_dtos(self._session, rows),
+            items=_products_to_dtos(self._session, rows, include_options=include_options),
             next_cursor=next_cursor,
             has_more=has_more,
         )
+
+    def count_products(self, restaurant_id: uuid.UUID) -> int:
+        from sqlalchemy import func
+
+        total = self._session.scalar(
+            select(func.count())
+            .select_from(Product)
+            .where(Product.restaurant_id == restaurant_id)
+        )
+        return int(total or 0)
 
     def update_product(self, id: uuid.UUID, data: ProductUpdate) -> ProductDTO | None:
         obj = self._session.get(Product, id)
