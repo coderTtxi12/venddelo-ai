@@ -420,9 +420,7 @@ export default function ProductsPage() {
       setProductsLoading(true);
       setProductsError(null);
       try {
-        const cursor = page === 1 ? null : (productsPageCursorsRef.current[page - 1] ?? null);
-        const [countResult, pageResult] = await Promise.all([
-          page === 1 ? getProductCount(accessToken, supplierId) : Promise.resolve(null),
+        const fetchPage = (pageNum: number, cursor: string | null) =>
           fetchSupplierProductsPage(
             accessToken,
             db,
