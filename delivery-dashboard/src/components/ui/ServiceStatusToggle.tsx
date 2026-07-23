@@ -1,5 +1,6 @@
 'use client';
 
+import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useServiceStatus } from '@/hooks/useServiceStatus';
 import type { DeliveryProviderServiceStatusReason } from '@/lib/api/types';
 import styles from './ServiceStatusToggle.module.css';
@@ -26,6 +27,7 @@ function statusCopy(
 }
 
 export default function ServiceStatusToggle() {
+  const { canWriteProviderConfig } = useDeliveryProviderAccess();
   const { status, loading, saving, setManuallyEnabled } = useServiceStatus();
 
   if (loading) {
@@ -63,9 +65,10 @@ export default function ServiceStatusToggle() {
         <input
           type="checkbox"
           checked={status.manually_enabled}
-          disabled={saving}
+          disabled={saving || !canWriteProviderConfig}
           aria-label="Activar o pausar servicio de reparto"
           onChange={(event) => {
+            if (!canWriteProviderConfig) return;
             void setManuallyEnabled(event.target.checked);
           }}
         />
