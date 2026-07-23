@@ -4,6 +4,7 @@ import {
   getProductVisibilityState,
   PRODUCT_VISIBILITY_OPTIONS,
   productVisibilityMeta,
+  type ProductVisibilityCategoryContext,
   type ProductVisibilityState,
 } from '@/lib/menu/productVisibility';
 import type { ProductDraft } from '@/services/db/supplierCatalogTypes';
@@ -14,6 +15,7 @@ type ProductVisibilitySelectProps = {
   disabled?: boolean;
   saving?: boolean;
   className?: string;
+  categoryContext?: ProductVisibilityCategoryContext;
   onChange: (state: ProductVisibilityState) => void;
 };
 
@@ -22,10 +24,11 @@ export function ProductVisibilitySelect({
   disabled = false,
   saving = false,
   className,
+  categoryContext,
   onChange,
 }: ProductVisibilitySelectProps) {
   const state = getProductVisibilityState(product);
-  const meta = productVisibilityMeta(product);
+  const meta = productVisibilityMeta(product, categoryContext);
 
   return (
     <label
