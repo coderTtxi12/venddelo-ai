@@ -196,6 +196,8 @@ export function RestaurantHoursFooter({
   );
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const saveInFlightRef = useRef(false);
   const [expandedBlocks, setExpandedBlocks] = useState<Record<RestaurantServiceType, boolean>>({
     takeout: true,
     delivery: true,
