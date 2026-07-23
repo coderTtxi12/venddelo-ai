@@ -2139,11 +2139,12 @@ function ProductEditor({
         <div className={styles.banner}>
           <div className={styles.bannerLeft}>
             <div className={styles.bannerTitle}>Estado en el menú</div>
-            <div className={styles.bannerText}>{productVisibilityMeta(initial).help}</div>
+            <div className={styles.bannerText}>{visibilityMeta?.help}</div>
           </div>
           <div className={styles.bannerRight}>
             <ProductVisibilitySelect
               product={initial}
+              categoryContext={visibilityCategoryContext}
               saving={visibilitySaving}
               onChange={onVisibilityChange}
             />
