@@ -1,4 +1,6 @@
 import type { Category, Product } from '@/lib/api/types';
+import { isDigitalMenuSpecialCategoryId } from '@/lib/digital-menu/specialCategories';
+import { isPublicMenuListed } from '@/lib/menu/productVisibility';
 
 export type MenuSearchHitKind = 'product' | 'category';
 
