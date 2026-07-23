@@ -358,7 +358,11 @@ class DeliveryProviderService:
     def update_weather_mode(
         self, user_id: uuid.UUID, data: DeliveryProviderWeatherModeUpdate
     ) -> DeliveryProviderPricingResponse:
-        provider = self._require_provider(user_id)
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, member_role = found
+        require_manage_weather(member_role)
         self._repo.set_weather_mode(provider.id, data.weather_mode)
         return self.get_pricing(user_id)
 
