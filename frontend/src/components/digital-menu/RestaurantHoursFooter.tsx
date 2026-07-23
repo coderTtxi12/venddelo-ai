@@ -278,10 +278,10 @@ export function RestaurantHoursFooter({
         <button
           type="button"
           className={styles.saveBtn}
-          disabled={!dirty || saving}
+          disabled={!dirty || savePending}
           onClick={() => void handleSave()}
         >
-          {saving ? 'Guardando…' : dirty ? 'Guardar horario' : 'Horario guardado'}
+          {savePending ? 'Guardando…' : dirty ? 'Guardar horario' : 'Horario guardado'}
         </button>
       </div>
     </section>
