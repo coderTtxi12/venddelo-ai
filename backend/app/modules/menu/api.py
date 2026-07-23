@@ -21,6 +21,7 @@ from app.modules.menu.schemas import (
     OptionItemDTO,
     OptionItemUpdate,
     ProductCreate,
+    ProductCountDTO,
     ProductDTO,
     ProductUpdate,
 )
@@ -157,13 +158,26 @@ def create_product(
     return dto
 
 
+@router.get("/restaurants/{restaurant_id}/products/count", response_model=ProductCountDTO)
+def count_products(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: MenuService = Depends(_service),
+) -> ProductCountDTO:
+    return ProductCountDTO(total=service.count_products(restaurant.id))
+
+
 @router.get("/restaurants/{restaurant_id}/products", response_model=CursorPage[ProductDTO])
 def list_products(
     params: PaginationParams = Depends(pagination_params),
+    view: str = Query("full", pattern="^(full|summary)$"),
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: MenuService = Depends(_service),
 ) -> CursorPage[ProductDTO]:
-    return service.list_products(restaurant.id, params)
+    return service.list_products(
+        restaurant.id,
+        params,
+        include_options=view == "full",
+    )
 
 
 @router.get("/restaurants/{restaurant_id}/products/{product_id}", response_model=ProductDTO)
