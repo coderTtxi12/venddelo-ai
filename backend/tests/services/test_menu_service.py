@@ -187,6 +187,29 @@ def _seed_category(repo: FakeMenuRepo) -> None:
     )
 
 
+def test_update_product_allows_inactive_category():
+    repo = FakeMenuRepo()
+    now = datetime.now(UTC)
+    inactive_cat_id = uuid.uuid4()
+    repo.categories[inactive_cat_id] = CategoryDTO(
+        id=inactive_cat_id,
+        restaurant_id=RESTAURANT_ID,
+        name="Inactive",
+        sort_index=0,
+        is_active=False,
+        created_at=now,
+        updated_at=now,
+    )
+    product = _product(category_ids=[inactive_cat_id])
+    repo.products[product.id] = product
+    svc = MenuService(repo)
+    svc.update_product(
+        RESTAURANT_ID,
+        product.id,
+        ProductUpdate(category_ids=[inactive_cat_id]),
+    )
+
+
 def test_option_group_validates_single_max():
     repo = FakeMenuRepo()
     _seed_category(repo)
