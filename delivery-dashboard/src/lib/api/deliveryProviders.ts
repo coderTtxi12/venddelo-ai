@@ -34,11 +34,15 @@ export function listMyDeliveryProviderMembers(token: string) {
   });
 }
 
-export function addMyDeliveryProviderAdminInvite(token: string, email: string) {
+export function addMyDeliveryProviderAdminInvite(
+  token: string,
+  email: string,
+  memberRole: 'admin' | 'operator' = 'admin',
+) {
   return apiRequest<DeliveryProviderAdminInvite>('/delivery-providers/me/admin-invites', {
     method: 'POST',
     token,
-    body: { email },
+    body: { email, member_role: memberRole },
   });
 }
 
