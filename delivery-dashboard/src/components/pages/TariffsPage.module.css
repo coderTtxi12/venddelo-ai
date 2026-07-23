@@ -482,6 +482,24 @@
   color: var(--color-text-secondary);
 }
 
+.readOnlyFieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.operatorNotice {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
 @media (max-width: 900px) {
   .grid2,
   .simGrid {
