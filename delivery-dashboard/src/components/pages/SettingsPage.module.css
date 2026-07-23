@@ -545,6 +545,31 @@
   color: var(--color-text-secondary);
 }
 
+.adminSectionHint {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.readOnlyFieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.operatorNotice {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
 .adminMemberList {
   display: flex;
   flex-direction: column;
@@ -616,6 +641,7 @@
 
 .roleBadgeOwner,
 .roleBadgeAdmin,
+.roleBadgeOperator,
 .roleBadgePending {
   display: inline-flex;
   align-items: center;
@@ -644,6 +670,12 @@
   background: #f8fafc;
   color: #334155;
   border: 1px solid #e2e8f0;
+}
+
+.roleBadgeOperator {
+  background: #ecfeff;
+  color: #0f766e;
+  border: 1px solid #99f6e4;
 }
 
 .roleBadgePending {
