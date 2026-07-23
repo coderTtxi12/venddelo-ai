@@ -1303,6 +1303,79 @@
    font-size: 0.85rem;
    color: var(--color-text);
  }
+
+ .categoryPickerSections {
+   display: flex;
+   flex-direction: column;
+   gap: 0.75rem;
+ }
+
+ .categoryPickerSection {
+   display: flex;
+   flex-direction: column;
+   gap: 0.45rem;
+ }
+
+ .categoryPickerSectionInactive {
+   border: 1px dashed var(--color-border);
+   border-radius: 12px;
+   padding: 0.65rem 0.7rem;
+   background: var(--color-bg);
+ }
+
+ .categoryPickerSectionHead {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 0.5rem;
+   flex-wrap: wrap;
+ }
+
+ .categoryPickerSectionLabel {
+   font-size: 0.72rem;
+   font-weight: 800;
+   letter-spacing: 0.04em;
+   text-transform: uppercase;
+   color: var(--color-text-secondary);
+ }
+
+ .categoryPickerEmpty {
+   font-size: 0.82rem;
+   color: var(--color-text-secondary);
+   font-weight: 600;
+ }
+
+ .categoryPickerInactiveHint {
+   margin: 0;
+   font-size: 0.78rem;
+   line-height: 1.4;
+   color: var(--color-text-secondary);
+ }
+
+ .multiSelectInactive {
+   background: var(--color-surface);
+   border-color: rgba(100, 116, 139, 0.24);
+   max-height: 132px;
+ }
+
+ .checkRowInactive {
+   color: var(--color-text-secondary);
+ }
+
+ .categoryPickerInactiveBadge {
+   margin-left: auto;
+   flex-shrink: 0;
+   font-size: 0.62rem;
+   font-weight: 800;
+   letter-spacing: 0.03em;
+   text-transform: uppercase;
+   padding: 0.14rem 0.38rem;
+   border-radius: 999px;
+   background: var(--color-bg);
+   border: 1px solid var(--color-border);
+   color: var(--color-text-secondary);
+   line-height: 1.1;
+ }
  
  .banner {
    border: 1px solid rgba(59, 130, 246, 0.25);
