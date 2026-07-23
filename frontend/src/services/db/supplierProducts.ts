@@ -4,6 +4,7 @@ import {
   createProduct,
   deleteOptionGroup,
   deleteOptionItem,
+  getProduct,
   listProducts,
   updateOptionGroup,
   updateOptionItem,
@@ -11,6 +12,7 @@ import {
   type OptionGroupCreateInput,
   type OptionGroupUpdateInput,
   type OptionItemUpdateInput,
+  type ProductListView,
 } from '@/lib/api/menu';
 import { mapOptionGroupToDraft, mapProductToDraft } from '@/lib/api/mappers';
 import type { Product } from '@/lib/api/types';
@@ -75,12 +77,14 @@ export async function fetchSupplierProductsPage(
   restaurantId: string,
   args: FetchSupplierProductsPageArgs,
   catalogPromotions?: Promotion[],
+  options?: { view?: ProductListView },
 ): Promise<FetchSupplierProductsPageResult> {
   const page = await listProducts(
     accessToken,
     restaurantId,
     PRODUCTS_PAGE_SIZE,
     args.cursor,
+    { view: options?.view ?? 'summary' },
   );
 
   const { discounts, promotions } = await buildProductCatalogDiscountMap(
@@ -104,11 +108,13 @@ export async function fetchAllSupplierProducts(
   accessToken: string,
   db: LegacyDbClient,
   restaurantId: string,
+  options?: { view?: ProductListView },
 ): Promise<{ items: ProductDraft[]; catalogPromotions: Promotion[] }> {
   const items: ProductDraft[] = [];
   let cursor: PageCursor = null;
   let hasMore = true;
   let catalogPromotions: Promotion[] = [];
+  const view = options?.view ?? 'summary';
 
   while (hasMore) {
     const result = await fetchSupplierProductsPage(
@@ -117,6 +123,7 @@ export async function fetchAllSupplierProducts(
       restaurantId,
       { cursor },
       catalogPromotions.length > 0 ? catalogPromotions : undefined,
+      { view },
     );
     catalogPromotions = result.catalogPromotions;
     items.push(...result.items);
@@ -126,6 +133,22 @@ export async function fetchAllSupplierProducts(
   }
 
   return { items, catalogPromotions };
+}
+
+export async function fetchSupplierProductDetail(
+  accessToken: string,
+  restaurantId: string,
+  productId: string,
+  catalogPromotions?: Promotion[],
+): Promise<ProductDraft> {
+  const product = await getProduct(accessToken, restaurantId, productId);
+  const { discounts } = await buildProductCatalogDiscountMap(
+    accessToken,
+    restaurantId,
+    [product],
+    catalogPromotions,
+  );
+  return mapProductToDraft(product, discounts.get(product.id) ?? 0);
 }
 
 export type SaveSupplierProductPayload = {
