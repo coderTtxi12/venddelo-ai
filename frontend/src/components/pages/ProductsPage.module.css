@@ -696,6 +696,65 @@
    color: var(--color-primary);
    border: 1px solid rgba(79, 70, 229, 0.15);
  }
+
+ .categoryChip {
+   display: inline-flex;
+   align-items: center;
+   gap: 0.4rem;
+   max-width: 100%;
+   padding: 0.28rem 0.45rem 0.28rem 0.55rem;
+   border-radius: 999px;
+   border: 1px solid transparent;
+   transition: border-color 0.2s ease, background-color 0.2s ease;
+ }
+
+ .categoryChipActive {
+   background: rgba(16, 185, 129, 0.08);
+   border-color: rgba(16, 185, 129, 0.18);
+ }
+
+ .categoryChipInactive {
+   background: var(--color-bg);
+   border-color: var(--color-border);
+ }
+
+ .categoryChipName {
+   font-size: 0.75rem;
+   font-weight: 700;
+   color: var(--color-text);
+   line-height: 1.2;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   white-space: nowrap;
+ }
+
+ .categoryChipInactive .categoryChipName {
+   color: var(--color-text-secondary);
+ }
+
+ .categoryChipStatus {
+   flex-shrink: 0;
+   font-size: 0.62rem;
+   font-weight: 800;
+   letter-spacing: 0.03em;
+   text-transform: uppercase;
+   padding: 0.14rem 0.38rem;
+   border-radius: 999px;
+   border: 1px solid transparent;
+   line-height: 1.1;
+ }
+
+ .categoryChipStatusActive {
+   background: rgba(16, 185, 129, 0.12);
+   border-color: rgba(16, 185, 129, 0.2);
+   color: #065f46;
+ }
+
+ .categoryChipStatusInactive {
+   background: var(--color-bg);
+   border-color: var(--color-border);
+   color: var(--color-text-secondary);
+ }
  
  .statusCol {
    display: flex;
