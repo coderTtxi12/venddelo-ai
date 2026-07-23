@@ -705,7 +705,7 @@ export default function ProductsPage() {
   );
 
   const paginatedProducts = useMemo(() => {
-    if (productFiltersActive || productsCatalogLoaded) {
+    if (usesClientProductPagination) {
       return paginateItems(displayedProducts, productsPage, PRODUCTS_PAGE_SIZE);
     }
     const totalPages = Math.max(1, Math.ceil(productsTotalCount / PRODUCTS_PAGE_SIZE));
