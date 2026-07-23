@@ -695,6 +695,8 @@ export default function ProductsPage() {
     productPriceSort,
     productDiscountSort,
     productTotalSort,
+    productFiltersActive,
+    productsFilterCatalogVersion,
   ]);
 
   const paginatedCategories = useMemo(
