@@ -38,6 +38,7 @@ export {
 export {
   PRODUCTS_PAGE_SIZE,
   fetchAllSupplierProducts,
+  fetchSupplierProductDetail,
   fetchSupplierProductsPage,
   mapProductDoc,
   normalizeOptionGroups,
