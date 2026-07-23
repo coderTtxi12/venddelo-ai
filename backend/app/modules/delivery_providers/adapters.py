@@ -841,7 +841,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             .where(
                 DeliveryProviderMember.delivery_provider_id == provider_id,
                 DeliveryProviderMember.is_active.is_(True),
-                DeliveryProviderMember.member_role.in_(("owner", "admin")),
+                DeliveryProviderMember.member_role.in_(("owner", "admin", "operator")),
             )
             .order_by(
                 DeliveryProviderMember.member_role.desc(),
@@ -871,11 +871,12 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         return [DeliveryProviderAdminInviteDTO.model_validate(row) for row in rows]
 
     def add_admin_invite(
-        self, provider_id: uuid.UUID, email: str
+        self, provider_id: uuid.UUID, email: str, member_role: str = "admin"
     ) -> DeliveryProviderAdminInviteDTO:
         invite = DeliveryProviderAdminInvite(
             delivery_provider_id=provider_id,
             email=email,
+            member_role=member_role,
         )
         self._session.add(invite)
         self._session.flush()
@@ -920,7 +921,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
                     DeliveryProviderMember(
                         delivery_provider_id=invite.delivery_provider_id,
                         user_id=user_id,
-                        member_role="admin",
+                        member_role=invite.member_role,
                         is_active=True,
                     )
                 )
