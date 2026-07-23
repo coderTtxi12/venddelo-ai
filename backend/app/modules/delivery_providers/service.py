@@ -273,7 +273,15 @@ class DeliveryProviderService:
     def update_service_status(
         self, user_id: uuid.UUID, data: DeliveryProviderServiceStatusUpdate
     ) -> DeliveryProviderServiceStatusDTO:
-        provider, schedules = self._provider_schedules_for_user(user_id)
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, member_role = found
+        require_write_provider_config(member_role)
+        schedules = list(self._repo.list_schedules(provider.id))
+        if not schedules:
+            self._repo.seed_default_schedules(provider.id)
+            schedules = list(self._repo.list_schedules(provider.id))
         self._repo.set_service_manually_enabled(provider.id, data.manually_enabled)
         return self._build_service_status(provider.id, schedules)
 
