@@ -1,11 +1,13 @@
 'use client';
 
 import { useAuth } from '@/hooks/useAuth';
+import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import ServiceStatusToggle from '@/components/ui/ServiceStatusToggle';
 import styles from './TopBar.module.css';
 
 export default function TopBar() {
   const { user, logout } = useAuth();
+  const { memberRoleLabel, loading: roleLoading } = useDeliveryProviderAccess();
 
   return (
     <header className={styles.topbar}>
@@ -34,7 +36,9 @@ export default function TopBar() {
           )}
           <div className={styles.userText}>
             <span className={styles.userName}>{user?.displayName ?? 'Admin'}</span>
-            <span className={styles.userRole}>Administrador</span>
+            <span className={styles.userRole}>
+              {roleLoading ? 'Cargando rol…' : memberRoleLabel}
+            </span>
           </div>
         </div>
 
