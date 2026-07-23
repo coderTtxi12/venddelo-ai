@@ -1363,9 +1363,9 @@ export default function ProductsPage() {
                         </tr>
                       ) : null}
                       {paginatedProducts.items.map((p) => {
-                        const catNames = p.categoryIds
-                          .map((id) => categories.find((c) => c.id === id)?.name)
-                          .filter(Boolean) as string[];
+                        const productCategories = p.categoryIds
+                          .map((id) => categoryById.get(id))
+                          .filter((category): category is CategoryDraft => Boolean(category));
                         return (
                           <tr
                             key={p.id}
@@ -1392,7 +1392,13 @@ export default function ProductsPage() {
                             </td>
                             <td className={`${styles.labeledCell} ${styles.categoryCell}`} data-label="Categorías">
                               <div className={styles.chips}>
-                                {catNames.length > 0 ? catNames.map((n) => <span key={n} className={styles.chip}>{n}</span>) : <span className={styles.muted}>—</span>}
+                                {productCategories.length > 0 ? (
+                                  productCategories.map((category) => (
+                                    <ProductCategoryChip key={category.id} category={category} />
+                                  ))
+                                ) : (
+                                  <span className={styles.muted}>—</span>
+                                )}
                               </div>
                             </td>
                             <td className={`${styles.labeledCell} ${styles.priceCell}`} data-label="Precio">
