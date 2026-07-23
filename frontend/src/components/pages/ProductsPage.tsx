@@ -379,13 +379,28 @@ export default function ProductsPage() {
   const [productsError, setProductsError] = useState<string | null>(null);
   const [productsPage, setProductsPage] = useState(1);
   const [productsTotalCount, setProductsTotalCount] = useState(0);
-  const [productsCatalogLoaded, setProductsCatalogLoaded] = useState(false);
   const catalogPromotionsRef = useRef<Promotion[] | null>(null);
   const productsPageCacheRef = useRef<Map<number, ProductDraft[]>>(new Map());
   const productsPageCursorsRef = useRef<(string | null)[]>([null]);
+  const productsFilterCatalogRef = useRef<ProductDraft[] | null>(null);
+  const [productsFilterCatalogVersion, setProductsFilterCatalogVersion] = useState(0);
   const productsLoadRequestRef = useRef(0);
 
-  const clearProductsPageCache = useCallback(() => {
+  const invalidateProductsPageCache = useCallback(() => {
+    productsPageCacheRef.current.clear();
+  }, []);
+
+  const invalidateProductsFilterCatalog = useCallback(() => {
+    productsFilterCatalogRef.current = null;
+    setProductsFilterCatalogVersion((version) => version + 1);
+  }, []);
+
+  const markProductsFilterCatalogReady = useCallback((items: ProductDraft[]) => {
+    productsFilterCatalogRef.current = items;
+    setProductsFilterCatalogVersion((version) => version + 1);
+  }, []);
+
+  const resetProductsPagination = useCallback(() => {
     productsPageCacheRef.current.clear();
     productsPageCursorsRef.current = [null];
   }, []);
