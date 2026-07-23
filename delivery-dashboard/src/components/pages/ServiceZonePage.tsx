@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ServiceZoneMapDrawer } from '@/components/onboarding/ServiceZoneMapDrawer';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
+import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useAuth } from '@/hooks/useAuth';
 import { getMyDeliveryProvider, updateMyDeliveryProvider } from '@/lib/api/deliveryProviders';
 import { ApiError } from '@/lib/api/types';
@@ -26,6 +27,7 @@ function zoneFieldsDirty(current: OnboardingData, initial: OnboardingData): bool
 
 export default function ServiceZonePage() {
   const { accessToken } = useAuth();
+  const { canWriteProviderConfig, isOperator } = useDeliveryProviderAccess();
   const [form, setForm] = useState<OnboardingData>(() => createDefaultOnboardingData());
   const [initialForm, setInitialForm] = useState<OnboardingData>(() => createDefaultOnboardingData());
   const [loading, setLoading] = useState(true);
@@ -131,14 +133,16 @@ export default function ServiceZonePage() {
         empty: styles.loading,
       }}
       action={
-        <button
-          type="button"
-          className={styles.primaryBtn}
-          disabled={loading || saving || !isDirty}
-          onClick={() => void handleSave()}
-        >
-          {saving ? 'Guardando…' : 'Guardar cambios'}
-        </button>
+        canWriteProviderConfig ? (
+          <button
+            type="button"
+            className={styles.primaryBtn}
+            disabled={loading || saving || !isDirty}
+            onClick={() => void handleSave()}
+          >
+            {saving ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+        ) : null
       }
     >
       {loading ? (
@@ -147,6 +151,11 @@ export default function ServiceZonePage() {
         </p>
       ) : (
         <section className={styles.panel} aria-labelledby="service-zone-panel">
+          {isOperator ? (
+            <div className={styles.operatorNotice} role="status">
+              Tu rol de Operador permite consultar el cerco geográfico, pero no editarlo.
+            </div>
+          ) : null}
           {error ? (
             <div className={styles.errorBanner} role="alert">
               {error}
@@ -157,6 +166,7 @@ export default function ServiceZonePage() {
               {success}
             </div>
           ) : null}
+          <fieldset disabled={!canWriteProviderConfig} className={styles.readOnlyFieldset}>
           <label className={`${styles.label} ${styles.formGridFull}`}>
             Nombre de la zona
             <input
@@ -182,6 +192,7 @@ export default function ServiceZonePage() {
               onPolygonChange={handleServiceZonePolygonChange}
             />
           </div>
+          </fieldset>
         </section>
       )}
     </PanelPageShell>
