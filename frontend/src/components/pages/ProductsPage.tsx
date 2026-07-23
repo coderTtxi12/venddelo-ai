@@ -1744,10 +1744,8 @@ export default function ProductsPage() {
                       }
                       return [product, ...prev];
                     });
-                    if (productFiltersActive || productsCatalogLoaded) {
-                      setProductsCatalogLoaded(true);
-                    } else {
-                      clearProductsPageCache();
+                    if (!productFiltersActive) {
+                      invalidateProductsPageCache();
                       void loadProductsTablePage(productsPage, { force: true });
                     }
                     setProductDrawerOpen(false);
