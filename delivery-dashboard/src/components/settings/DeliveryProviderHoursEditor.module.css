@@ -303,9 +303,16 @@
 
 .errorText {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.88rem;
   color: #991b1b;
   flex: 1;
+}
+
+.readOnlyFieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
