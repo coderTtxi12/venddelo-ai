@@ -143,7 +143,7 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
   const deliveryMapsUrl =
     fulfillment.serviceType === 'delivery' ? buildGoogleMapsDeliveryUrl(fulfillment) : null;
   const restaurantMapsUrl =
-    fulfillment.serviceType === 'delivery'
+    fulfillment.serviceType === 'delivery' || fulfillment.serviceType === 'takeout'
       ? buildGoogleMapsRestaurantUrl(restaurantLocation)
       : null;
 
