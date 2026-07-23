@@ -274,6 +274,7 @@ export function DeliveryProviderHoursEditor({
           />
         ))}
       </div>
+      </fieldset>
 
       <div className={styles.footer}>
         {validationError ? (
