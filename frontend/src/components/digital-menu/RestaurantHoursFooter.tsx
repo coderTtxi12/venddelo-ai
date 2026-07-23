@@ -242,8 +242,13 @@ export function RestaurantHoursFooter({
     } catch (err) {
       console.error(err);
       setError('No se pudo guardar el horario. Inténtalo de nuevo.');
+    } finally {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
     }
   };
+
+  const savePending = saving || isSaving;
 
   return (
     <section className={styles.hoursSection} aria-label="Horario del restaurante">
