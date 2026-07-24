@@ -1316,11 +1316,79 @@
    gap: 0.45rem;
  }
 
- .categoryPickerSectionInactive {
-   border: 1px dashed var(--color-border);
+ .categoryPickerAccordion {
+   border: 1px solid var(--color-border);
    border-radius: 12px;
-   padding: 0.65rem 0.7rem;
    background: var(--color-bg);
+   overflow: hidden;
+ }
+
+ .categoryPickerAccordionTrigger {
+   width: 100%;
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 0.75rem;
+   padding: 0.65rem 0.75rem;
+   border: none;
+   background: transparent;
+   cursor: pointer;
+   touch-action: manipulation;
+   text-align: left;
+   transition: background-color 0.2s ease;
+ }
+
+ .categoryPickerAccordionTrigger:hover {
+   background: rgba(100, 116, 139, 0.05);
+ }
+
+ .categoryPickerAccordionTrigger:focus-visible {
+   outline: 2px solid rgba(79, 70, 229, 0.4);
+   outline-offset: -2px;
+ }
+
+ .categoryPickerAccordionOpen .categoryPickerAccordionTrigger {
+   border-bottom: 1px solid var(--color-border);
+ }
+
+ .categoryPickerAccordionTriggerContent {
+   display: flex;
+   flex-direction: column;
+   gap: 0.25rem;
+   flex: 1;
+   min-width: 0;
+   pointer-events: none;
+ }
+
+ .categoryPickerAccordionMeta {
+   font-size: 0.78rem;
+   font-weight: 600;
+   color: var(--color-text-secondary);
+   line-height: 1.35;
+ }
+
+ .categoryPickerAccordionIcon {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   flex-shrink: 0;
+   width: 28px;
+   height: 28px;
+   color: var(--color-text-secondary);
+   transition: transform 0.2s ease, color 0.2s ease;
+   pointer-events: none;
+ }
+
+ .categoryPickerAccordionIconOpen {
+   transform: rotate(180deg);
+   color: var(--color-primary);
+ }
+
+ .categoryPickerAccordionPanel {
+   display: flex;
+   flex-direction: column;
+   gap: 0.45rem;
+   padding: 0.65rem 0.75rem 0.75rem;
  }
 
  .categoryPickerSectionHead {
@@ -1347,34 +1415,17 @@
 
  .categoryPickerInactiveHint {
    margin: 0;
-   font-size: 0.78rem;
+   font-size: 0.76rem;
    line-height: 1.4;
    color: var(--color-text-secondary);
  }
 
- .multiSelectInactive {
-   background: var(--color-surface);
-   border-color: rgba(100, 116, 139, 0.24);
+ .multiSelectMuted {
    max-height: 132px;
  }
 
- .checkRowInactive {
+ .checkRowMuted {
    color: var(--color-text-secondary);
- }
-
- .categoryPickerInactiveBadge {
-   margin-left: auto;
-   flex-shrink: 0;
-   font-size: 0.62rem;
-   font-weight: 800;
-   letter-spacing: 0.03em;
-   text-transform: uppercase;
-   padding: 0.14rem 0.38rem;
-   border-radius: 999px;
-   background: var(--color-bg);
-   border: 1px solid var(--color-border);
-   color: var(--color-text-secondary);
-   line-height: 1.1;
  }
  
  .banner {
