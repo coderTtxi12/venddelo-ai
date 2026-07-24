@@ -7,6 +7,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import Popover from '@mui/material/Popover';
 import { legacyDb as db, legacyStorage as storage } from '@/services/legacyDb';
@@ -1869,6 +1870,9 @@ function ProductCategoryPicker({
   categoryIds: Id[];
   onChange: (next: Id[]) => void;
 }) {
+  const [inactiveExpanded, setInactiveExpanded] = useState(false);
+  const inactivePanelId = 'product-inactive-categories-panel';
+
   const toggleCategory = (categoryId: Id, checked: boolean) => {
     onChange(
       checked
@@ -1906,35 +1910,67 @@ function ProductCategoryPicker({
       </div>
 
       {inactiveCategories.length > 0 ? (
-        <div className={`${styles.categoryPickerSection} ${styles.categoryPickerSectionInactive}`}>
-          <div className={styles.categoryPickerSectionHead}>
-            <span className={styles.categoryPickerSectionLabel}>Categorías inactivas</span>
-            <Pill tone="neutral">Fuera del menú</Pill>
-          </div>
-          <p className={styles.categoryPickerInactiveHint}>
-            No se muestran en el menú público mientras estén desactivadas. Puedes seguir editando y
-            guardando el producto.
-          </p>
-          <div
-            className={`${styles.multiSelect} ${styles.multiSelectInactive}`}
-            role="group"
-            aria-label="Categorías inactivas asignadas"
+        <div
+          className={`${styles.categoryPickerAccordion} ${
+            inactiveExpanded ? styles.categoryPickerAccordionOpen : ''
+          }`}
+        >
+          <button
+            type="button"
+            className={styles.categoryPickerAccordionTrigger}
+            aria-expanded={inactiveExpanded}
+            aria-controls={inactivePanelId}
+            onClick={() => setInactiveExpanded((prev) => !prev)}
           >
-            {inactiveCategories.map((category) => {
-              const checked = categoryIds.includes(category.id);
-              return (
-                <label key={category.id} className={`${styles.checkRow} ${styles.checkRowInactive}`}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(e) => toggleCategory(category.id, e.target.checked)}
-                  />
-                  <span>{category.name}</span>
-                  <span className={styles.categoryPickerInactiveBadge}>Inactiva</span>
-                </label>
-              );
-            })}
-          </div>
+            <span className={styles.categoryPickerAccordionTriggerContent}>
+              <span className={styles.categoryPickerSectionHead}>
+                <span className={styles.categoryPickerSectionLabel}>Categorías inactivas</span>
+                <Pill tone="neutral">Fuera del menú</Pill>
+              </span>
+              {!inactiveExpanded ? (
+                <span className={styles.categoryPickerAccordionMeta}>
+                  {inactiveCategories.length === 1
+                    ? '1 categoría oculta'
+                    : `${inactiveCategories.length} categorías ocultas`}
+                </span>
+              ) : null}
+            </span>
+            <span
+              className={`${styles.categoryPickerAccordionIcon} ${
+                inactiveExpanded ? styles.categoryPickerAccordionIconOpen : ''
+              }`}
+              aria-hidden
+            >
+              <ExpandMoreOutlinedIcon sx={{ fontSize: 22 }} />
+            </span>
+          </button>
+
+          {inactiveExpanded ? (
+            <div id={inactivePanelId} className={styles.categoryPickerAccordionPanel}>
+              <p className={styles.categoryPickerInactiveHint}>
+                No se muestran en el menú público. Puedes seguir asignándolas al producto.
+              </p>
+              <div
+                className={`${styles.multiSelect} ${styles.multiSelectMuted}`}
+                role="group"
+                aria-label="Categorías inactivas asignadas"
+              >
+                {inactiveCategories.map((category) => {
+                  const checked = categoryIds.includes(category.id);
+                  return (
+                    <label key={category.id} className={`${styles.checkRow} ${styles.checkRowMuted}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => toggleCategory(category.id, e.target.checked)}
+                      />
+                      <span>{category.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
