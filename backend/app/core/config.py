@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     rate_limit_window_seconds: int = 60
     openai_api_key: str | None = None
     openai_model: str = "gpt-5-nano-2025-08-07"
+    openai_reasoning_effort: str = "medium"
+    openai_reasoning_summary: str = "auto"
     openai_image_model: str = "gpt-image-2"
     openai_vision_model: str = Field(
         default="gpt-5.4-nano-2026-03-17",
