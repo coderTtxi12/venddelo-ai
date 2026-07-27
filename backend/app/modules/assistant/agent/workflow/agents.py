@@ -5,6 +5,7 @@ from __future__ import annotations
 from agents import Agent
 
 from app.core.config import Settings
+from app.modules.assistant.agent.model_settings import build_assistant_model_settings
 from app.modules.assistant.agent.run_context import AssistantRunContext
 from app.modules.assistant.agent.tools import build_executor_function_tools
 from app.modules.assistant.agent.workflow.prompts import (
@@ -27,6 +28,7 @@ def build_router_agent(*, settings: Settings) -> Agent[AssistantRunContext]:
         instructions=ROUTER_INSTRUCTIONS,
         tools=[],
         model=settings.openai_model,
+        model_settings=build_assistant_model_settings(settings),
         output_type=WorkflowRouteDecision,
     )
 
@@ -42,6 +44,7 @@ def build_executor_agent(
         instructions=EXECUTOR_INSTRUCTIONS,
         tools=build_executor_function_tools(registry, effective_skill_ids, settings=settings),
         model=settings.openai_model,
+        model_settings=build_assistant_model_settings(settings),
         output_type=ExecutionRecord,
     )
 
@@ -52,6 +55,7 @@ def build_evaluator_agent(*, settings: Settings) -> Agent[AssistantRunContext]:
         instructions=EVALUATOR_INSTRUCTIONS,
         tools=[],
         model=settings.openai_model,
+        model_settings=build_assistant_model_settings(settings),
         output_type=WorkflowEvaluation,
     )
 
@@ -62,4 +66,5 @@ def build_responder_agent(*, settings: Settings) -> Agent[AssistantRunContext]:
         instructions=RESPONDER_INSTRUCTIONS,
         tools=[],
         model=settings.openai_model,
+        model_settings=build_assistant_model_settings(settings),
     )

@@ -5,6 +5,7 @@ from __future__ import annotations
 from agents import Agent
 
 from app.core.config import Settings
+from app.modules.assistant.agent.model_settings import build_assistant_model_settings
 from app.modules.assistant.agent.run_context import AssistantRunContext
 from app.modules.assistant.agent.tools import build_menu_import_internal_tools
 from app.modules.assistant.agent.workflow.schemas import ExecutionRecord
@@ -32,6 +33,7 @@ def build_menu_import_executor_agent(
         instructions=MENU_IMPORT_EXECUTOR_INSTRUCTIONS,
         tools=build_menu_import_internal_tools(registry),
         model=settings.openai_model,
+        model_settings=build_assistant_model_settings(settings),
         output_type=ExecutionRecord,
     )
 
@@ -42,6 +44,7 @@ def build_menu_import_responder_agent(*, settings: Settings) -> Agent[AssistantR
         instructions=MENU_IMPORT_RESPONDER_INSTRUCTIONS,
         tools=[],
         model=settings.openai_model,
+        model_settings=build_assistant_model_settings(settings),
         output_type=MenuImportUserResponse,
     )
 
