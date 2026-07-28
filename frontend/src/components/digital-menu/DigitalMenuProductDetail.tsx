@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CheckIcon from '@mui/icons-material/Check';
@@ -15,6 +15,7 @@ import { formatMoney } from '@/lib/currency';
 import { attachDragOverlay } from '@/lib/dragOverlay';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
 import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
+import { ProductImageLightbox } from '@/components/digital-menu/ProductImageLightbox';
 import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
 import { PromotionCountdown } from '@/components/digital-menu/PromotionCountdown';
 import {
@@ -78,6 +79,8 @@ type DigitalMenuProductDetailProps = {
   onBack: () => void;
   onAddToCart?: (payload: AddToCartPayload) => void;
   hideHeroBackButton?: boolean;
+  enableImageLightbox?: boolean;
+  themeStyle?: CSSProperties;
   enableHaptics?: boolean;
   isTabletLayout?: boolean;
   /** Editor preview only: keeps mobile footer/layout when the browser viewport is desktop-wide. */
@@ -154,6 +157,8 @@ export function DigitalMenuProductDetail({
   onBack,
   onAddToCart,
   hideHeroBackButton = false,
+  enableImageLightbox = false,
+  themeStyle,
   enableHaptics = false,
   isTabletLayout = false,
   editorPreviewDevice,
@@ -162,6 +167,8 @@ export function DigitalMenuProductDetail({
 }: DigitalMenuProductDetailProps) {
   const useEditorMobileBand = editorPreviewDevice === 'mobile';
   const heroSentinelRef = useRef<HTMLDivElement>(null);
+  const heroImageTriggerRef = useRef<HTMLButtonElement>(null);
+  const [imageLightboxOpen, setImageLightboxOpen] = useState(false);
   const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const addFeedbackTimerRef = useRef<number | null>(null);
   const validationScrollTimerRef = useRef<number | null>(null);
@@ -216,6 +223,7 @@ export function DigitalMenuProductDetail({
     setNotes('');
     setSelectionValidationAttempted(false);
     setAddBtnAttention(false);
+    setImageLightboxOpen(false);
     if (addFeedbackTimerRef.current != null) {
       window.clearTimeout(addFeedbackTimerRef.current);
       addFeedbackTimerRef.current = null;
@@ -363,7 +371,29 @@ export function DigitalMenuProductDetail({
         <section className={styles.productHero} aria-label={product.name}>
           <div className={styles.productHeroWrap}>
             {imageUrl ? (
-              <img src={imageUrl} alt={product.name} className={styles.heroImage} />
+              enableImageLightbox ? (
+                <>
+                  <button
+                    ref={heroImageTriggerRef}
+                    type="button"
+                    className={styles.heroImageButton}
+                    aria-label={`Ver imagen completa de ${product.name}`}
+                    onClick={() => setImageLightboxOpen(true)}
+                  >
+                    <img src={imageUrl} alt={product.name} className={styles.heroImage} />
+                  </button>
+                  <ProductImageLightbox
+                    open={imageLightboxOpen}
+                    imageUrl={imageUrl}
+                    imageAlt={product.name}
+                    onClose={() => setImageLightboxOpen(false)}
+                    returnFocusRef={heroImageTriggerRef}
+                    themeStyle={themeStyle}
+                  />
+                </>
+              ) : (
+                <img src={imageUrl} alt={product.name} className={styles.heroImage} />
+              )
             ) : (
               <ProductImagePlaceholder
                 name={product.name}

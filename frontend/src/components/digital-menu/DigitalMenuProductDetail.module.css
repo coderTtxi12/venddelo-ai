@@ -83,6 +83,31 @@
   pointer-events: none;
 }
 
+.heroImageButton {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .heroImageButton .heroImage {
+    transition: opacity 180ms ease;
+  }
+}
+
+.heroImageButton:hover .heroImage,
+.heroImageButton:focus-visible .heroImage {
+  opacity: 0.92;
+}
+
+.heroImageButton:focus-visible {
+  outline: 2px solid var(--dm-primary, #111827);
+  outline-offset: -2px;
+}
+
 .heroImage {
   width: 100%;
   height: var(--dm-cover-height, 168px);

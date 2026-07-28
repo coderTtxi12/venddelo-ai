@@ -863,6 +863,8 @@ export default function PublicDigitalMenuPage({
                 onBack={closeProduct}
                 onAddToCart={handleAddToCart}
                 hideHeroBackButton
+                enableImageLightbox
+                themeStyle={menuThemeStyle}
                 enableHaptics
                 isTabletLayout={isTabletLayout}
               />
@@ -1134,6 +1136,8 @@ export default function PublicDigitalMenuPage({
               onBack={closeProduct}
               onAddToCart={handleAddToCart}
               hideHeroBackButton
+              enableImageLightbox
+              themeStyle={menuThemeStyle}
               enableHaptics
             />
           ) : undefined}
