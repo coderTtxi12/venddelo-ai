@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { DigitalMenuTheme, DigitalMenuThemeCssVars } from './types';
 import { resolveAddSuccessTokens } from './deriveAddSuccess';
+import { resolveOverlayScrim } from './deriveOverlayScrim';
 import { resolveUnavailableTokens } from './deriveUnavailable';
 
 const BORDER_RADIUS_MAP = {
@@ -49,6 +50,7 @@ export function digitalMenuThemeToCssVars(theme: DigitalMenuTheme): DigitalMenuT
     '--dm-unavailable-badge-text': unavailable.badgeText,
     '--dm-unavailable-badge-border': unavailable.badgeBorder,
     '--dm-unavailable-sold-out-bg': unavailable.soldOutBg,
+    '--dm-overlay-scrim': resolveOverlayScrim(colors),
     '--dm-font-heading': typography.headingFont,
     '--dm-font-body': typography.bodyFont,
     '--dm-font-heading-weight': String(typography.headingWeight),
