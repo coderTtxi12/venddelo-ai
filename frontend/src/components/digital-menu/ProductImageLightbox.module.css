@@ -1,0 +1,118 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--dm-font-body, system-ui, sans-serif);
+  background: var(
+    --dm-overlay-scrim,
+    color-mix(in srgb, var(--dm-bg, #f8fafc) 94%, transparent)
+  );
+  backdrop-filter: blur(8px);
+  touch-action: none;
+}
+
+.overlay[data-entering='true'] {
+  animation: lightboxFadeIn 220ms ease;
+}
+
+.overlay[data-exiting='true'] {
+  animation: lightboxFadeOut 180ms ease forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay[data-entering='true'],
+  .overlay[data-exiting='true'] {
+    animation: none;
+  }
+}
+
+@keyframes lightboxFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lightboxFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.closeBtn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--dm-float-btn-text, #111827);
+  background: var(--dm-float-btn-bg, rgba(255, 255, 255, 0.92));
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--dm-text, #0f172a) 18%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .closeBtn {
+    transition: background-color 180ms ease;
+  }
+}
+
+.closeBtn:hover {
+  background: color-mix(
+    in srgb,
+    var(--dm-float-btn-bg, rgba(255, 255, 255, 0.92)) 88%,
+    var(--dm-primary, #111827) 12%
+  );
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--dm-primary, #111827);
+  outline-offset: 2px;
+}
+
+.viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 56px 16px 24px;
+  box-sizing: border-box;
+}
+
+.image {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  will-change: transform;
+}
+
+.image[data-animating='true'] {
+  transition: transform 220ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image[data-animating='true'] {
+    transition: none;
+  }
+}
