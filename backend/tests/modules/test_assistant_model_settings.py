@@ -8,6 +8,8 @@ def test_build_assistant_model_settings_uses_configured_reasoning():
         openai_reasoning_summary="auto",
     )
     model_settings = build_assistant_model_settings(settings)
+    assert model_settings.store is False
+    assert model_settings.response_include == ["reasoning.encrypted_content"]
     assert model_settings.reasoning is not None
     assert model_settings.reasoning.effort == "medium"
     assert model_settings.reasoning.summary == "auto"
