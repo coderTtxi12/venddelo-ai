@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import uuid
 from dataclasses import dataclass
 
 from app.core.config import Settings, get_settings
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.agent.prompt_composer import compose_system_prompt
-from app.modules.assistant.agent.workflow.schemas import (
-    ExecutionRecord,
-    WorkflowEvaluation,
-    WorkflowRouteDecision,
-)
 from app.modules.assistant.chat_attachment_describer import describe_chat_attachments
 from app.modules.assistant.chat_attachments import (
     append_attachment_descriptions,
@@ -36,9 +30,7 @@ from app.modules.assistant.profile.service import AssistantProfileService
 from app.modules.assistant.schemas import AssistantChatHistoryMessage, ChatAttachmentRef
 from app.modules.assistant.skills.discovery import discover_skill_executors
 from app.modules.assistant.skills.markdown import load_skill_metadata
-from app.modules.assistant.skills.menu_import.response_schema import MenuImportQuizQuestion
 from app.modules.assistant.skills.menu_import.session_context import (
-    build_full_import_session_context,
     build_router_import_session_context,
     get_active_import_for_conversation,
 )
@@ -304,17 +296,44 @@ async def load_workflow_runtime(
     )
 
 
-def router_input(context: WorkflowContext) -> str:
+def orchestrator_input(context: WorkflowContext) -> str:
     parts = [
         f"## Conversation history\n\n{context.conversation_history}",
-        f"## User request\n\n{context.user_message}",
+        (
+            "## User request\n\n"
+            + build_agent_user_request(
+                context.user_message,
+                context.current_turn_attachments_context,
+            )
+        ),
     ]
+    if context.menu_import_enabled:
+        parts.append(
+            "## Menu import capability\n\n"
+            "menu_subagent is available via delegate_task for full menu onboarding "
+            "from documents/images and active import sessions."
+        )
     if context.import_session_context:
         parts.append(f"## Active menu import session\n\n{context.import_session_context}")
     return "\n\n".join(parts)
 
 
-def menu_import_input(context: WorkflowContext, route: WorkflowRouteDecision) -> str:
+def restaurant_ops_input(context: WorkflowContext, task: str) -> str:
+    parts = [
+        f"## Conversation history\n\n{context.conversation_history}",
+        (
+            "## User request\n\n"
+            + build_agent_user_request(
+                context.user_message,
+                context.current_turn_attachments_context,
+            )
+        ),
+        f"## Delegated task\n\n{task.strip()}",
+    ]
+    return "\n\n".join(parts) + "\n"
+
+
+def menu_subagent_input(context: WorkflowContext, task: str) -> str:
     parts = [
         f"## Conversation history\n\n{context.menu_import_conversation_history}",
         (
@@ -324,7 +343,7 @@ def menu_import_input(context: WorkflowContext, route: WorkflowRouteDecision) ->
                 context.current_turn_attachments_context,
             )
         ),
-        f"## User goal\n\n{route.goal}",
+        f"## Delegated task\n\n{task.strip()}",
     ]
     if context.import_session_context:
         parts.append(f"## Import session\n\n{context.import_session_context}")
@@ -335,138 +354,3 @@ def menu_import_input(context: WorkflowContext, route: WorkflowRouteDecision) ->
         )
     return "\n\n".join(parts)
 
-
-def menu_import_responder_input(
-    context: WorkflowContext,
-    route: WorkflowRouteDecision,
-    execution: ExecutionRecord,
-    *,
-    pending_quiz: list[MenuImportQuizQuestion] | None = None,
-    public_menu_url: str | None = None,
-) -> str:
-    parts = [
-        f"## Conversation history\n\n{context.menu_import_conversation_history}",
-        f"## User request\n\n{context.user_message}",
-        f"## User goal\n\n{route.goal}",
-        f"## Execution findings\n\n{_format_execution_findings(execution)}",
-    ]
-    if public_menu_url:
-        from app.modules.assistant.skills.menu_import.public_menu_url import (
-            format_public_menu_link_block,
-        )
-
-        parts.append(format_public_menu_link_block(public_menu_url))
-    if context.import_session_context:
-        parts.append(f"## Import session\n\n{context.import_session_context}")
-    if pending_quiz:
-        payload = [question.model_dump() for question in pending_quiz]
-        parts.append(
-            "## Pending clarification questions\n\n"
-            "Copia **exactamente** este arreglo en el campo `questions` de tu respuesta "
-            "(sin modificar ids, textos ni opciones). El dueño verá el cuestionario debajo "
-            "de `message`.\n\n"
-            f"```json\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n```"
-        )
-    return "\n\n".join(parts) + "\n"
-
-
-def executor_input(
-    context: WorkflowContext,
-    route: WorkflowRouteDecision,
-    *,
-    previous_execution: ExecutionRecord | None = None,
-    evaluation: WorkflowEvaluation | None = None,
-) -> str:
-    parts = [
-        f"## Conversation history\n\n{context.conversation_history}",
-        (
-            "## User request\n\n"
-            + build_agent_user_request(
-                context.user_message,
-                context.current_turn_attachments_context,
-            )
-        ),
-        f"## User goal\n\n{route.goal}",
-    ]
-    if previous_execution is not None and evaluation is not None:
-        parts.extend(
-            [
-                f"## Previous attempt\n\n{previous_execution.model_dump_json(indent=2)}",
-                f"## Evaluator feedback (retry with a different approach)\n\n"
-                f"{evaluation.model_dump_json(indent=2)}",
-            ]
-        )
-    return "\n\n".join(parts) + "\n"
-
-
-def evaluator_input(
-    context: WorkflowContext,
-    route: WorkflowRouteDecision,
-    execution: ExecutionRecord,
-) -> str:
-    return (
-        f"## Conversation history\n\n{context.conversation_history}\n\n"
-        f"## User request\n\n{context.user_message}\n\n"
-        f"## User goal\n\n{route.goal}\n\n"
-        f"## Execution result\n\n{execution.model_dump_json(indent=2)}"
-    )
-
-
-def _format_execution_findings(execution: ExecutionRecord) -> str:
-    has_content = bool(
-        execution.summary.strip()
-        or execution.executed_steps
-        or execution.notes
-        or execution.status != "success"
-    )
-    if not has_content:
-        return "El executor terminó sin hallazgos."
-
-    parts: list[str] = []
-    if execution.summary.strip():
-        parts.append("### Datos para responder\n\n" + execution.summary.strip())
-
-    metadata = execution.model_dump(
-        exclude={"summary", "tools_used", "requires_user_approval", "approval_reason"},
-        mode="json",
-    )
-    has_metadata = bool(
-        metadata.get("executed_steps")
-        or metadata.get("notes")
-        or metadata.get("status") != "success"
-    )
-    if has_metadata:
-        parts.append(
-            "### Metadatos de ejecución\n\n```json\n"
-            + json.dumps(metadata, ensure_ascii=False, indent=2)
-            + "\n```"
-        )
-
-    return "\n\n".join(parts)
-
-
-def _format_evaluation_result(evaluation: WorkflowEvaluation) -> str:
-    payload = evaluation.model_dump(mode="json")
-    return "```json\n" + json.dumps(payload, ensure_ascii=False, indent=2) + "\n```"
-
-
-def responder_input(
-    context: WorkflowContext,
-    route: WorkflowRouteDecision,
-    execution: ExecutionRecord,
-    evaluation: WorkflowEvaluation,
-) -> str:
-    if route.is_direct:
-        return (
-            f"## Conversation history\n\n{context.conversation_history}\n\n"
-            f"## User request\n\n{context.user_message}\n\n"
-            f"## User goal\n\n{route.goal}\n\n"
-            "## Findings\n\n(Sin investigación de datos: responde de forma conversacional.)"
-        )
-    return (
-        f"## Conversation history\n\n{context.conversation_history}\n\n"
-        f"## User request\n\n{context.user_message}\n\n"
-        f"## User goal\n\n{route.goal}\n\n"
-        f"## Findings\n\n{_format_execution_findings(execution)}\n\n"
-        f"## Evaluation\n\n{_format_evaluation_result(evaluation)}"
-    )

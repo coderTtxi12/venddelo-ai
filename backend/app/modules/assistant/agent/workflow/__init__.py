@@ -1,6 +1,6 @@
-"""Router → executor → evaluator → responder workflow for the restaurant assistant."""
+"""Orchestrator → delegate_task → subagents workflow for the restaurant assistant."""
 
 from app.modules.assistant.agent.workflow.orchestrator import WorkflowOrchestrator
-from app.modules.assistant.agent.workflow.schemas import WorkflowEvaluation, WorkflowRouteDecision
+from app.modules.assistant.agent.workflow.schemas import ExecutionRecord
 
-__all__ = ["WorkflowEvaluation", "WorkflowOrchestrator", "WorkflowRouteDecision"]
+__all__ = ["ExecutionRecord", "WorkflowOrchestrator"]

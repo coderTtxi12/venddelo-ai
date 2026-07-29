@@ -1,4 +1,5 @@
 import asyncio
+import json
 import uuid
 from unittest.mock import MagicMock, patch
 
@@ -7,34 +8,25 @@ from openai.types.responses.response_text_delta_event import ResponseTextDeltaEv
 from agents.stream_events import RawResponsesStreamEvent
 
 from app.core.config import Settings
+from app.core.llm.ports import ChatStreamEvent
 from app.modules.assistant.agent.service import build_skill_registry
 from app.modules.assistant.agent.workflow.context_loader import WorkflowContext, WorkflowRuntimeBundle
-from app.modules.assistant.agent.workflow.orchestrator import WorkflowOrchestrator
-from app.modules.assistant.agent.workflow.schemas import (
-    ExecutionRecord,
-    WorkflowEvaluation,
-    WorkflowRouteDecision,
+from app.modules.assistant.agent.workflow.delegate import (
+    DELEGATE_TASK_NAME,
+    DelegationState,
+    build_delegate_task_tool,
 )
-from app.modules.assistant.skills.menu_import.response_schema import MenuImportUserResponse
+from app.modules.assistant.agent.workflow.orchestrator import WorkflowOrchestrator
+from app.modules.assistant.agent.workflow.schemas import ExecutionRecord, MAX_DELEGATIONS_PER_TURN
+from app.modules.assistant.agent.run_context import AssistantRunContext
+from app.modules.assistant.skills.context import AgentContext
 
 
-def _executor_route() -> WorkflowRouteDecision:
-    return WorkflowRouteDecision(
-        route="executor",
-        goal="Listar categorías del menú",
-        reason="El usuario pregunta por categorías del menú live.",
-    )
-
-
-def _responder_route() -> WorkflowRouteDecision:
-    return WorkflowRouteDecision(
-        route="responder",
-        goal="Saludo del usuario",
-        reason="Es un saludo sin necesidad de tools.",
-    )
-
-
-def _workflow_context(conversation_id: uuid.UUID | None = None) -> WorkflowContext:
+def _workflow_context(
+    conversation_id: uuid.UUID | None = None,
+    *,
+    menu_import_enabled: bool = False,
+) -> WorkflowContext:
     resolved_id = conversation_id or uuid.uuid4()
     return WorkflowContext(
         user_message="¿Qué categorías tengo?",
@@ -45,6 +37,7 @@ def _workflow_context(conversation_id: uuid.UUID | None = None) -> WorkflowConte
         system_prompt="You are the assistant.",
         conversation_history="(sin historial previo en esta conversación)",
         assistant_display_name="Luna",
+        menu_import_enabled=menu_import_enabled,
     )
 
 
@@ -58,16 +51,6 @@ def _runtime_bundle(conversation_id: uuid.UUID | None = None) -> WorkflowRuntime
         menu_import_registry=menu_import_registry,
         conversation_id=context.conversation_id,
     )
-
-
-def _run_result(final_output):
-    return type("RunResult", (), {"final_output": final_output, "new_items": []})()
-
-
-def _structured_result(model):
-    result = _run_result(model)
-    result.final_output_as = lambda cls, raise_if_incorrect_type=False: model  # noqa: ARG005
-    return result
 
 
 class FakeStreamedResult:
@@ -100,306 +83,6 @@ class FakeStreamedResult:
         raise AssertionError("No final output configured for streamed run")
 
 
-def test_workflow_orchestrator_runs_phases_in_order():
-    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
-    orchestrator = WorkflowOrchestrator(settings=settings, rollout_skill_ids=("menu_read",))
-    runtime = _runtime_bundle()
-
-    route = _executor_route()
-    execution = ExecutionRecord(summary="Hay 2 categorías: Tacos y Bebidas.", tools_used=["list_categories"])
-    evaluation = WorkflowEvaluation(ok=True, issues=[])
-
-    async def fake_run(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
-        name = getattr(agent, "name", "")
-        if name == "Evaluator":
-            return _structured_result(evaluation)
-        raise AssertionError(f"Unexpected agent run: {name!r}")
-
-    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
-        name = getattr(agent, "name", "")
-        if name == "Router":
-            return FakeStreamedResult(final_output=route)
-        if name == "Executor":
-            return FakeStreamedResult(final_output=execution)
-        if name == "Responder":
-            return FakeStreamedResult(text_delta="Tienes 2 categorías.")
-        raise AssertionError(f"Unexpected streamed agent run: {name!r}")
-
-    with (
-        patch(
-            "app.modules.assistant.agent.workflow.orchestrator.load_workflow_runtime",
-            return_value=runtime,
-        ),
-        patch(
-            "app.modules.assistant.agent.workflow.orchestrator.schedule_persist_turn",
-        ) as persist_mock,
-        patch("app.modules.assistant.agent.workflow.orchestrator.Runner.run", side_effect=fake_run),
-        patch(
-            "app.modules.assistant.agent.workflow.orchestrator.Runner.run_streamed",
-            side_effect=fake_run_streamed,
-        ),
-    ):
-        events = asyncio.run(_collect(orchestrator))
-
-    phases = [event.data["phase"] for event in events if event.event == "agent.phase"]
-    assert phases == ["context", "routing", "executing", "evaluating", "responding"]
-    assert not any(event.event == "agent.plan" for event in events)
-    thought_events = [event for event in events if event.event == "agent.thought"]
-    assert len(thought_events) == 1
-    assert thought_events[0].data["source"] == "router"
-    assert "menú live" in thought_events[0].data["text"]
-    assert events[-1].event == "message.complete"
-    assert events[-1].data["content"] == "Tienes 2 categorías."
-    persist_mock.assert_called_once()
-
-
-def test_workflow_orchestrator_retries_executor_when_evaluation_fails():
-    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
-    orchestrator = WorkflowOrchestrator(settings=settings, rollout_skill_ids=("menu_read",))
-    runtime = _runtime_bundle()
-
-    route = _executor_route()
-    failed_execution = ExecutionRecord(summary="No se encontró el producto.", tools_used=["search_products"])
-    passed_execution = ExecutionRecord(summary="Encontré el producto Clásica.", tools_used=["search_products"])
-    failed_eval = WorkflowEvaluation(ok=False, should_replan=True, issues=["Producto no encontrado"])
-    passed_eval = WorkflowEvaluation(ok=True, issues=[])
-
-    executor_calls = {"count": 0}
-    evaluator_calls = {"count": 0}
-
-    async def fake_run(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
-        name = getattr(agent, "name", "")
-        if name == "Evaluator":
-            evaluator_calls["count"] += 1
-            if evaluator_calls["count"] == 1:
-                return _structured_result(failed_eval)
-            return _structured_result(passed_eval)
-        raise AssertionError(f"Unexpected agent run: {name!r}")
-
-    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
-        name = getattr(agent, "name", "")
-        if name == "Router":
-            return FakeStreamedResult(final_output=route)
-        if name == "Executor":
-            executor_calls["count"] += 1
-            if executor_calls["count"] == 1:
-                return FakeStreamedResult(final_output=failed_execution)
-            return FakeStreamedResult(final_output=passed_execution)
-        if name == "Responder":
-            return FakeStreamedResult(text_delta="Encontré Clásica.")
-        raise AssertionError(f"Unexpected streamed agent run: {name!r}")
-
-    with (
-        patch(
-            "app.modules.assistant.agent.workflow.orchestrator.load_workflow_runtime",
-            return_value=runtime,
-        ),
-        patch("app.modules.assistant.agent.workflow.orchestrator.schedule_persist_turn"),
-        patch("app.modules.assistant.agent.workflow.orchestrator.Runner.run", side_effect=fake_run),
-        patch(
-            "app.modules.assistant.agent.workflow.orchestrator.Runner.run_streamed",
-            side_effect=fake_run_streamed,
-        ),
-    ):
-        events = asyncio.run(_collect(orchestrator))
-
-    phases = [event.data["phase"] for event in events if event.event == "agent.phase"]
-    assert phases.count("executing") == 2
-    assert phases.count("evaluating") == 2
-    assert executor_calls["count"] == 2
-
-
-def test_workflow_orchestrator_direct_route_skips_executor():
-    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
-    orchestrator = WorkflowOrchestrator(settings=settings, rollout_skill_ids=("menu_read",))
-    runtime = _runtime_bundle()
-
-    route = _responder_route()
-
-    async def fake_run(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
-        name = getattr(agent, "name", "")
-        raise AssertionError(f"Unexpected agent run in direct route: {name!r}")
-
-    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
-        name = getattr(agent, "name", "")
-        if name == "Router":
-            return FakeStreamedResult(final_output=route)
-        if name == "Responder":
-            return FakeStreamedResult(text_delta="¡Hola! ¿En qué te ayudo con tu menú?")
-        raise AssertionError(f"Unexpected streamed agent run in direct route: {name!r}")
-
-    with (
-        patch(
-            "app.modules.assistant.agent.workflow.orchestrator.load_workflow_runtime",
-            return_value=runtime,
-        ),
-        patch("app.modules.assistant.agent.workflow.orchestrator.schedule_persist_turn") as persist_mock,
-        patch("app.modules.assistant.agent.workflow.orchestrator.Runner.run", side_effect=fake_run),
-        patch(
-            "app.modules.assistant.agent.workflow.orchestrator.Runner.run_streamed",
-            side_effect=fake_run_streamed,
-        ),
-    ):
-        events = asyncio.run(_collect(orchestrator, message="Hola"))
-
-    phases = [event.data["phase"] for event in events if event.event == "agent.phase"]
-    assert phases == ["context", "routing", "responding"]
-    assert not any(event.event == "agent.evaluation" for event in events)
-    assert events[-1].event == "message.complete"
-    assert events[-1].data["content"] == "¡Hola! ¿En qué te ayudo con tu menú?"
-    persist_mock.assert_called_once()
-
-
-def test_workflow_orchestrator_menu_import_handoff_skips_executor():
-    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
-    orchestrator = WorkflowOrchestrator(settings=settings, rollout_skill_ids=("menu_read", "menu_import"))
-    context = _workflow_context()
-    context = WorkflowContext(
-        user_message=context.user_message,
-        restaurant_id=context.restaurant_id,
-        conversation_id=context.conversation_id,
-        effective_skill_ids=context.effective_skill_ids,
-        skill_catalog=context.skill_catalog,
-        system_prompt=context.system_prompt,
-        conversation_history=context.conversation_history,
-        assistant_display_name=context.assistant_display_name,
-        menu_import_enabled=True,
-        menu_source_attachment_count=1,
-    )
-    runtime = WorkflowRuntimeBundle(
-        context=context,
-        registry=build_skill_registry(["menu_read"]),
-        menu_import_registry=build_skill_registry(["menu_import"]),
-        conversation_id=context.conversation_id,
-    )
-
-    route = WorkflowRouteDecision(
-        route="menu_import",
-        goal="Importar menú completo desde PDF",
-        reason="El usuario subió un menú y quiere publicarlo completo.",
-    )
-    execution = ExecutionRecord(
-        status="success",
-        summary="OCR completado; sesión en fase de recolección.",
-    )
-
-    async def fake_run(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
-        raise AssertionError("Evaluator/Responder should not run for menu_import handoff")
-
-    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
-        name = getattr(agent, "name", "")
-        if name == "Router":
-            return FakeStreamedResult(final_output=route)
-        if name == "MenuImportExecutor":
-            return FakeStreamedResult(final_output=execution)
-        if name == "MenuImportResponder":
-            return FakeStreamedResult(
-                final_output=MenuImportUserResponse(
-                    message="Empezaré a importar tu menú.",
-                    questions=[],
-                ),
-            )
-        raise AssertionError(f"Unexpected streamed agent run: {name!r}")
-
-    with (
-        patch(
-            "app.modules.assistant.agent.workflow.orchestrator.load_workflow_runtime",
-            return_value=runtime,
-        ),
-        patch(
-            "app.modules.assistant.agent.workflow.orchestrator.schedule_persist_turn",
-        ) as persist_mock,
-        patch("app.modules.assistant.agent.workflow.orchestrator.Runner.run", side_effect=fake_run),
-        patch(
-            "app.modules.assistant.agent.workflow.orchestrator.Runner.run_streamed",
-            side_effect=fake_run_streamed,
-        ),
-    ):
-        events = asyncio.run(_collect(orchestrator, message="Importa este menú"))
-
-    phases = [event.data["phase"] for event in events if event.event == "agent.phase"]
-    assert phases == ["context", "routing", "executing", "responding"]
-    phase_labels = [
-        event.data.get("label")
-        for event in events
-        if event.event == "agent.phase" and event.data.get("phase") == "executing"
-    ]
-    assert phase_labels == ["Importando menú"]
-    assert not any(event.event == "agent.evaluation" for event in events)
-    assert events[-1].event == "message.complete"
-    assert events[-1].data["content"] == "Empezaré a importar tu menú."
-    persist_mock.assert_called_once()
-
-
-def test_workflow_orchestrator_menu_import_emits_quiz_event():
-    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
-    orchestrator = WorkflowOrchestrator(settings=settings, rollout_skill_ids=("menu_read", "menu_import"))
-    context = _workflow_context()
-    context = WorkflowContext(
-        user_message=context.user_message,
-        restaurant_id=context.restaurant_id,
-        conversation_id=context.conversation_id,
-        effective_skill_ids=context.effective_skill_ids,
-        skill_catalog=context.skill_catalog,
-        system_prompt=context.system_prompt,
-        conversation_history=context.conversation_history,
-        assistant_display_name=context.assistant_display_name,
-        menu_import_enabled=True,
-        menu_source_attachment_count=1,
-    )
-    runtime = WorkflowRuntimeBundle(
-        context=context,
-        registry=build_skill_registry(["menu_read"]),
-        menu_import_registry=build_skill_registry(["menu_import"]),
-        conversation_id=context.conversation_id,
-    )
-
-    route = WorkflowRouteDecision(
-        route="menu_import",
-        goal="Importar menú completo",
-        reason="Menú adjunto para importación.",
-    )
-    import_response = MenuImportUserResponse(
-        message="Menú importado y publicado correctamente.",
-        questions=[],
-    )
-    execution = ExecutionRecord(
-        status="success",
-        summary="OCR + apply completados; 12 productos publicados.",
-        notes=[],
-    )
-
-    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
-        name = getattr(agent, "name", "")
-        if name == "Router":
-            return FakeStreamedResult(final_output=route)
-        if name == "MenuImportExecutor":
-            return FakeStreamedResult(final_output=execution)
-        if name == "MenuImportResponder":
-            return FakeStreamedResult(final_output=import_response)
-        raise AssertionError(f"Unexpected streamed agent run: {name!r}")
-
-    with (
-        patch(
-            "app.modules.assistant.agent.workflow.orchestrator.load_workflow_runtime",
-            return_value=runtime,
-        ),
-        patch(
-            "app.modules.assistant.agent.workflow.orchestrator.schedule_persist_turn",
-        ),
-        patch(
-            "app.modules.assistant.agent.workflow.orchestrator.Runner.run_streamed",
-            side_effect=fake_run_streamed,
-        ),
-    ):
-        events = asyncio.run(_collect(orchestrator, message="Importa este menú"))
-
-    quiz_events = [event for event in events if event.event == "menu_import.quiz"]
-    assert len(quiz_events) == 0
-    assert events[-1].event == "message.complete"
-    assert events[-1].data["content"] == import_response.message
-
-
 async def _collect(orchestrator: WorkflowOrchestrator, message: str = "¿Qué categorías tengo?"):
     events = []
     async for event in orchestrator.stream_chat(
@@ -409,3 +92,234 @@ async def _collect(orchestrator: WorkflowOrchestrator, message: str = "¿Qué ca
     ):
         events.append(event)
     return events
+
+
+def test_workflow_orchestrator_reply_only():
+    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
+    orchestrator = WorkflowOrchestrator(settings=settings, rollout_skill_ids=("menu_read",))
+    runtime = _runtime_bundle()
+
+    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
+        name = getattr(agent, "name", "")
+        if name == "Orchestrator":
+            return FakeStreamedResult(text_delta="¡Hola! ¿En qué te ayudo con tu menú?")
+        raise AssertionError(f"Unexpected streamed agent run: {name!r}")
+
+    with (
+        patch(
+            "app.modules.assistant.agent.workflow.orchestrator.load_workflow_runtime",
+            return_value=runtime,
+        ),
+        patch(
+            "app.modules.assistant.agent.workflow.orchestrator.schedule_persist_turn",
+        ) as persist_mock,
+        patch(
+            "app.modules.assistant.agent.workflow.orchestrator.Runner.run_streamed",
+            side_effect=fake_run_streamed,
+        ),
+    ):
+        events = asyncio.run(_collect(orchestrator, message="Hola"))
+
+    phases = [event.data["phase"] for event in events if event.event == "agent.phase"]
+    assert phases == ["context", "orchestrating"]
+    assert not any(event.event == "agent.evaluation" for event in events)
+    assert events[-1].event == "message.complete"
+    assert events[-1].data["content"] == "¡Hola! ¿En qué te ayudo con tu menú?"
+    persist_mock.assert_called_once()
+
+
+def test_workflow_orchestrator_fallback_when_no_content():
+    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
+    orchestrator = WorkflowOrchestrator(settings=settings, rollout_skill_ids=("menu_read",))
+    runtime = _runtime_bundle()
+
+    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
+        return FakeStreamedResult()
+
+    with (
+        patch(
+            "app.modules.assistant.agent.workflow.orchestrator.load_workflow_runtime",
+            return_value=runtime,
+        ),
+        patch("app.modules.assistant.agent.workflow.orchestrator.schedule_persist_turn"),
+        patch(
+            "app.modules.assistant.agent.workflow.orchestrator.Runner.run_streamed",
+            side_effect=fake_run_streamed,
+        ),
+    ):
+        events = asyncio.run(_collect(orchestrator))
+
+    assert events[-1].event == "message.complete"
+    assert "No pude generar una respuesta" in events[-1].data["content"]
+
+
+def _run_context(registry, restaurant_id: uuid.UUID, conversation_id: uuid.UUID) -> AssistantRunContext:
+    return AssistantRunContext(
+        agent_ctx=AgentContext(
+            restaurant_id=restaurant_id,
+            conversation_id=conversation_id,
+            uow=MagicMock(),
+            effective_skill_ids=["menu_read"],
+        ),
+        registry=registry,
+    )
+
+
+def test_delegate_task_runs_restaurant_ops_subagent():
+    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
+    context = _workflow_context()
+    registry = build_skill_registry(["menu_read"])
+    execution = ExecutionRecord(summary="Hay 2 categorías: Tacos y Bebidas.", tools_used=["list_categories"])
+    side_events: list[ChatStreamEvent] = []
+
+    async def sink(event: ChatStreamEvent) -> None:
+        side_events.append(event)
+
+    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
+        name = getattr(agent, "name", "")
+        if name == "RestaurantOpsSubagent":
+            assert "Delegated task" in agent_input
+            return FakeStreamedResult(final_output=execution)
+        raise AssertionError(f"Unexpected agent: {name!r}")
+
+    tool = build_delegate_task_tool(
+        settings=settings,
+        workflow_context=context,
+        registry=registry,
+        menu_import_registry=None,
+        uow=MagicMock(),
+        restaurant_id=context.restaurant_id,
+        ops_run_context=_run_context(registry, context.restaurant_id, context.conversation_id),
+        menu_run_context=None,
+        delegation_state=DelegationState(),
+        event_sink=sink,
+    )
+
+    with patch(
+        "app.modules.assistant.agent.workflow.delegate.Runner.run_streamed",
+        side_effect=fake_run_streamed,
+    ):
+        result = asyncio.run(
+            tool.on_invoke_tool(
+                MagicMock(),
+                json.dumps(
+                    {
+                        "subagent": "restaurant_ops_subagent",
+                        "task": "Listar categorías del menú",
+                    }
+                ),
+            )
+        )
+
+    payload = json.loads(result)
+    assert payload["ok"] is True
+    assert "Tacos" in payload["execution"]["summary"]
+    assert any(event.event == "agent.phase" and event.data["phase"] == "executing" for event in side_events)
+
+
+def test_delegate_task_rejects_over_limit():
+    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
+    context = _workflow_context()
+    registry = build_skill_registry(["menu_read"])
+    state = DelegationState()
+    state.count = MAX_DELEGATIONS_PER_TURN
+
+    tool = build_delegate_task_tool(
+        settings=settings,
+        workflow_context=context,
+        registry=registry,
+        menu_import_registry=None,
+        uow=MagicMock(),
+        restaurant_id=context.restaurant_id,
+        ops_run_context=_run_context(registry, context.restaurant_id, context.conversation_id),
+        menu_run_context=None,
+        delegation_state=state,
+    )
+
+    result = asyncio.run(
+        tool.on_invoke_tool(
+            MagicMock(),
+            json.dumps({"subagent": "restaurant_ops_subagent", "task": "Otra cosa"}),
+        )
+    )
+    payload = json.loads(result)
+    assert payload["ok"] is False
+    assert "limit" in payload["summary"].lower() or "Delegation limit" in payload["summary"]
+
+
+def test_delegate_task_menu_unavailable():
+    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
+    context = _workflow_context(menu_import_enabled=False)
+    registry = build_skill_registry(["menu_read"])
+
+    tool = build_delegate_task_tool(
+        settings=settings,
+        workflow_context=context,
+        registry=registry,
+        menu_import_registry=None,
+        uow=MagicMock(),
+        restaurant_id=context.restaurant_id,
+        ops_run_context=_run_context(registry, context.restaurant_id, context.conversation_id),
+        menu_run_context=None,
+        delegation_state=DelegationState(),
+    )
+
+    result = asyncio.run(
+        tool.on_invoke_tool(
+            MagicMock(),
+            json.dumps({"subagent": "menu_subagent", "task": "Importar menú"}),
+        )
+    )
+    payload = json.loads(result)
+    assert payload["ok"] is False
+    assert "not available" in payload["summary"].lower()
+
+
+def test_delegate_task_runs_menu_subagent():
+    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
+    context = _workflow_context(menu_import_enabled=True)
+    registry = build_skill_registry(["menu_read"])
+    menu_registry = build_skill_registry(["menu_import"])
+    execution = ExecutionRecord(summary="OCR completado; sesión en recolección.")
+    state = DelegationState()
+
+    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
+        name = getattr(agent, "name", "")
+        if name == "MenuSubagent":
+            return FakeStreamedResult(final_output=execution)
+        raise AssertionError(f"Unexpected agent: {name!r}")
+
+    tool = build_delegate_task_tool(
+        settings=settings,
+        workflow_context=context,
+        registry=registry,
+        menu_import_registry=menu_registry,
+        uow=MagicMock(),
+        restaurant_id=context.restaurant_id,
+        ops_run_context=_run_context(registry, context.restaurant_id, context.conversation_id),
+        menu_run_context=_run_context(menu_registry, context.restaurant_id, context.conversation_id),
+        delegation_state=state,
+    )
+
+    with (
+        patch(
+            "app.modules.assistant.agent.workflow.delegate.Runner.run_streamed",
+            side_effect=fake_run_streamed,
+        ),
+        patch(
+            "app.modules.assistant.agent.workflow.delegate.get_active_import_for_conversation",
+            return_value=None,
+        ),
+    ):
+        result = asyncio.run(
+            tool.on_invoke_tool(
+                MagicMock(),
+                json.dumps({"subagent": "menu_subagent", "task": "Importar menú desde PDF"}),
+            )
+        )
+
+    payload = json.loads(result)
+    assert payload["ok"] is True
+    assert state.used_menu_subagent is True
+    assert "OCR" in payload["execution"]["summary"]
+    assert tool.name == DELEGATE_TASK_NAME

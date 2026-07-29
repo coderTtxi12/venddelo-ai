@@ -3,12 +3,9 @@ from app.modules.assistant.agent.tools import build_executor_function_tools, bui
 from app.modules.assistant.agent.workflow.schemas import ExecutionRecord
 from app.modules.assistant.skills import build_skill_registry
 from app.modules.assistant.skills.menu_import.onboarding_agent import (
-    MENU_IMPORT_EXECUTOR_NAME,
-    MENU_IMPORT_RESPONDER_NAME,
-    build_menu_import_executor_agent,
-    build_menu_import_responder_agent,
+    MENU_SUBAGENT_NAME,
+    build_menu_subagent,
 )
-from app.modules.assistant.skills.menu_import.response_schema import MenuImportUserResponse
 from app.modules.assistant.skills.menu_import.tools import (
     MENU_IMPORT_INTERNAL_TOOL_NAMES,
     MenuImportSkill,
@@ -38,21 +35,14 @@ def test_executor_excludes_menu_import_tools():
     assert "list_products" in names
 
 
-def test_menu_import_executor_has_granular_tools():
+def test_menu_subagent_has_granular_tools():
     registry = build_skill_registry()
-    agent = build_menu_import_executor_agent(settings=Settings(), registry=registry)
-    assert agent.name == MENU_IMPORT_EXECUTOR_NAME
+    agent = build_menu_subagent(settings=Settings(), registry=registry)
+    assert agent.name == MENU_SUBAGENT_NAME
     assert agent.output_type is ExecutionRecord
     tools = build_menu_import_internal_tools(registry)
     names = {tool.name for tool in tools}
     assert names == MENU_IMPORT_INTERNAL_TOOL_NAMES
-
-
-def test_menu_import_responder_has_no_tools():
-    agent = build_menu_import_responder_agent(settings=Settings())
-    assert agent.name == MENU_IMPORT_RESPONDER_NAME
-    assert agent.output_type is MenuImportUserResponse
-    assert agent.tools == []
 
 
 def test_pending_source_files_skips_already_extracted():

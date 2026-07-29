@@ -1,4 +1,4 @@
-"""Structured contracts between router, executor, evaluator, and responder agents."""
+"""Structured contracts between orchestrator and subagents."""
 
 from __future__ import annotations
 
@@ -6,43 +6,15 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-RouteTarget = Literal["executor", "responder", "menu_import"]
-
-
-class WorkflowRouteDecision(BaseModel):
-    route: RouteTarget = Field(
-        description=(
-            "executor = needs tools/data; responder = answer from conversation only; "
-            "menu_import = full menu onboarding from uploaded documents"
-        ),
-    )
-    goal: str = Field(min_length=1, description="User intent in one line (Spanish)")
-    reason: str = Field(
-        default="",
-        description="Brief reason for this routing choice (Spanish)",
-    )
-
-    @property
-    def is_direct(self) -> bool:
-        return self.route == "responder"
-
-    @property
-    def is_menu_import(self) -> bool:
-        return self.route == "menu_import"
-
-
-class WorkflowEvaluation(BaseModel):
-    ok: bool
-    issues: list[str] = Field(default_factory=list)
-    should_replan: bool = False
-    user_facing_hint: str | None = Field(
-        default=None,
-        description="Optional hint for the responder when ok=false but no replan",
-    )
-
-
 ExecutionStatus = Literal["success", "partial_success", "failed"]
 ExecutedStepStatus = Literal["success", "failed", "skipped"]
+
+DelegateSubagent = Literal["restaurant_ops_subagent", "menu_subagent"]
+
+MAX_DELEGATIONS_PER_TURN = 3
+ORCHESTRATOR_MAX_TURNS = 8
+RESTAURANT_OPS_MAX_TURNS = 12
+MENU_SUBAGENT_MAX_TURNS = 16
 
 
 class ExecutedStep(BaseModel):
@@ -57,7 +29,7 @@ class ExecutedStep(BaseModel):
 
 
 class ExecutionRecord(BaseModel):
-    """Structured output from the executor agent after running tools."""
+    """Structured output from a subagent after running tools."""
 
     status: ExecutionStatus = Field(
         default="success",
@@ -78,7 +50,7 @@ class ExecutionRecord(BaseModel):
     )
     notes: list[str] = Field(
         default_factory=list,
-        description="Extra internal notes for evaluator/responder",
+        description="Extra internal notes for the orchestrator",
     )
     tools_used: list[str] = Field(
         default_factory=list,
@@ -87,7 +59,7 @@ class ExecutionRecord(BaseModel):
 
 
 def clear_execution_approval_gates(execution: ExecutionRecord) -> ExecutionRecord:
-    """Owner approval is disabled — mutations run when the executor calls tools."""
+    """Owner approval is disabled — mutations run when the subagent calls tools."""
     return execution.model_copy(
         update={
             "requires_user_approval": False,
@@ -97,27 +69,9 @@ def clear_execution_approval_gates(execution: ExecutionRecord) -> ExecutionRecor
 
 
 def execution_needs_user_clarification(execution: ExecutionRecord) -> bool:
-    """Executor stopped for missing owner input — another tool pass will not help."""
+    """Subagent stopped for missing owner input — another tool pass will not help."""
     if not execution.notes:
         return False
     if execution.executed_steps or execution.tools_used:
         return False
     return True
-
-
-def adjust_evaluation_for_execution(
-    evaluation: WorkflowEvaluation,
-    execution: ExecutionRecord,
-) -> WorkflowEvaluation:
-    if not execution_needs_user_clarification(execution):
-        return evaluation
-    hint = evaluation.user_facing_hint
-    if not hint and execution.notes:
-        hint = execution.notes[0]
-    return evaluation.model_copy(
-        update={
-            "ok": False,
-            "should_replan": False,
-            "user_facing_hint": hint,
-        }
-    )

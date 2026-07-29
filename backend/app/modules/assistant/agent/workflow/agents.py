@@ -2,46 +2,46 @@
 
 from __future__ import annotations
 
-from agents import Agent
+from agents import Agent, FunctionTool
 
 from app.core.config import Settings
 from app.modules.assistant.agent.model_settings import build_assistant_model_settings
 from app.modules.assistant.agent.run_context import AssistantRunContext
 from app.modules.assistant.agent.tools import build_executor_function_tools
 from app.modules.assistant.agent.workflow.prompts import (
-    EVALUATOR_INSTRUCTIONS,
-    EXECUTOR_INSTRUCTIONS,
-    RESPONDER_INSTRUCTIONS,
-    ROUTER_INSTRUCTIONS,
+    ORCHESTRATOR_INSTRUCTIONS,
+    RESTAURANT_OPS_SUBAGENT_INSTRUCTIONS,
 )
-from app.modules.assistant.agent.workflow.schemas import (
-    ExecutionRecord,
-    WorkflowEvaluation,
-    WorkflowRouteDecision,
-)
+from app.modules.assistant.agent.workflow.schemas import ExecutionRecord
 from app.modules.assistant.skills.registry import SkillRegistry
 
+ORCHESTRATOR_NAME = "Orchestrator"
+RESTAURANT_OPS_SUBAGENT_NAME = "RestaurantOpsSubagent"
 
-def build_router_agent(*, settings: Settings) -> Agent[AssistantRunContext]:
+
+def build_orchestrator_agent(
+    *,
+    settings: Settings,
+    tools: list[FunctionTool],
+) -> Agent[AssistantRunContext]:
     return Agent[AssistantRunContext](
-        name="Router",
-        instructions=ROUTER_INSTRUCTIONS,
-        tools=[],
+        name=ORCHESTRATOR_NAME,
+        instructions=ORCHESTRATOR_INSTRUCTIONS,
+        tools=tools,
         model=settings.openai_model,
         model_settings=build_assistant_model_settings(settings),
-        output_type=WorkflowRouteDecision,
     )
 
 
-def build_executor_agent(
+def build_restaurant_ops_subagent(
     *,
     settings: Settings,
     registry: SkillRegistry,
     effective_skill_ids: list[str],
 ) -> Agent[AssistantRunContext]:
     return Agent[AssistantRunContext](
-        name="Executor",
-        instructions=EXECUTOR_INSTRUCTIONS,
+        name=RESTAURANT_OPS_SUBAGENT_NAME,
+        instructions=RESTAURANT_OPS_SUBAGENT_INSTRUCTIONS,
         tools=build_executor_function_tools(registry, effective_skill_ids, settings=settings),
         model=settings.openai_model,
         model_settings=build_assistant_model_settings(settings),
@@ -49,22 +49,5 @@ def build_executor_agent(
     )
 
 
-def build_evaluator_agent(*, settings: Settings) -> Agent[AssistantRunContext]:
-    return Agent[AssistantRunContext](
-        name="Evaluator",
-        instructions=EVALUATOR_INSTRUCTIONS,
-        tools=[],
-        model=settings.openai_model,
-        model_settings=build_assistant_model_settings(settings),
-        output_type=WorkflowEvaluation,
-    )
-
-
-def build_responder_agent(*, settings: Settings) -> Agent[AssistantRunContext]:
-    return Agent[AssistantRunContext](
-        name="Responder",
-        instructions=RESPONDER_INSTRUCTIONS,
-        tools=[],
-        model=settings.openai_model,
-        model_settings=build_assistant_model_settings(settings),
-    )
+# Back-compat alias.
+build_executor_agent = build_restaurant_ops_subagent

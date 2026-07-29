@@ -13,14 +13,12 @@ End-to-end **menu import** for restaurant owners — OCR and publish in one step
 - First-time setup of categories, products, complements, and promotions.
 - Owner uploads PDF, DOCX, or menu photos via chat attachments (`menu_source` only).
 
-## Main workflow entry (agent-as-tool)
+## Main workflow entry
 
-The **main assistant executor** calls a single tool:
+The **Orchestrator** calls `delegate_task` with `subagent=menu_subagent`.
 
-- **`run_menu_import_onboarding`** — sub-agent pair: **MenuImportExecutor** (tools) +
-  **MenuImportResponder** (owner-facing JSON), Postgres session memory.
-
-Granular `menu_import` tools are **internal** to that sub-agent, not exposed on the main executor.
+- **`menu_subagent`** — tools + `ExecutionRecord` summary; the Orchestrator writes the owner-facing reply.
+- Granular `menu_import` tools are **internal** to that subagent, not exposed on `restaurant_ops_subagent`.
 
 ## Required skills at start
 

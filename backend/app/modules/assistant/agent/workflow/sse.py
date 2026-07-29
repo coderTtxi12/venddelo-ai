@@ -3,35 +3,21 @@
 from __future__ import annotations
 
 from app.core.llm.ports import ChatStreamEvent
-from app.modules.assistant.agent.workflow.schemas import WorkflowEvaluation
 from app.modules.assistant.skills.menu_import.response_schema import MenuImportQuizQuestion
 
 PHASE_LABELS: dict[str, str] = {
     "context": "Preparando contexto",
-    "routing": "Analizando solicitud",
+    "orchestrating": "Pensando y respondiendo",
     "executing": "Investigando y ejecutando",
-    "evaluating": "Evaluando resultados",
-    "responding": "Redactando respuesta",
 }
 
 
-def phase_event(phase: str) -> ChatStreamEvent:
+def phase_event(phase: str, *, label: str | None = None) -> ChatStreamEvent:
     return ChatStreamEvent(
         event="agent.phase",
         data={
             "phase": phase,
-            "label": PHASE_LABELS.get(phase, phase),
-        },
-    )
-
-
-def evaluation_event(evaluation: WorkflowEvaluation) -> ChatStreamEvent:
-    return ChatStreamEvent(
-        event="agent.evaluation",
-        data={
-            "ok": evaluation.ok,
-            "should_replan": evaluation.should_replan,
-            "issues": evaluation.issues,
+            "label": label or PHASE_LABELS.get(phase, phase),
         },
     )
 
@@ -72,7 +58,7 @@ def agent_thought_event(
     *,
     text: str | None = None,
     delta: str | None = None,
-    source: str = "router",
+    source: str = "orchestrator",
 ) -> ChatStreamEvent:
     data: dict[str, object] = {"source": source}
     if text:
@@ -85,5 +71,7 @@ def agent_thought_event(
 def menu_import_quiz_event(questions: list[MenuImportQuizQuestion]) -> ChatStreamEvent:
     return ChatStreamEvent(
         event="menu_import.quiz",
-        data={"questions": [question.model_dump() for question in questions]},
+        data={
+            "questions": [question.model_dump() for question in questions],
+        },
     )
