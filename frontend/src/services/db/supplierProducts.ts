@@ -249,6 +249,24 @@ function groupMetaChanged(
   );
 }
 
+/** Active-item order changes for persisted items (label/price unchanged). */
+export function collectOptionItemSortUpdates(
+  activeItems: Array<{ id: string }>,
+  existingActiveItems: Array<{ id: string }>,
+): Array<{ itemId: string; sort_index: number }> {
+  const existingIndexById = new Map(
+    existingActiveItems.map((item, index) => [item.id, index]),
+  );
+  const updates: Array<{ itemId: string; sort_index: number }> = [];
+  for (const [index, item] of activeItems.entries()) {
+    const existingIndex = existingIndexById.get(item.id);
+    if (existingIndex !== undefined && existingIndex !== index) {
+      updates.push({ itemId: item.id, sort_index: index });
+    }
+  }
+  return updates;
+}
+
 function itemPayloadMatches(
   label: string,
   priceDeltaCents: number,
@@ -266,9 +284,14 @@ async function syncGroupItems(
   existing: OptionGroupDraft,
 ): Promise<OptionGroupDraft> {
   const activeItems = group.items.filter((item) => item.isActive);
+  const existingActiveItems = existing.items.filter((item) => item.isActive);
   const keptPersistedIds = new Set<string>();
   const deleteIds: string[] = [];
-  const pendingUpdates: Array<{ itemId: string; body: OptionItemUpdateInput }> = [];
+  const pendingUpdatesById = new Map<string, OptionItemUpdateInput>();
+
+  const queueItemUpdate = (itemId: string, body: OptionItemUpdateInput) => {
+    pendingUpdatesById.set(itemId, { ...pendingUpdatesById.get(itemId), ...body });
+  };
 
   for (const existingItem of existing.items) {
     const draftItem = group.items.find((item) => item.id === existingItem.id);
@@ -281,13 +304,13 @@ async function syncGroupItems(
 
     if (!draftItem.isActive) {
       if (existingItem.isActive) {
-        pendingUpdates.push({ itemId: existingItem.id, body: { is_active: false } });
+        queueItemUpdate(existingItem.id, { is_active: false });
       }
       continue;
     }
 
     if (!existingItem.isActive) {
-      pendingUpdates.push({ itemId: existingItem.id, body: { is_active: true } });
+      queueItemUpdate(existingItem.id, { is_active: true });
     }
 
     if (itemPayloadMatches(draftItem.label, priceDeltaCents, existingItem)) {
@@ -297,6 +320,17 @@ async function syncGroupItems(
 
     deleteIds.push(existingItem.id);
   }
+
+  for (const { itemId, sort_index } of collectOptionItemSortUpdates(activeItems, existingActiveItems)) {
+    if (keptPersistedIds.has(itemId)) {
+      queueItemUpdate(itemId, { sort_index });
+    }
+  }
+
+  const pendingUpdates = [...pendingUpdatesById.entries()].map(([itemId, body]) => ({
+    itemId,
+    body,
+  }));
 
   type PendingCreate = { label: string; price_delta_cents: number; sort_index: number; draftIndex: number };
   const pendingCreates: PendingCreate[] = [];
