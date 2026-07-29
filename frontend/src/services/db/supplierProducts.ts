@@ -234,9 +234,10 @@ function groupMetaChanged(
   group: OptionGroupDraft,
   existing: OptionGroupDraft,
   sortIndex: number,
+  existingSortIndex: number,
 ): boolean {
   const next = mapOptionGroupToUpdate(group, sortIndex);
-  const prev = mapOptionGroupToUpdate(existing, sortIndex);
+  const prev = mapOptionGroupToUpdate(existing, existingSortIndex);
   return (
     next.title !== prev.title ||
     next.required !== prev.required ||
@@ -367,6 +368,9 @@ async function syncProductOptionGroups(
   groups: OptionGroupDraft[],
 ): Promise<OptionGroupDraft[]> {
   const existingById = new Map(existingGroups.map((group) => [group.id, group]));
+  const existingSortIndexById = new Map(
+    existingGroups.map((group, index) => [group.id, index]),
+  );
   const payloadPersistedIds = new Set(
     groups.filter((group) => isPersistedId(group.id)).map((group) => group.id),
   );
@@ -385,7 +389,8 @@ async function syncProductOptionGroups(
     groups.map(async (group, index) => {
       if (isPersistedId(group.id) && existingById.has(group.id)) {
         const existing = existingById.get(group.id)!;
-        if (groupMetaChanged(group, existing, index)) {
+        const existingSortIndex = existingSortIndexById.get(group.id) ?? index;
+        if (groupMetaChanged(group, existing, index, existingSortIndex)) {
           await updateOptionGroup(
             accessToken,
             restaurantId,
