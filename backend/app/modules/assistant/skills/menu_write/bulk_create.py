@@ -132,7 +132,10 @@ def _parse_row_option_groups(raw: Any) -> tuple[list[OptionGroupCreate], str | N
         title = _optional_str(entry.get("title"))
         if not title:
             return [], "Each option group requires a title"
-        nested_items, nested_err = _parse_nested_option_items(entry.get("items"))
+        try:
+            nested_items, nested_err = _parse_nested_option_items(entry.get("items"))
+        except (TypeError, ValueError) as exc:
+            return [], str(exc)
         if nested_err:
             return [], nested_err
         selection = str(entry.get("selection") or "single")
