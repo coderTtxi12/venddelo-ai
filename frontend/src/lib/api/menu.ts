@@ -93,6 +93,17 @@ export function deleteCategory(
   );
 }
 
+export function permanentlyDeleteCategory(
+  token: string,
+  restaurantId: string,
+  categoryId: string,
+) {
+  return apiRequest<void>(
+    `/restaurants/${restaurantId}/categories/${categoryId}/permanent`,
+    { method: 'DELETE', token },
+  );
+}
+
 export function setCategoryProductOrder(
   token: string,
   restaurantId: string,
@@ -162,6 +173,32 @@ export function deleteProduct(
   return apiRequest<void>(
     `/restaurants/${restaurantId}/products/${productId}`,
     { method: 'DELETE', token },
+  );
+}
+
+export function permanentlyDeleteProduct(
+  token: string,
+  restaurantId: string,
+  productId: string,
+) {
+  return apiRequest<void>(
+    `/restaurants/${restaurantId}/products/${productId}/permanent`,
+    { method: 'DELETE', token },
+  );
+}
+
+export function permanentlyDeleteProductsBulk(
+  token: string,
+  restaurantId: string,
+  productIds: string[],
+) {
+  return apiRequest<void>(
+    `/restaurants/${restaurantId}/products/permanent-bulk`,
+    {
+      method: 'POST',
+      token,
+      body: { product_ids: productIds },
+    },
   );
 }
 

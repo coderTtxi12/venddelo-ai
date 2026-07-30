@@ -4,7 +4,8 @@ import {
   createProduct,
   deleteOptionGroup,
   deleteOptionItem,
-  deleteProduct,
+  permanentlyDeleteProduct,
+  permanentlyDeleteProductsBulk,
   getProduct,
   listProducts,
   updateOptionGroup,
@@ -29,6 +30,7 @@ import type { ProductVisibilityState } from '@/lib/menu/productVisibility';
 import { visibilityUpdateForState } from '@/lib/menu/productVisibility';
 import type { LegacyDbClient, LegacyStorageClient } from '../legacyDb';
 import type {
+  Id,
   ImageDraft,
   MoneyUSD,
   OptionGroupDraft,
@@ -595,7 +597,16 @@ export async function deleteSupplierProduct(
   restaurantId: string,
   productId: string,
 ): Promise<void> {
-  await deleteProduct(accessToken, restaurantId, productId);
+  await permanentlyDeleteProduct(accessToken, restaurantId, productId);
+}
+
+export async function deleteSupplierProducts(
+  accessToken: string,
+  _db: LegacyDbClient,
+  restaurantId: string,
+  productIds: Id[],
+): Promise<void> {
+  await permanentlyDeleteProductsBulk(accessToken, restaurantId, productIds);
 }
 
 export async function updateSupplierProductActive(

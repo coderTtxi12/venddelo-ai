@@ -45,6 +45,7 @@ export {
   normalizeOptionGroups,
   saveSupplierProduct,
   deleteSupplierProduct,
+  deleteSupplierProducts,
   updateSupplierProductActive,
   updateSupplierProductVisibility,
   updateSupplierProductReviewStatus,
