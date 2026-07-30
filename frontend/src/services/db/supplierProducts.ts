@@ -4,6 +4,7 @@ import {
   createProduct,
   deleteOptionGroup,
   deleteOptionItem,
+  deleteProduct,
   getProduct,
   listProducts,
   updateOptionGroup,
@@ -586,6 +587,15 @@ export async function updateSupplierProductVisibility(
 ): Promise<void> {
   const patch = visibilityUpdateForState(state);
   await updateProduct(accessToken, restaurantId, productId, patch);
+}
+
+export async function deleteSupplierProduct(
+  accessToken: string,
+  _db: LegacyDbClient,
+  restaurantId: string,
+  productId: string,
+): Promise<void> {
+  await deleteProduct(accessToken, restaurantId, productId);
 }
 
 export async function updateSupplierProductActive(

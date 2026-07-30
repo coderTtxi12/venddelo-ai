@@ -82,6 +82,17 @@ export function updateCategory(
   );
 }
 
+export function deleteCategory(
+  token: string,
+  restaurantId: string,
+  categoryId: string,
+) {
+  return apiRequest<void>(
+    `/restaurants/${restaurantId}/categories/${categoryId}`,
+    { method: 'DELETE', token },
+  );
+}
+
 export function setCategoryProductOrder(
   token: string,
   restaurantId: string,
@@ -140,6 +151,17 @@ export function updateProduct(
   return apiRequest<Product>(
     `/restaurants/${restaurantId}/products/${productId}`,
     { method: 'PATCH', token, body: data },
+  );
+}
+
+export function deleteProduct(
+  token: string,
+  restaurantId: string,
+  productId: string,
+) {
+  return apiRequest<void>(
+    `/restaurants/${restaurantId}/products/${productId}`,
+    { method: 'DELETE', token },
   );
 }
 

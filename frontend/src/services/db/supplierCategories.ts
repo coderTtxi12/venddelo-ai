@@ -1,4 +1,4 @@
-import { createCategory, listCategories, updateCategory } from '@/lib/api/menu';
+import { createCategory, deleteCategory, listCategories, updateCategory } from '@/lib/api/menu';
 import { fetchAllPages } from '@/lib/api/pagination';
 import { mapCategoryToDraft } from '@/lib/api/mappers';
 import { resolveImagePathForUpload } from '@/lib/storage/resolveImagePath';
@@ -113,4 +113,13 @@ export async function updateSupplierCategoryActive(
   isActive: boolean,
 ): Promise<void> {
   await updateCategory(accessToken, restaurantId, categoryId, { is_active: isActive });
+}
+
+export async function deleteSupplierCategory(
+  accessToken: string,
+  _db: LegacyDbClient,
+  restaurantId: string,
+  categoryId: string,
+): Promise<void> {
+  await deleteCategory(accessToken, restaurantId, categoryId);
 }
