@@ -231,7 +231,9 @@
  .tableWrap {
    border: 1px solid var(--color-border);
    border-radius: 16px;
-   overflow: hidden;
+   overflow-x: auto;
+   overflow-y: hidden;
+   -webkit-overflow-scrolling: touch;
    background: var(--color-surface);
    position: relative;
  }
@@ -277,15 +279,73 @@
   text-align: right;
 }
 
+.selectHead {
+  width: 2.75rem;
+  text-align: center;
+}
+
+.selectCell {
+  width: 2.75rem;
+  text-align: center;
+}
+
+.selectCheckbox {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.rowSelected td {
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+}
+
+.selectionBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+}
+
+.selectionCount {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.selectionActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .actionsCell {
   text-align: right;
   white-space: nowrap;
 }
 
-.actionsCell .dangerGhostBtn {
+.catalogDeleteBtn {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  justify-content: center;
+  gap: 0.35rem;
+  touch-action: manipulation;
+  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.catalogDeleteBtn:hover:not(:disabled) {
+  background: rgba(185, 28, 28, 0.08);
+  border-color: rgba(185, 28, 28, 0.28);
+}
+
+.catalogDeleteBtn:focus-visible {
+  outline: 2px solid #b91c1c;
+  outline-offset: 2px;
 }
 
 .thFilterColumn {
@@ -628,18 +688,8 @@
 }
 
 .actionsCell {
-   text-align: right;
-   white-space: nowrap;
- }
-
-.productRowActions {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.4rem;
-  max-width: 22rem;
-  margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
 }
  
  .productCell {
@@ -2182,12 +2232,28 @@
 
   .cardActions {
     justify-content: stretch;
+    gap: 0.5rem;
   }
 
   .cardActions .secondaryBtn,
   .cardActions .dangerGhostBtn {
     flex: 1;
     min-height: 44px;
+  }
+
+  .cardActions .catalogDeleteBtn {
+    flex: 1 1 100%;
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid rgba(185, 28, 28, 0.28);
+    background: rgba(254, 242, 242, 0.9);
+    border-radius: 12px;
+    font-weight: 800;
+  }
+
+  .cardActions .catalogDeleteBtn:hover:not(:disabled) {
+    background: rgba(254, 226, 226, 0.95);
+    border-color: rgba(185, 28, 28, 0.4);
   }
 
   .mobileTableControls {
@@ -2229,6 +2295,16 @@
     order: 1;
   }
 
+  .selectCell {
+    order: 0;
+    display: flex !important;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.5rem 0.85rem !important;
+  }
+
   .statusCell {
     order: 2;
   }
@@ -2250,7 +2326,39 @@
   }
 
   .actionsCell {
-    order: 7;
+    order: 8;
+    display: flex !important;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding: 0.85rem !important;
+    white-space: normal;
+    text-align: left;
+    background: rgba(254, 242, 242, 0.72);
+    border-bottom: none;
+  }
+
+  .actionsCell::before {
+    margin-bottom: 0;
+    font-size: 0.72rem;
+    color: #991b1b;
+  }
+
+  .actionsCell .catalogDeleteBtn {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid rgba(185, 28, 28, 0.28);
+    background: var(--color-surface);
+    border-radius: 12px;
+    font-weight: 800;
+  }
+
+  .actionsCell .catalogDeleteBtn:hover:not(:disabled) {
+    background: rgba(254, 226, 226, 0.95);
+  }
+
+  .actionsCell .catalogDeleteBtn:active:not(:disabled) {
+    background: rgba(254, 202, 202, 0.95);
   }
 
   .table tr.rowHover:hover td {
@@ -2466,9 +2574,60 @@
   }
 }
 
+@media (max-width: 640px) {
+  .selectionBar {
+    position: sticky;
+    bottom: 0.75rem;
+    z-index: 5;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .selectionActions {
+    flex-direction: column;
+  }
+
+  .selectionActions .dangerGhostBtn,
+  .selectionActions .ghostBtn {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .selectCheckbox {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+}
+
 @media (min-width: 768px) and (max-width: 1023px) {
   .headerActions .primaryBtn {
     white-space: nowrap;
+  }
+
+  .cardActions {
+    gap: 0.5rem;
+  }
+
+  .cardActions .secondaryBtn,
+  .cardActions .dangerGhostBtn,
+  .cardActions .catalogDeleteBtn {
+    min-height: 44px;
+  }
+
+  .cardActions .catalogDeleteBtn {
+    padding-inline: 0.9rem;
+    border: 1px solid rgba(185, 28, 28, 0.22);
+    background: rgba(254, 242, 242, 0.75);
+  }
+
+  .actionsHead {
+    min-width: 8.25rem;
+  }
+
+  .actionsCell .catalogDeleteBtn {
+    min-height: 40px;
+    padding-inline: 0.75rem;
   }
 }
 
@@ -2480,7 +2639,8 @@
 @media (prefers-reduced-motion: reduce) {
   .tab,
   .primaryBtn,
-  .mobileControlBtn {
+  .mobileControlBtn,
+  .catalogDeleteBtn {
     transition: none;
   }
 

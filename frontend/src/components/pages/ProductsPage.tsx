@@ -40,6 +40,7 @@ import {
   CATEGORIES_PAGE_SIZE,
   deleteSupplierCategory,
   deleteSupplierProduct,
+  deleteSupplierProducts,
   fetchAllSupplierCategories,
   normalizeOptionGroups,
   PRODUCTS_PAGE_SIZE,
@@ -346,7 +347,8 @@ function CatalogLoadingState({
 export default function ProductsPage() {
   type PendingDelete =
     | { kind: 'category'; id: Id; name: string; linkedProductCount: number }
-    | { kind: 'product'; id: Id; name: string };
+    | { kind: 'product'; id: Id; name: string }
+    | { kind: 'products'; ids: Id[] };
   type DeleteError = {
     tab: 'categories' | 'products';
     message: string;
@@ -398,10 +400,13 @@ export default function ProductsPage() {
   const [deleteError, setDeleteError] = useState<DeleteError | null>(null);
   const [productsPage, setProductsPage] = useState(1);
   const [productsTotalCount, setProductsTotalCount] = useState(0);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<Id>>(() => new Set());
   const catalogPromotionsRef = useRef<Promotion[] | null>(null);
   const productsPageCacheRef = useRef<Map<number, ProductDraft[]>>(new Map());
   const productsPageCursorsRef = useRef<(string | null)[]>([null]);
   const productsFilterCatalogRef = useRef<ProductDraft[] | null>(null);
+  /** Catalog loaded only to count linked products for category delete — must NOT enable client pagination. */
+  const categoryDeleteCountCatalogRef = useRef<ProductDraft[] | null>(null);
   const [productsFilterCatalogVersion, setProductsFilterCatalogVersion] = useState(0);
   const productsLoadRequestRef = useRef(0);
 
@@ -411,6 +416,7 @@ export default function ProductsPage() {
 
   const invalidateProductsFilterCatalog = useCallback(() => {
     productsFilterCatalogRef.current = null;
+    categoryDeleteCountCatalogRef.current = null;
     setProductsFilterCatalogVersion((version) => version + 1);
   }, []);
 
@@ -423,6 +429,17 @@ export default function ProductsPage() {
     productsPageCacheRef.current.clear();
     productsPageCursorsRef.current = [null];
   }, []);
+
+  function clearProductSelection() {
+    setSelectedProductIds(new Set());
+  }
+
+  function handleActiveTabChange(tab: 'categories' | 'products') {
+    if (tab !== 'products') {
+      clearProductSelection();
+    }
+    setActiveTab(tab);
+  }
 
   const loadProductsTablePage = useCallback(
     async (page: number, options?: { force?: boolean }) => {
@@ -564,7 +581,7 @@ export default function ProductsPage() {
     if (appliedProductsPageFilterRef.current === filterKey) return;
     appliedProductsPageFilterRef.current = filterKey;
 
-    setActiveTab(filter.tab);
+    handleActiveTabChange(filter.tab);
     if (filter.tab === 'categories') {
       setCategorySearch(filter.query);
     } else {
@@ -593,6 +610,12 @@ export default function ProductsPage() {
         linkedProductCount: pendingDelete.linkedProductCount,
       });
     }
+    if (pendingDelete.kind === 'products') {
+      return buildDeleteConfirmCopy({
+        kind: 'products',
+        count: pendingDelete.ids.length,
+      });
+    }
     return buildDeleteConfirmCopy({
       kind: 'product',
       name: pendingDelete.name,
@@ -601,7 +624,11 @@ export default function ProductsPage() {
 
   async function requestDeleteCategory(category: CategoryDraft) {
     setDeleteError(null);
-    let catalog = productsFilterCatalogRef.current;
+    // Prefer filter catalog if already loaded for filters; otherwise use a dedicated
+    // cache. Never call markProductsFilterCatalogReady here — that flips client
+    // pagination while `products` may still hold only the current server page.
+    let catalog =
+      productsFilterCatalogRef.current ?? categoryDeleteCountCatalogRef.current;
     if (!catalog) {
       if (!supplierId || !accessToken) return;
       setCategoryDeleteCatalogLoadingId(category.id);
@@ -610,7 +637,7 @@ export default function ProductsPage() {
           view: 'summary',
         });
         catalogPromotionsRef.current = result.catalogPromotions;
-        markProductsFilterCatalogReady(result.items);
+        categoryDeleteCountCatalogRef.current = result.items;
         catalog = result.items;
       } catch (err) {
         console.error(err);
@@ -642,6 +669,18 @@ export default function ProductsPage() {
   function cancelPendingDelete() {
     if (deleteLoading) return;
     setPendingDelete(null);
+    // Recover if an older bug left the filter catalog set without syncing `products`
+    // (client pagination on a single server page). Intentional post-filter state has
+    // products.length === catalog.length.
+    if (
+      !productFiltersActive &&
+      productsFilterCatalogRef.current !== null &&
+      products.length !== productsFilterCatalogRef.current.length
+    ) {
+      invalidateProductsFilterCatalog();
+      resetProductsPagination();
+      void loadProductsTablePage(1, { force: true });
+    }
   }
 
   async function confirmPendingDelete() {
@@ -654,6 +693,35 @@ export default function ProductsPage() {
         await deleteSupplierCategory(accessToken, db, supplierId, target.id);
         setCategories((prev) => prev.filter((c) => c.id !== target.id));
         setProductCategoryFilterIds((prev) => prev.filter((id) => id !== target.id));
+      } else if (target.kind === 'products') {
+        await deleteSupplierProducts(accessToken, db, supplierId, target.ids);
+        const idSet = new Set(target.ids);
+        if (productFiltersActive) {
+          const nextCatalog = (productsFilterCatalogRef.current ?? products).filter(
+            (product) => !idSet.has(product.id),
+          );
+          const nextDisplayedCount = displayedProducts.filter(
+            (product) => !idSet.has(product.id),
+          ).length;
+          const lastPage = Math.max(1, Math.ceil(nextDisplayedCount / PRODUCTS_PAGE_SIZE));
+          productsFilterCatalogRef.current = nextCatalog;
+          setProducts(nextCatalog);
+          setProductsTotalCount(nextCatalog.length);
+          setProductsPage((page) => Math.min(page, lastPage));
+          invalidateProductsPageCache();
+        } else {
+          invalidateProductsFilterCatalog();
+          const nextTotal = Math.max(0, productsTotalCount - target.ids.length);
+          const lastPage = Math.max(1, Math.ceil(nextTotal / PRODUCTS_PAGE_SIZE));
+          const targetPage = Math.min(productsPage, lastPage);
+          setProductsTotalCount(nextTotal);
+          resetProductsPagination();
+          void loadProductsTablePage(targetPage, { force: true });
+        }
+        setCopySourceProducts((prev) =>
+          prev ? prev.filter((product) => !idSet.has(product.id)) : prev,
+        );
+        clearProductSelection();
       } else {
         await deleteSupplierProduct(accessToken, db, supplierId, target.id);
         if (productFiltersActive) {
@@ -691,6 +759,8 @@ export default function ProductsPage() {
         message:
           target.kind === 'category'
             ? 'No se pudo eliminar la categoría. Intenta de nuevo.'
+            : target.kind === 'products'
+              ? 'No se pudieron eliminar los productos. No se eliminó ninguno. Intenta de nuevo.'
             : 'No se pudo eliminar el producto. Intenta de nuevo.',
       });
     } finally {
@@ -736,8 +806,21 @@ export default function ProductsPage() {
     [productFiltersActive, productsFilterCatalogVersion],
   );
 
+  // Repair polluted state from category-delete count fetch that incorrectly marked the
+  // filter catalog ready (client pagination with only the current server page in `products`).
+  useEffect(() => {
+    if (activeTab !== 'products' || productFiltersActive) return;
+    const catalog = productsFilterCatalogRef.current;
+    if (!catalog || products.length === catalog.length) return;
+    invalidateProductsFilterCatalog();
+    resetProductsPagination();
+    void loadProductsTablePage(1, { force: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, productFiltersActive]);
+
   const handleProductsPageChange = useCallback(
     (page: number) => {
+      clearProductSelection();
       if (usesClientProductPagination) {
         setProductsPage(page);
         return;
@@ -861,6 +944,7 @@ export default function ProductsPage() {
 
   useEffect(() => {
     setProductsPage(1);
+    clearProductSelection();
   }, [
     productNameFilter,
     productCategoryFilterIds,
@@ -872,6 +956,7 @@ export default function ProductsPage() {
   ]);
 
   function clearProductTableFilters() {
+    clearProductSelection();
     setProductNameFilter('');
     setProductCategoryFilterIds([]);
     setProductCategoryActiveFilter([]);
@@ -1084,14 +1169,14 @@ export default function ProductsPage() {
         <button
           type="button"
           className={`${styles.tab} ${activeTab === 'products' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('products')}
+          onClick={() => handleActiveTabChange('products')}
         >
           Productos
         </button>
         <button
           type="button"
           className={`${styles.tab} ${activeTab === 'categories' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('categories')}
+          onClick={() => handleActiveTabChange('categories')}
         >
           Categorías
         </button>
@@ -1228,7 +1313,7 @@ export default function ProductsPage() {
                     )}
                     <button
                       type="button"
-                      className={styles.dangerGhostBtn}
+                      className={`${styles.dangerGhostBtn} ${styles.catalogDeleteBtn}`}
                       disabled={
                         deleteLoading ||
                         categoryDeleteCatalogLoadingId !== null ||
@@ -1246,7 +1331,10 @@ export default function ProductsPage() {
                         void requestDeleteCategory(c);
                       }}
                     >
-                      {categoryDeleteCatalogLoadingId === c.id ? 'Cargando…' : 'Eliminar'}
+                      <DeleteOutlineOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
+                      <span>
+                        {categoryDeleteCatalogLoadingId === c.id ? 'Cargando…' : 'Eliminar'}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -1310,7 +1398,7 @@ export default function ProductsPage() {
               subtitle="Cada producto debe pertenecer al menos a una categoría."
               action={
                 <button type="button" className={styles.primaryBtn} onClick={() => {
-                  setActiveTab('categories');
+                  handleActiveTabChange('categories');
                   openNewCategory();
                 }}>
                   + Nueva categoría
@@ -1355,36 +1443,88 @@ export default function ProductsPage() {
                   }
                 />
               ) : (
-                <div className={styles.tableWrap}>
-                  {productVisibilityError ? (
-                    <div className={styles.errorBanner} role="alert">{productVisibilityError}</div>
+                <>
+                  {selectedProductIds.size > 0 ? (
+                    <div className={styles.selectionBar} role="status">
+                      <span className={styles.selectionCount}>
+                        {selectedProductIds.size} seleccionados
+                      </span>
+                      <div className={styles.selectionActions}>
+                        <button type="button" className={styles.ghostBtn} onClick={clearProductSelection}>
+                          Deseleccionar
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.dangerGhostBtn} ${styles.catalogDeleteBtn}`}
+                          disabled={deleteLoading || !supplierId || !accessToken}
+                          onClick={() => {
+                            setDeleteError(null);
+                            setPendingDelete({ kind: 'products', ids: [...selectedProductIds] });
+                          }}
+                        >
+                          <DeleteOutlineOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
+                          <span>Eliminar</span>
+                        </button>
+                      </div>
+                    </div>
                   ) : null}
-                  <ProductMobileControls
-                    categories={categories}
-                    productCategoryFilterIds={productCategoryFilterIds}
-                    productCategoryActiveFilter={productCategoryActiveFilter}
-                    productVisibilityFilter={productVisibilityFilter}
-                    productPriceSort={productPriceSort}
-                    setProductPriceSort={setProductPriceSort}
-                    productDiscountSort={productDiscountSort}
-                    setProductDiscountSort={setProductDiscountSort}
-                    productTotalSort={productTotalSort}
-                    setProductTotalSort={setProductTotalSort}
-                    categoryFilterAnchor={categoryFilterAnchor}
-                    setCategoryFilterAnchor={setCategoryFilterAnchor}
-                    statusFilterAnchor={statusFilterAnchor}
-                    setStatusFilterAnchor={setStatusFilterAnchor}
-                    selectedStatusTags={selectedStatusTags}
-                    selectedCategoryStatusTags={selectedCategoryStatusTags}
-                    removeCategoryFilter={removeCategoryFilter}
-                    removeCategoryStatusFilter={removeCategoryStatusFilter}
-                    removeStatusTag={removeStatusTag}
-                    productFiltersActive={productFiltersActive}
-                    onClearFilters={clearProductTableFilters}
-                  />
-                  <table className={styles.table}>
+                  <div className={styles.tableWrap}>
+                    {productVisibilityError ? (
+                      <div className={styles.errorBanner} role="alert">{productVisibilityError}</div>
+                    ) : null}
+                    <ProductMobileControls
+                      categories={categories}
+                      productCategoryFilterIds={productCategoryFilterIds}
+                      productCategoryActiveFilter={productCategoryActiveFilter}
+                      productVisibilityFilter={productVisibilityFilter}
+                      productPriceSort={productPriceSort}
+                      setProductPriceSort={setProductPriceSort}
+                      productDiscountSort={productDiscountSort}
+                      setProductDiscountSort={setProductDiscountSort}
+                      productTotalSort={productTotalSort}
+                      setProductTotalSort={setProductTotalSort}
+                      categoryFilterAnchor={categoryFilterAnchor}
+                      setCategoryFilterAnchor={setCategoryFilterAnchor}
+                      statusFilterAnchor={statusFilterAnchor}
+                      setStatusFilterAnchor={setStatusFilterAnchor}
+                      selectedStatusTags={selectedStatusTags}
+                      selectedCategoryStatusTags={selectedCategoryStatusTags}
+                      removeCategoryFilter={removeCategoryFilter}
+                      removeCategoryStatusFilter={removeCategoryStatusFilter}
+                      removeStatusTag={removeStatusTag}
+                      productFiltersActive={productFiltersActive}
+                      onClearFilters={clearProductTableFilters}
+                    />
+                    <table className={styles.table}>
                     <thead>
                       <tr className={styles.headerLabelRow}>
+                        <th className={`${styles.thDashboard} ${styles.selectHead}`} scope="col">
+                          <input
+                            type="checkbox"
+                            className={styles.selectCheckbox}
+                            checked={
+                              paginatedProducts.items.length > 0 &&
+                              paginatedProducts.items.every((p) => selectedProductIds.has(p.id))
+                            }
+                            ref={(el) => {
+                              if (!el) return;
+                              const pageIds = paginatedProducts.items.map((p) => p.id);
+                              const selectedOnPage = pageIds.filter((id) => selectedProductIds.has(id)).length;
+                              el.indeterminate = selectedOnPage > 0 && selectedOnPage < pageIds.length;
+                            }}
+                            disabled={deleteLoading || paginatedProducts.items.length === 0}
+                            aria-label="Seleccionar todos los productos de esta página"
+                            onChange={(e) => {
+                              const pageIds = paginatedProducts.items.map((p) => p.id);
+                              setSelectedProductIds((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) pageIds.forEach((id) => next.add(id));
+                                else pageIds.forEach((id) => next.delete(id));
+                                return next;
+                              });
+                            }}
+                          />
+                        </th>
                         <th className={styles.thDashboard}>Producto</th>
                         <th className={`${styles.thDashboard} ${styles.thFilterColumn}`}>
                           <div className={styles.thFilterHead}>
@@ -1613,7 +1753,7 @@ export default function ProductsPage() {
                     <tbody>
                       {paginatedProducts.items.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className={styles.filterNoResults}>
+                          <td colSpan={8} className={styles.filterNoResults}>
                             <div className={styles.filterNoResultsInner}>
                               {productsFilterCatalogPending ? (
                                 <p>Buscando productos…</p>
@@ -1638,7 +1778,9 @@ export default function ProductsPage() {
                         return (
                           <tr
                             key={p.id}
-                            className={`${styles.rowHover} ${styles.clickableRow} ${p.status !== 'inactive' ? '' : styles.rowInactive}`}
+                            className={`${styles.rowHover} ${styles.clickableRow} ${
+                              selectedProductIds.has(p.id) ? styles.rowSelected : ''
+                            } ${p.status !== 'inactive' ? '' : styles.rowInactive}`}
                             tabIndex={0}
                             onClick={() => openEditProduct(p.id)}
                             onKeyDown={(e) => {
@@ -1648,6 +1790,28 @@ export default function ProductsPage() {
                               }
                             }}
                           >
+                            <td
+                              className={styles.selectCell}
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                className={styles.selectCheckbox}
+                                checked={selectedProductIds.has(p.id)}
+                                disabled={deleteLoading}
+                                aria-label={`Seleccionar ${p.name}`}
+                                onClick={(event) => event.stopPropagation()}
+                                onChange={(event) => {
+                                  setSelectedProductIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (event.target.checked) next.add(p.id);
+                                    else next.delete(p.id);
+                                    return next;
+                                  });
+                                }}
+                              />
+                            </td>
                             <td className={styles.productPrimaryCell}>
                               <div className={styles.productCell}>
                                 <div className={styles.productThumb}>
@@ -1701,7 +1865,7 @@ export default function ProductsPage() {
                             >
                               <button
                                 type="button"
-                                className={styles.dangerGhostBtn}
+                                className={`${styles.dangerGhostBtn} ${styles.catalogDeleteBtn}`}
                                 disabled={
                                   deleteLoading ||
                                   categoryDeleteCatalogLoadingId !== null ||
@@ -1727,7 +1891,7 @@ export default function ProductsPage() {
                         );
                       })}
                     </tbody>
-                  </table>
+                    </table>
                   <Popover
                     open={Boolean(categoryFilterAnchor)}
                     anchorEl={categoryFilterAnchor}
@@ -1840,7 +2004,8 @@ export default function ProductsPage() {
                       </div>
                     </div>
                   </Popover>
-                </div>
+                  </div>
+                </>
               )}
 
               {productsError ? (
