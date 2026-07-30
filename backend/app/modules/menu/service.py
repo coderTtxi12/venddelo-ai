@@ -8,20 +8,20 @@ from app.modules.menu.repository import MenuRepository
 from app.modules.menu.schemas import (
     CategoryCreate,
     CategoryDTO,
-    CategoryUpdate,
     CategoryProductOrderUpdate,
+    CategoryUpdate,
     FullMenuDTO,
     OptionGroupCreate,
     OptionGroupDTO,
-    OptionGroupUpdate,
     OptionGroupItemOrderUpdate,
+    OptionGroupUpdate,
     OptionItemCreate,
     OptionItemDTO,
     OptionItemUpdate,
     ProductCreate,
     ProductDTO,
-    ProductUpdate,
     ProductOptionGroupOrderUpdate,
+    ProductUpdate,
 )
 
 
@@ -82,6 +82,13 @@ class MenuService:
     def delete_category(self, restaurant_id: uuid.UUID, category_id: uuid.UUID) -> None:
         self.get_category(restaurant_id, category_id)
         if not self._repo.soft_delete_category(category_id):
+            raise NotFoundError("Category not found")
+
+    def permanently_delete_category(self, restaurant_id: uuid.UUID, category_id: uuid.UUID) -> None:
+        cat = self._repo.get_category_by_id(category_id)
+        if cat is None or cat.restaurant_id != restaurant_id:
+            raise NotFoundError("Category not found")
+        if not self._repo.hard_delete_category(category_id):
             raise NotFoundError("Category not found")
 
     # Products
@@ -155,6 +162,25 @@ class MenuService:
         if not self._repo.soft_delete_product(product_id):
             raise NotFoundError("Product not found")
 
+    def permanently_delete_product(self, restaurant_id: uuid.UUID, product_id: uuid.UUID) -> None:
+        prod = self._repo.get_product_by_id(product_id)
+        if prod is None or prod.restaurant_id != restaurant_id:
+            raise NotFoundError("Product not found")
+        if not self._repo.hard_delete_product(product_id):
+            raise NotFoundError("Product not found")
+
+    def permanently_delete_products(
+        self, restaurant_id: uuid.UUID, product_ids: list[uuid.UUID]
+    ) -> None:
+        unique_ids = list(dict.fromkeys(product_ids))
+        for product_id in unique_ids:
+            prod = self._repo.get_product_by_id(product_id)
+            if prod is None or prod.restaurant_id != restaurant_id:
+                raise NotFoundError("Product not found")
+        deleted = self._repo.hard_delete_products(unique_ids)
+        if deleted != len(unique_ids):
+            raise NotFoundError("Product not found")
+
     def set_category_product_order(
         self,
         restaurant_id: uuid.UUID,
@@ -201,7 +227,6 @@ class MenuService:
             self._repo.set_option_group_item_order(group_id, data.item_ids)
         except ValueError as exc:
             raise ValidationError(str(exc)) from exc
-
 
     # Option groups
     def add_option_group(

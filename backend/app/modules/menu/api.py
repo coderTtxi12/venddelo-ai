@@ -12,17 +12,18 @@ from app.modules.menu.schemas import (
     AssetUploadDTO,
     CategoryCreate,
     CategoryDTO,
-    CategoryUpdate,
     CategoryProductOrderUpdate,
+    CategoryUpdate,
     OptionGroupCreate,
     OptionGroupDTO,
     OptionGroupUpdate,
     OptionItemCreate,
     OptionItemDTO,
     OptionItemUpdate,
-    ProductCreate,
     ProductCountDTO,
+    ProductCreate,
     ProductDTO,
+    ProductPermanentBulkDelete,
     ProductUpdate,
 )
 from app.modules.menu.service import MenuService
@@ -50,9 +51,7 @@ def upload_restaurant_asset(
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
 ) -> AssetUploadDTO:
     if folder not in ALLOWED_ASSET_FOLDERS:
-        raise ValidationError(
-            f"folder must be one of: {', '.join(sorted(ALLOWED_ASSET_FOLDERS))}"
-        )
+        raise ValidationError(f"folder must be one of: {', '.join(sorted(ALLOWED_ASSET_FOLDERS))}")
     content = file.file.read()
     content_type = file.content_type or "application/octet-stream"
     if not content_type.startswith("image/"):
@@ -123,6 +122,20 @@ def delete_category(
     uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
     service.delete_category(restaurant.id, category_id)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+
+
+@router.delete(
+    "/restaurants/{restaurant_id}/categories/{category_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def permanently_delete_category(
+    category_id: uuid.UUID,
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> None:
+    service.permanently_delete_category(restaurant.id, category_id)
     invalidate_restaurant_menu_cache(uow, restaurant.id)
 
 
@@ -218,6 +231,33 @@ def delete_product(
     service.delete_product(restaurant.id, product_id)
     invalidate_restaurant_menu_cache(uow, restaurant.id)
 
+
+@router.delete(
+    "/restaurants/{restaurant_id}/products/{product_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def permanently_delete_product(
+    product_id: uuid.UUID,
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> None:
+    service.permanently_delete_product(restaurant.id, product_id)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
+
+
+@router.post(
+    "/restaurants/{restaurant_id}/products/permanent-bulk",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def permanently_delete_products_bulk(
+    data: ProductPermanentBulkDelete,
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: MenuService = Depends(_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> None:
+    service.permanently_delete_products(restaurant.id, data.product_ids)
+    invalidate_restaurant_menu_cache(uow, restaurant.id)
 
 
 # Option groups

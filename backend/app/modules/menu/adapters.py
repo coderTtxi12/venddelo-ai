@@ -300,6 +300,14 @@ class SqlAlchemyMenuRepository(MenuRepository):
         self._session.flush()
         return True
 
+    def hard_delete_category(self, id: uuid.UUID) -> bool:
+        obj = self._session.get(Category, id)
+        if obj is None:
+            return False
+        self._session.delete(obj)
+        self._session.flush()
+        return True
+
     # Products
     def _load_categories(self, ids: list[uuid.UUID]) -> list[Category]:
         if not ids:

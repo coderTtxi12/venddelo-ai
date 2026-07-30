@@ -79,6 +79,9 @@ class FakeMenuRepo(MenuRepository):
     def soft_delete_category(self, id):
         return True
 
+    def hard_delete_category(self, id):
+        return self.categories.pop(id, None) is not None
+
     def add_product(self, data: ProductCreate) -> ProductDTO:
         p = _product(name=data.name, category_ids=data.category_ids)
         self.products[p.id] = p
@@ -259,3 +262,51 @@ def test_option_group_validates_single_max():
             p.id,
             OptionGroupCreate(title="Size", selection="single", max_selections=3),
         )
+
+
+def test_permanently_delete_products_all_or_nothing():
+    repo = FakeMenuRepo()
+    _seed_category(repo)
+    p1 = repo.add_product(
+        ProductCreate(
+            restaurant_id=RESTAURANT_ID,
+            name="A",
+            price_cents=100,
+            category_ids=[CAT_ID],
+            status="active",
+        )
+    )
+    missing = uuid.uuid4()
+    service = MenuService(repo)
+    try:
+        service.permanently_delete_products(RESTAURANT_ID, [p1.id, missing])
+        raise AssertionError("expected NotFoundError")
+    except NotFoundError:
+        pass
+    assert repo.get_product_by_id(p1.id) is not None
+
+
+def test_permanently_delete_products_deletes_all():
+    repo = FakeMenuRepo()
+    _seed_category(repo)
+    p1 = repo.add_product(
+        ProductCreate(
+            restaurant_id=RESTAURANT_ID,
+            name="A",
+            price_cents=100,
+            category_ids=[CAT_ID],
+            status="active",
+        )
+    )
+    p2 = repo.add_product(
+        ProductCreate(
+            restaurant_id=RESTAURANT_ID,
+            name="B",
+            price_cents=200,
+            category_ids=[CAT_ID],
+            status="active",
+        )
+    )
+    MenuService(repo).permanently_delete_products(RESTAURANT_ID, [p1.id, p2.id, p1.id])
+    assert repo.get_product_by_id(p1.id) is None
+    assert repo.get_product_by_id(p2.id) is None

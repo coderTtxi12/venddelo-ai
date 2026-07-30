@@ -49,6 +49,9 @@ class MenuRepository(ABC):
     @abstractmethod
     def soft_delete_category(self, id: uuid.UUID) -> bool: ...
 
+    @abstractmethod
+    def hard_delete_category(self, id: uuid.UUID) -> bool: ...
+
     # Products
     @abstractmethod
     def add_product(self, data: ProductCreate) -> ProductDTO: ...
