@@ -669,18 +669,6 @@ export default function ProductsPage() {
   function cancelPendingDelete() {
     if (deleteLoading) return;
     setPendingDelete(null);
-    // Recover if an older bug left the filter catalog set without syncing `products`
-    // (client pagination on a single server page). Intentional post-filter state has
-    // products.length === catalog.length.
-    if (
-      !productFiltersActive &&
-      productsFilterCatalogRef.current !== null &&
-      products.length !== productsFilterCatalogRef.current.length
-    ) {
-      invalidateProductsFilterCatalog();
-      resetProductsPagination();
-      void loadProductsTablePage(1, { force: true });
-    }
   }
 
   async function confirmPendingDelete() {
@@ -749,6 +737,11 @@ export default function ProductsPage() {
         setCopySourceProducts((prev) =>
           prev ? prev.filter((product) => product.id !== target.id) : prev,
         );
+        setSelectedProductIds((prev) => {
+          const next = new Set(prev);
+          next.delete(target.id);
+          return next;
+        });
       }
       setPendingDelete(null);
     } catch (err) {
@@ -805,18 +798,6 @@ export default function ProductsPage() {
     () => productFiltersActive || productsFilterCatalogRef.current !== null,
     [productFiltersActive, productsFilterCatalogVersion],
   );
-
-  // Repair polluted state from category-delete count fetch that incorrectly marked the
-  // filter catalog ready (client pagination with only the current server page in `products`).
-  useEffect(() => {
-    if (activeTab !== 'products' || productFiltersActive) return;
-    const catalog = productsFilterCatalogRef.current;
-    if (!catalog || products.length === catalog.length) return;
-    invalidateProductsFilterCatalog();
-    resetProductsPagination();
-    void loadProductsTablePage(1, { force: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, productFiltersActive]);
 
   const handleProductsPageChange = useCallback(
     (page: number) => {
