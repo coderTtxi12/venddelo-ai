@@ -95,11 +95,15 @@ def test_menu_subagent_input_includes_session_and_task():
         menu_import_conversation_history="Usuario: importa",
         import_session_context="fase=collecting",
         menu_source_attachment_count=1,
+        user_message="importa este menú",
     )
     payload = menu_subagent_input(context, "Importar menú desde PDF")
     assert "## Delegated task" in payload
     assert "## Import session" in payload
     assert "solo" in payload
+    assert "## User request" not in payload
+    assert "importa este menú" not in payload
+    assert "## Conversation history" not in payload
 
 
 def test_format_history_strips_chat_attachments_from_user_messages():
