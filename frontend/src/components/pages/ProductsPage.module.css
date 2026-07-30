@@ -272,6 +272,22 @@
   padding: 0.65rem 0.7rem 0.5rem;
 }
 
+.actionsHead {
+  width: 7.5rem;
+  text-align: right;
+}
+
+.actionsCell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.actionsCell .dangerGhostBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .thFilterColumn {
   min-width: 7.5rem;
   max-width: 14rem;
@@ -2231,6 +2247,10 @@
 
   .totalCell {
     order: 6;
+  }
+
+  .actionsCell {
+    order: 7;
   }
 
   .table tr.rowHover:hover td {

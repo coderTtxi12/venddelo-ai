@@ -30,12 +30,16 @@ import {
   type ProductVisibilityState,
 } from '@/lib/menu/productVisibility';
 import { ProductVisibilitySelect } from '@/components/products/ProductVisibilitySelect';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { ListPagination } from '@/components/ui/ListPagination';
+import { buildDeleteConfirmCopy } from '@/lib/menu/deleteConfirmCopy';
 import { paginateItems } from '@/lib/paginate';
 import { normalizeSearchText, tokenizeQuery } from '@/lib/search/fuzzyMatch';
 import { parseProductsPageFilter } from '@/lib/search/productsPageFilter';
 import {
   CATEGORIES_PAGE_SIZE,
+  deleteSupplierCategory,
+  deleteSupplierProduct,
   fetchAllSupplierCategories,
   normalizeOptionGroups,
   PRODUCTS_PAGE_SIZE,
@@ -340,6 +344,10 @@ function CatalogLoadingState({
 }
 
 export default function ProductsPage() {
+  type PendingDelete =
+    | { kind: 'category'; id: Id; name: string }
+    | { kind: 'product'; id: Id; name: string };
+
   const { accessToken, loading: authLoading } = useAuth();
   const {
     loading: accessLoading,
@@ -378,6 +386,9 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<ProductDraft[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [productsPage, setProductsPage] = useState(1);
   const [productsTotalCount, setProductsTotalCount] = useState(0);
   const catalogPromotionsRef = useRef<Promotion[] | null>(null);
@@ -565,6 +576,66 @@ export default function ProductsPage() {
   const [productVisibilityError, setProductVisibilityError] = useState<string | null>(null);
   const [categoryActiveToggleId, setCategoryActiveToggleId] = useState<Id | null>(null);
   const [categoryActiveError, setCategoryActiveError] = useState<string | null>(null);
+
+  const deleteConfirmCopy = useMemo(() => {
+    if (!pendingDelete) return null;
+    if (pendingDelete.kind === 'category') {
+      const linkedProductCount = products.filter((p) =>
+        p.categoryIds.includes(pendingDelete.id),
+      ).length;
+      return buildDeleteConfirmCopy({
+        kind: 'category',
+        name: pendingDelete.name,
+        linkedProductCount,
+      });
+    }
+    return buildDeleteConfirmCopy({
+      kind: 'product',
+      name: pendingDelete.name,
+    });
+  }, [pendingDelete, products]);
+
+  function requestDeleteCategory(category: CategoryDraft) {
+    setDeleteError(null);
+    setPendingDelete({ kind: 'category', id: category.id, name: category.name });
+  }
+
+  function requestDeleteProduct(product: ProductDraft) {
+    setDeleteError(null);
+    setPendingDelete({ kind: 'product', id: product.id, name: product.name });
+  }
+
+  function cancelPendingDelete() {
+    if (deleteLoading) return;
+    setPendingDelete(null);
+  }
+
+  async function confirmPendingDelete() {
+    if (!pendingDelete || !supplierId || !accessToken) return;
+    setDeleteLoading(true);
+    setDeleteError(null);
+    const target = pendingDelete;
+    try {
+      if (target.kind === 'category') {
+        await deleteSupplierCategory(accessToken, db, supplierId, target.id);
+        setCategories((prev) => prev.filter((c) => c.id !== target.id));
+      } else {
+        await deleteSupplierProduct(accessToken, db, supplierId, target.id);
+        setProducts((prev) => prev.filter((p) => p.id !== target.id));
+      }
+      setPendingDelete(null);
+    } catch (err) {
+      console.error(err);
+      setPendingDelete(null);
+      setDeleteError(
+        target.kind === 'category'
+          ? 'No se pudo eliminar la categoría. Intenta de nuevo.'
+          : 'No se pudo eliminar el producto. Intenta de nuevo.',
+      );
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
 
   const filteredCategories = useMemo(() => {
     const q = categorySearch.trim().toLowerCase();
@@ -1094,6 +1165,17 @@ export default function ProductsPage() {
                         {categoryActiveToggleId === c.id ? 'Guardando…' : 'Activar'}
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className={styles.dangerGhostBtn}
+                      disabled={deleteLoading || !supplierId || !accessToken}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        requestDeleteCategory(c);
+                      }}
+                    >
+                      Eliminar
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1105,6 +1187,9 @@ export default function ProductsPage() {
           ) : null}
           {categoryActiveError ? (
             <div className={styles.errorBanner} role="alert">{categoryActiveError}</div>
+          ) : null}
+          {deleteError && activeTab === 'categories' ? (
+            <div className={styles.errorBanner} role="alert">{deleteError}</div>
           ) : null}
 
           {!categoriesLoading ? (
@@ -1450,12 +1535,13 @@ export default function ProductsPage() {
                             </div>
                           ) : null}
                         </th>
+                        <th className={`${styles.thDashboard} ${styles.actionsHead}`}>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       {paginatedProducts.items.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className={styles.filterNoResults}>
+                          <td colSpan={7} className={styles.filterNoResults}>
                             <div className={styles.filterNoResultsInner}>
                               {productsFilterCatalogPending ? (
                                 <p>Buscando productos…</p>
@@ -1535,6 +1621,25 @@ export default function ProductsPage() {
                                   void handleProductVisibilityChange(p.id, nextState);
                                 }}
                               />
+                            </td>
+                            <td
+                              className={`${styles.labeledCell} ${styles.actionsCell}`}
+                              data-label="Acciones"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                className={styles.dangerGhostBtn}
+                                disabled={deleteLoading || !supplierId || !accessToken}
+                                aria-label={`Eliminar ${p.name}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  requestDeleteProduct(p);
+                                }}
+                              >
+                                <DeleteOutlineOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
+                                <span>Eliminar</span>
+                              </button>
                             </td>
                           </tr>
                         );
@@ -1659,6 +1764,9 @@ export default function ProductsPage() {
               {productsError ? (
                 <div className={styles.errorBanner} role="alert">{productsError}</div>
               ) : null}
+              {deleteError && activeTab === 'products' ? (
+                <div className={styles.errorBanner} role="alert">{deleteError}</div>
+              ) : null}
 
               {!productsLoading ? (
                 <ListPagination
@@ -1758,6 +1866,20 @@ export default function ProductsPage() {
           )}
         </section>
       )}
+      {deleteConfirmCopy ? (
+        <ConfirmDialog
+          open={Boolean(pendingDelete)}
+          title={deleteConfirmCopy.title}
+          description={deleteConfirmCopy.description}
+          confirmLabel={deleteConfirmCopy.confirmLabel}
+          cancelLabel={deleteConfirmCopy.cancelLabel}
+          loading={deleteLoading}
+          onConfirm={() => {
+            void confirmPendingDelete();
+          }}
+          onCancel={cancelPendingDelete}
+        />
+      ) : null}
     </div>
   );
 }
