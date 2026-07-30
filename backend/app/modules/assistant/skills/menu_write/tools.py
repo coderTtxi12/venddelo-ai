@@ -17,7 +17,10 @@ from app.modules.assistant.skills.menu_write.bulk import (
     bulk_update_product_names,
     bulk_update_product_prices,
 )
-from app.modules.assistant.skills.menu_write.bulk_create import bulk_create_categories
+from app.modules.assistant.skills.menu_write.bulk_create import (
+    bulk_create_categories,
+    bulk_create_products,
+)
 from app.modules.assistant.skills.menu_write.option_item_bulk import (
     bulk_add_option_groups,
     bulk_add_option_items,
@@ -388,6 +391,82 @@ class MenuWriteSkill:
                                     "name": {"type": "string"},
                                     "description": {"type": "string"},
                                     "sort_index": {"type": "integer"},
+                                },
+                                "required": ["name"],
+                            },
+                        },
+                    },
+                    "required": ["items"],
+                },
+            ),
+            ToolDefinition(
+                name="bulk_create_products",
+                description=(
+                    "Create MANY complete products in one call. Only name is required per item; "
+                    "omitted price_cents defaults to 0; status defaults to active (live menu); "
+                    "categories optional (category_ids and/or category_names); optional nested "
+                    f"option_groups[].items[] for complements. Up to {BULK_DEFAULT_LIMIT} "
+                    "products. "
+                    "Use when the owner already listed several products — no per-item recap."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "price_cents": {"type": "integer"},
+                                    "description": {"type": "string"},
+                                    "image_path": {"type": "string"},
+                                    "currency": {"type": "string"},
+                                    "status": {
+                                        "type": "string",
+                                        "enum": ["active", "inactive", "draft"],
+                                    },
+                                    "category_ids": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                    },
+                                    "category_names": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                    },
+                                    "option_groups": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "title": {"type": "string"},
+                                                "required": {"type": "boolean"},
+                                                "selection": {
+                                                    "type": "string",
+                                                    "enum": ["single", "multi"],
+                                                },
+                                                "min_selections": {"type": "integer"},
+                                                "max_selections": {"type": "integer"},
+                                                "sort_index": {"type": "integer"},
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "label": {"type": "string"},
+                                                            "price_delta_cents": {
+                                                                "type": "integer"
+                                                            },
+                                                            "sort_index": {"type": "integer"},
+                                                        },
+                                                        "required": ["label"],
+                                                    },
+                                                },
+                                            },
+                                            "required": ["title"],
+                                        },
+                                    },
                                 },
                                 "required": ["name"],
                             },
@@ -1416,6 +1495,11 @@ class MenuWriteSkill:
 
         if tool_name == "bulk_create_categories":
             return bulk_create_categories(
+                service, ctx, args, invalidate=_finalize_menu_mutation
+            )
+
+        if tool_name == "bulk_create_products":
+            return bulk_create_products(
                 service, ctx, args, invalidate=_finalize_menu_mutation
             )
 
