@@ -35,7 +35,7 @@ class MenuService:
         for cid in category_ids:
             cat = self._repo.get_category_by_id(cid)
             if cat is None or cat.restaurant_id != restaurant_id:
-                raise ValidationError(f"Category {cid} not found in restaurant")
+                raise NotFoundError("Category not found")
 
     def _validate_option_group(self, data: OptionGroupCreate | OptionGroupUpdate) -> None:
         selection = getattr(data, "selection", None)
@@ -86,9 +86,8 @@ class MenuService:
 
     # Products
     def create_product(self, restaurant_id: uuid.UUID, data: ProductCreate) -> ProductDTO:
-        if len(data.category_ids) < 1:
-            raise ValidationError("Product must belong to at least one category")
-        self._ensure_categories_in_restaurant(restaurant_id, data.category_ids)
+        if data.category_ids:
+            self._ensure_categories_in_restaurant(restaurant_id, data.category_ids)
         payload = data.model_copy(update={"restaurant_id": restaurant_id})
         return self._repo.add_product(payload)
 

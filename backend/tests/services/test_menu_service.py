@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.core.exceptions import ValidationError
+from app.core.exceptions import NotFoundError, ValidationError
 from app.core.pagination import CursorPage
 from app.modules.menu.repository import MenuRepository
 from app.modules.menu.schemas import (
@@ -93,6 +93,9 @@ class FakeMenuRepo(MenuRepository):
     def list_products(self, restaurant_id, params, *, published_only=False):
         return CursorPage(items=[])
 
+    def count_products(self, restaurant_id):
+        return len(self.products)
+
     def update_product(self, id, data: ProductUpdate) -> ProductDTO | None:
         p = self.products.get(id)
         if p is None:
@@ -159,17 +162,34 @@ class FakeMenuRepo(MenuRepository):
         return FullMenuDTO(restaurant_id=restaurant_id, categories=[], products=[])
 
 
-def test_product_requires_category():
+def test_create_product_allows_empty_categories():
     repo = FakeMenuRepo()
     svc = MenuService(repo)
-    with pytest.raises(ValidationError):
+    created = svc.create_product(
+        RESTAURANT_ID,
+        ProductCreate(
+            restaurant_id=RESTAURANT_ID,
+            name="P",
+            price_cents=100,
+            category_ids=[],
+            status="active",
+        ),
+    )
+    assert created.name == "P"
+    assert created.category_ids == []
+
+
+def test_create_product_rejects_unknown_category():
+    repo = FakeMenuRepo()
+    svc = MenuService(repo)
+    with pytest.raises(NotFoundError):
         svc.create_product(
             RESTAURANT_ID,
             ProductCreate(
                 restaurant_id=RESTAURANT_ID,
                 name="P",
                 price_cents=100,
-                category_ids=[],
+                category_ids=[uuid.uuid4()],
             ),
         )
 
