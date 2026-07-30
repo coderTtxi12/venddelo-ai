@@ -2574,7 +2574,7 @@
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 767px) {
   .selectionBar {
     position: sticky;
     bottom: 0.75rem;
