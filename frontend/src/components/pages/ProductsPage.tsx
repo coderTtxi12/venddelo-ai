@@ -345,7 +345,7 @@ function CatalogLoadingState({
 
 export default function ProductsPage() {
   type PendingDelete =
-    | { kind: 'category'; id: Id; name: string }
+    | { kind: 'category'; id: Id; name: string; linkedProductCount: number }
     | { kind: 'product'; id: Id; name: string };
   type DeleteError = {
     tab: 'categories' | 'products';
@@ -392,6 +392,9 @@ export default function ProductsPage() {
   const [productsError, setProductsError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [categoryDeleteCatalogLoadingId, setCategoryDeleteCatalogLoadingId] = useState<Id | null>(
+    null,
+  );
   const [deleteError, setDeleteError] = useState<DeleteError | null>(null);
   const [productsPage, setProductsPage] = useState(1);
   const [productsTotalCount, setProductsTotalCount] = useState(0);
@@ -584,30 +587,51 @@ export default function ProductsPage() {
   const deleteConfirmCopy = useMemo(() => {
     if (!pendingDelete) return null;
     if (pendingDelete.kind === 'category') {
-      const cachedProducts = Array.from(productsPageCacheRef.current.values()).flat();
-      const productsForLinkedCount =
-        productsFilterCatalogRef.current ??
-        (productsPageCacheRef.current.size > 0
-          ? Array.from(new Map(cachedProducts.map((product) => [product.id, product])).values())
-          : products);
-      const linkedProductCount = productsForLinkedCount.filter((p) =>
-        p.categoryIds.includes(pendingDelete.id),
-      ).length;
       return buildDeleteConfirmCopy({
         kind: 'category',
         name: pendingDelete.name,
-        linkedProductCount,
+        linkedProductCount: pendingDelete.linkedProductCount,
       });
     }
     return buildDeleteConfirmCopy({
       kind: 'product',
       name: pendingDelete.name,
     });
-  }, [pendingDelete, products]);
+  }, [pendingDelete]);
 
-  function requestDeleteCategory(category: CategoryDraft) {
+  async function requestDeleteCategory(category: CategoryDraft) {
     setDeleteError(null);
-    setPendingDelete({ kind: 'category', id: category.id, name: category.name });
+    let catalog = productsFilterCatalogRef.current;
+    if (!catalog) {
+      if (!supplierId || !accessToken) return;
+      setCategoryDeleteCatalogLoadingId(category.id);
+      try {
+        const result = await fetchAllSupplierProducts(accessToken, db, supplierId, {
+          view: 'summary',
+        });
+        catalogPromotionsRef.current = result.catalogPromotions;
+        markProductsFilterCatalogReady(result.items);
+        catalog = result.items;
+      } catch (err) {
+        console.error(err);
+        setDeleteError({
+          tab: 'categories',
+          message: 'No se pudieron cargar los productos vinculados. Intenta de nuevo.',
+        });
+        return;
+      } finally {
+        setCategoryDeleteCatalogLoadingId(null);
+      }
+    }
+    const linkedProductCount = catalog.filter((product) =>
+      product.categoryIds.includes(category.id),
+    ).length;
+    setPendingDelete({
+      kind: 'category',
+      id: category.id,
+      name: category.name,
+      linkedProductCount,
+    });
   }
 
   function requestDeleteProduct(product: ProductDraft) {
@@ -629,9 +653,9 @@ export default function ProductsPage() {
       if (target.kind === 'category') {
         await deleteSupplierCategory(accessToken, db, supplierId, target.id);
         setCategories((prev) => prev.filter((c) => c.id !== target.id));
+        setProductCategoryFilterIds((prev) => prev.filter((id) => id !== target.id));
       } else {
         await deleteSupplierProduct(accessToken, db, supplierId, target.id);
-        setProducts((prev) => prev.filter((product) => product.id !== target.id));
         if (productFiltersActive) {
           const nextCatalog = (productsFilterCatalogRef.current ?? products).filter(
             (product) => product.id !== target.id,
@@ -651,7 +675,7 @@ export default function ProductsPage() {
           const lastPage = Math.max(1, Math.ceil(nextTotal / PRODUCTS_PAGE_SIZE));
           const targetPage = Math.min(productsPage, lastPage);
           setProductsTotalCount(nextTotal);
-          invalidateProductsPageCache();
+          resetProductsPagination();
           void loadProductsTablePage(targetPage, { force: true });
         }
         setCopySourceProducts((prev) =>
@@ -1205,7 +1229,13 @@ export default function ProductsPage() {
                     <button
                       type="button"
                       className={styles.dangerGhostBtn}
-                      disabled={deleteLoading || !supplierId || !accessToken}
+                      disabled={
+                        deleteLoading ||
+                        categoryDeleteCatalogLoadingId !== null ||
+                        !supplierId ||
+                        !accessToken
+                      }
+                      aria-label={`Eliminar ${c.name}`}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.stopPropagation();
@@ -1213,10 +1243,10 @@ export default function ProductsPage() {
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        requestDeleteCategory(c);
+                        void requestDeleteCategory(c);
                       }}
                     >
-                      Eliminar
+                      {categoryDeleteCatalogLoadingId === c.id ? 'Cargando…' : 'Eliminar'}
                     </button>
                   </div>
                 </div>
@@ -1672,7 +1702,12 @@ export default function ProductsPage() {
                               <button
                                 type="button"
                                 className={styles.dangerGhostBtn}
-                                disabled={deleteLoading || !supplierId || !accessToken}
+                                disabled={
+                                  deleteLoading ||
+                                  categoryDeleteCatalogLoadingId !== null ||
+                                  !supplierId ||
+                                  !accessToken
+                                }
                                 aria-label={`Eliminar ${p.name}`}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter' || e.key === ' ') {

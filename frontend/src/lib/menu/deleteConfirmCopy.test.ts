@@ -11,6 +11,11 @@ test('product confirm copy names the product and warns irreversible', () => {
   assert.equal(copy.cancelLabel, 'Cancelar');
 });
 
+test('category confirm copy requires an explicit linked product count', () => {
+  // @ts-expect-error Categories must provide an accurate count before confirmation.
+  buildDeleteConfirmCopy({ kind: 'category', name: 'Bebidas' });
+});
+
 test('empty category confirm copy warns irreversible without product count', () => {
   const copy = buildDeleteConfirmCopy({
     kind: 'category',
