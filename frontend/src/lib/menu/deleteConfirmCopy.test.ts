@@ -51,3 +51,16 @@ test('category with one linked product uses singular wording', () => {
     /Esta categoría tiene 1 producto vinculado\. Se eliminará de todas formas\./,
   );
 });
+
+test('bulk products confirm copy uses count and warns irreversible', () => {
+  const copy = buildDeleteConfirmCopy({ kind: 'products', count: 3 });
+  assert.equal(copy.title, '¿Eliminar 3 productos?');
+  assert.match(copy.description, /no se puede deshacer/i);
+  assert.equal(copy.confirmLabel, 'Eliminar');
+  assert.equal(copy.cancelLabel, 'Cancelar');
+});
+
+test('bulk products confirm copy singular wording for one', () => {
+  const copy = buildDeleteConfirmCopy({ kind: 'products', count: 1 });
+  assert.equal(copy.title, '¿Eliminar 1 producto?');
+});

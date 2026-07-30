@@ -1,4 +1,4 @@
-export type DeleteConfirmKind = 'product' | 'category';
+export type DeleteConfirmKind = 'product' | 'products' | 'category';
 
 export type DeleteConfirmCopy = {
   title: string;
@@ -9,9 +9,21 @@ export type DeleteConfirmCopy = {
 
 type DeleteConfirmArgs =
   | { kind: 'product'; name: string }
+  | { kind: 'products'; count: number }
   | { kind: 'category'; name: string; linkedProductCount: number };
 
 export function buildDeleteConfirmCopy(args: DeleteConfirmArgs): DeleteConfirmCopy {
+  if (args.kind === 'products') {
+    const n = args.count;
+    const noun = n === 1 ? 'producto' : 'productos';
+    return {
+      title: `¿Eliminar ${n} ${noun}?`,
+      description: 'Se quitarán del catálogo y no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+    };
+  }
+
   const title = `¿Eliminar «${args.name}»?`;
   const irreversible =
     args.kind === 'product'
