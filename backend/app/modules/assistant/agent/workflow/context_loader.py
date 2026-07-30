@@ -326,17 +326,7 @@ def restaurant_ops_input(context: WorkflowContext, task: str) -> str:
 
 
 def menu_subagent_input(context: WorkflowContext, task: str) -> str:
-    parts = [
-        f"## Conversation history\n\n{context.menu_import_conversation_history}",
-        (
-            "## User request\n\n"
-            + build_agent_user_request(
-                context.user_message,
-                context.current_turn_attachments_context,
-            )
-        ),
-        f"## Delegated task\n\n{task.strip()}",
-    ]
+    parts = [f"## Delegated task\n\n{task.strip()}"]
     if context.import_session_context:
         parts.append(f"## Import session\n\n{context.import_session_context}")
     if context.menu_source_attachment_count:
