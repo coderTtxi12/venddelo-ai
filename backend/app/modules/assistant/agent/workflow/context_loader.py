@@ -321,8 +321,10 @@ def menu_subagent_input(context: WorkflowContext, task: str) -> str:
         parts.append(f"## Import session\n\n{context.import_session_context}")
     if context.menu_source_attachment_count:
         parts.append(
-            "Registra en esta sesión **solo** los archivos de menú (PDF/DOCX) listados en "
-            "## User request de este turno."
+            "Registra en esta sesión **solo** los archivos de menú (PDF/DOCX) "
+            "adjuntos en el turno actual del dueño."
         )
+    if context.current_turn_attachments_context:
+        parts.append(context.current_turn_attachments_context)
     return "\n\n".join(parts)
 
