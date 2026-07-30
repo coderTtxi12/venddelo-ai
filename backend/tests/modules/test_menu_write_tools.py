@@ -1658,3 +1658,136 @@ def test_menu_write_bulk_create_categories_partial_and_limit(session):
     )
     assert over.ok is False
     assert "At most" in over.summary
+
+
+def test_menu_write_registers_bulk_create_products_tool():
+    definitions = {
+        definition.name: definition for definition in MenuWriteSkill().tool_definitions()
+    }
+
+    tool = definitions["bulk_create_products"]
+    assert tool.effect == "mutate"
+    item_schema = tool.input_schema["properties"]["items"]["items"]
+    assert item_schema["required"] == ["name"]
+    assert item_schema["properties"]["option_groups"]["type"] == "array"
+
+
+@requires_db
+def test_menu_write_bulk_create_products_minimal(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Create Prods", subdomain="menu-write-bulk-create-prods")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_create_products",
+        {"items": [{"name": "Solo nombre"}, {"name": "Otro"}]},
+        ctx,
+    )
+    assert result.ok is True
+    assert result.data["updated"] == 2
+    assert result.data["failed"] == 0
+
+    page = uow.menu.list_products(
+        restaurant.id, PaginationParams(limit=50, cursor=None), include_options=True
+    )
+    by_name = {product.name: product for product in page.items}
+    assert by_name["Solo nombre"].price_cents == 0
+    assert by_name["Solo nombre"].status == "active"
+    assert by_name["Solo nombre"].category_ids == []
+    assert by_name["Otro"].price_cents == 0
+
+
+@requires_db
+def test_menu_write_bulk_create_products_with_categories_and_options(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Create Full", subdomain="menu-write-bulk-create-full")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Tacos", sort_index=1)
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_create_products",
+        {
+            "items": [
+                {
+                    "name": "Taco pastor",
+                    "price_cents": 2500,
+                    "category_names": ["Tacos"],
+                    "description": "Con piña",
+                    "option_groups": [
+                        {
+                            "title": "Extras",
+                            "selection": "multi",
+                            "items": [
+                                {"label": "Queso", "price_delta_cents": 1000},
+                                {"label": "Guacamole", "price_delta_cents": 1500},
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "name": "Agua",
+                    "category_ids": [str(category.id)],
+                    "price_cents": 2000,
+                },
+                {"name": ""},
+            ]
+        },
+        ctx,
+    )
+    assert result.ok is True
+    assert result.data["updated"] == 2
+    assert result.data["failed"] == 1
+
+    page = uow.menu.list_products(
+        restaurant.id, PaginationParams(limit=50, cursor=None), include_options=True
+    )
+    pastor = next(product for product in page.items if product.name == "Taco pastor")
+    assert pastor.price_cents == 2500
+    assert category.id in pastor.category_ids
+    extras = next(group for group in pastor.option_groups if group.title == "Extras")
+    assert {item.label for item in extras.items} == {"Queso", "Guacamole"}
+
+
+@requires_db
+def test_menu_write_bulk_create_products_over_limit(session):
+    from app.modules.assistant.skills.menu_write.bulk import BULK_DEFAULT_LIMIT
+
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Create Limit", subdomain="menu-write-bulk-create-limit")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+
+    over = MenuWriteSkill().execute(
+        "bulk_create_products",
+        {"items": [{"name": f"P{index}"} for index in range(BULK_DEFAULT_LIMIT + 1)]},
+        ctx,
+    )
+    assert over.ok is False
+    assert "At most" in over.summary
