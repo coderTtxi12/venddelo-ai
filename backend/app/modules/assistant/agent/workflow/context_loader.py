@@ -307,14 +307,6 @@ def orchestrator_input(context: WorkflowContext) -> str:
             )
         ),
     ]
-    if context.menu_import_enabled:
-        parts.append(
-            "## Menu import capability\n\n"
-            "menu_subagent is available via delegate_task for full menu onboarding "
-            "from documents/images and active import sessions."
-        )
-    if context.import_session_context:
-        parts.append(f"## Active menu import session\n\n{context.import_session_context}")
     return "\n\n".join(parts)
 
 
