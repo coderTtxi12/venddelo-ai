@@ -398,6 +398,10 @@ export default function ProductsPage() {
   const [productsFilterCatalogVersion, setProductsFilterCatalogVersion] = useState(0);
   const productsLoadRequestRef = useRef(0);
 
+  useEffect(() => {
+    setDeleteError(null);
+  }, [activeTab]);
+
   const invalidateProductsPageCache = useCallback(() => {
     productsPageCacheRef.current.clear();
   }, []);
@@ -580,7 +584,13 @@ export default function ProductsPage() {
   const deleteConfirmCopy = useMemo(() => {
     if (!pendingDelete) return null;
     if (pendingDelete.kind === 'category') {
-      const linkedProductCount = products.filter((p) =>
+      const cachedProducts = Array.from(productsPageCacheRef.current.values()).flat();
+      const productsForLinkedCount =
+        productsFilterCatalogRef.current ??
+        (productsPageCacheRef.current.size > 0
+          ? Array.from(new Map(cachedProducts.map((product) => [product.id, product])).values())
+          : products);
+      const linkedProductCount = productsForLinkedCount.filter((p) =>
         p.categoryIds.includes(pendingDelete.id),
       ).length;
       return buildDeleteConfirmCopy({
@@ -621,7 +631,25 @@ export default function ProductsPage() {
         setCategories((prev) => prev.filter((c) => c.id !== target.id));
       } else {
         await deleteSupplierProduct(accessToken, db, supplierId, target.id);
-        setProducts((prev) => prev.filter((p) => p.id !== target.id));
+        setProducts((prev) => prev.filter((product) => product.id !== target.id));
+        if (productFiltersActive) {
+          const nextCatalog = (productsFilterCatalogRef.current ?? products).filter(
+            (product) => product.id !== target.id,
+          );
+          productsFilterCatalogRef.current = nextCatalog;
+          setProducts(nextCatalog);
+          setProductsTotalCount(nextCatalog.length);
+        } else {
+          invalidateProductsFilterCatalog();
+          setProductsTotalCount((count) => Math.max(0, count - 1));
+        }
+        setCopySourceProducts((prev) =>
+          prev ? prev.filter((product) => product.id !== target.id) : prev,
+        );
+        invalidateProductsPageCache();
+        if (!productFiltersActive) {
+          void loadProductsTablePage(productsPage, { force: true });
+        }
       }
       setPendingDelete(null);
     } catch (err) {
@@ -1169,6 +1197,11 @@ export default function ProductsPage() {
                       type="button"
                       className={styles.dangerGhostBtn}
                       disabled={deleteLoading || !supplierId || !accessToken}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.stopPropagation();
+                        }
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         requestDeleteCategory(c);
@@ -1632,6 +1665,11 @@ export default function ProductsPage() {
                                 className={styles.dangerGhostBtn}
                                 disabled={deleteLoading || !supplierId || !accessToken}
                                 aria-label={`Eliminar ${p.name}`}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.stopPropagation();
+                                  }
+                                }}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   requestDeleteProduct(p);
