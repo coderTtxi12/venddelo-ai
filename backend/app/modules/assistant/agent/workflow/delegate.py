@@ -61,7 +61,7 @@ _DELEGATE_PARAMS_SCHEMA: dict[str, Any] = {
         "task": {
             "type": "string",
             "minLength": 1,
-            "description": "Spanish goal for the subagent this turn",
+            "description": "Specific spanish goal for the subagent this turn. Based only on the user intent, don't go beyond the user inetent or invent information.",
         },
     },
     "required": ["subagent", "task"],
