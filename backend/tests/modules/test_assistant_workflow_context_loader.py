@@ -59,30 +59,34 @@ def _base_context(**overrides) -> WorkflowContext:
     return WorkflowContext(**data)
 
 
-def test_orchestrator_input_includes_import_session():
+def test_orchestrator_input_is_history_and_user_request_only():
     context = _base_context(
         menu_import_enabled=True,
         import_session_context="Sesión activa en extracción",
+        user_message="Hola",
     )
     payload = orchestrator_input(context)
-    assert "## Active menu import session" in payload
-    assert "Sesión activa en extracción" in payload
-    assert "menu_subagent is available" in payload
+    assert "## Conversation history" in payload
+    assert "## User request" in payload
+    assert "Hola" in payload
+    assert "## Active menu import session" not in payload
+    assert "Menu import capability" not in payload
 
 
-def test_orchestrator_instructions_mention_delegate_targets():
+def test_orchestrator_instructions_include_parallel_tool_calls():
     from app.modules.assistant.agent.workflow.prompts import ORCHESTRATOR_INSTRUCTIONS
 
-    assert "delegate_task" in ORCHESTRATOR_INSTRUCTIONS
-    assert "restaurant_ops_subagent" in ORCHESTRATOR_INSTRUCTIONS
-    assert "menu_subagent" in ORCHESTRATOR_INSTRUCTIONS
+    assert "Parallel tool calls" in ORCHESTRATOR_INSTRUCTIONS
 
 
 def test_restaurant_ops_input_includes_delegated_task():
-    context = _base_context(user_message="Lista categorías")
+    context = _base_context(user_message="desactiva el producto hamburguesa")
     payload = restaurant_ops_input(context, "Listar categorías del menú")
     assert "## Delegated task" in payload
     assert "Listar categorías del menú" in payload
+    assert "## User request" not in payload
+    assert "hamburguesa" not in payload
+    assert "## Conversation history" not in payload
 
 
 def test_menu_subagent_input_includes_session_and_task():
