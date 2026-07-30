@@ -347,6 +347,10 @@ export default function ProductsPage() {
   type PendingDelete =
     | { kind: 'category'; id: Id; name: string }
     | { kind: 'product'; id: Id; name: string };
+  type DeleteError = {
+    tab: 'categories' | 'products';
+    message: string;
+  };
 
   const { accessToken, loading: authLoading } = useAuth();
   const {
@@ -388,7 +392,7 @@ export default function ProductsPage() {
   const [productsError, setProductsError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<DeleteError | null>(null);
   const [productsPage, setProductsPage] = useState(1);
   const [productsTotalCount, setProductsTotalCount] = useState(0);
   const catalogPromotionsRef = useRef<Promotion[] | null>(null);
@@ -397,10 +401,6 @@ export default function ProductsPage() {
   const productsFilterCatalogRef = useRef<ProductDraft[] | null>(null);
   const [productsFilterCatalogVersion, setProductsFilterCatalogVersion] = useState(0);
   const productsLoadRequestRef = useRef(0);
-
-  useEffect(() => {
-    setDeleteError(null);
-  }, [activeTab]);
 
   const invalidateProductsPageCache = useCallback(() => {
     productsPageCacheRef.current.clear();
@@ -636,30 +636,39 @@ export default function ProductsPage() {
           const nextCatalog = (productsFilterCatalogRef.current ?? products).filter(
             (product) => product.id !== target.id,
           );
+          const nextDisplayedCount = displayedProducts.filter(
+            (product) => product.id !== target.id,
+          ).length;
+          const lastPage = Math.max(1, Math.ceil(nextDisplayedCount / PRODUCTS_PAGE_SIZE));
           productsFilterCatalogRef.current = nextCatalog;
           setProducts(nextCatalog);
           setProductsTotalCount(nextCatalog.length);
+          setProductsPage((page) => Math.min(page, lastPage));
+          invalidateProductsPageCache();
         } else {
           invalidateProductsFilterCatalog();
-          setProductsTotalCount((count) => Math.max(0, count - 1));
+          const nextTotal = Math.max(0, productsTotalCount - 1);
+          const lastPage = Math.max(1, Math.ceil(nextTotal / PRODUCTS_PAGE_SIZE));
+          const targetPage = Math.min(productsPage, lastPage);
+          setProductsTotalCount(nextTotal);
+          invalidateProductsPageCache();
+          void loadProductsTablePage(targetPage, { force: true });
         }
         setCopySourceProducts((prev) =>
           prev ? prev.filter((product) => product.id !== target.id) : prev,
         );
-        invalidateProductsPageCache();
-        if (!productFiltersActive) {
-          void loadProductsTablePage(productsPage, { force: true });
-        }
       }
       setPendingDelete(null);
     } catch (err) {
       console.error(err);
       setPendingDelete(null);
-      setDeleteError(
-        target.kind === 'category'
-          ? 'No se pudo eliminar la categoría. Intenta de nuevo.'
-          : 'No se pudo eliminar el producto. Intenta de nuevo.',
-      );
+      setDeleteError({
+        tab: target.kind === 'category' ? 'categories' : 'products',
+        message:
+          target.kind === 'category'
+            ? 'No se pudo eliminar la categoría. Intenta de nuevo.'
+            : 'No se pudo eliminar el producto. Intenta de nuevo.',
+      });
     } finally {
       setDeleteLoading(false);
     }
@@ -1221,8 +1230,8 @@ export default function ProductsPage() {
           {categoryActiveError ? (
             <div className={styles.errorBanner} role="alert">{categoryActiveError}</div>
           ) : null}
-          {deleteError && activeTab === 'categories' ? (
-            <div className={styles.errorBanner} role="alert">{deleteError}</div>
+          {deleteError?.tab === 'categories' ? (
+            <div className={styles.errorBanner} role="alert">{deleteError.message}</div>
           ) : null}
 
           {!categoriesLoading ? (
@@ -1802,8 +1811,8 @@ export default function ProductsPage() {
               {productsError ? (
                 <div className={styles.errorBanner} role="alert">{productsError}</div>
               ) : null}
-              {deleteError && activeTab === 'products' ? (
-                <div className={styles.errorBanner} role="alert">{deleteError}</div>
+              {deleteError?.tab === 'products' ? (
+                <div className={styles.errorBanner} role="alert">{deleteError.message}</div>
               ) : null}
 
               {!productsLoading ? (
