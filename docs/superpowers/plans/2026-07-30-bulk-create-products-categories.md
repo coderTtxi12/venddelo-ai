@@ -371,11 +371,11 @@ ToolDefinition(
 ```python
 if tool_name == "bulk_create_categories":
     return bulk_create_categories(
-        service, ctx, args, invalidate=_invalidate_preview_menu_cache
+        service, ctx, args, invalidate=_finalize_menu_mutation
     )
 ```
 
-Use the same `invalidate` callable name already used by other bulk tools in this file.
+Use the same `invalidate` callable already used by other bulk tools in this file (`_finalize_menu_mutation`).
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -829,7 +829,7 @@ ToolDefinition(
 ```python
 if tool_name == "bulk_create_products":
     return bulk_create_products(
-        service, ctx, args, invalidate=_invalidate_preview_menu_cache
+        service, ctx, args, invalidate=_finalize_menu_mutation
     )
 ```
 
@@ -949,4 +949,4 @@ git commit -m "docs(assistant): document bulk_create_products and bulk_create_ca
 - No TBD/TODO left in steps.
 - `bulk_tool_result` verb `"Added"` matches existing `bulk_add_*` tools (`updated`/`failed` keys unchanged).
 - `_parse_nested_option_items` imported from `option_item_bulk` (private but same package pattern as `_parse_items` from `bulk`).
-- Invalidate callback: use exact name already used in `tools.py` for other bulks (`_invalidate_preview_menu_cache` — confirm when implementing).
+- Invalidate callback: `_finalize_menu_mutation` (same as other bulk tools in `tools.py`).
