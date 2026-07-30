@@ -300,6 +300,14 @@ class SqlAlchemyMenuRepository(MenuRepository):
         self._session.flush()
         return True
 
+    def hard_delete_category(self, id: uuid.UUID) -> bool:
+        obj = self._session.get(Category, id)
+        if obj is None:
+            return False
+        self._session.delete(obj)
+        self._session.flush()
+        return True
+
     # Products
     def _load_categories(self, ids: list[uuid.UUID]) -> list[Category]:
         if not ids:
@@ -436,6 +444,21 @@ class SqlAlchemyMenuRepository(MenuRepository):
         obj.status = "draft"
         self._session.flush()
         return True
+
+    def hard_delete_product(self, id: uuid.UUID) -> bool:
+        obj = self._session.get(Product, id)
+        if obj is None:
+            return False
+        self._session.delete(obj)
+        self._session.flush()
+        return True
+
+    def hard_delete_products(self, ids: list[uuid.UUID]) -> int:
+        deleted = 0
+        for product_id in ids:
+            if self.hard_delete_product(product_id):
+                deleted += 1
+        return deleted
 
     # Options
     def add_option_group(self, product_id: uuid.UUID, data: OptionGroupCreate) -> OptionGroupDTO:

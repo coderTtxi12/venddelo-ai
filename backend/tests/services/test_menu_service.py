@@ -79,6 +79,9 @@ class FakeMenuRepo(MenuRepository):
     def soft_delete_category(self, id):
         return True
 
+    def hard_delete_category(self, id):
+        return self.categories.pop(id, None) is not None
+
     def add_product(self, data: ProductCreate) -> ProductDTO:
         p = _product(name=data.name, category_ids=data.category_ids)
         self.products[p.id] = p
@@ -122,6 +125,16 @@ class FakeMenuRepo(MenuRepository):
 
     def soft_delete_product(self, id):
         return True
+
+    def hard_delete_product(self, id):
+        return self.products.pop(id, None) is not None
+
+    def hard_delete_products(self, ids):
+        deleted = 0
+        for product_id in ids:
+            if self.hard_delete_product(product_id):
+                deleted += 1
+        return deleted
 
     def add_option_group(self, product_id, data: OptionGroupCreate) -> OptionGroupDTO:
         return OptionGroupDTO(
@@ -249,3 +262,42 @@ def test_option_group_validates_single_max():
             p.id,
             OptionGroupCreate(title="Size", selection="single", max_selections=3),
         )
+
+
+def test_permanently_delete_category_purges_inactive_category():
+    repo = FakeMenuRepo()
+    _seed_category(repo)
+    repo.categories[CAT_ID] = repo.categories[CAT_ID].model_copy(update={"is_active": False})
+
+    MenuService(repo).permanently_delete_category(RESTAURANT_ID, CAT_ID)
+
+    assert CAT_ID not in repo.categories
+
+
+def test_permanently_delete_product_purges_draft_product():
+    repo = FakeMenuRepo()
+    product = _product(status="draft")
+    repo.products[product.id] = product
+
+    MenuService(repo).permanently_delete_product(RESTAURANT_ID, product.id)
+
+    assert product.id not in repo.products
+
+
+@pytest.mark.parametrize("resource", ["category", "product"])
+def test_permanent_delete_rejects_resource_owned_by_another_restaurant(resource):
+    repo = FakeMenuRepo()
+    other_restaurant_id = uuid.uuid4()
+    service = MenuService(repo)
+
+    if resource == "category":
+        _seed_category(repo)
+        with pytest.raises(NotFoundError, match="Category not found"):
+            service.permanently_delete_category(other_restaurant_id, CAT_ID)
+        assert CAT_ID in repo.categories
+    else:
+        product = _product()
+        repo.products[product.id] = product
+        with pytest.raises(NotFoundError, match="Product not found"):
+            service.permanently_delete_product(other_restaurant_id, product.id)
+        assert product.id in repo.products

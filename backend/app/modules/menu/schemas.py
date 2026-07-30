@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 ProductStatus = Literal["active", "inactive", "draft"]
 
@@ -117,6 +117,10 @@ class ProductUpdate(BaseModel):
     image_path: str | None = None
     status: ProductStatus | None = None
     category_ids: list[uuid.UUID] | None = None
+
+
+class ProductPermanentBulkDelete(BaseModel):
+    product_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
 
 
 class ProductCountDTO(BaseModel):
