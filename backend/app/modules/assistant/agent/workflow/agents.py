@@ -44,7 +44,10 @@ def build_restaurant_ops_subagent(
         instructions=RESTAURANT_OPS_SUBAGENT_INSTRUCTIONS,
         tools=build_executor_function_tools(registry, effective_skill_ids, settings=settings),
         model=settings.openai_model,
-        model_settings=build_assistant_model_settings(settings),
+        model_settings=build_assistant_model_settings(
+            settings,
+            parallel_tool_calls=False,
+        ),
         output_type=ExecutionRecord,
     )
 

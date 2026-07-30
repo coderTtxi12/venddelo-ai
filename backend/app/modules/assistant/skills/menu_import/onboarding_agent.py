@@ -29,7 +29,10 @@ def build_menu_subagent(
         instructions=MENU_SUBAGENT_INSTRUCTIONS,
         tools=build_menu_import_internal_tools(registry),
         model=settings.openai_model,
-        model_settings=build_assistant_model_settings(settings),
+        model_settings=build_assistant_model_settings(
+            settings,
+            parallel_tool_calls=False,
+        ),
         output_type=ExecutionRecord,
     )
 
