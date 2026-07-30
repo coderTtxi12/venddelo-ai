@@ -1,4 +1,9 @@
-import { createCategory, deleteCategory, listCategories, updateCategory } from '@/lib/api/menu';
+import {
+  createCategory,
+  permanentlyDeleteCategory,
+  listCategories,
+  updateCategory,
+} from '@/lib/api/menu';
 import { fetchAllPages } from '@/lib/api/pagination';
 import { mapCategoryToDraft } from '@/lib/api/mappers';
 import { resolveImagePathForUpload } from '@/lib/storage/resolveImagePath';
@@ -121,5 +126,5 @@ export async function deleteSupplierCategory(
   restaurantId: string,
   categoryId: string,
 ): Promise<void> {
-  await deleteCategory(accessToken, restaurantId, categoryId);
+  await permanentlyDeleteCategory(accessToken, restaurantId, categoryId);
 }
