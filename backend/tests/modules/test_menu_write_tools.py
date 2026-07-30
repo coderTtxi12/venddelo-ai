@@ -2,6 +2,7 @@ import uuid
 
 from sqlalchemy.orm import sessionmaker
 
+from app.core.pagination import PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.menu_read.tools import (
@@ -1582,3 +1583,78 @@ def test_menu_write_applies_menu_theme_without_import_session(session):
     loaded = uow.restaurants.get(restaurant.id)
     assert loaded is not None
     assert loaded.digital_menu_theme_id == "taqueria-viva"
+
+
+@requires_db
+def test_menu_write_bulk_create_categories(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Create Cats", subdomain="menu-write-bulk-create-cats")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    result = skill.execute(
+        "bulk_create_categories",
+        {
+            "items": [
+                {"name": "Tacos"},
+                {"name": "Bebidas", "description": "Frías y calientes", "sort_index": 2},
+            ]
+        },
+        ctx,
+    )
+    assert result.ok is True
+    assert result.data["updated"] == 2
+    assert result.data["failed"] == 0
+    names = {row["label"] for row in result.data["results"]}
+    assert names == {"Tacos", "Bebidas"}
+
+    page = uow.menu.list_categories(
+        restaurant.id,
+        PaginationParams(limit=50, cursor=None),
+    )
+    live_names = {c.name for c in page.items}
+    assert "Tacos" in live_names
+    assert "Bebidas" in live_names
+
+
+@requires_db
+def test_menu_write_bulk_create_categories_partial_and_limit(session):
+    from app.modules.assistant.skills.menu_write.bulk import BULK_DEFAULT_LIMIT
+
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Create Cats 2", subdomain="menu-write-bulk-create-cats-2")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+    skill = MenuWriteSkill()
+
+    partial = skill.execute(
+        "bulk_create_categories",
+        {"items": [{"name": "Ok"}, {"description": "missing name"}]},
+        ctx,
+    )
+    assert partial.data["updated"] == 1
+    assert partial.data["failed"] == 1
+    assert partial.ok is True
+
+    over = skill.execute(
+        "bulk_create_categories",
+        {"items": [{"name": f"C{i}"} for i in range(BULK_DEFAULT_LIMIT + 1)]},
+        ctx,
+    )
+    assert over.ok is False
+    assert "At most" in over.summary

@@ -17,6 +17,7 @@ from app.modules.assistant.skills.menu_write.bulk import (
     bulk_update_product_names,
     bulk_update_product_prices,
 )
+from app.modules.assistant.skills.menu_write.bulk_create import bulk_create_categories
 from app.modules.assistant.skills.menu_write.option_item_bulk import (
     bulk_add_option_groups,
     bulk_add_option_items,
@@ -366,6 +367,33 @@ class MenuWriteSkill:
                         "sort_index": {"type": "integer"},
                     },
                     "required": ["name"],
+                },
+            ),
+            ToolDefinition(
+                name="bulk_create_categories",
+                description=(
+                    "Create MANY categories in one call. Each item needs name; optional "
+                    f"description and sort_index. Up to {BULK_DEFAULT_LIMIT} items. "
+                    "Use when the owner already listed several categories — no per-item recap."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "description": {"type": "string"},
+                                    "sort_index": {"type": "integer"},
+                                },
+                                "required": ["name"],
+                            },
+                        },
+                    },
+                    "required": ["items"],
                 },
             ),
             ToolDefinition(
@@ -1385,6 +1413,11 @@ class MenuWriteSkill:
                 )
 
             return _run_mutation(ctx, action, summary=f"Created category {name!r}")
+
+        if tool_name == "bulk_create_categories":
+            return bulk_create_categories(
+                service, ctx, args, invalidate=_finalize_menu_mutation
+            )
 
         if tool_name == "update_category":
             category_id_raw = args.get("category_id")
