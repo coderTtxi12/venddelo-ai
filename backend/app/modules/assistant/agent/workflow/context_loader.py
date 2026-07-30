@@ -311,18 +311,8 @@ def orchestrator_input(context: WorkflowContext) -> str:
 
 
 def restaurant_ops_input(context: WorkflowContext, task: str) -> str:
-    parts = [
-        f"## Conversation history\n\n{context.conversation_history}",
-        (
-            "## User request\n\n"
-            + build_agent_user_request(
-                context.user_message,
-                context.current_turn_attachments_context,
-            )
-        ),
-        f"## Delegated task\n\n{task.strip()}",
-    ]
-    return "\n\n".join(parts) + "\n"
+    _ = context
+    return f"## Delegated task\n\n{task.strip()}\n"
 
 
 def menu_subagent_input(context: WorkflowContext, task: str) -> str:
