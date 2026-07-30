@@ -145,17 +145,28 @@ def _parse_row_option_groups(raw: Any) -> tuple[list[OptionGroupCreate], str | N
             max_selections = (
                 int(entry["max_selections"]) if entry.get("max_selections") is not None else None
             )
-            groups.append(
-                OptionGroupCreate(
-                    title=title,
-                    required=bool(entry.get("required", False)),
-                    selection=selection,
-                    min_selections=int(entry.get("min_selections", 0) or 0),
-                    max_selections=max_selections,
-                    sort_index=int(entry.get("sort_index", 0) or 0),
-                    items=nested_items,
-                )
+            group = OptionGroupCreate(
+                title=title,
+                required=bool(entry.get("required", False)),
+                selection=selection,
+                min_selections=int(entry.get("min_selections", 0) or 0),
+                max_selections=max_selections,
+                sort_index=int(entry.get("sort_index", 0) or 0),
+                items=nested_items,
             )
+            if (
+                group.min_selections is not None
+                and group.max_selections is not None
+                and group.min_selections > group.max_selections
+            ):
+                return [], "min_selections cannot exceed max_selections"
+            if (
+                group.selection == "single"
+                and group.max_selections is not None
+                and group.max_selections > 1
+            ):
+                return [], "single selection allows max_selections of 1 at most"
+            groups.append(group)
         except (TypeError, ValueError) as exc:
             return [], str(exc)
     return groups, None
@@ -237,11 +248,17 @@ def bulk_create_products(
                 )
             )
         except (ValidationError, NotFoundError, ConflictError, TypeError, ValueError) as exc:
+            error = str(exc)
+            if created is not None:
+                error = (
+                    f"Product was created (id={created.id}), but adding an option group failed: "
+                    f"{error}"
+                )
             results.append(
                 BulkRowResult(
                     id=str(created.id) if created is not None else "?",
                     ok=False,
-                    error=str(exc),
+                    error=error,
                     label=name,
                 )
             )

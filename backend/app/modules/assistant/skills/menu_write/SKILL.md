@@ -82,7 +82,7 @@ Only after **explicit yes** on the recap → **`create_product`**.
 
 ### After create (optional, same conversation or later)
 
-- **Photo:** offer `menu_media` `generate_food_product_image` if they want a picture.
+- **Photo:** offer `menu_media` `generate_product_image` if they want a picture.
 - **Complements:** offer `add_option_group` / `add_option_item` if they want extras or sizes.
 - **Visibility:** new products default to `draft`; offer `status="active"` when they want it on the live menu — explain in plain language if they ask.
 
@@ -123,9 +123,10 @@ You:  [create_product] Listo, ya está en tu menú.
 When the owner pastes or lists **several** products or categories to add, call
 `bulk_create_products` / `bulk_create_categories` **directly** — no per-item secretary
 recap. Only `name` is required per product; missing price → 0; new products default to
-`active` on the live menu; categories optional. Nest `option_groups[].items[]` on each
-product when complements are known. Prefer these over looping `create_product` /
-`create_category`. Single-product conversational alta still uses the secretary flow.
+`active`; categories are optional, but a product with no category does **not** appear on the
+public/live menu until assigned to one. Nest `option_groups[].items[]` on each product when
+complements are known. Prefer these over looping `create_product` / `create_category`.
+Single-product conversational alta still uses the secretary flow.
 
 ---
 
@@ -154,7 +155,7 @@ Paths must be under `restaurants/{id}/import/inbox/`, legacy `import/product_pho
 On assign, inbox images are copied into `products/` automatically.
 Pass `force=true` to replace an existing `image_path`.
 
-For **AI-generated** food photos (no upload), use skill **`menu_media`** → `generate_food_product_image`.
+For **AI-generated** food photos (no upload), use skill **`menu_media`** → `generate_product_image`.
 
 ---
 
@@ -207,7 +208,7 @@ When the owner wants to **change how the public menu looks** — "cambia el tema
 | `update_category` | Rename, reorder, set `display_layout` (`vertical` \| `horizontal` \| `grid`), enable/disable regular categories (`category_id` UUID), or rename/enable/disable special aisles (`__dm_promotions__`, `__dm_limited_time__`) |
 | `create_product` | New product (`name`, `price_cents`, `category_ids`, optional `description`, optional `status` — default `draft`) |
 | `bulk_create_categories` | Create up to 50 categories (`items[]` with `name`; optional `description`, `sort_index`) |
-| `bulk_create_products` | Create up to 50 products (`name` required; price default 0; status default `active`; optional cats + nested `option_groups`) |
+| `bulk_create_products` | Create up to 50 products (`name` required; price default 0; status default `active`; optional categories + nested `option_groups`; uncategorized products stay off the public/live menu until assigned) |
 | `update_product` | Change one product by `product_id` **or** `name`/`product_name`; use `new_name` to rename; `price_cents` in cents (100 MXN = 10000); set `status` (`active` \| `inactive` \| `draft`) for visibility |
 | `bulk_update_product_names` | Rename up to 50 products (`items[]` with `new_name` + `product_id` or lookup name) |
 | `bulk_update_product_descriptions` | Rewrite up to 50 descriptions in one call (`items[]` with `description` + `product_id` or `name`) |

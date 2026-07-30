@@ -403,10 +403,11 @@ class MenuWriteSkill:
                 name="bulk_create_products",
                 description=(
                     "Create MANY complete products in one call. Only name is required per item; "
-                    "omitted price_cents defaults to 0; status defaults to active (live menu); "
-                    "categories optional (category_ids and/or category_names); optional nested "
-                    f"option_groups[].items[] for complements. Up to {BULK_DEFAULT_LIMIT} "
-                    "products. "
+                    "omitted price_cents defaults to 0; status defaults to active; categories "
+                    "are optional (category_ids and/or category_names), but uncategorized "
+                    "products do not appear on the public/live menu until assigned to a category; "
+                    "optional nested option_groups[].items[] for complements. "
+                    f"Up to {BULK_DEFAULT_LIMIT} products. "
                     "Use when the owner already listed several products — no per-item recap."
                 ),
                 effect="mutate",
