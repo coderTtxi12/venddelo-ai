@@ -68,6 +68,40 @@ def agent_thought_event(
     return ChatStreamEvent(event="agent.thought", data=data)
 
 
+def clarify_event(
+    *,
+    clarify_id: str,
+    conversation_id: str,
+    question: str,
+    choices: list[str] | None,
+    multi_select: bool,
+    timeout_seconds: int,
+) -> ChatStreamEvent:
+    return ChatStreamEvent(
+        event="agent.clarify",
+        data={
+            "clarify_id": clarify_id,
+            "conversation_id": conversation_id,
+            "question": question,
+            "choices": choices,
+            "multi_select": multi_select,
+            "allow_other": True,
+            "timeout_seconds": timeout_seconds,
+        },
+    )
+
+
+def clarify_closed_event(
+    *,
+    clarify_id: str,
+    reason: str,
+) -> ChatStreamEvent:
+    return ChatStreamEvent(
+        event="agent.clarify_closed",
+        data={"clarify_id": clarify_id, "reason": reason},
+    )
+
+
 def menu_import_quiz_event(questions: list[MenuImportQuizQuestion]) -> ChatStreamEvent:
     return ChatStreamEvent(
         event="menu_import.quiz",
