@@ -83,6 +83,12 @@ class AssistantChatRequest(BaseModel):
         return self
 
 
+class AssistantClarifyAnswerRequest(BaseModel):
+    conversation_id: uuid.UUID
+    clarify_id: uuid.UUID
+    user_response: str | list[str]
+
+
 class AssistantChatCompletePayload(BaseModel):
     conversation_id: str
     message_id: str
