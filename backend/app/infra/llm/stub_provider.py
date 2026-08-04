@@ -26,16 +26,19 @@ class StubLLMProvider(LLMProviderPort):
         if request.tools and last_role != "tool":
             search_fn = self._find_search_tool(request.tools)
             if search_fn and self._should_search(latest_user):
+                query = latest_user.strip() or "pastor"
+                arguments = (
+                    {"queries": [query]}
+                    if search_fn.endswith("bulk_search_products")
+                    else {"query": query}
+                )
                 tool_calls = [
                     {
                         "id": "call_stub_1",
                         "type": "function",
                         "function": {
                             "name": search_fn,
-                            "arguments": json.dumps(
-                                {"query": latest_user.strip() or "pastor"},
-                                ensure_ascii=False,
-                            ),
+                            "arguments": json.dumps(arguments, ensure_ascii=False),
                         },
                     }
                 ]
@@ -69,7 +72,7 @@ class StubLLMProvider(LLMProviderPort):
     def _find_search_tool(tools: list[dict]) -> str | None:
         for tool in tools:
             name = (tool.get("function") or {}).get("name") or ""
-            if name.endswith("search_products"):
+            if name.endswith("bulk_search_products") or name.endswith("search_products"):
                 return name
         return None
 

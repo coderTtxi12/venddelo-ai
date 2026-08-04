@@ -18,7 +18,7 @@ guide on disk; you do not need a separate "activation" step.
   product by `product_ids` (scope=product), by `category_ids` (scope=category), or applies to
   the whole order (scope=order).
 - **`list_products` and `get_product` both include `promotions[]` / `has_promotions` per product**
-  (with `option_participation` when bundle/percent/amount applies). `search_products` does not.
+  (with `option_participation` when bundle/percent/amount applies). `bulk_search_products` does not.
   Use `list_product_promotions` only when you already have the product elsewhere and want promos
   without the full catalog row; use `list_promotions` for a restaurant-wide promo overview.
 - Options are children of a product (`option_groups → option_items`); add-on price lives in
@@ -58,7 +58,7 @@ Follow this workflow on every menu question:
 | "¿Qué categorías tengo?" | `list_categories` |
 | "Lista todos mis productos" / "¿cuántos productos tengo?" | `list_products` (paginate with `cursor`) |
 | "Productos de la categoría Tacos" | `list_categories` first if needed, then `list_products` + `category_id` |
-| "Busca tacos al pastor" / "¿tienes X?" | `search_products` + `query` |
+| "Busca tacos al pastor" / "¿tienes X?" | `bulk_search_products` + `queries` |
 | "Detalle del producto {id}" / after search by id | `get_product` + `product_id` |
 | "Detalle de varios productos" / known UUID list | `bulk_get_products` + `product_ids` or `items` |
 | "¿Qué opciones/tamaños/extras tiene X?" / "¿es obligatorio elegir?" | `get_product` (read `option_groups` + `selection_summary`) |
@@ -70,14 +70,14 @@ Follow this workflow on every menu question:
 ### Step 2: Prefer the Smallest Read
 
 1. **Default:** answer from conversation history and prior tool results if accurate.
-2. **Text lookup:** `search_products` when the owner names or describes items.
+2. **Text lookup:** `bulk_search_products` when the owner names or describes items.
 3. **Full catalog / counts:** `list_products` with pagination — never guess totals.
 4. **Single record:** `get_product` when you already have a UUID.
 5. **Several known products:** `bulk_get_products` with `product_ids` and/or `names` (max 50) instead of many `get_product` calls.
 
 ### Step 2b: Handle "Product Not Found" (typos + other languages)
 
-`search_products` is fuzzy and accent-insensitive, so typos usually still match
+`bulk_search_products` is fuzzy and accent-insensitive, so typos usually still match
 ("wins" → "WINGS & FRIES", "limon" → "Limón"). Two cases need extra care:
 
 - **Suggestions returned:** if `products` is empty but `suggestions` is not, do **not**
@@ -85,7 +85,7 @@ Follow this workflow on every menu question:
   **WINGS & FRIES**?" and proceed if the owner confirms.
 - **Another language / synonym:** fuzzy matching cannot bridge languages
   ("alitas" → "wings", "papas" → "fries", "refresco" → "soda"). When
-  `search_products` returns **0 products and 0 suggestions**, fall back to
+  `bulk_search_products` returns **0 products and 0 suggestions** for that query, fall back to
   `list_products` to load the catalog, then **you** map the term by translating /
   interpreting it against the real product names. Never declare a product missing
   until you have scanned the catalog this way.
@@ -127,19 +127,19 @@ from `price_cents`). Never dump raw tool JSON keys or snake_case field names in 
 
 **Use when:** Full browse, "how many products", complements/photos audit, finding **inactive** items to re-enable, or all items in one category. Paginate until `has_more=false`.
 
-### `search_products`
+### `bulk_search_products`
 
 | Arg | Required | Meaning |
 |-----|----------|---------|
-| `query` | yes | Fuzzy, accent-insensitive match on **product name** (descriptions ignored) |
+| `queries` | yes | Non-empty array of fuzzy name searches (1–50). A single query is valid. |
 
-**Returns:**
+**Returns:** `results[]` — one row per query:
 
 | Field | Meaning |
 |-------|---------|
+| `query` | Echo of that search string |
 | `products` | Up to 20 confident matches, ranked, each with `match_score` (0–1) |
 | `suggestions` | Up to 5 near-misses (lower score) for "did you mean" prompts |
-| `query` | Echo of the searched term |
 
 Matching tolerates typos and accents ("wins" → "WINGS & FRIES", "limon" → "Limón").
 **Exact name wins** over neighbors (e.g. query "Hamburguesa" matches product `HAMBURGUESA`,
@@ -147,7 +147,7 @@ not `BURGER & BONELESS` even if its description mentions hamburguesa). Always se
 full owner catalog (active, inactive, draft). Check `status` on each hit.
 It does **not** cross languages — see Step 2b for the `list_products` fallback.
 
-**Use when:** Named item lookup ("pastor", "limonada"), not full catalog export.
+**Use when:** Named item lookup ("pastor", "limonada"), including several names in one call.
 
 ### `get_product`
 
@@ -158,7 +158,7 @@ It does **not** cross languages — see Step 2b for the `list_products` fallback
 
 Provide **at least one**. If `product_id` is invalid/unknown and `name` is given, it
 retries by name. On a name miss it returns `suggestions` (same shape as
-`search_products`) instead of a hard failure.
+`bulk_search_products`) instead of a hard failure.
 
 **Returns:** One product with `option_groups`, prices, flags, **plus `promotions[]` and
 `has_promotions`** for that product (or `suggestions` on a miss).
@@ -184,7 +184,7 @@ skipped after the first hit.
 **Returns:** `products[]` (full payloads, same shape as `get_product`), plus `results[]`
 per input (`ok`, `input`, `product` or `error`), and `found` / `failed` counts.
 
-**Use when:** You need detail for several known products (e.g. after `search_products`
+**Use when:** You need detail for several known products (e.g. after `bulk_search_products`
 returned multiple ids, or comparing a short list). Prefer this over N separate
 `get_product` calls.
 
@@ -387,7 +387,7 @@ Never invent values missing from tool results.
 
 ### "Muéstrame detalles de ambos" (reuse prior results — do NOT re-search blindly)
 
-`search_products` and `list_products` already return **full payloads** (price,
+`bulk_search_products` and `list_products` already return **full payloads** (price,
 `option_groups`, flags). When the owner asks for details of items you just listed:
 
 1. **First, reuse** the products already in this turn's tool results — you usually have
@@ -401,7 +401,7 @@ Never invent values missing from tool results.
 
 ### "¿Cuánto cuesta el taco al pastor?" / "háblame de X"
 
-1. Prefer `search_products` `{ "query": "pastor" }`; if you need full detail use
+1. Prefer `bulk_search_products` `{ "queries": ["pastor"] }`; if you need full detail use
    `get_product`.
 2. If multiple matches, clarify or list options.
 3. Format `price_cents` in Spanish for the owner.
@@ -412,14 +412,14 @@ Never invent values missing from tool results.
 
 ### "¿Tienes alitas con papas?" (other language / synonym)
 
-1. `search_products` `{ "query": "alitas con papas" }` → 0 products, 0 suggestions.
+1. `bulk_search_products` `{ "queries": ["alitas con papas"] }` → 0 products, 0 suggestions.
 2. Fall back to `list_products` (paginate if needed) to load the catalog.
 3. Map "alitas con papas" → **WINGS & FRIES** by interpreting the names yourself.
 4. Answer in Spanish with that product (price, option groups). Do not say it is missing.
 
 ### "Busca wins and fries" (typo)
 
-1. `search_products` `{ "query": "wins and fries" }` → fuzzy match returns **WINGS & FRIES**.
+1. `bulk_search_products` `{ "queries": ["wins and fries"] }` → fuzzy match returns **WINGS & FRIES**.
 2. If it lands in `suggestions` instead of `products`, confirm: "¿Te refieres a WINGS & FRIES?"
 
 ### "¿Qué opciones tiene la hamburguesa?" (modifiers)
@@ -485,7 +485,7 @@ Never invent values missing from tool results.
 | Do | Don't |
 |----|-------|
 | Use tools for live DB data when context is insufficient | Invent prices, counts, or categories |
-| Paginate with `list_products` for large menus | Assume `search_products` returns the full catalog |
+| Paginate with `list_products` for large menus | Assume `bulk_search_products` returns the full catalog |
 | Scope every call to the current restaurant tenant | Reference other restaurants |
 | Say when data is partial (page 1 of N) | Claim you edited or disabled products |
 | Use `bulk_get_products` for several known UUIDs/names | Call `get_product` in a loop when ids are already known |

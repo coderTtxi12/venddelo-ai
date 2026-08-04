@@ -62,5 +62,5 @@ def test_build_skill_registry_discovers_menu_read_tools():
     registry = build_skill_registry()
     tools = registry.tool_definitions(["menu_read"])
     names = {tool.name for tool in tools}
-    assert "search_products" in names
+    assert "bulk_search_products" in names
     assert "list_categories" in names

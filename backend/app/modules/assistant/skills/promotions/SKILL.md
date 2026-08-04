@@ -148,7 +148,7 @@ Other edits (dates, rules, non-NxM promos) are done in the **admin UI**.
 
 ```
 Owner: "Crea un 2×1 de WINGS & FRIES"
-  → menu_read: get_product / search_products (confirm product)
+  → menu_read: get_product / bulk_search_products (confirm product)
   → promotions: create_promotion {
        name: "2×1 Alitas",
        type: "bundle",

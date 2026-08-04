@@ -50,6 +50,17 @@ def test_build_special_categories_orders_promotions_before_limited_time():
     assert specials[1]["is_active"] is True
 
 
+def test_menu_read_registers_bulk_search_products_not_search_products():
+    definitions = {
+        definition.name: definition for definition in MenuReadSkill().tool_definitions()
+    }
+    assert "bulk_search_products" in definitions
+    assert "search_products" not in definitions
+    tool = definitions["bulk_search_products"]
+    assert tool.effect == "read"
+    assert tool.input_schema["required"] == ["queries"]
+
+
 @requires_db
 def test_menu_read_lists_categories_and_searches_products(session):
     uow = SqlAlchemyUnitOfWork(lambda: session)
@@ -76,7 +87,7 @@ def test_menu_read_lists_categories_and_searches_products(session):
     skill = MenuReadSkill()
 
     categories = skill.execute("list_categories", {}, ctx)
-    products = skill.execute("search_products", {"query": "pastor"}, ctx)
+    products = skill.execute("bulk_search_products", {"queries": ["pastor"]}, ctx)
 
     assert categories.ok is True
     assert categories.data["categories"][0]["category_type"] == "special_promotions"
@@ -88,7 +99,59 @@ def test_menu_read_lists_categories_and_searches_products(session):
     assert regular["display_layout"] is None
     assert regular["is_active"] is True
     assert products.ok is True
-    assert products.data["products"][0]["id"] == str(product.id)
+    assert products.data["results"][0]["products"][0]["id"] == str(product.id)
+
+
+@requires_db
+def test_menu_read_bulk_search_products_multiple_queries(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Bulk Search", subdomain="menu-read-bulk-search")
+    )
+    category = uow.menu.add_category(
+        CategoryCreate(restaurant_id=restaurant.id, name="Tacos", sort_index=1)
+    )
+    pastor = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Taco al pastor",
+            price_cents=1200,
+            category_ids=[category.id],
+        )
+    )
+    asada = uow.menu.add_product(
+        ProductCreate(
+            restaurant_id=restaurant.id,
+            name="Taco de asada",
+            price_cents=1300,
+            category_ids=[category.id],
+        )
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_read"],
+    )
+
+    result = MenuReadSkill().execute(
+        "bulk_search_products",
+        {"queries": ["pastor", "asada", "xyz-no-match"]},
+        ctx,
+    )
+
+    assert result.ok is True
+    assert len(result.data["results"]) == 3
+    assert [row["query"] for row in result.data["results"]] == [
+        "pastor",
+        "asada",
+        "xyz-no-match",
+    ]
+    assert result.data["results"][0]["products"][0]["id"] == str(pastor.id)
+    assert result.data["results"][1]["products"][0]["id"] == str(asada.id)
+    assert result.data["results"][2]["products"] == []
+    assert result.data["results"][2]["suggestions"] == []
 
 
 @requires_db
@@ -117,17 +180,17 @@ def test_menu_read_search_tolerates_typos(session):
     )
     skill = MenuReadSkill()
 
-    typo = skill.execute("search_products", {"query": "wins and fries"}, ctx)
-    other_language = skill.execute("search_products", {"query": "alitas"}, ctx)
+    typo = skill.execute("bulk_search_products", {"queries": ["wins and fries"]}, ctx)
+    other_language = skill.execute("bulk_search_products", {"queries": ["alitas"]}, ctx)
 
     assert typo.ok is True
-    assert [item["id"] for item in typo.data["products"]] == [str(product.id)]
-    assert "match_score" in typo.data["products"][0]
+    assert [item["id"] for item in typo.data["results"][0]["products"]] == [str(product.id)]
+    assert "match_score" in typo.data["results"][0]["products"][0]
 
     # Cross-language returns nothing here; the agent must fall back to list_products.
     assert other_language.ok is True
-    assert other_language.data["products"] == []
-    assert other_language.data["suggestions"] == []
+    assert other_language.data["results"][0]["products"] == []
+    assert other_language.data["results"][0]["suggestions"] == []
 
 
 @requires_db
@@ -248,11 +311,15 @@ def test_menu_read_search_wings_fries_matches_boneless_when_no_exact_name(sessio
         effective_skill_ids=["menu_read"],
     )
 
-    result = MenuReadSkill().execute("search_products", {"query": "Wings & Fries"}, ctx)
+    result = MenuReadSkill().execute(
+        "bulk_search_products", {"queries": ["Wings & Fries"]}, ctx
+    )
 
     assert result.ok is True
-    assert [item["id"] for item in result.data["products"]] == [str(boneless_fries.id)]
-    assert result.data["suggestions"] == []
+    assert [item["id"] for item in result.data["results"][0]["products"]] == [
+        str(boneless_fries.id)
+    ]
+    assert result.data["results"][0]["suggestions"] == []
 
 
 @requires_db
@@ -305,15 +372,18 @@ def test_menu_read_search_wild_rooster_prefers_exact_inactive_wings_and_fries(se
         effective_skill_ids=["menu_read"],
     )
 
-    result = MenuReadSkill().execute("search_products", {"query": "Wings & Fries"}, ctx)
+    result = MenuReadSkill().execute(
+        "bulk_search_products", {"queries": ["Wings & Fries"]}, ctx
+    )
 
     assert result.ok is True
     assert result.summary == "Found 1 matching products"
-    assert [item["id"] for item in result.data["products"]] == [str(wings_fries.id)]
-    assert result.data["products"][0]["name"] == "WINGS & FRIES"
-    assert result.data["products"][0]["status"] == "inactive"
-    assert result.data["products"][0]["match_score"] == 1.0
-    assert result.data["suggestions"] == []
+    row = result.data["results"][0]
+    assert [item["id"] for item in row["products"]] == [str(wings_fries.id)]
+    assert row["products"][0]["name"] == "WINGS & FRIES"
+    assert row["products"][0]["status"] == "inactive"
+    assert row["products"][0]["match_score"] == 1.0
+    assert row["suggestions"] == []
 
 
 @requires_db
@@ -357,15 +427,16 @@ def test_menu_read_search_ignores_legacy_active_only_arg(session):
     )
 
     result = MenuReadSkill().execute(
-        "search_products",
-        {"query": "Wings & Fries", "active_only": True},
+        "bulk_search_products",
+        {"queries": ["Wings & Fries"], "active_only": True},
         ctx,
     )
 
     assert result.ok is True
-    assert [item["id"] for item in result.data["products"]] == [str(wings_fries.id)]
-    assert result.data["products"][0]["name"] == "WINGS & FRIES"
-    assert result.data["products"][0]["match_score"] == 1.0
+    row = result.data["results"][0]
+    assert [item["id"] for item in row["products"]] == [str(wings_fries.id)]
+    assert row["products"][0]["name"] == "WINGS & FRIES"
+    assert row["products"][0]["match_score"] == 1.0
 
 
 @requires_db
@@ -394,11 +465,14 @@ def test_menu_read_search_finds_draft_products(session):
         effective_skill_ids=["menu_read"],
     )
 
-    result = MenuReadSkill().execute("search_products", {"query": "Wings & Fries"}, ctx)
+    result = MenuReadSkill().execute(
+        "bulk_search_products", {"queries": ["Wings & Fries"]}, ctx
+    )
 
     assert result.ok is True
-    assert [item["id"] for item in result.data["products"]] == [str(draft_product.id)]
-    assert result.data["products"][0]["status"] == "draft"
+    row = result.data["results"][0]
+    assert [item["id"] for item in row["products"]] == [str(draft_product.id)]
+    assert row["products"][0]["status"] == "draft"
 
 
 @requires_db
@@ -1152,13 +1226,13 @@ def test_menu_read_search_hamburguesa_prefers_exact_name_over_neighbor_descripti
     )
     skill = MenuReadSkill()
 
-    search = skill.execute("search_products", {"query": "hamburguesa"}, ctx)
+    search = skill.execute("bulk_search_products", {"queries": ["hamburguesa"]}, ctx)
     get_by_name = skill.execute("get_product", {"name": "Hamburguesa"}, ctx)
     listed = skill.execute("list_products", {}, ctx)
 
     assert search.ok is True
-    assert len(search.data["products"]) == 1
-    assert search.data["products"][0]["name"] == "HAMBURGUESA"
+    assert len(search.data["results"][0]["products"]) == 1
+    assert search.data["results"][0]["products"][0]["name"] == "HAMBURGUESA"
     assert get_by_name.ok is True
     assert get_by_name.data["product"]["id"] == str(hamburguesa.id)
     assert get_by_name.data["product"]["status"] == "inactive"

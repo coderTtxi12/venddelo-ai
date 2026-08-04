@@ -38,6 +38,7 @@ from app.modules.promotions.types import serialize_promotion_type
 DEFAULT_LIST_PRODUCTS_LIMIT = 20
 MAX_LIST_PRODUCTS_LIMIT = 50
 MAX_BULK_GET_PRODUCTS_LIMIT = 50
+MAX_BULK_SEARCH_PRODUCTS_LIMIT = 50
 MAX_SEARCH_RESULTS = 20
 MAX_SEARCH_SUGGESTIONS = 5
 DEFAULT_LIST_PROMOTIONS_LIMIT = 20
@@ -420,6 +421,74 @@ def _score_catalog(
             scored.append((score, product))
     scored.sort(key=lambda pair: pair[0], reverse=True)
     return scored
+
+
+def _parse_bulk_search_queries(args: dict[str, Any]) -> tuple[list[str], str | None]:
+    raw = args.get("queries")
+    if not isinstance(raw, list) or not raw:
+        return [], "Provide queries: a non-empty array of search strings"
+    queries: list[str] = []
+    for entry in raw:
+        text = str(entry or "").strip()
+        if text:
+            queries.append(text)
+    if not queries:
+        return [], "Provide queries: a non-empty array of search strings"
+    if len(queries) > MAX_BULK_SEARCH_PRODUCTS_LIMIT:
+        return (
+            [],
+            f"At most {MAX_BULK_SEARCH_PRODUCTS_LIMIT} queries per call (got {len(queries)})",
+        )
+    return queries, None
+
+
+def _search_products_for_query(
+    query: str,
+    catalog: list[ProductDTO],
+) -> dict[str, Any]:
+    """Run one fuzzy name search (same behavior as the former search_products tool)."""
+    if not query:
+        scored = [(1.0, product) for product in catalog]
+    else:
+        scored = _score_catalog(query, catalog)
+
+    strong = [
+        _scored_payload(score, product)
+        for score, product in scored
+        if score >= STRONG_MATCH_THRESHOLD
+    ][:MAX_SEARCH_RESULTS]
+    suggestions = [
+        _scored_payload(score, product)
+        for score, product in scored
+        if score < STRONG_MATCH_THRESHOLD
+    ][:MAX_SEARCH_SUGGESTIONS]
+
+    if (
+        not strong
+        and len(suggestions) == 1
+        and suggestions[0].get("match_score", 0) >= LONE_MATCH_THRESHOLD
+    ):
+        strong = suggestions
+        suggestions = []
+
+    if strong:
+        summary = f"Found {len(strong)} matching products"
+    elif suggestions:
+        summary = (
+            f"No confident match for '{query}'; "
+            f"{len(suggestions)} possible suggestions"
+        )
+    else:
+        summary = (
+            f"No products matched '{query}'. "
+            "Fall back to list_products and match by translating/interpreting the name."
+        )
+    return {
+        "query": query,
+        "products": strong,
+        "suggestions": suggestions,
+        "summary": summary,
+    }
 
 
 def _resolve_result_payload(
@@ -903,21 +972,48 @@ class MenuReadSkill:
                     },
                 },
             ),
+            # Disabled: use bulk_search_products (works for a single query too).
+            # ToolDefinition(
+            #     name="search_products",
+            #     description=(
+            #         "Search products by **name** (exact name wins over fuzzy neighbors; "
+            #         "descriptions are ignored so shared words like 'hamburguesa' in another "
+            #         "product's copy do not hijack the match). Searches the full owner catalog "
+            #         "including inactive and draft items — check status on each hit."
+            #     ),
+            #     effect="read",
+            #     input_schema={
+            #         "type": "object",
+            #         "properties": {
+            #             "query": {"type": "string"},
+            #         },
+            #         "required": ["query"],
+            #     },
+            # ),
             ToolDefinition(
-                name="search_products",
+                name="bulk_search_products",
                 description=(
-                    "Search products by **name** (exact name wins over fuzzy neighbors; "
-                    "descriptions are ignored so shared words like 'hamburguesa' in another "
-                    "product's copy do not hijack the match). Searches the full owner catalog "
-                    "including inactive and draft items — check status on each hit."
+                    "Search products by **name** for one or many queries (fuzzy). "
+                    "Exact name wins over fuzzy neighbors; descriptions are ignored so shared "
+                    "words like 'hamburguesa' in another product's copy do not hijack the match. "
+                    f"Up to {MAX_BULK_SEARCH_PRODUCTS_LIMIT} queries; a single-query array is valid. "
+                    "Searches the full owner catalog including inactive and draft items — check "
+                    "status on each hit."
                 ),
                 effect="read",
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string"},
+                        "queries": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "Search strings (product names / fragments). "
+                                "One query is enough when looking up a single product."
+                            ),
+                        },
                     },
-                    "required": ["query"],
+                    "required": ["queries"],
                 },
             ),
             ToolDefinition(
@@ -1162,53 +1258,44 @@ class MenuReadSkill:
                 data=data,
             )
 
-        if tool_name == "search_products":
-            query = str(args.get("query", "")).strip()
+        # Disabled: use bulk_search_products (works for a single query too).
+        # if tool_name == "search_products":
+        #     query = str(args.get("query", "")).strip()
+        #     catalog = iter_catalog_products(service, ctx.restaurant_id)
+        #     row = _search_products_for_query(query, catalog)
+        #     return ToolResult(
+        #         ok=True,
+        #         summary=row["summary"],
+        #         data={
+        #             "products": row["products"],
+        #             "suggestions": row["suggestions"],
+        #             "query": row["query"],
+        #         },
+        #     )
+
+        if tool_name == "bulk_search_products":
+            queries, parse_err = _parse_bulk_search_queries(args)
+            if parse_err:
+                return ToolResult(ok=False, summary=parse_err)
             catalog = iter_catalog_products(service, ctx.restaurant_id)
-
-            if not query:
-                scored = [(1.0, product) for product in catalog]
+            results = [_search_products_for_query(query, catalog) for query in queries]
+            matched = sum(1 for row in results if row["products"] or row["suggestions"])
+            if len(results) == 1:
+                summary = results[0]["summary"]
             else:
-                scored = _score_catalog(query, catalog)
-
-            strong = [
-                _scored_payload(score, product)
-                for score, product in scored
-                if score >= STRONG_MATCH_THRESHOLD
-            ][:MAX_SEARCH_RESULTS]
-            suggestions = [
-                _scored_payload(score, product)
-                for score, product in scored
-                if score < STRONG_MATCH_THRESHOLD
-            ][:MAX_SEARCH_SUGGESTIONS]
-
-            if (
-                not strong
-                and len(suggestions) == 1
-                and suggestions[0].get("match_score", 0) >= LONE_MATCH_THRESHOLD
-            ):
-                strong = suggestions
-                suggestions = []
-
-            if strong:
-                summary = f"Found {len(strong)} matching products"
-            elif suggestions:
-                summary = (
-                    f"No confident match for '{query}'; "
-                    f"{len(suggestions)} possible suggestions"
-                )
-            else:
-                summary = (
-                    f"No products matched '{query}'. "
-                    "Fall back to list_products and match by translating/interpreting the name."
-                )
+                summary = f"Searched {len(results)} queries; {matched} with matches or suggestions"
             return ToolResult(
                 ok=True,
                 summary=summary,
                 data={
-                    "products": strong,
-                    "suggestions": suggestions,
-                    "query": query,
+                    "results": [
+                        {
+                            "query": row["query"],
+                            "products": row["products"],
+                            "suggestions": row["suggestions"],
+                        }
+                        for row in results
+                    ]
                 },
             )
 

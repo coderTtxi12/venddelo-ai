@@ -23,7 +23,7 @@ def test_build_skill_function_tools_exposes_menu_read_tools():
     expected = {
         "list_categories",
         "list_products",
-        "search_products",
+        "bulk_search_products",
         "get_product",
         "bulk_get_products",
         "list_promotions",
