@@ -56,12 +56,21 @@ from app.modules.assistant.skills.menu_write.product_photos import (
 from app.modules.assistant.skills.menu_write.restaurant_settings_tools import (
     assign_restaurant_cover,
     assign_restaurant_logo,
+    get_delivery_provider_payment_methods,
+    get_delivery_provider_schedules,
+    get_restaurant_description,
+    get_restaurant_location,
+    get_restaurant_menu_qr,
     get_restaurant_name,
+    get_restaurant_payment_methods,
     get_restaurant_public_menu_url,
     get_restaurant_schedules,
     remove_restaurant_cover,
     remove_restaurant_logo,
+    set_restaurant_payment_methods,
     set_restaurant_schedules,
+    update_restaurant_description,
+    update_restaurant_location,
 )
 from app.modules.assistant.skills.menu_write.theme_tools import (
     apply_menu_theme,
@@ -88,7 +97,7 @@ from app.modules.menu.schemas import (
     OptionItemCreate,
     OptionItemDTO,
     OptionItemUpdate,
-    ProductCreate,
+    # ProductCreate,  # only used by disabled create_product tool
     ProductDTO,
     ProductUpdate,
 )
@@ -482,10 +491,10 @@ class MenuWriteSkill:
             ToolDefinition(
                 name="ocr_menu_to_bulk_products",
                 description=(
-                    "OCR one or more uploaded menu images (storage_path from chat attachments) into "
-                    "JSON {items:[...]} ready for bulk_create_products. Read-only — does not create "
-                    "products. Pass storage_paths (1-5) or storage_path. Uses OPENAI_VISION_MODEL. "
-                    "After OCR, create missing categories then call bulk_create_products (split if >50)."
+                    "OCR one or more uploaded menu images (storage_path from chat attachments) and "
+                    "return only JSON {items:[...]} (bulk product shape). Read-only mapping — does "
+                    "not create products or categories. Pass storage_paths (1-5) or storage_path. "
+                    "Uses OPENAI_VISION_MODEL."
                 ),
                 effect="read",
                 input_schema={
@@ -547,34 +556,35 @@ class MenuWriteSkill:
                     "required": ["category_id"],
                 },
             ),
-            ToolDefinition(
-                name="create_product",
-                description=(
-                    "Create a product after the owner confirmed the recap in the secretary "
-                    "onboarding flow (category, name, price). Price is in cents. Do not call "
-                    "until category_ids, name, and price_cents are known and the owner said yes."
-                ),
-                effect="mutate",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "name": {"type": "string"},
-                        "price_cents": {"type": "integer"},
-                        "category_ids": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
-                        "description": {"type": "string"},
-                        "currency": {"type": "string"},
-                        "status": {
-                            "type": "string",
-                            "enum": ["active", "inactive", "draft"],
-                            "default": "draft",
-                        },
-                    },
-                    "required": ["name", "price_cents", "category_ids"],
-                },
-            ),
+            # Disabled: use bulk_create_products (works for a single product too).
+            # ToolDefinition(
+            #     name="create_product",
+            #     description=(
+            #         "Create a product after the owner confirmed the recap in the secretary "
+            #         "onboarding flow (category, name, price). Price is in cents. Do not call "
+            #         "until category_ids, name, and price_cents are known and the owner said yes."
+            #     ),
+            #     effect="mutate",
+            #     input_schema={
+            #         "type": "object",
+            #         "properties": {
+            #             "name": {"type": "string"},
+            #             "price_cents": {"type": "integer"},
+            #             "category_ids": {
+            #                 "type": "array",
+            #                 "items": {"type": "string"},
+            #             },
+            #             "description": {"type": "string"},
+            #             "currency": {"type": "string"},
+            #             "status": {
+            #                 "type": "string",
+            #                 "enum": ["active", "inactive", "draft"],
+            #                 "default": "draft",
+            #             },
+            #         },
+            #         "required": ["name", "price_cents", "category_ids"],
+            #     },
+            # ),
             ToolDefinition(
                 name="update_product",
                 description=(
@@ -1367,6 +1377,56 @@ class MenuWriteSkill:
                 input_schema={"type": "object", "properties": {}, "required": []},
             ),
             ToolDefinition(
+                name="get_restaurant_description",
+                description="Read the restaurant business description shown on the public profile.",
+                effect="read",
+                input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
+                name="update_restaurant_description",
+                description=(
+                    "Update the restaurant business description. Pass description as a string; "
+                    "empty string or null clears it."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "description": {
+                            "type": ["string", "null"],
+                            "description": "Business description text; empty/null clears.",
+                        },
+                    },
+                    "required": ["description"],
+                },
+            ),
+            ToolDefinition(
+                name="get_restaurant_location",
+                description=(
+                    "Read restaurant location: address, latitude, longitude, and place_id."
+                ),
+                effect="read",
+                input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
+                name="update_restaurant_location",
+                description=(
+                    "Update restaurant location fields. Pass any of address, latitude, longitude, "
+                    "place_id (null clears that field)."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "address": {"type": ["string", "null"]},
+                        "latitude": {"type": ["number", "null"]},
+                        "longitude": {"type": ["number", "null"]},
+                        "place_id": {"type": ["string", "null"]},
+                    },
+                    "required": [],
+                },
+            ),
+            ToolDefinition(
                 name="get_restaurant_public_menu_url",
                 description=(
                     "Read the public digital menu URL for this restaurant (share link for customers)."
@@ -1375,10 +1435,19 @@ class MenuWriteSkill:
                 input_schema={"type": "object", "properties": {}, "required": []},
             ),
             ToolDefinition(
+                name="get_restaurant_menu_qr",
+                description=(
+                    "Read the URL encoded by the restaurant digital-menu QR code "
+                    "(same as the public menu link). Use when the owner asks for the QR."
+                ),
+                effect="read",
+                input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
                 name="get_restaurant_schedules",
                 description=(
-                    "Read opening hours. Returns schedule rows with service_type (takeout|delivery), "
-                    "day_of_week (0=Mon..6=Sun), opens_at, closes_at."
+                    "Read restaurant opening hours. Returns schedule rows with service_type "
+                    "(takeout|delivery), day_of_week (0=Mon..6=Sun), opens_at, closes_at."
                 ),
                 effect="read",
                 input_schema={"type": "object", "properties": {}, "required": []},
@@ -1417,6 +1486,66 @@ class MenuWriteSkill:
                     },
                     "required": ["schedules"],
                 },
+            ),
+            ToolDefinition(
+                name="get_delivery_provider_schedules",
+                description=(
+                    "Read courier/delivery-provider hours when an active partnership exists. "
+                    "Returns empty schedules if there is no active delivery provider."
+                ),
+                effect="read",
+                input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
+                name="get_restaurant_payment_methods",
+                description=(
+                    "Read payment methods for pickup (takeout) and delivery. "
+                    "Rows include method (cash|transfer|card_terminal), service_type, enabled."
+                ),
+                effect="read",
+                input_schema={"type": "object", "properties": {}, "required": []},
+            ),
+            ToolDefinition(
+                name="set_restaurant_payment_methods",
+                description=(
+                    "Replace ALL restaurant payment method rows for takeout and delivery. "
+                    "Pass payment_methods[] with method, service_type, enabled. "
+                    "Delivery methods must be allowed by the active courier when partnership exists."
+                ),
+                effect="mutate",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "payment_methods": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "method": {
+                                        "type": "string",
+                                        "enum": ["cash", "transfer", "card_terminal"],
+                                    },
+                                    "service_type": {
+                                        "type": "string",
+                                        "enum": ["takeout", "delivery"],
+                                    },
+                                    "enabled": {"type": "boolean"},
+                                },
+                                "required": ["method", "service_type", "enabled"],
+                            },
+                        },
+                    },
+                    "required": ["payment_methods"],
+                },
+            ),
+            ToolDefinition(
+                name="get_delivery_provider_payment_methods",
+                description=(
+                    "Read which payment methods the active delivery courier allows. "
+                    "Empty when there is no active delivery provider partnership."
+                ),
+                effect="read",
+                input_schema={"type": "object", "properties": {}, "required": []},
             ),
             ToolDefinition(
                 name="assign_restaurant_logo",
@@ -1527,7 +1656,6 @@ class MenuWriteSkill:
             return bulk_create_categories(
                 service, ctx, args, invalidate=_finalize_menu_mutation
             )
-
         if tool_name == "bulk_create_products":
             return bulk_create_products(
                 service, ctx, args, invalidate=_finalize_menu_mutation
@@ -1574,31 +1702,32 @@ class MenuWriteSkill:
 
             return _run_mutation(ctx, action, summary="Updated category")
 
-        if tool_name == "create_product":
-            name = _optional_str(args.get("name"))
-            if not name:
-                return ToolResult(ok=False, summary="name is required")
-            try:
-                price_cents = int(args.get("price_cents"))
-                category_ids = _parse_uuid_list(args.get("category_ids"), "category_ids")
-            except (TypeError, ValueError, ValidationError) as exc:
-                return ToolResult(ok=False, summary=str(exc))
-
-            def action() -> ProductDTO:
-                return service.create_product(
-                    restaurant_id,
-                    ProductCreate(
-                        restaurant_id=restaurant_id,
-                        name=name,
-                        description=_optional_str(args.get("description")),
-                        price_cents=price_cents,
-                        currency=str(args.get("currency") or "MXN"),
-                        status=str(args.get("status") or "draft"),
-                        category_ids=category_ids,
-                    ),
-                )
-
-            return _run_mutation(ctx, action, summary=f"Created product {name!r}")
+        # Disabled: use bulk_create_products (works for a single product too).
+        # if tool_name == "create_product":
+        #     name = _optional_str(args.get("name"))
+        #     if not name:
+        #         return ToolResult(ok=False, summary="name is required")
+        #     try:
+        #         price_cents = int(args.get("price_cents"))
+        #         category_ids = _parse_uuid_list(args.get("category_ids"), "category_ids")
+        #     except (TypeError, ValueError, ValidationError) as exc:
+        #         return ToolResult(ok=False, summary=str(exc))
+        #
+        #     def action() -> ProductDTO:
+        #         return service.create_product(
+        #             restaurant_id,
+        #             ProductCreate(
+        #                 restaurant_id=restaurant_id,
+        #                 name=name,
+        #                 description=_optional_str(args.get("description")),
+        #                 price_cents=price_cents,
+        #                 currency=str(args.get("currency") or "MXN"),
+        #                 status=str(args.get("status") or "draft"),
+        #                 category_ids=category_ids,
+        #             ),
+        #         )
+        #
+        #     return _run_mutation(ctx, action, summary=f"Created product {name!r}")
 
         if tool_name == "update_product":
             product_id, resolve_error = _resolve_product_id_for_write(service, ctx, args)
@@ -1991,14 +2120,38 @@ class MenuWriteSkill:
 
         if tool_name == "get_restaurant_name":
             return get_restaurant_name(ctx)
+        if tool_name == "get_restaurant_description":
+            return get_restaurant_description(ctx)
+        if tool_name == "update_restaurant_description":
+            return update_restaurant_description(
+                ctx, args, invalidate=_finalize_menu_mutation
+            )
+        if tool_name == "get_restaurant_location":
+            return get_restaurant_location(ctx)
+        if tool_name == "update_restaurant_location":
+            return update_restaurant_location(
+                ctx, args, invalidate=_finalize_menu_mutation
+            )
         if tool_name == "get_restaurant_public_menu_url":
             return get_restaurant_public_menu_url(ctx)
+        if tool_name == "get_restaurant_menu_qr":
+            return get_restaurant_menu_qr(ctx)
         if tool_name == "get_restaurant_schedules":
             return get_restaurant_schedules(ctx)
         if tool_name == "set_restaurant_schedules":
             return set_restaurant_schedules(
                 ctx, args, invalidate=_finalize_menu_mutation
             )
+        if tool_name == "get_delivery_provider_schedules":
+            return get_delivery_provider_schedules(ctx)
+        if tool_name == "get_restaurant_payment_methods":
+            return get_restaurant_payment_methods(ctx)
+        if tool_name == "set_restaurant_payment_methods":
+            return set_restaurant_payment_methods(
+                ctx, args, invalidate=_finalize_menu_mutation
+            )
+        if tool_name == "get_delivery_provider_payment_methods":
+            return get_delivery_provider_payment_methods(ctx)
         if tool_name == "assign_restaurant_logo":
             return assign_restaurant_logo(
                 ctx, args, invalidate=_finalize_menu_mutation

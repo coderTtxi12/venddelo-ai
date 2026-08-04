@@ -212,17 +212,21 @@ def test_menu_write_creates_and_updates_product(session):
     skill = MenuWriteSkill()
 
     created = skill.execute(
-        "create_product",
+        "bulk_create_products",
         {
-            "name": "Taco al pastor",
-            "price_cents": 1200,
-            "category_ids": [str(category.id)],
-            "description": "Con piña",
+            "items": [
+                {
+                    "name": "Taco al pastor",
+                    "price_cents": 1200,
+                    "category_ids": [str(category.id)],
+                    "description": "Con piña",
+                }
+            ],
         },
         ctx,
     )
     assert created.ok is True
-    product_id = created.data["product"]["id"]
+    product_id = created.data["results"][0]["id"]
 
     updated = skill.execute(
         "update_product",
