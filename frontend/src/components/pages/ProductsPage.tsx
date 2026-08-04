@@ -919,6 +919,24 @@ export default function ProductsPage() {
     };
   }, [displayedProducts, products, productsPage, productsTotalCount, usesClientProductPagination]);
 
+  const pageProductIds = useMemo(
+    () => paginatedProducts.items.map((product) => product.id),
+    [paginatedProducts.items],
+  );
+  const selectedOnPageCount = pageProductIds.filter((id) => selectedProductIds.has(id)).length;
+  const allPageSelected =
+    pageProductIds.length > 0 && selectedOnPageCount === pageProductIds.length;
+  const somePageSelected = selectedOnPageCount > 0 && !allPageSelected;
+
+  function setPageSelection(checked: boolean) {
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev);
+      if (checked) pageProductIds.forEach((id) => next.add(id));
+      else pageProductIds.forEach((id) => next.delete(id));
+      return next;
+    });
+  }
+
   useEffect(() => {
     setCategoriesPage(1);
   }, [categorySearch]);
@@ -1476,6 +1494,31 @@ export default function ProductsPage() {
                       productFiltersActive={productFiltersActive}
                       onClearFilters={clearProductTableFilters}
                     />
+                    <label
+                      className={`${styles.mobileSelectAll} ${
+                        allPageSelected || somePageSelected ? styles.mobileSelectAllActive : ''
+                      }`}
+                    >
+                      <span className={styles.mobileSelectAllControl}>
+                        <input
+                          type="checkbox"
+                          className={styles.selectCheckbox}
+                          checked={allPageSelected}
+                          ref={(el) => {
+                            if (!el) return;
+                            el.indeterminate = somePageSelected;
+                          }}
+                          disabled={deleteLoading || pageProductIds.length === 0}
+                          aria-label="Seleccionar todos los productos de esta página"
+                          onChange={(e) => setPageSelection(e.target.checked)}
+                        />
+                      </span>
+                      <span className={styles.mobileSelectAllText}>
+                        {allPageSelected
+                          ? 'Deseleccionar todos en pantalla'
+                          : 'Seleccionar todos en pantalla'}
+                      </span>
+                    </label>
                     <table className={styles.table}>
                     <thead>
                       <tr className={styles.headerLabelRow}>
@@ -1483,27 +1526,14 @@ export default function ProductsPage() {
                           <input
                             type="checkbox"
                             className={styles.selectCheckbox}
-                            checked={
-                              paginatedProducts.items.length > 0 &&
-                              paginatedProducts.items.every((p) => selectedProductIds.has(p.id))
-                            }
+                            checked={allPageSelected}
                             ref={(el) => {
                               if (!el) return;
-                              const pageIds = paginatedProducts.items.map((p) => p.id);
-                              const selectedOnPage = pageIds.filter((id) => selectedProductIds.has(id)).length;
-                              el.indeterminate = selectedOnPage > 0 && selectedOnPage < pageIds.length;
+                              el.indeterminate = somePageSelected;
                             }}
-                            disabled={deleteLoading || paginatedProducts.items.length === 0}
+                            disabled={deleteLoading || pageProductIds.length === 0}
                             aria-label="Seleccionar todos los productos de esta página"
-                            onChange={(e) => {
-                              const pageIds = paginatedProducts.items.map((p) => p.id);
-                              setSelectedProductIds((prev) => {
-                                const next = new Set(prev);
-                                if (e.target.checked) pageIds.forEach((id) => next.add(id));
-                                else pageIds.forEach((id) => next.delete(id));
-                                return next;
-                              });
-                            }}
+                            onChange={(e) => setPageSelection(e.target.checked)}
                           />
                         </th>
                         <th className={styles.thDashboard}>Producto</th>

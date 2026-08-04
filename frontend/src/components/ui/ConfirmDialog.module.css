@@ -48,6 +48,8 @@
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
+  touch-action: manipulation;
+  transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease;
 }
 
 .cancelBtn:hover {
@@ -64,6 +66,8 @@
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 180ms ease;
 }
 
 .confirmBtn:hover:not(:disabled) {
@@ -73,4 +77,68 @@
 .confirmBtn:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+.cancelBtn:focus-visible,
+.confirmBtn:focus-visible {
+  outline: 2px solid #b91c1c;
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .dialog {
+    max-width: none;
+    border-radius: 16px 16px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding: 1.15rem 1.15rem calc(1.15rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .title {
+    font-size: 1.1rem;
+  }
+
+  .body {
+    font-size: 0.9rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .actions {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+
+  .cancelBtn,
+  .confirmBtn {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .dialog {
+    max-width: 440px;
+  }
+
+  .cancelBtn,
+  .confirmBtn {
+    min-height: 44px;
+    padding-inline: 1.15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cancelBtn,
+  .confirmBtn {
+    transition: none;
+  }
 }
