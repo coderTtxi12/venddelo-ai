@@ -1,86 +1,89 @@
 # Vendelo AI
 
-Plataforma para que restaurantes **creen, optimicen y publiquen un menú digital con QR**, reciban **pedidos en línea** (checkout hacia WhatsApp) y operen **delivery** con partners — con el **Copilot de Operaciones para Restaurantes**, que digitaliza menús y opera el panel en lenguaje natural.
+**An AI-native restaurant operations platform.** Upload a menu. Chat in natural language. Ship a live QR digital menu, WhatsApp checkout, and delivery ops — while **Mexy Agent** digs into the catalog, mutates it with real tools, and asks only when a decision actually matters.
+
+This repo is built around a **subagent-driven assistant**: an Orchestrator that thinks and replies to the owner, then delegates hard work to specialized child agents with skill toolkits. Not a chatbot wrapper. A control plane for the restaurant.
 
 ---
 
-## Qué hace
+## What it does
 
-| Superficie | App | Puerto | Rol |
-|------------|-----|--------|-----|
-| Panel restaurante + menú público | `frontend/` | `:3000` | Onboarding, dashboard, menú digital público (`/menu/[subdomain]` o subdominio) |
-| Ops de delivery | `delivery-dashboard/` | `:3001` | Geofence, tarifas, partnerships, pedidos, analytics del courier |
-| API | `backend/` | `:8080` | FastAPI modular monolith — dominio + Copilot de Operaciones |
-| Infra local | `infra/` | `:5434` / `:6379` | Postgres + PostGIS, Redis |
+| Surface | App | Port | Role |
+|---------|-----|------|------|
+| Restaurant panel + public menu | `frontend/` | `:3000` | Onboarding, dashboard, public digital menu (`/menu/[subdomain]` or subdomain) |
+| Delivery ops | `delivery-dashboard/` | `:3001` | Geofence, fees, partnerships, orders, courier analytics |
+| API | `backend/` | `:8080` | FastAPI modular monolith — domain + Mexy Agent |
+| Local infra | `infra/` | `:5434` / `:6379` | Postgres + PostGIS, Redis |
 
 ---
 
-## Scaffolding del proyecto
+## Project scaffolding
 
 ```
 venddelo-ai/
-├── docker-compose.yml          # Stack completo (infra + api + frontends)
-├── .env.example                # Variables compartidas de Compose
+├── docker-compose.yml          # Full stack (infra + api + frontends)
+├── .env.example                # Shared Compose variables
 │
-├── frontend/                   # Panel restaurante + menú público (Next.js)
+├── frontend/                   # Restaurant panel + public menu (Next.js)
 │   └── src/
-│       ├── app/                # Rutas App Router
-│       ├── components/         # UI del panel y menú digital
-│       └── lib/                # API client, utilidades    
+│       ├── app/                # App Router routes
+│       ├── components/         # Dashboard UI + digital menu (+ assistant chat)
+│       └── lib/                # API client, utilities
 │
-├── delivery-dashboard/         # Ops de delivery (Next.js)
+├── delivery-dashboard/         # Delivery ops (Next.js)
 │   └── src/
-│       ├── app/                # Rutas App Router
-│       ├── components/         # UI del panel courier (mapas, tarifas, pedidos)
-│       └── lib/                # API client, utilidades
+│       ├── app/                # App Router routes
+│       ├── components/         # Courier panel UI (maps, fees, orders)
+│       └── lib/                # API client, utilities
 │
-├── backend/                    # API FastAPI (modular monolith)
+├── backend/                    # FastAPI API (modular monolith)
 │   ├── app/
-│   │   ├── api/                # Routers agregados
-│   │   ├── core/               # Config, auth, ports
-│   │   ├── db/                 # Models SQLAlchemy
-│   │   ├── infra/              # Redis, storage, repos compartidos
+│   │   ├── api/                # Aggregated routers
+│   │   ├── core/               # Config, auth, LLM ports
+│   │   ├── db/                 # SQLAlchemy models
+│   │   ├── infra/              # Redis, storage, shared repos
 │   │   ├── middleware/         # Rate limit, etc.
-│   │   └── modules/            # Dominio por módulo
-│   │       ├── assistant/      # Copilot de Operaciones
-│   │       │   ├── agent/      # Workflow router/executor/responder
-│   │       │   ├── skills/     # menu_read, menu_write, menu_import, …
-│   │       │   ├── context/    # Compresión de historial
+│   │   └── modules/            # Domain by module
+│   │       ├── assistant/      # Mexy Agent (AI control plane)
+│   │       │   ├── agent/
+│   │       │   │   └── workflow/   # Orchestrator → subagents (delegate + clarify)
+│   │       │   ├── skills/     # Plug-in capabilities (SKILL.md + tools)
+│   │       │   ├── context/    # History compression for the LLM
 │   │       │   └── entitlements/
 │   │       ├── menu/
 │   │       ├── orders/
 │   │       ├── promotions/
 │   │       ├── restaurants/
 │   │       ├── delivery_providers/
-│   │       ├── public/         # Menú público + pedidos guest
+│   │       ├── public/         # Public menu + guest orders
 │   │       └── …
 │   ├── migrations/             # Alembic
 │   ├── tests/
-│   └── scripts/                # entrypoint.sh, utilidades
+│   └── scripts/                # entrypoint.sh, utilities
 │
 ├── infra/                      # Postgres + PostGIS + Redis (local)
 │   ├── docker-compose.yml
 │   └── postgres-init/
 │
-└── docs/                       # Producto, arquitectura, specs
+└── docs/                       # Product, architecture, AI specs
     ├── PROJECT_CONTEXT.es.md
     ├── TECH_ARCHITECTURE.es.md
     └── superpowers/
-        ├── specs/              # Diseños aprobados
-        └── plans/              # Planes de implementación
+        ├── specs/              # Approved designs (agent, clarify, import, …)
+        └── plans/              # Implementation plans
 ```
 
 ---
 
-## Cómo correrlo
+## How to run it
 
-### Requisitos
+### Requirements
 
 - Docker Desktop (Compose v2.20+)
 
-### Stack completo (recomendado)
+### Full stack (recommended)
 
-Desde la raíz del repo:
+From the repo root:
 
 ```bash
 cp .env.example .env
@@ -88,22 +91,22 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
 cp delivery-dashboard/.env.example delivery-dashboard/.env.local
 
-# Edita los .env copiados con tus propias keys
+# Edit the copied .env files with your own keys (especially OPENAI_API_KEY)
 
 docker compose up --build
 ```
 
-| Servicio | URL |
-|----------|-----|
+| Service | URL |
+|---------|-----|
 | Frontend | http://localhost:3000 |
 | Delivery dashboard | http://localhost:3001 |
 | API health | http://localhost:8080/api/v1/health |
 | Postgres | `localhost:5434` (`vendelo` / `vendelo`) |
 | Redis | `localhost:6379` |
 
-El compose raíz **incluye** `infra/docker-compose.yml` y levanta `api`, `frontend` y `delivery-dashboard`. El API usa la red interna (`postgres`, `redis`) y corre migraciones al arrancar si `RUN_MIGRATIONS=true`.
+Root Compose **includes** `infra/docker-compose.yml` and starts `api`, `frontend`, and `delivery-dashboard`. The API uses the internal network (`postgres`, `redis`) and runs migrations on boot when `RUN_MIGRATIONS=true`.
 
-### Sin Docker (híbrido)
+### Without Docker (hybrid)
 
 ```bash
 # Infra
@@ -114,12 +117,13 @@ cd backend
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env   # DATABASE_URL → localhost:5434
-python start.py        # NO corre migraciones solo; usa: alembic upgrade head
+python start.py        # does NOT run migrations alone; use: alembic upgrade head
 
 # Frontends
 cd frontend && pnpm install && pnpm dev
 cd delivery-dashboard && pnpm install && pnpm dev
 ```
+
 ---
 
 ## Stack
@@ -127,190 +131,210 @@ cd delivery-dashboard && pnpm install && pnpm dev
 | App | Stack |
 |-----|--------|
 | frontend / delivery-dashboard | Next.js 16 · React 19 · TypeScript · MUI · Supabase SSR |
-| backend | Python 3.12 · FastAPI · SQLAlchemy 2 · Alembic · Pydantic v2 · GeoAlchemy2 · Redis · OpenAI Agents SDK |
+| backend | Python 3.12 · FastAPI · SQLAlchemy 2 · Alembic · Pydantic v2 · GeoAlchemy2 · Redis · **OpenAI Agents SDK** |
 | infra | PostGIS 16 · Redis 7 |
 
 ---
 
-## Copilot de Operaciones para Restaurantes
+## Mexy Agent — Restaurant Operations Copilot
 
-El Copilot de Operaciones para Restaurantes es el **plano de control en lenguaje natural** del restaurante: el personal chatea en lenguaje natural y el agente lee/actualiza menú, promociones, branding y horarios — **sin deletes** (soft-disable).
+Mexy is the **natural-language control plane** for the restaurant. Staff chat in Spanish; the agent reads and updates menu, promotions, branding, and hours with real skill tools — grounded in tool output, not vibes.
 
-Inspiración OpenClaw adaptada a SaaS: tool loop, skills enchufables (`SKILL.md` + `tools.py`), identidad por restaurante, turnos serializados.
+Architecture is **subagent-driven** (OpenAI Agents SDK):
+
+| Role | Responsibility |
+|------|----------------|
+| **Orchestrator** | Only agent that talks to the owner. Plans, replies in Markdown ES, and calls tools. |
+| **`delegate_task`** | Spawns a focused child agent for a concrete goal. |
+| **`catalog_agent`** | Live catalog: products, categories, complements, promos, themes, product photos. |
+| **`operations_agent`** | Business profile: name, location, hours, payments, logo/cover, public menu URL / QR. |
+| **`clarify`** | Mid-turn structured question to the owner (choices / multi-select); blocks until answer or timeout. |
+
+Subagents return a structured **`ExecutionRecord`** (JSON). The Orchestrator never invents mutations — it reports what tools actually did. If a subagent needs a user decision, it emits `needs_user_input:…` in `notes`; only the Orchestrator may call `clarify`.
+
+Inspiration: OpenClaw-style tool loops, adapted for multi-tenant SaaS — pluggable skills (`SKILL.md` + `tools.py`), restaurant identity from JWT, serialized turns.
 
 ### Endpoints
 
-| Método | Path | Uso |
+| Method | Path | Use |
 |--------|------|-----|
-| `POST` | `/api/v1/restaurants/{id}/assistant/chat` | Chat SSE (turno principal) |
-| `POST` | `/api/v1/restaurants/{id}/assistant/import/assets` | Subir PDF/DOCX/imagen al inbox de import |
-| `POST` | `/api/v1/restaurants/{id}/assistant/conversations/reset` | Nuevo hilo + cancelar import activo |
+| `POST` | `/api/v1/restaurants/{id}/assistant/chat` | Main chat SSE turn |
+| `POST` | `/api/v1/restaurants/{id}/assistant/clarify/answer` | Answer a mid-turn `clarify` prompt (`clarify_id` + response in body) |
+| `POST` | `/api/v1/restaurants/{id}/assistant/import/assets` | Upload PDF/DOCX/image into the import inbox |
+| `POST` | `/api/v1/restaurants/{id}/assistant/conversations/reset` | New thread (+ cancel active import) |
 
-Auth: `require_owned_restaurant`. Body: mensaje + `conversation_id` opcional + `attachments[]`.
+Auth: `require_owned_restaurant`. Body: message + optional `conversation_id` + `attachments[]`.
 
-### Flujo de un turno (SSE)
+### Turn flow (SSE)
 
 ```mermaid
 flowchart TD
-  A[POST /assistant/chat] --> B[Cargar profile + entitlements + historial]
-  B --> C{¿Big Context?}
-  C -->|sí| D[Context Compressors]
-  C -->|no| E[Router]
+  A[POST /assistant/chat] --> B[Load profile + entitlements + history]
+  B --> C{Big context?}
+  C -->|yes| D[Context compressors]
+  C -->|no| E[Orchestrator Agent]
   D --> E
-  E -->|responder| F[Responder]
-  E -->|executor| G[Executor — tools de skills]
-  G --> H[Evaluator]
-  H -->|replan| G
-  H -->|ok| F
-  E -->|menu_import| I[MenuImportExecutor]
-  I -->|responder| W[Responder]
-  F --> J[message.complete + persistir turno]
-  W --> J
+  E -->|small talk / answer| F[content.delta → owner]
+  E -->|delegate_task| G{Subagent}
+  G --> H[catalog_agent]
+  G --> I[operations_agent]
+  H --> J[ExecutionRecord JSON]
+  I --> J
+  J --> E
+  E -->|needs user decision| K[clarify tool]
+  K -->|SSE clarify + wait| L[Owner answers / timeout]
+  L --> E
+  E --> M[message.complete + persist turn]
 ```
 
-Eventos SSE típicos: `agent.status` → `agent.phase` → `agent.thought` → `tool.start` / `tool.result` → `agent.evaluation` → `content.delta` → `message.complete` (a veces con `menu_import.questions` para el quiz UI).
+Typical SSE events: `agent.status` → `agent.phase` → `agent.thought` → `tool.start` / `tool.result` → `clarify` / `clarify.closed` → `content.delta` → `message.complete`.
 
-### Pipeline de roles
+### Why subagents
 
-| Rol | Qué hace |
-|-----|----------|
-| **Context** | Profile, entitlements, registry, historial comprimido, adjuntos, sesión de import activa |
-| **Router** | Decide `responder` \| `executor` \| `menu_import` |
-| **Executor** | Loop de tools (Agents SDK); skills con entitlement, excepto tools granulares de import |
-| **Evaluator** | Puede pedir replan (pocos reintentos) si faltan datos o fallaron tools |
-| **Responder** | Markdown de respuesta al dueño|
+| Before | Now |
+|--------|-----|
+| Router → Executor → Evaluator → Responder | **Orchestrator** + `delegate_task` + `clarify` |
+| One mega tool loop for everything | Specialized children with narrower tool surfaces |
+| Python evaluator retries | Orchestrator re-delegates when the record is incomplete |
+| Separate responder LLM | Orchestrator writes the owner-facing reply |
 
-`menu_import` **no** va por el executor general: tiene agentes dedicados para OCR largo + quiz + apply.
+Hard rules:
+
+- **`restaurant_id` comes from the JWT**, never from the LLM.
+- **Entitlements:** `effective = granted ∩ enabled ∩ registered`.
+- **System prompts in English**; owner-facing replies in Spanish.
+- Prefer **bulk tools** for multi-item reads/writes (`bulk_search_products`, `bulk_create_products`, …) — including single-item arrays.
+- Act on obvious defaults; use **`clarify`** only when the ambiguity changes the tool call.
 
 ### Skills (Lego)
 
-| Skill | Mutaciones | Propósito |
-|-------|------------|-----------|
-| `menu_read` | No | Catálogo + promos (search/list/get) |
-| `menu_write` | Sí | Categorías, productos, opciones, theme, horarios, asignar fotos |
-| `menu_import` | Sí | Digitalización completa (sub-workflow) |
-| `menu_media` | Sí | Generar foto de platillo con IA (**prohibido durante import**) |
-| `menu_intelligence` | No | Visión: componentes / complementos sugeridos |
-| `menu_best_practices` | Guía | Criterios de calidad (sin tools) |
-| `promotions` | Sí | Campañas + banners NxM |
+| Skill | Mutations | Purpose |
+|-------|-----------|---------|
+| `menu_read` | No | Catalog + promos (`bulk_search_products`, list/get, bulk get) |
+| `menu_write` | Yes | Categories, products, options, theme, hours, assign photos |
+| `menu_import` | Yes | Full digitization pipeline (OCR → clarify → model → apply) |
+| `menu_media` | Yes | AI dish photo generation (**forbidden during import**) |
+| `menu_intelligence` | No | Vision: suggested components / complements |
+| `menu_best_practices` | Guide | Quality criteria (no tools) |
+| `promotions` | Yes | Campaigns + NxM banners |
 
-Reglas duras:
+Skills are discovered from disk: new capability ≈ new folder with `SKILL.md` + `tools.py`.
 
-- **`restaurant_id` viene del JWT**, nunca del LLM.
-- **No-delete:** el registry rechaza tools de delete.
-- **Entitlements:** `effective = granted ∩ enabled ∩ registered`.
-- Prompts de sistema en **inglés**.
+### Context compression
 
-### Compresión de contexto
+`context/compressor.py` trims **what the LLM sees** (Postgres keeps the full transcript):
 
-`context/compressor.py` recorta **lo que ve el LLM** (el transcript en Postgres se conserva completo):
+1. If estimated tokens ≥ threshold → keep the last K raw turns.
+2. Summarize the rest with a cheap LLM (`<conversation_summary>`).
+3. Deterministic fallback (`<state_snapshot>`) if summary fails.
 
-1. Si tokens estimados ≥ umbral → mantener últimas K turnos crudos.
-2. Resumir el resto con LLM barato (`<conversation_summary>`).
-3. Fallback determinístico (`<state_snapshot>`) si falla el summary.
+### Agent decisions / tradeoffs
 
-### Decisiones / tradeoffs del Copilot de Operaciones
+| Decision | Why | Tradeoff |
+|----------|-----|----------|
+| Subagent-driven Orchestrator | Clear ownership: one voice to the owner, specialists for work | Extra LLM calls / latency vs a single mega-agent |
+| `delegate_task` + `ExecutionRecord` | Ground replies in real tool output | Orchestrator must re-delegate when the record is thin |
+| Mid-turn `clarify` | Human-in-the-loop without ending the SSE turn | In-process waiters (MVP); multi-worker needs shared wait storage |
+| Postgres as durable state | Conversations + import sessions survive N replicas | Hot-path latency without cache |
+| Redis as hot layer | Public menu cache, translations, profile, rate limit, order idempotency | Without `REDIS_URL` degrades to null adapters; Postgres stays source of truth |
+| Disk-discovered skills | Open-Closed: ship capability as a folder | Keep `SKILL.md` and tools aligned |
 
-| Decisión | Por qué | Tradeoff |
-|----------|---------|----------|
-| Postgres como estado durable | Conversaciones + sesiones de import sobreviven N réplicas | Más latencia en lecturas calientes si no hay cache |
-| Redis como capa caliente | Cache de menú público, traducciones, profile del Copilot, rate limit e idempotency de pedidos; locks/caches efímeros compartidos entre réplicas Cloud Run | Sin `REDIS_URL` degrada a adapters nulos; no es fuente de verdad (Postgres sí) |
-| Router → Executor → Evaluator → Responder | Roles claros vs un mega-prompt | Más llamadas LLM / latencia |
-| Skills descubiertas en disco | Open-Closed: nueva capability = nueva carpeta | Hay que mantener `SKILL.md` + tools alineados |
-| Confirm gates (spec) vs mutate inmediato (código) | Spec más seguro; runtime actual prioriza velocidad cuando la intención es clara | “Secretary recap” vive en guías de skill, no siempre como token duro |
-
-
-Código clave: `backend/app/modules/assistant/` — sobre todo `agent/workflow/orchestrator.py`, `agent/service.py`, `skills/`, `context/compressor.py`.
+Key code: `backend/app/modules/assistant/` — especially `agent/workflow/orchestrator.py`, `delegate.py`, `clarify_tool.py`, `skills/`, `context/compressor.py`.
 
 ## Specs
 
-Specs de diseño: [`docs/superpowers/specs/`](docs/superpowers/specs/)
+Design specs: [`docs/superpowers/specs/`](docs/superpowers/specs/)
+
+AI-heavy ones worth reading first:
+
+- [Assistant orchestrator](docs/superpowers/specs/2026-07-29-assistant-orchestrator-design.es.md)
+- [Clarify tool](docs/superpowers/specs/2026-07-30-assistant-clarify-tool-design.es.md)
+- [Parallel delegate](docs/superpowers/specs/2026-07-29-assistant-parallel-delegate-design.es.md)
+- [Agentic assistant](docs/superpowers/specs/2026-06-27-agentic-assistant-design.en.md)
 
 ---
 
-## Menu import (profundidad)
+## Menu import (depth)
 
-Objetivo: del PDF/foto del menú físico → **menú vivo** en la base, con fidelidad literal del OCR y un quiz de aclaración cuando hay ambigüedad (sobre todo complementos).
+Goal: physical menu PDF/photo → **live menu** in the database, with literal OCR fidelity and a clarification quiz when complements (or other fields) are ambiguous.
 
-### Vista mental
+### Mental model
 
 ```mermaid
 flowchart TD
-  A[Dueño sube PDF/fotos + notas opcionales] --> B[Router → menu_import]
+  A[Owner uploads PDF/photos + optional notes] --> B[menu_import skill session]
   B --> C[start_menu_import_session]
   C --> D[register_menu_source_file × N]
-  D --> E[start_menu_extraction_batch<br/>OCR literal]
-  E --> F[persiste ocr_original inmutable<br/>+ draft_batches editable]
+  D --> E[start_menu_extraction_batch<br/>literal OCR]
+  E --> F[persist immutable ocr_original<br/>+ editable draft_batches]
   F --> G{open_questions?}
-  G -->|sí| H[quiz UI<br/>awaiting_clarification]
-  H --> I[model_working_draft<br/>reescribe solo draft_batches]
+  G -->|yes| H[quiz UI<br/>awaiting_clarification]
+  H --> I[model_working_draft<br/>rewrites draft_batches only]
   G -->|no| I
-  I --> J[apply_full_import<br/>categorías / productos / opciones / promos]
+  I --> J[apply_full_import<br/>categories / products / options / promos]
 ```
 
-### Memoria de sesión (Postgres)
+### Session memory (Postgres)
 
-| Campo | Rol |
-|-------|-----|
-| `ocr_original` | Snapshot **inmutable** del OCR literal |
-| `draft_batches` | Copia de trabajo que se modela y se aplica |
-| `discovery_answers` / `clarification_answers` | Contexto y respuestas del quiz |
-| `open_questions` | Ambigüedades → UI quiz |
-| `live_menu_snapshot` | Menú vivo cacheado para reconcile |
+| Field | Role |
+|-------|------|
+| `ocr_original` | **Immutable** snapshot of literal OCR |
+| `draft_batches` | Working copy that gets modeled and applied |
+| `discovery_answers` / `clarification_answers` | Context + quiz answers |
+| `open_questions` | Ambiguities → quiz UI |
+| `live_menu_snapshot` | Cached live menu for reconcile |
 
-Una sesión activa por restaurante; un nuevo `menu_source` puede cancelar/reemplazar una incompleta.
+One active session per restaurant; a new `menu_source` can cancel/replace an incomplete one.
 
-### Secuencia end-to-end
+### End-to-end sequence
 
 ```mermaid
 sequenceDiagram
-  participant Owner as Dueño
+  participant Owner as Owner
   participant API as Assistant API
-  participant Router as Router
-  participant Exec as MenuImportExecutor
+  participant Imp as menu_import skill
   participant OCR as extraction
   participant Model as model_working_draft
   participant Apply as apply_full_import
   participant Live as MenuService
 
   Owner->>API: Upload assets + chat
-  API->>Router: turn
-  Router->>Exec: route menu_import
-  Exec->>Exec: start session + register sources
-  Exec->>OCR: start_menu_extraction_batch
-  Note over OCR: PDF pages / DOCX / images<br/>prompt literal → merge pages
-  OCR-->>Exec: ocr_original + draft_batches + open_questions?
-  alt hay open_questions
-    Exec-->>Owner: quiz (menu_import.questions)
-    Owner->>Exec: respuestas / instrucciones
-    Exec->>Model: model from frozen ocr_original
+  API->>Imp: import session turn
+  Imp->>Imp: start session + register sources
+  Imp->>OCR: start_menu_extraction_batch
+  Note over OCR: PDF pages / DOCX / images<br/>literal prompt → merge pages
+  OCR-->>Imp: ocr_original + draft_batches + open_questions?
+  alt open_questions present
+    Imp-->>Owner: quiz (menu_import.questions)
+    Owner->>Imp: answers / instructions
+    Imp->>Model: model from frozen ocr_original
     Model->>Model: rewrite draft_batches only
   end
-  alt sin preguntas abiertas + apply-after-modeling
+  alt no open questions + apply-after-modeling
     Model->>Apply: apply_full_import
     Apply->>Live: categories, products, options, promos
     Apply-->>Owner: public_menu_url + counts
-  else aún aclarando
-    Exec-->>Owner: sigue el quiz / OCR-only
+  else still clarifying
+    Imp-->>Owner: continue quiz / OCR-only
   end
 ```
 
-### Flags de apply (estado actual del código)
+### Apply flags (current code)
 
-| Flag | Valor típico | Efecto |
-|------|--------------|--------|
-| `MENU_IMPORT_APPLY_ENABLED` | `False` | No aplicar directo desde OCR crudo |
-| `MENU_IMPORT_APPLY_AFTER_MODELING_ENABLED` | `True` | Publicar cuando el draft modelado no tiene preguntas abiertas |
+| Flag | Typical value | Effect |
+|------|---------------|--------|
+| `MENU_IMPORT_APPLY_ENABLED` | `False` | Do not apply straight from raw OCR |
+| `MENU_IMPORT_APPLY_AFTER_MODELING_ENABLED` | `True` | Publish when the modeled draft has no open questions |
 
-Así se evita “blast radius” de un OCR malo: primero literal → aclarar → modelar → publicar.
+That avoids blast radius from bad OCR: literal → clarify → model → publish.
 
-### Después del import
+### After import
 
-- **Fotos de platillos:** no en el loop de import. Luego, chat normal + `menu_write` (`assign_product_image` / bulk) o `menu_media` para generar.
-- **Banners NxM / promos:** skill `promotions` post-publish.
-- **Cierre:** `update_menu_knowledge` + sesión `completed`.
+- **Dish photos:** not inside the import loop. Later, normal chat + `menu_write` (`assign_product_image` / bulk) or `menu_media` to generate.
+- **NxM banners / promos:** `promotions` skill post-publish.
+- **Close-out:** `update_menu_knowledge` + session `completed`.
 
-Código clave: `backend/app/modules/assistant/skills/menu_import/` — `tools.py`, `extraction.py`, `extraction_prompt.py`, `draft_modeling.py`, `apply_batch.py`, `SKILL.md`.
+Key code: `backend/app/modules/assistant/skills/menu_import/` — `tools.py`, `extraction.py`, `extraction_prompt.py`, `draft_modeling.py`, `apply_batch.py`, `SKILL.md`.
 
 Specs:  
 [`menu-import-concierge`](docs/superpowers/specs/2026-07-06-menu-import-concierge-redesign.es.md) ·  
@@ -318,29 +342,28 @@ Specs:
 
 ---
 
-## Decisiones transversales del monorepo
+## Cross-cutting monorepo decisions
 
-| Tema | Decisión | Tradeoff |
-|------|----------|----------|
-| Forma del backend | Modular monolith (SOLID, listo a extraer módulos) | Menos ops que microservicios; disciplina de boundaries |
-| Compose raíz | `include` de `infra/` + api/frontends | Un comando; frontends en `next dev` con volúmenes (no imagen prod) |
-| Migraciones locales Docker | `RUN_MIGRATIONS=true` en entrypoint | Conveniente en local; en Cloud Run debe ir `false` + migrar en CI |
-| Migraciones en prod | Diseño: CI / release job, no boot del contenedor | Evita races entre réplicas|
-| Dinero | Centavos en DB / API interna | UI y drafts de import hablan MXN |
-| Soft deletes | Default en dominio | Menú “borra” = inactive |
-| Redis | Cache, rate limit, conversaciones assistant | App degrada a Postgres si Redis no está |
-| Frontends en Docker | Dev mode + bind mount | Hot reload; builds más pesados (pnpm 11 necesita `allowBuilds` en `pnpm-workspace.yaml`) |
+| Topic | Decision | Tradeoff |
+|-------|----------|----------|
+| Backend shape | Modular monolith (SOLID, extractable modules) | Less ops than microservices; boundary discipline required |
+| Root Compose | `include` of `infra/` + api/frontends | One command; frontends run `next dev` with volumes (not prod images) |
+| Local Docker migrations | `RUN_MIGRATIONS=true` in entrypoint | Convenient locally; Cloud Run should use `false` + migrate in CI |
+| Prod migrations | Design: CI / release job, not container boot | Avoids races across replicas |
+| Money | Cents in DB / internal API | UI and import drafts speak MXN |
+| Soft deletes | Default in domain | Menu “delete” = inactive |
+| Redis | Cache, rate limit, assistant hot paths | App degrades to Postgres if Redis is down |
+| Frontends in Docker | Dev mode + bind mount | Hot reload; heavier builds (pnpm 11 needs `allowBuilds` in `pnpm-workspace.yaml`) |
 
 ---
 
-## Documentación relacionada
+## Related documentation
 
-| Doc | Contenido |
-|-----|-----------|
-| [`docs/PROJECT_CONTEXT.es.md`](docs/PROJECT_CONTEXT.es.md) | Producto: para quién, flujos, promesas de IA |
-| [`docs/TECH_ARCHITECTURE.es.md`](docs/TECH_ARCHITECTURE.es.md) | Stack, Redis, WS, puertos de IA |
-| [`docs/PROJECT_PLANNING.es.md`](docs/PROJECT_PLANNING.es.md) | Fases de construcción |
-| [`backend/README.md`](backend/README.md) | Setup API, Docker parcial, Cloud Run |
-| [`delivery-dashboard/README.md`](delivery-dashboard/README.md) | Panel courier + setup Supabase Google |
-| [`docs/superpowers/specs/`](docs/superpowers/specs/) | Specs de diseño (assistant, import, compose, etc.) |
-
+| Doc | Contents |
+|-----|----------|
+| [`docs/PROJECT_CONTEXT.es.md`](docs/PROJECT_CONTEXT.es.md) | Product: who it's for, flows, AI promises |
+| [`docs/TECH_ARCHITECTURE.es.md`](docs/TECH_ARCHITECTURE.es.md) | Stack, Redis, WS, AI ports |
+| [`docs/PROJECT_PLANNING.es.md`](docs/PROJECT_PLANNING.es.md) | Build phases |
+| [`backend/README.md`](backend/README.md) | API setup, partial Docker, Cloud Run |
+| [`delivery-dashboard/README.md`](delivery-dashboard/README.md) | Courier panel + Supabase Google setup |
+| [`docs/superpowers/specs/`](docs/superpowers/specs/) | Design specs (assistant, clarify, import, compose, …) |
