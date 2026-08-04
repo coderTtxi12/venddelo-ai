@@ -1,0 +1,305 @@
+{
+  "items": [
+    {
+      "name": "Torta de chilaquiles",
+      "price_cents": 6000,
+      "category_names": [
+        "Desayunos"
+      ],
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Huevos",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Pollo",
+              "price_delta_cents": 500
+            },
+            {
+              "label": "Longaniza",
+              "price_delta_cents": 500
+            },
+            {
+              "label": "Suadero",
+              "price_delta_cents": 1000
+            },
+            {
+              "label": "Bistec",
+              "price_delta_cents": 1500
+            },
+            {
+              "label": "Arrachera",
+              "price_delta_cents": 2500
+            },
+            {
+              "label": "Cecina",
+              "price_delta_cents": 2500
+            }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Hot cakes",
+      "price_cents": 8500,
+      "category_names": [
+        "Desayunos"
+      ],
+      "option_groups": [
+        {
+          "title": "Variante",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Sencillos",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Con tocino",
+              "price_delta_cents": 2500
+            }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Burrito",
+      "price_cents": 12500,
+      "category_names": [
+        "Desayunos"
+      ],
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Chorizo",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Pastor",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Suadero",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Bistec",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Cecina",
+              "price_delta_cents": 1000
+            },
+            {
+              "label": "Cochinita",
+              "price_delta_cents": 1000
+            },
+            {
+              "label": "Arrachera",
+              "price_delta_cents": 1000
+            },
+            {
+              "label": "Birria",
+              "price_delta_cents": 1000
+            }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chilaquiles",
+      "price_cents": 11000,
+      "category_names": [
+        "Desayunos"
+      ],
+      "option_groups": [
+        {
+          "title": "Salsa",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Verdes",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Rojos",
+              "price_delta_cents": 0
+            }
+          ]
+        },
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Sencillos",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Huevo",
+              "price_delta_cents": 1000
+            },
+            {
+              "label": "Pollo",
+              "price_delta_cents": 1500
+            },
+            {
+              "label": "Suadero",
+              "price_delta_cents": 2000
+            },
+            {
+              "label": "Pastor",
+              "price_delta_cents": 2000
+            },
+            {
+              "label": "Longaniza",
+              "price_delta_cents": 2000
+            },
+            {
+              "label": "Bistec",
+              "price_delta_cents": 2500
+            },
+            {
+              "label": "Arrachera",
+              "price_delta_cents": 4000
+            },
+            {
+              "label": "Cochinita",
+              "price_delta_cents": 4000
+            },
+            {
+              "label": "Cecina",
+              "price_delta_cents": 4000
+            }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Huevos al gusto",
+      "price_cents": 10000,
+      "category_names": [
+        "Desayunos"
+      ],
+      "option_groups": [
+        {
+          "title": "Preparación",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "A la mexicana",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Con jamón",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Con tocino",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Con chorizo",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Divorciados",
+              "price_delta_cents": 1000
+            },
+            {
+              "label": "Omelete con champiñones",
+              "price_delta_cents": 2000
+            },
+            {
+              "label": "Omelete yucateco",
+              "price_delta_cents": 4000
+            },
+            {
+              "label": "Omelete jalisciense",
+              "price_delta_cents": 4000
+            }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

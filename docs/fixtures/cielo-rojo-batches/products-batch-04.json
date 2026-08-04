@@ -1,0 +1,350 @@
+{
+  "items": [
+    {
+      "name": "Molletes (3 pzas)",
+      "price_cents": 8500,
+      "category_names": [
+        "Desayunos"
+      ],
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Sencillos",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Con jamón",
+              "price_delta_cents": 2500
+            },
+            {
+              "label": "Con tocino",
+              "price_delta_cents": 2500
+            },
+            {
+              "label": "Con chorizo",
+              "price_delta_cents": 2500
+            },
+            {
+              "label": "Suadero",
+              "price_delta_cents": 3000
+            },
+            {
+              "label": "Pastor",
+              "price_delta_cents": 3000
+            },
+            {
+              "label": "Cochinita",
+              "price_delta_cents": 5500
+            },
+            {
+              "label": "Birria",
+              "price_delta_cents": 5500
+            },
+            {
+              "label": "Cecina",
+              "price_delta_cents": 5500
+            }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Enchiladas",
+      "price_cents": 13000,
+      "category_names": [
+        "Desayunos"
+      ],
+      "option_groups": [
+        {
+          "title": "Salsa",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Verdes",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Rojas",
+              "price_delta_cents": 0
+            }
+          ]
+        },
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Pollo",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Bistec",
+              "price_delta_cents": 1000
+            }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Enmoladas",
+      "price_cents": 14500,
+      "category_names": [
+        "Desayunos"
+      ],
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Pollo",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Bistec",
+              "price_delta_cents": 1000
+            }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Suizas",
+      "price_cents": 13500,
+      "category_names": [
+        "Desayunos"
+      ],
+      "option_groups": [
+        {
+          "title": "Salsa",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Verdes",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Rojas",
+              "price_delta_cents": 0
+            }
+          ]
+        },
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Pollo",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Bistec",
+              "price_delta_cents": 1000
+            }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Plato de fruta",
+      "price_cents": 3500,
+      "category_names": [
+        "Desayunos"
+      ]
+    },
+    {
+      "name": "Vaso de jugo",
+      "price_cents": 3500,
+      "category_names": [
+        "Desayunos"
+      ]
+    },
+    {
+      "name": "Pan de dulce",
+      "price_cents": 2700,
+      "category_names": [
+        "Desayunos"
+      ]
+    },
+    {
+      "name": "Salchipulpos con papas (6 pzas)",
+      "price_cents": 9000,
+      "category_names": [
+        "Para los peques"
+      ]
+    },
+    {
+      "name": "Waffles",
+      "price_cents": 9000,
+      "category_names": [
+        "Para los peques"
+      ]
+    },
+    {
+      "name": "Sincronizada con papas",
+      "price_cents": 8500,
+      "category_names": [
+        "Para los peques"
+      ]
+    },
+    {
+      "name": "Nuggets de pollo con papas (8 pzas)",
+      "price_cents": 9000,
+      "category_names": [
+        "Para los peques"
+      ]
+    },
+    {
+      "name": "Tacos dorados de pollo",
+      "price_cents": 8000,
+      "category_names": [
+        "Para los peques"
+      ]
+    },
+    {
+      "name": "Caldo de panza",
+      "price_cents": 11500,
+      "category_names": [
+        "Caldos"
+      ],
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Chico",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Grande",
+              "price_delta_cents": 3500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Panza con lengua (La Mamalona)",
+      "price_cents": 17000,
+      "category_names": [
+        "Caldos"
+      ],
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Chico",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Grande",
+              "price_delta_cents": 3500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Birria",
+      "price_cents": 13500,
+      "category_names": [
+        "Caldos"
+      ],
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Chico",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Grande",
+              "price_delta_cents": 4000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Quesabirria con consomé",
+      "price_cents": 8000,
+      "category_names": [
+        "Caldos"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,325 @@
+{
+  "items": [
+    {
+      "name": "Flautas",
+      "price_cents": 9000,
+      "category_names": [
+        "Antojos"
+      ],
+      "description": "Preparadas con lechuga, queso y crema.",
+      "option_groups": [
+        {
+          "title": "Preparación",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Normales",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Ahogadas en salsa de la casa (verde o roja)",
+              "price_delta_cents": 2000
+            }
+          ]
+        },
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Pollo",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Res",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Cochinita",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Mixtas",
+              "price_delta_cents": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tostadas",
+      "price_cents": 6000,
+      "category_names": [
+        "Antojos"
+      ],
+      "description": "Preparadas con lechuga, queso, frijoles y crema.",
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Pata",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Tinga de pollo",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Tinga de res",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Cochinita",
+              "price_delta_cents": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Machete",
+      "price_cents": 6000,
+      "category_names": [
+        "Machetes"
+      ],
+      "description": "Quesadilla de 32 cm con lechuga, queso y crema, en base de quesillo.",
+      "option_groups": [
+        {
+          "title": "Variante",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Sólo quesillo",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Pollo",
+              "price_delta_cents": 1500
+            },
+            {
+              "label": "Chicharrón",
+              "price_delta_cents": 1500
+            },
+            {
+              "label": "Hongos",
+              "price_delta_cents": 1500
+            },
+            {
+              "label": "Tinga de res",
+              "price_delta_cents": 1500
+            },
+            {
+              "label": "Suadero",
+              "price_delta_cents": 2000
+            },
+            {
+              "label": "Pastor",
+              "price_delta_cents": 2000
+            },
+            {
+              "label": "Bistec",
+              "price_delta_cents": 2000
+            },
+            {
+              "label": "Enchilada",
+              "price_delta_cents": 2000
+            },
+            {
+              "label": "Arrachera",
+              "price_delta_cents": 3000
+            },
+            {
+              "label": "Cecina",
+              "price_delta_cents": 3000
+            },
+            {
+              "label": "Cochinita",
+              "price_delta_cents": 3000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Huarache",
+      "price_cents": 5500,
+      "category_names": [
+        "Huaraches"
+      ],
+      "description": "Preparados con lechuga, queso y crema.",
+      "option_groups": [
+        {
+          "title": "Variante",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Sencillo",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Con quesillo",
+              "price_delta_cents": 2500
+            },
+            {
+              "label": "Pollo",
+              "price_delta_cents": 4500
+            },
+            {
+              "label": "Chicharrón",
+              "price_delta_cents": 4500
+            },
+            {
+              "label": "Hongos",
+              "price_delta_cents": 4500
+            },
+            {
+              "label": "Tinga de res",
+              "price_delta_cents": 4500
+            },
+            {
+              "label": "Suadero",
+              "price_delta_cents": 5500
+            },
+            {
+              "label": "Pastor",
+              "price_delta_cents": 5500
+            },
+            {
+              "label": "Enchilada",
+              "price_delta_cents": 5500
+            },
+            {
+              "label": "Bistec",
+              "price_delta_cents": 5500
+            },
+            {
+              "label": "Arrachera",
+              "price_delta_cents": 6500
+            },
+            {
+              "label": "Cecina",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pambazo",
+      "price_cents": 5500,
+      "category_names": [
+        "Pambazos"
+      ],
+      "description": "Preparados con lechuga, queso y crema.",
+      "option_groups": [
+        {
+          "title": "Variante",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Sencillo (papa y longaniza)",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Tinga de pollo",
+              "price_delta_cents": 1500
+            },
+            {
+              "label": "Tinga de res",
+              "price_delta_cents": 1500
+            },
+            {
+              "label": "Cochinita",
+              "price_delta_cents": 1500
+            },
+            {
+              "label": "Suadero",
+              "price_delta_cents": 2500
+            },
+            {
+              "label": "Enchilada",
+              "price_delta_cents": 2500
+            },
+            {
+              "label": "Pastor",
+              "price_delta_cents": 2500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Quesafritas",
+      "price_cents": 4500,
+      "category_names": [
+        "Quesafritas"
+      ],
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Queso",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Pollo",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Chicharrón",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Hongos",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Suadero",
+              "price_delta_cents": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Gringa con papas",
+      "price_cents": 8500,
+      "category_names": [
+        "Especiales"
+      ]
+    },
+    {
+      "name": "Carne asada con guarnición",
+      "price_cents": 13000,
+      "category_names": [
+        "Especiales"
+      ],
+      "description": "Con chilaquiles y ensalada."
+    },
+    {
+      "name": "Orden de tostadas con crema",
+      "price_cents": 2000,
+      "category_names": [
+        "Extras"
+      ]
+    }
+  ]
+}

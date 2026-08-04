@@ -1,0 +1,330 @@
+{
+  "items": [
+    {
+      "name": "Queso extra",
+      "price_cents": 1000,
+      "category_names": [
+        "Extras"
+      ]
+    },
+    {
+      "name": "Queso extra huaraches",
+      "price_cents": 2000,
+      "category_names": [
+        "Extras"
+      ]
+    },
+    {
+      "name": "Orden de papas",
+      "price_cents": 6000,
+      "category_names": [
+        "Extras"
+      ]
+    },
+    {
+      "name": "Café Americano",
+      "price_cents": 4500,
+      "category_names": [
+        "Bebidas"
+      ]
+    },
+    {
+      "name": "Café de Olla",
+      "price_cents": 5000,
+      "category_names": [
+        "Bebidas"
+      ]
+    },
+    {
+      "name": "Chocolate",
+      "price_cents": 5500,
+      "category_names": [
+        "Bebidas"
+      ]
+    },
+    {
+      "name": "Té",
+      "price_cents": 3500,
+      "category_names": [
+        "Bebidas"
+      ]
+    },
+    {
+      "name": "Malteada",
+      "price_cents": 8000,
+      "category_names": [
+        "Bebidas"
+      ],
+      "option_groups": [
+        {
+          "title": "Sabor",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Chocolate",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Vainilla",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Fresa",
+              "price_delta_cents": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chocomilk",
+      "price_cents": 5500,
+      "category_names": [
+        "Bebidas"
+      ]
+    },
+    {
+      "name": "Botella de agua 1L",
+      "price_cents": 3000,
+      "category_names": [
+        "Bebidas"
+      ]
+    },
+    {
+      "name": "Agua de sabor natural",
+      "price_cents": 4000,
+      "category_names": [
+        "Bebidas"
+      ],
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Medio",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Litro",
+              "price_delta_cents": 3000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Refresco",
+      "price_cents": 4000,
+      "category_names": [
+        "Bebidas"
+      ],
+      "description": "Coca Cola, Mundet Rojo, Del Valle, etc."
+    },
+    {
+      "name": "Jugo",
+      "price_cents": 4000,
+      "category_names": [
+        "Bebidas"
+      ],
+      "option_groups": [
+        {
+          "title": "Sabor",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Naranja",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Frutas",
+              "price_delta_cents": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Agua mineral o sangría preparada",
+      "price_cents": 5500,
+      "category_names": [
+        "Bebidas"
+      ]
+    },
+    {
+      "name": "Cerveza",
+      "price_cents": 6500,
+      "category_names": [
+        "Bebidas"
+      ],
+      "option_groups": [
+        {
+          "title": "Marca",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Corona",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "XX Lager",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Modelo Especial",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Victoria",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Indio",
+              "price_delta_cents": 0
+            }
+          ]
+        },
+        {
+          "title": "Presentación",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Media 355 ml",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Michelada",
+              "price_delta_cents": 500
+            },
+            {
+              "label": "Cubana",
+              "price_delta_cents": 1000
+            },
+            {
+              "label": "Con gomitas",
+              "price_delta_cents": 1500
+            },
+            {
+              "label": "Caguamón",
+              "price_delta_cents": 4500
+            },
+            {
+              "label": "Caguamón michelada",
+              "price_delta_cents": 5500
+            },
+            {
+              "label": "Caguamón cubana",
+              "price_delta_cents": 6000
+            },
+            {
+              "label": "Caguamón con gomitas",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pulque natural",
+      "price_cents": 3500,
+      "category_names": [
+        "Bebidas"
+      ],
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Medio",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Litro",
+              "price_delta_cents": 1000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pulque curado",
+      "price_cents": 4500,
+      "category_names": [
+        "Bebidas"
+      ],
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Medio",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Litro",
+              "price_delta_cents": 3000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pay de limón",
+      "price_cents": 5500,
+      "category_names": [
+        "Postres"
+      ]
+    },
+    {
+      "name": "Flan de la tía",
+      "price_cents": 6000,
+      "category_names": [
+        "Postres"
+      ]
+    },
+    {
+      "name": "Duraznos con crema",
+      "price_cents": 5500,
+      "category_names": [
+        "Postres"
+      ]
+    },
+    {
+      "name": "Pan de elote",
+      "price_cents": 6500,
+      "category_names": [
+        "Postres"
+      ]
+    },
+    {
+      "name": "Mil hojas frutal",
+      "price_cents": 6500,
+      "category_names": [
+        "Postres"
+      ]
+    },
+    {
+      "name": "Helado frito",
+      "price_cents": 8500,
+      "category_names": [
+        "Postres"
+      ]
+    }
+  ]
+}

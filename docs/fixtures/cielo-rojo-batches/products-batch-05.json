@@ -1,0 +1,247 @@
+{
+  "items": [
+    {
+      "name": "Orden de 3 tacos con consomé",
+      "price_cents": 13500,
+      "category_names": [
+        "Caldos"
+      ]
+    },
+    {
+      "name": "Birriamen",
+      "price_cents": 14500,
+      "category_names": [
+        "Caldos"
+      ],
+      "description": "Ramen con birria."
+    },
+    {
+      "name": "Pozole",
+      "price_cents": 8500,
+      "category_names": [
+        "Caldos"
+      ],
+      "option_groups": [
+        {
+          "title": "Tipo",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Maciza",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Puerco",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Pollo",
+              "price_delta_cents": 0
+            }
+          ]
+        },
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Chico",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Grande",
+              "price_delta_cents": 2500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pozole vegetariano",
+      "price_cents": 7500,
+      "category_names": [
+        "Caldos"
+      ],
+      "description": "Con champiñones.",
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Chico",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Grande",
+              "price_delta_cents": 2500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tarrito de consomé",
+      "price_cents": 2000,
+      "category_names": [
+        "Caldos"
+      ]
+    },
+    {
+      "name": "Plato de consomé",
+      "price_cents": 3000,
+      "category_names": [
+        "Caldos"
+      ]
+    },
+    {
+      "name": "Taco sencillo",
+      "price_cents": 4500,
+      "category_names": [
+        "Tacos"
+      ],
+      "description": "Servidos con papas.",
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Suadero",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Bistec",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Pastor",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Longaniza",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Campechanos",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Chorizo argentino",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Chistorra",
+              "price_delta_cents": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Taco especial",
+      "price_cents": 5500,
+      "category_names": [
+        "Tacos"
+      ],
+      "description": "Servidos con papas.",
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Arrachera",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Cecina",
+              "price_delta_cents": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Taco de guisado",
+      "price_cents": 5000,
+      "category_names": [
+        "Tacos"
+      ],
+      "description": "Servidos con papas.",
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Cochinita",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Birria",
+              "price_delta_cents": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Volcán con guacamole",
+      "price_cents": 6500,
+      "category_names": [
+        "Volcanes"
+      ],
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Suadero",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Bistec",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Pastor",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Longaniza",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Campechanos",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Chorizo argentino",
+              "price_delta_cents": 0
+            },
+            {
+              "label": "Chistorra",
+              "price_delta_cents": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
