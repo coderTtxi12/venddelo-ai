@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     assistant_context_compression_model: str | None = None
     assistant_context_compression_max_output_tokens: int = 1500
     assistant_max_tool_iterations: int = 32
+    assistant_clarify_timeout_seconds: int = 288
     menu_import_batch_max_products: int = 15
     menu_import_full_max_products: int = 200
     menu_import_max_source_bytes: int = 15 * 1024 * 1024
