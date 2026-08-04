@@ -310,7 +310,16 @@ def orchestrator_input(context: WorkflowContext) -> str:
     return "\n\n".join(parts)
 
 
-def restaurant_ops_input(context: WorkflowContext, task: str) -> str:
+def catalog_agent_input(context: WorkflowContext, task: str) -> str:
+    _ = context
+    return f"## Delegated task\n\n{task.strip()}\n"
+
+
+# Back-compat alias.
+restaurant_ops_input = catalog_agent_input
+
+
+def operations_agent_input(context: WorkflowContext, task: str) -> str:
     _ = context
     return f"## Delegated task\n\n{task.strip()}\n"
 
