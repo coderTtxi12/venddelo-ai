@@ -1,6 +1,6 @@
-# Vendelo AI
+# Venddelo AI
 
-**An AI-native restaurant operations platform.** Upload a menu. Chat in natural language. Ship a live QR digital menu, WhatsApp checkout, and delivery ops — while **Mexy Agent** digs into the catalog, mutates it with real tools, and asks only when a decision actually matters.
+**An AI-native restaurant operations platform.** Upload a menu. Chat in natural language. Ship a live QR digital menu, WhatsApp checkout, and delivery ops — while **The Agent** digs into the catalog, mutates it with real tools, and asks only when a decision actually matters.
 
 This repo is built around a **subagent-driven assistant**: an Orchestrator that thinks and replies to the owner, then delegates hard work to specialized child agents with skill toolkits. Not a chatbot wrapper. A control plane for the restaurant.
 
