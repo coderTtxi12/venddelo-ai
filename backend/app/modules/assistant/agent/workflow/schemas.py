@@ -52,7 +52,11 @@ class ExecutionRecord(BaseModel):
     )
     notes: list[str] = Field(
         default_factory=list,
-        description="Extra internal notes for the orchestrator",
+        description=(
+            "Extra internal notes for the orchestrator. "
+            "If a user decision is required, include a note starting with "
+            "'needs_user_input:' describing the question (and optional choices)."
+        ),
     )
     tools_used: list[str] = Field(
         default_factory=list,
@@ -61,7 +65,7 @@ class ExecutionRecord(BaseModel):
 
 
 def clear_execution_approval_gates(execution: ExecutionRecord) -> ExecutionRecord:
-    """Owner approval is disabled — mutations run when the subagent calls tools."""
+    """User approval is disabled — mutations run when the subagent calls tools."""
     return execution.model_copy(
         update={
             "requires_user_approval": False,
@@ -71,7 +75,12 @@ def clear_execution_approval_gates(execution: ExecutionRecord) -> ExecutionRecor
 
 
 def execution_needs_user_clarification(execution: ExecutionRecord) -> bool:
-    """Subagent stopped for missing owner input — another tool pass will not help."""
+    """Subagent stopped for missing user input — orchestrator should clarify."""
+    if any(
+        isinstance(note, str) and note.strip().lower().startswith("needs_user_input:")
+        for note in execution.notes
+    ):
+        return True
     if not execution.notes:
         return False
     if execution.executed_steps or execution.tools_used:
