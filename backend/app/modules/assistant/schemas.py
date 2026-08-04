@@ -13,7 +13,8 @@ ChatHistoryRole = Literal["user", "assistant"]
 
 class AssistantChatHistoryMessage(BaseModel):
     role: ChatHistoryRole
-    content: str = Field(min_length=1, max_length=8000)
+    # TEMP: raised for bulk menu paste testing (was 8000)
+    content: str = Field(min_length=1, max_length=50_000)
 
 
 class AssistantConversationDTO(BaseModel):
@@ -56,7 +57,8 @@ class ChatAttachmentRef(BaseModel):
 
 
 class AssistantConversationChatRequest(BaseModel):
-    message: str = Field(min_length=0, max_length=8000)
+    # TEMP: raised for bulk menu paste testing (was 8000)
+    message: str = Field(min_length=0, max_length=50_000)
     attachments: list[ChatAttachmentRef] = Field(default_factory=list, max_length=20)
     profile_version: int = Field(ge=1)
     profile_snapshot: AssistantProfileSnapshot | None = None
@@ -71,7 +73,8 @@ class AssistantConversationChatRequest(BaseModel):
 
 
 class AssistantChatRequest(BaseModel):
-    message: str = Field(min_length=0, max_length=8000)
+    # TEMP: raised for bulk menu paste testing (was 8000)
+    message: str = Field(min_length=0, max_length=50_000)
     conversation_id: uuid.UUID | None = None
     history: list[AssistantChatHistoryMessage] = Field(default_factory=list, max_length=40)
     attachments: list[ChatAttachmentRef] = Field(default_factory=list, max_length=20)
