@@ -130,13 +130,11 @@ Single-product conversational alta still uses the secretary flow.
 
 ---
 
-## OCR de menú → bulk create
+## OCR de menú → JSON
 
-When the owner uploads menu photo(s) to add many products:
+When the owner uploads menu photo(s) and you need a structured product list:
 1. Call `ocr_menu_to_bulk_products` with attachment `storage_path`(s) (up to 5).
-2. Review returned `items`; if `item_count` > 50, split before create.
-3. Ensure categories exist (`bulk_create_categories` for missing `category_names`).
-4. Call `bulk_create_products` with the items (or batches).
+2. Use the returned `{items:[...]}` JSON only — this tool maps images → JSON and creates nothing.
 
 Read-only OCR — never treat this tool as a write. Prefer this over pasting giant JSON in chat.
 
@@ -221,7 +219,7 @@ When the owner wants to **change how the public menu looks** — "cambia el tema
 | `create_product` | New product (`name`, `price_cents`, `category_ids`, optional `description`, optional `status` — default `draft`) |
 | `bulk_create_categories` | Create up to 50 categories (`items[]` with `name`; optional `description`, `sort_index`) |
 | `bulk_create_products` | Create up to 50 products (`name` required; price default 0; status default `active`; optional categories + nested `option_groups`; uncategorized products stay off the public/live menu until assigned) |
-| `ocr_menu_to_bulk_products` | OCR chat menu images → `{items}` for `bulk_create_products` (1–5 `storage_paths`; read-only) |
+| `ocr_menu_to_bulk_products` | OCR chat menu images → `{items}` JSON only (1–5 `storage_paths`; read-only, no writes) |
 | `update_product` | Change one product by `product_id` **or** `name`/`product_name`; use `new_name` to rename; `price_cents` in cents (100 MXN = 10000); set `status` (`active` \| `inactive` \| `draft`) for visibility |
 | `bulk_update_product_names` | Rename up to 50 products (`items[]` with `new_name` + `product_id` or lookup name) |
 | `bulk_update_product_descriptions` | Rewrite up to 50 descriptions in one call (`items[]` with `description` + `product_id` or `name`) |
