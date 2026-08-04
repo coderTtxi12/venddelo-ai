@@ -25,29 +25,40 @@ Read this restaurant menu image and return only a JSON object.
 Extract every visible menu product accurately; do not invent products, prices, categories,
 descriptions, or options that are not shown. If a value is unclear or absent, omit it.
 Menu prices are MXN pesos: set price_cents to the listed pesos × 100. Model each visible
-size, variant, or guisado as an option_groups entry; use the lowest listed price as the
-product's price_cents and set every option item's price_delta_cents relative to that base price.
+size, variant, or guisado as an option_groups entry.
 Return category_names, never category_ids.
-
-Devuelve solamente un objeto JSON. Extrae los productos visibles con fidelidad; no inventes
-productos, precios, categorías, descripciones ni complementos. Si un valor no es legible o no
-aparece, omítelo. Los precios están en pesos MXN: price_cents es pesos × 100. Modela cada
-tamaño, variante o guisado visible como option_groups; usa el precio más bajo como price_cents
-del producto y expresa cada price_delta_cents respecto de ese precio base. Devuelve
-category_names, nunca category_ids.
 
 Example:
 {
-  "items": [{
-    "name": "Taco al pastor",
-    "price_cents": 2500,
-    "category_names": ["Tacos"],
-    "option_groups": [{
-      "title": "Extras",
-      "selection": "multi",
-      "items": [{"label": "Queso", "price_delta_cents": 1000}]
-    }]
-  }]
+  "items": [
+    {
+      "name": "Taco al pastor",
+      "price_cents": 2500,
+      "category_names": ["Tacos"],
+      "description": "Con piña y cilantro",
+      "option_groups": [
+        {
+          "title": "Extras",
+          "selection": "multi",
+          "required": false,
+          "items": [
+            { "label": "Queso", "price_delta_cents": 1000 },
+            { "label": "Guacamole", "price_delta_cents": 1500 }
+          ]
+        },
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Normal", "price_delta_cents": 0 },
+            { "label": "Doble", "price_delta_cents": 2000 }
+          ]
+        }
+      ]
+    }
+  ]
 }
 """.strip()
 
