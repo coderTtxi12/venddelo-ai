@@ -12,8 +12,13 @@ from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.core.llm.ports import ChatStreamEvent
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.modules.assistant.agent.service import AssistantAgentService
+from app.modules.assistant.agent.workflow.clarify_registry import get_clarify_registry
 from app.modules.assistant.import_assets import upload_import_asset
-from app.modules.assistant.schemas import AssistantChatRequest, ImportAssetUploadDTO
+from app.modules.assistant.schemas import (
+    AssistantChatRequest,
+    AssistantClarifyAnswerRequest,
+    ImportAssetUploadDTO,
+)
 from app.modules.assistant.skills.menu_import.session_context import (
     cancel_active_import_for_restaurant,
 )
@@ -53,6 +58,26 @@ def reset_assistant_conversation(
     """Start a fresh chat + menu-import context (cancels any active import for this restaurant)."""
     cancel_active_import_for_restaurant(uow, restaurant_id=restaurant.id)
     uow.commit()
+    return {"ok": True}
+
+
+@router.post("/restaurants/{restaurant_id}/assistant/clarify/answer")
+async def answer_assistant_clarify(
+    body: AssistantClarifyAnswerRequest,
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),  # noqa: ARG001
+) -> dict[str, bool]:
+    """Resolve a pending clarify prompt for an in-flight chat stream.
+
+    Ownership is enforced via ``require_owned_restaurant`` on the restaurant
+    scoping the URL; the ``clarify_id`` itself is an unguessable UUID minted
+    per-prompt, which is sufficient secrecy for this MVP endpoint.
+    """
+    try:
+        get_clarify_registry().resolve(
+            body.conversation_id, body.clarify_id, body.user_response
+        )
+    except KeyError as exc:
+        raise NotFoundError("No pending clarify for this id") from exc
     return {"ok": True}
 
 
