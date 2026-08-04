@@ -38,6 +38,21 @@ export type AssistantStreamErrorPayload = {
   message: string;
 };
 
+export type AssistantClarifyPayload = {
+  clarify_id: string;
+  conversation_id: string;
+  question: string;
+  choices: string[] | null;
+  multi_select: boolean;
+  allow_other: boolean;
+  timeout_seconds: number;
+};
+
+export type AssistantClarifyClosedPayload = {
+  clarify_id: string;
+  reason: string;
+};
+
 export type AssistantStreamHandlers = {
   onDelta: (delta: string) => void;
   onComplete: (payload: AssistantStreamCompletePayload) => void;
@@ -79,6 +94,8 @@ export type AssistantStreamHandlers = {
     source?: string;
   }) => void;
   onMenuImportQuiz?: (payload: MenuImportQuizPayload) => void;
+  onClarify?: (payload: AssistantClarifyPayload) => void;
+  onClarifyClosed?: (payload: AssistantClarifyClosedPayload) => void;
 };
 
 function parseMenuImportQuizPayload(raw: unknown): MenuImportQuizPayload | null {
@@ -122,6 +139,34 @@ function parseMenuImportQuizEvent(payload: Record<string, unknown>): MenuImportQ
   const direct = parseMenuImportQuizPayload({ questions: payload.questions });
   if (direct) return direct;
   return parseMenuImportQuizPayload(payload.menu_import);
+}
+
+function parseAssistantClarifyPayload(payload: Record<string, unknown>): AssistantClarifyPayload | null {
+  const clarifyId = payload.clarify_id;
+  const conversationId = payload.conversation_id;
+  const question = payload.question;
+  if (
+    typeof clarifyId !== 'string' ||
+    typeof conversationId !== 'string' ||
+    typeof question !== 'string'
+  ) {
+    return null;
+  }
+
+  const rawChoices = payload.choices;
+  const choices = Array.isArray(rawChoices)
+    ? rawChoices.filter((item): item is string => typeof item === 'string')
+    : null;
+
+  return {
+    clarify_id: clarifyId,
+    conversation_id: conversationId,
+    question,
+    choices,
+    multi_select: payload.multi_select === true,
+    allow_other: payload.allow_other !== false,
+    timeout_seconds: typeof payload.timeout_seconds === 'number' ? payload.timeout_seconds : 0,
+  };
 }
 
 const WORKFLOW_PHASES = new Set<WorkflowPhaseId>([
@@ -343,6 +388,25 @@ export async function streamAssistantChat(
         continue;
       }
 
+      if (parsed.event === 'agent.clarify') {
+        const clarify = parseAssistantClarifyPayload(payload);
+        if (clarify) {
+          handlers.onClarify?.(clarify);
+        }
+        continue;
+      }
+
+      if (parsed.event === 'agent.clarify_closed') {
+        const clarifyId = payload.clarify_id;
+        if (typeof clarifyId === 'string') {
+          handlers.onClarifyClosed?.({
+            clarify_id: clarifyId,
+            reason: typeof payload.reason === 'string' ? payload.reason : 'unknown',
+          });
+        }
+        continue;
+      }
+
       if (parsed.event === 'menu_import.quiz') {
         const quiz = parseMenuImportQuizEvent(payload);
         if (quiz) {
@@ -377,6 +441,40 @@ export async function streamAssistantChat(
     await reader.cancel();
   } catch {
     // Stream may already be closed.
+  }
+}
+
+export async function answerAssistantClarify(
+  token: string,
+  restaurantId: string,
+  body: {
+    conversation_id: string;
+    clarify_id: string;
+    user_response: string | string[];
+  },
+): Promise<void> {
+  const response = await fetch(
+    `${API_URL}/restaurants/${restaurantId}/assistant/clarify/answer`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    },
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    let errorMessage = response.statusText;
+    try {
+      const parsed = text ? JSON.parse(text) : null;
+      errorMessage = parsed?.error?.message ?? errorMessage;
+    } catch {
+      if (text) errorMessage = text;
+    }
+    throw new ApiError('assistant_clarify_answer_error', errorMessage, response.status);
   }
 }
 

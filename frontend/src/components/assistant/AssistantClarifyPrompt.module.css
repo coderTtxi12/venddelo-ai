@@ -1,0 +1,220 @@
+.prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  width: 100%;
+  margin-top: 0.65rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-left: 2px solid color-mix(in srgb, var(--color-primary) 55%, var(--color-border));
+  border-radius: 0.75rem;
+  background: transparent;
+}
+
+.promptSettled {
+  padding: 0.45rem 0.65rem;
+  border-left-color: color-mix(in srgb, var(--color-border) 80%, transparent);
+  animation: clarifySettle 180ms ease-out;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+@keyframes clarifySettle {
+  from {
+    opacity: 0.55;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.question {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--color-text);
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.optionRow {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.35rem;
+  border: none;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.optionRow:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-border) 28%, transparent);
+}
+
+.optionRow:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 25%, transparent);
+}
+
+.optionRowSelected {
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+}
+
+.optionRow:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.optionRadio {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1.5px solid var(--color-border);
+  background: transparent;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.optionCheckbox {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-shrink: 0;
+  border-radius: 0.25rem;
+  border: 1.5px solid var(--color-border);
+  background: transparent;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.optionRowSelected .optionRadio,
+.optionRowSelected .optionCheckbox {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  box-shadow: inset 0 0 0 2px var(--color-surface);
+}
+
+.optionLabel {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.textInput {
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  transition: border-color 0.15s ease;
+}
+
+.textInput::placeholder {
+  color: color-mix(in srgb, var(--color-text-secondary) 75%, transparent);
+}
+
+.textInput:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-primary) 55%, var(--color-border));
+}
+
+.textInput:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #dc2626;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 0.15rem;
+}
+
+.submitButton {
+  min-height: 2.25rem;
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.submitButton:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.submitButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 25%, transparent);
+}
+
+.submitButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.statusNote {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .optionRow,
+  .submitButton,
+  .textInput,
+  .optionRadio,
+  .optionCheckbox,
+  .promptSettled {
+    transition: none;
+    animation: none;
+  }
+}

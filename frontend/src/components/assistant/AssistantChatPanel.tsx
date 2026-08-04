@@ -5,6 +5,7 @@ import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
+import AssistantClarifyPrompt from '@/components/assistant/AssistantClarifyPrompt';
 import ChatAttachmentList from '@/components/assistant/ChatAttachmentList';
 import ChatAgentActivity from '@/components/assistant/ChatAgentActivity';
 import ChatMarkdown from '@/components/assistant/ChatMarkdown';
@@ -16,8 +17,12 @@ import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useChatAutoScroll } from '@/hooks/useChatAutoScroll';
 import { useChatPanelResize } from '@/hooks/useChatPanelResize';
-import { resetAssistantConversation, streamAssistantChat } from '@/lib/api/assistant';
-import type { MenuImportQuizPayload } from '@/lib/api/assistant';
+import {
+  answerAssistantClarify,
+  resetAssistantConversation,
+  streamAssistantChat,
+} from '@/lib/api/assistant';
+import type { AssistantClarifyPayload, MenuImportQuizPayload } from '@/lib/api/assistant';
 import { isFetchAbortError } from '@/lib/api/assistantStream';
 import {
   CHAT_ATTACHMENT_ACCEPT,
@@ -66,6 +71,9 @@ type ChatMessage = {
   attachments?: ChatAttachment[];
   menuImportQuiz?: MenuImportQuizPayload | null;
   menuImportQuizSubmitted?: boolean;
+  clarify?: AssistantClarifyPayload | null;
+  clarifySubmitted?: boolean;
+  clarifyClosedReason?: string | null;
 };
 
 const WELCOME_MESSAGE: ChatMessage = {
@@ -105,6 +113,10 @@ export default function AssistantChatPanel() {
   const [quizAnswersByMessageId, setQuizAnswersByMessageId] = useState<
     Record<string, MenuImportQuizAnswers>
   >({});
+  const [pendingClarify, setPendingClarify] = useState<{
+    messageId: string;
+    payload: AssistantClarifyPayload;
+  } | null>(null);
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesContentRef = useRef<HTMLDivElement>(null);
@@ -333,6 +345,7 @@ export default function AssistantChatPanel() {
         setIsBusy(false);
         setAgentProcessing(false);
         setAgentActivity(INITIAL_AGENT_ACTIVITY);
+        setPendingClarify(null);
       };
 
       try {
@@ -384,6 +397,49 @@ export default function AssistantChatPanel() {
                     ? { ...message, menuImportQuiz: quiz }
                     : message,
                 ),
+              );
+            },
+            onClarify: (clarify) => {
+              setAgentProcessing(false);
+              setAgentActivity((current) => clearAgentActivityForResponse(current));
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.id === assistantMessageId
+                    ? {
+                        ...message,
+                        clarify,
+                        clarifySubmitted: false,
+                        clarifyClosedReason: null,
+                      }
+                    : message,
+                ),
+              );
+              setPendingClarify({ messageId: assistantMessageId, payload: clarify });
+            },
+            onClarifyClosed: (closed) => {
+              setPendingClarify((current) =>
+                current && current.payload.clarify_id === closed.clarify_id ? null : current,
+              );
+              setMessages((prev) =>
+                prev.map((message) => {
+                  if (
+                    message.id !== assistantMessageId ||
+                    message.clarify?.clarify_id !== closed.clarify_id
+                  ) {
+                    return message;
+                  }
+                  if (closed.reason === 'answered' || message.clarifySubmitted) {
+                    return {
+                      ...message,
+                      clarifySubmitted: true,
+                      clarifyClosedReason: null,
+                    };
+                  }
+                  return {
+                    ...message,
+                    clarifyClosedReason: closed.reason,
+                  };
+                }),
               );
             },
             onComplete: (payload) => {
@@ -468,13 +524,39 @@ export default function AssistantChatPanel() {
     [accessToken, clearPendingAttachments, conversationId, pendingAttachments, pinToBottom, restaurantId],
   );
 
+  const handleClarifySubmit = useCallback(
+    async (
+      messageId: string,
+      payload: AssistantClarifyPayload,
+      userResponse: string | string[],
+    ) => {
+      if (!accessToken || !restaurantId) {
+        throw new Error('No pude conectar con el asistente.');
+      }
+      await answerAssistantClarify(accessToken, restaurantId, {
+        conversation_id: payload.conversation_id,
+        clarify_id: payload.clarify_id,
+        user_response: userResponse,
+      });
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === messageId ? { ...message, clarifySubmitted: true } : message,
+        ),
+      );
+      setPendingClarify((current) =>
+        current && current.payload.clarify_id === payload.clarify_id ? null : current,
+      );
+    },
+    [accessToken, restaurantId],
+  );
+
   const submitComposer = useCallback(
     (overrides?: {
       quizMessageId?: string;
       quizAnswers?: MenuImportQuizAnswers;
       requireAllQuizAnswers?: boolean;
     }) => {
-      if (isBusy || sendInFlightRef.current) return;
+      if (isBusy || sendInFlightRef.current || pendingClarify) return;
 
       const pendingQuiz = findPendingMenuImportQuiz(messages);
       const quizMessageId = overrides?.quizMessageId ?? pendingQuiz?.messageId;
@@ -519,7 +601,7 @@ export default function AssistantChatPanel() {
         includeQuiz ? quizMessageId : undefined,
       );
     },
-    [draft, isBusy, messages, pendingAttachments, quizAnswersByMessageId, sendMessage],
+    [draft, isBusy, messages, pendingAttachments, pendingClarify, quizAnswersByMessageId, sendMessage],
   );
 
   const submitMenuImportQuiz = useCallback(
@@ -560,6 +642,7 @@ export default function AssistantChatPanel() {
     setStreamingMessageId(null);
     setAgentProcessing(false);
     setAgentActivity(INITIAL_AGENT_ACTIVITY);
+    setPendingClarify(null);
     setMessages([WELCOME_MESSAGE]);
     textareaRef.current?.focus();
 
@@ -586,6 +669,7 @@ export default function AssistantChatPanel() {
     : undefined;
   const canSend =
     !isBusy &&
+    !pendingClarify &&
     (draft.trim().length > 0 ||
       pendingAttachments.length > 0 ||
       hasMenuImportQuizAnswers(pendingQuizAnswers ?? {}));
@@ -702,7 +786,13 @@ export default function AssistantChatPanel() {
             isStreaming &&
             (agentProcessing || hasVisibleAgentActivity(agentActivity) || !message.content);
 
-          if (!isUser && !message.content && !isStreaming && !message.menuImportQuiz?.questions.length) {
+          if (
+            !isUser &&
+            !message.content &&
+            !isStreaming &&
+            !message.menuImportQuiz?.questions.length &&
+            !message.clarify
+          ) {
             return null;
           }
 
@@ -793,6 +883,17 @@ export default function AssistantChatPanel() {
                           }}
                         />
                       ) : null}
+                      {message.clarify ? (
+                        <AssistantClarifyPrompt
+                          key={message.clarify.clarify_id}
+                          payload={message.clarify}
+                          submitted={message.clarifySubmitted}
+                          closedReason={message.clarifyClosedReason}
+                          onSubmit={(response) =>
+                            handleClarifySubmit(message.id, message.clarify!, response)
+                          }
+                        />
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -810,7 +911,7 @@ export default function AssistantChatPanel() {
               key={suggestion}
               type="button"
               className={styles.suggestionChip}
-              disabled={isBusy}
+              disabled={isBusy || Boolean(pendingClarify)}
               onClick={() => {
                 void sendMessage(suggestion);
               }}
@@ -837,7 +938,7 @@ export default function AssistantChatPanel() {
             className={styles.hiddenFileInput}
             accept={CHAT_ATTACHMENT_ACCEPT}
             multiple
-            disabled={isBusy}
+            disabled={isBusy || Boolean(pendingClarify)}
             onChange={(event) => {
               if (event.target.files) {
                 addPendingFiles(event.target.files);
@@ -849,7 +950,9 @@ export default function AssistantChatPanel() {
             type="button"
             className={styles.attachButton}
             onClick={() => fileInputRef.current?.click()}
-            disabled={isBusy || pendingAttachments.length >= MAX_CHAT_ATTACHMENTS}
+            disabled={
+              isBusy || Boolean(pendingClarify) || pendingAttachments.length >= MAX_CHAT_ATTACHMENTS
+            }
             aria-label="Adjuntar imagen o documento"
             title="Adjuntar menú (PDF, Word o foto)"
           >
@@ -863,9 +966,13 @@ export default function AssistantChatPanel() {
             id="assistant-chat-input"
             className={styles.textarea}
             rows={1}
-            placeholder="Escribe o adjunta tu menú (PDF, Word, fotos)…"
+            placeholder={
+              pendingClarify
+                ? 'Responde la pregunta de arriba para continuar…'
+                : 'Escribe o adjunta tu menú (PDF, Word, fotos)…'
+            }
             value={draft}
-            disabled={isBusy}
+            disabled={isBusy || Boolean(pendingClarify)}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleKeyDown}
           />
