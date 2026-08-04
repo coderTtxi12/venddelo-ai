@@ -16,6 +16,8 @@ from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.agent.run_context import AssistantRunContext
 from app.modules.assistant.agent.tracing import assistant_tracing_active
 from app.modules.assistant.agent.workflow.agents import build_orchestrator_agent
+from app.modules.assistant.agent.workflow.clarify_registry import get_clarify_registry
+from app.modules.assistant.agent.workflow.clarify_tool import build_clarify_tool
 from app.modules.assistant.agent.workflow.context_loader import (
     load_workflow_runtime,
     orchestrator_input,
@@ -28,7 +30,6 @@ from app.modules.assistant.agent.workflow.delegate import (
 from app.modules.assistant.agent.workflow.schemas import ORCHESTRATOR_MAX_TURNS
 from app.modules.assistant.agent.workflow.sse import (
     agent_thought_event,
-    menu_import_quiz_event,
     phase_event,
 )
 from app.modules.assistant.agent.workflow.stream_mapping import map_agent_stream_event
@@ -36,10 +37,6 @@ from app.modules.assistant.agent.workflow.tracing_async import async_langsmith_r
 from app.modules.assistant.conversation_store import schedule_persist_turn
 from app.modules.assistant.schemas import ChatAttachmentRef
 from app.modules.assistant.skills.context import AgentContext
-from app.modules.assistant.skills.menu_import.quiz_bridge import (
-    format_menu_import_assistant_turn_for_history,
-)
-from app.modules.assistant.skills.menu_import.response_schema import MenuImportQuizQuestion
 from app.modules.assistant.skills.registry import SkillRegistry
 
 _FALLBACK_REPLY = "No pude generar una respuesta en este momento. Intenta de nuevo."
@@ -137,7 +134,6 @@ class WorkflowOrchestrator:
         )
         workflow_context = runtime.context
         registry = runtime.registry
-        menu_import_registry = runtime.menu_import_registry
         resolved_conversation_id = runtime.conversation_id
         run_context = self._build_run_context(
             uow=uow,
@@ -146,15 +142,6 @@ class WorkflowOrchestrator:
             registry=registry,
             effective_skill_ids=workflow_context.effective_skill_ids,
         )
-        menu_run_context = None
-        if menu_import_registry is not None:
-            menu_run_context = self._build_run_context(
-                uow=uow,
-                restaurant_id=restaurant_id,
-                conversation_id=resolved_conversation_id,
-                registry=menu_import_registry,
-                effective_skill_ids=["menu_import"],
-            )
 
         trace_metadata = {
             "restaurant_id": str(restaurant_id),
@@ -171,21 +158,24 @@ class WorkflowOrchestrator:
         async def sink(event: ChatStreamEvent) -> None:
             await event_queue.put(event)
 
+        clarify_registry = get_clarify_registry()
+        clarify_tool = build_clarify_tool(
+            settings=self._settings,
+            conversation_id=resolved_conversation_id,
+            registry=clarify_registry,
+            event_sink=sink,
+        )
         delegate_tool = build_delegate_task_tool(
             settings=self._settings,
             workflow_context=workflow_context,
             registry=registry,
-            menu_import_registry=menu_import_registry,
-            uow=uow,
-            restaurant_id=restaurant_id,
             ops_run_context=run_context,
-            menu_run_context=menu_run_context,
             delegation_state=delegation_state,
             event_sink=sink,
         )
         orchestrator = build_orchestrator_agent(
             settings=self._settings,
-            tools=[delegate_tool],
+            tools=[delegate_tool, clarify_tool],
         )
 
         async def emit() -> AsyncIterator[ChatStreamEvent]:
@@ -255,36 +245,19 @@ class WorkflowOrchestrator:
                     data={"delta": final_output},
                 )
 
-            quiz_models: list[MenuImportQuizQuestion] = []
-            if delegation_state.last_quiz_questions:
-                quiz_models = [
-                    MenuImportQuizQuestion.model_validate(item)
-                    for item in delegation_state.last_quiz_questions
-                ]
-                yield menu_import_quiz_event(quiz_models)
+            yield ChatStreamEvent(
+                event="message.complete",
+                data={
+                    "conversation_id": str(resolved_conversation_id),
+                    "content": final_output,
+                },
+            )
 
-            complete_data: dict[str, object] = {
-                "conversation_id": str(resolved_conversation_id),
-                "content": final_output,
-            }
-            if quiz_models:
-                complete_data["menu_import"] = {
-                    "questions": [question.model_dump() for question in quiz_models],
-                }
-            yield ChatStreamEvent(event="message.complete", data=complete_data)
-
-            if quiz_models:
-                persisted = format_menu_import_assistant_turn_for_history(
-                    final_output,
-                    quiz_models,
-                )
-            else:
-                persisted = final_output
-            if persisted:
+            if final_output:
                 schedule_persist_turn(
                     conversation_id=resolved_conversation_id,
                     user_message=workflow_context.user_message,
-                    assistant_message=persisted,
+                    assistant_message=final_output,
                 )
 
         async with async_langsmith_root_trace(
