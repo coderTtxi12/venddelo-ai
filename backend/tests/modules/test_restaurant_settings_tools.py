@@ -7,10 +7,18 @@ from app.modules.assistant.import_asset_paths import logo_prefix
 from app.modules.assistant.import_assets import upload_import_asset
 from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.menu_write.restaurant_settings_tools import (
+    get_delivery_provider_schedules,
+    get_restaurant_description,
+    get_restaurant_location,
+    get_restaurant_menu_qr,
     get_restaurant_name,
+    get_restaurant_payment_methods,
     get_restaurant_public_menu_url,
     get_restaurant_schedules,
+    set_restaurant_payment_methods,
     set_restaurant_schedules,
+    update_restaurant_description,
+    update_restaurant_location,
 )
 from app.modules.assistant.skills.menu_write.tools import MenuWriteSkill
 from app.modules.restaurants.schemas import RestaurantCreate
@@ -165,3 +173,132 @@ def test_set_restaurant_schedules_rejects_invalid_service_type():
         invalidate=lambda _ctx: None,
     )
     assert result.ok is False
+
+
+@requires_db
+def test_update_and_get_restaurant_description(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Desc Test", subdomain="desc-test-settings")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+
+    updated = update_restaurant_description(
+        ctx,
+        {"description": "Tacos al pastor en el centro"},
+        invalidate=lambda _ctx: None,
+    )
+    assert updated.ok is True
+    listed = get_restaurant_description(ctx)
+    assert listed.ok is True
+    assert listed.data["description"] == "Tacos al pastor en el centro"
+
+
+@requires_db
+def test_update_and_get_restaurant_location(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Loc Test", subdomain="loc-test-settings")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+
+    updated = update_restaurant_location(
+        ctx,
+        {"address": "Av. Reforma 100", "latitude": 19.43, "longitude": -99.13},
+        invalidate=lambda _ctx: None,
+    )
+    assert updated.ok is True
+    listed = get_restaurant_location(ctx)
+    assert listed.ok is True
+    assert listed.data["address"] == "Av. Reforma 100"
+    assert listed.data["latitude"] == 19.43
+
+
+@requires_db
+def test_set_and_get_restaurant_payment_methods(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Pay Test", subdomain="pay-test-settings")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+
+    updated = set_restaurant_payment_methods(
+        ctx,
+        {
+            "payment_methods": [
+                {"method": "cash", "service_type": "takeout", "enabled": True},
+                {"method": "transfer", "service_type": "takeout", "enabled": False},
+                {"method": "card_terminal", "service_type": "takeout", "enabled": True},
+                {"method": "cash", "service_type": "delivery", "enabled": True},
+                {"method": "transfer", "service_type": "delivery", "enabled": True},
+                {"method": "card_terminal", "service_type": "delivery", "enabled": False},
+            ]
+        },
+        invalidate=lambda _ctx: None,
+    )
+    assert updated.ok is True
+    listed = get_restaurant_payment_methods(ctx)
+    assert listed.ok is True
+    assert len(listed.data["payment_methods"]) == 6
+
+
+@requires_db
+def test_get_delivery_provider_schedules_without_partnership(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="Courier Hours", subdomain="courier-hours-settings")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+
+    result = get_delivery_provider_schedules(ctx)
+    assert result.ok is True
+    assert result.data["has_active_delivery_provider"] is False
+    assert result.data["schedules"] == []
+
+
+@requires_db
+def test_get_restaurant_menu_qr(session):
+    uow = SqlAlchemyUnitOfWork(lambda: session)
+    uow.__enter__()
+    restaurant = uow.restaurants.add(
+        RestaurantCreate(name="QR Test", subdomain="qr-test-settings")
+    )
+    ctx = AgentContext(
+        restaurant_id=restaurant.id,
+        conversation_id=uuid.uuid4(),
+        uow=uow,
+        effective_skill_ids=["menu_write"],
+    )
+
+    with patch(
+        "app.modules.assistant.skills.menu_write.restaurant_settings_tools.build_public_menu_url",
+        return_value="http://qr-test-settings.localhost:3000",
+    ):
+        result = get_restaurant_menu_qr(ctx)
+
+    assert result.ok is True
+    assert result.data["qr_encodes_url"] == "http://qr-test-settings.localhost:3000"
