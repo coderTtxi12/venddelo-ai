@@ -21,7 +21,7 @@ from app.modules.assistant.skills.menu_import.document_loader import (
 logger = logging.getLogger(__name__)
 
 _IMAGE_VISION_PROMPT = """\
-Describe brevemente en español qué contiene este archivo adjunto de un restaurante.
+Describe brevemente en español qué contiene este archivo adjunto.
 Menciona si parece menú, foto de platillo, documento u otro, y 1-2 datos útiles (platillos, precios, secciones).
 Máximo 2 oraciones cortas.
 
@@ -29,7 +29,8 @@ Responde solo JSON: {"description": "..."}\
 """
 
 _DOCX_TEXT_PROMPT = """\
-Resume en 1-2 oraciones en español qué contiene este documento Word de restaurante.
+Resume en 1-2 oraciones en español qué contiene este documento Word.
+Menciona si parece menú, foto de platillo, documento u otro, y 1-2 datos útiles (platillos, precios, secciones).
 Archivo: {filename}
 
 Contenido extraído:
