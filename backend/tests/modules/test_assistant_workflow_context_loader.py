@@ -4,9 +4,10 @@ import uuid
 from app.modules.assistant.agent.workflow.context_loader import (
     _build_conversation_history,
     menu_subagent_input,
+    operations_agent_input,
     orchestrator_input,
     resolve_runtime_skill_ids,
-    restaurant_ops_input,
+    catalog_agent_input,
 )
 from app.modules.assistant.schemas import AssistantChatHistoryMessage
 from app.modules.assistant.agent.workflow.context_loader import WorkflowContext
@@ -79,9 +80,22 @@ def test_orchestrator_instructions_include_parallel_tool_calls():
     assert "Parallel tool calls" in ORCHESTRATOR_INSTRUCTIONS
 
 
-def test_restaurant_ops_input_includes_delegated_task():
+def test_prompts_document_needs_user_input_clarify_handoff():
+    from app.modules.assistant.agent.workflow.prompts import (
+        CATALOG_AGENT_INSTRUCTIONS,
+        OPERATIONS_AGENT_INSTRUCTIONS,
+        ORCHESTRATOR_INSTRUCTIONS,
+    )
+
+    assert "needs_user_input:" in CATALOG_AGENT_INSTRUCTIONS
+    assert "needs_user_input:" in OPERATIONS_AGENT_INSTRUCTIONS
+    assert "needs_user_input" in ORCHESTRATOR_INSTRUCTIONS
+    assert "`clarify` after subagents" in ORCHESTRATOR_INSTRUCTIONS
+
+
+def test_catalog_agent_input_includes_delegated_task():
     context = _base_context(user_message="desactiva el producto hamburguesa")
-    payload = restaurant_ops_input(context, "Listar categorías del menú")
+    payload = catalog_agent_input(context, "Listar categorías del menú")
     assert "## Delegated task" in payload
     assert "Listar categorías del menú" in payload
     assert "## User request" not in payload
@@ -89,7 +103,25 @@ def test_restaurant_ops_input_includes_delegated_task():
     assert "## Conversation history" not in payload
 
 
+def test_operations_agent_input_includes_delegated_task():
+    context = _base_context(user_message="cambia la descripción")
+    payload = operations_agent_input(context, "Actualizar descripción del negocio")
+    assert "## Delegated task" in payload
+    assert "Actualizar descripción del negocio" in payload
+    assert "## User request" not in payload
+    assert "cambia la descripción" not in payload
+
+
+def test_orchestrator_instructions_do_not_mention_menu_subagent():
+    from app.modules.assistant.agent.workflow.prompts import ORCHESTRATOR_INSTRUCTIONS
+
+    assert "menu_subagent" not in ORCHESTRATOR_INSTRUCTIONS
+    assert "operations_agent" in ORCHESTRATOR_INSTRUCTIONS
+    assert "catalog_agent" in ORCHESTRATOR_INSTRUCTIONS
+
+
 def test_menu_subagent_input_includes_session_and_task():
+    # Helper kept for menu_import code; not wired into the live AI agent.
     context = _base_context(
         menu_import_enabled=True,
         menu_import_conversation_history="Usuario: importa",
