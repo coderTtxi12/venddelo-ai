@@ -18,7 +18,7 @@ End-to-end **menu import** for restaurant owners — OCR and publish in one step
 The **Orchestrator** calls `delegate_task` with `subagent=menu_subagent`.
 
 - **`menu_subagent`** — tools + `ExecutionRecord` summary; the Orchestrator writes the owner-facing reply.
-- Granular `menu_import` tools are **internal** to that subagent, not exposed on `restaurant_ops_subagent`.
+- Granular `menu_import` tools are **internal** to that subagent, not exposed on `catalog_agent`.
 
 ## Required skills at start
 
