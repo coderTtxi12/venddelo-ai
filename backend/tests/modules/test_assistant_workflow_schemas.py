@@ -30,3 +30,23 @@ def test_execution_needs_user_clarification_false_after_tool_runs():
         tools_used=["search_products"],
     )
     assert execution_needs_user_clarification(execution) is False
+
+
+def test_execution_needs_user_clarification_with_needs_user_input_note():
+    execution = ExecutionRecord(
+        status="partial_success",
+        summary="Encontré 2 tacos; falta decidir el precio.",
+        notes=[
+            "needs_user_input: ¿Qué precio aplico? choices=[45, 50]",
+        ],
+        tools_used=["search_products"],
+        executed_steps=[
+            ExecutedStep(
+                step_id="lookup_1",
+                tool="search_products",
+                status="success",
+                output_summary="2 resultados",
+            )
+        ],
+    )
+    assert execution_needs_user_clarification(execution) is True
