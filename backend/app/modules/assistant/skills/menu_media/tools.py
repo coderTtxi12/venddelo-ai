@@ -154,13 +154,12 @@ class MenuMediaSkill:
     def tool_definitions(self) -> list[ToolDefinition]:
         return [
             ToolDefinition(
-                name="generate_product_image",
+                name="generate_food_product_image",
                 description=(
                     "Generate an appetizing AI food photo for ONE product and attach it to "
                     "the menu. Before generating, the tool loads full product context "
                     "(name, description, categories, add-ons/complements, promotions). "
                     "Skips products that already have image_path unless force=true. "
-                    "Requires owner confirmation before calling (mutates the product). "
                     "Quality rules: professional menu-style food photography; warm lighting, "
                     "appetizing, photorealistic; no text, logos, watermarks, people, or hands "
                     "in the image. Do not invent dish details beyond menu_read / tool context."
@@ -198,7 +197,7 @@ class MenuMediaSkill:
     def execute(self, tool_name: str, args: dict[str, Any], ctx: AgentContext) -> ToolResult:
         service = MenuService(ctx.uow.menu)
 
-        if tool_name == "generate_product_image":
+        if tool_name == "generate_food_product_image":
             product, resolve_error = _resolve_product_for_media(service, ctx, args)
             if resolve_error is not None:
                 return resolve_error

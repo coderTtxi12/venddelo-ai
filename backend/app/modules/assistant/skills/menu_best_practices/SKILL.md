@@ -96,7 +96,7 @@ Responde al dueño en **español**, con markdown claro.
 | Badge visual, sin cálculo | `promotions` type `combo` (`priced_in_cart=false`) | `create_promotion` |
 | Logo / portada / tema | branding de `restaurants` | `menu_write` `list_menu_themes`, `apply_menu_theme` |
 | "Apagar" un producto | `is_active=false` (nunca eliminar) | `set_product_active`, `update_option_*` |
-| Fotos | `image_path` en producto/categoría/promo | Fotos subidas: `assign_product_image` / `bulk_assign_product_images` (menu_write); generación IA: `generate_product_image` (menu_media) |
+| Fotos | `image_path` en producto/categoría/promo | Fotos subidas: `assign_product_image` / `bulk_assign_product_images` (menu_write); generación IA: `generate_food_product_image` (menu_media) |
 
 ---
 
@@ -220,7 +220,7 @@ Venddelo recomienda que **cada platillo tenga una foto de calidad**. Checklist:
 | Consistencia | La foto debe coincidir con nombre y descripción |
 | Prohibido en la foto | Precios, % de descuento, teléfonos, logo >25% del encuadre, empaque desechable poco apetitoso, contenido inapropiado |
 
-En esta plataforma: si falta `image_path`, ofrece **`generate_product_image`** (skill
+En esta plataforma: si falta `image_path`, ofrece **`generate_food_product_image`** (skill
 **`menu_media`**).
 
 ---

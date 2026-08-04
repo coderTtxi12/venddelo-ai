@@ -44,7 +44,7 @@ Direct flow: **optional owner context → OCR → auto-apply entire menu.**
 
 ## Never during import
 
-- **`menu_media`** / product photo tools
+- **`menu_media`** / `generate_food_product_image` / product photo tools
 - Do not ask the owner to upload product photos
 - Do not call **`load_skill(menu_best_practices)`** during import
 

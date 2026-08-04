@@ -19,7 +19,7 @@ Guía para dueños de restaurante y desarrolladores.
 
 **Skills al inicio:** `menu_write` + `menu_best_practices` + `menu_import`.
 
-**Prohibido en import:** `menu_media`, `generate_product_image`, `request_image_enhancement`.
+**Prohibido en import:** `menu_media`, `generate_food_product_image`, `request_image_enhancement`.
 
 ---
 

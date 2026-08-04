@@ -15,14 +15,14 @@ Generate **appetizing food photography** for products on the digital menu.
 
 1. **`menu_read`** — `list_products` (or `get_product`)
 2. **Confirm with the owner** — list the products you will generate for (names + count). Image generation is a **mutation** and costs API credits.
-3. **`generate_product_image`** — one product per call.
+3. **`generate_food_product_image`** — one product per call.
 4. Summarize results with product names and mention they can review photos in the live menu.
 
 Optional: **`load_skill(menu_best_practices)`** for photo quality guidelines before proposing generation.
 
 ## Tools
 
-### `generate_product_image` (mutate)
+### `generate_food_product_image` (mutate)
 
 Generates one photo and sets `image_path` on the product.
 

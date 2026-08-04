@@ -12,7 +12,7 @@ from tests.conftest import requires_db
 
 
 @requires_db
-def test_generate_product_image_sets_image_path(session):
+def test_generate_food_product_image_sets_image_path(session):
     uow = SqlAlchemyUnitOfWork(lambda: session)
     uow.__enter__()
     restaurant = uow.restaurants.add(
@@ -49,7 +49,7 @@ def test_generate_product_image_sets_image_path(session):
         ),
     ):
         result = skill.execute(
-            "generate_product_image",
+            "generate_food_product_image",
             {"product_id": str(product.id)},
             ctx,
         )
@@ -66,7 +66,7 @@ def test_generate_product_image_sets_image_path(session):
 
 
 @requires_db
-def test_generate_product_image_skips_existing_without_force(session):
+def test_generate_food_product_image_skips_existing_without_force(session):
     uow = SqlAlchemyUnitOfWork(lambda: session)
     uow.__enter__()
     restaurant = uow.restaurants.add(
@@ -94,7 +94,7 @@ def test_generate_product_image_skips_existing_without_force(session):
     skill = MenuMediaSkill()
 
     result = skill.execute(
-        "generate_product_image",
+        "generate_food_product_image",
         {"product_id": str(product.id)},
         ctx,
     )
