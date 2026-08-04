@@ -11,6 +11,8 @@ from app.modules.assistant.import_asset_paths import import_inbox_prefix
 from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.menu_write.ocr_bulk_products import (
     OCR_BULK_MAX_PATHS,
+    _coerce_int,
+    build_bulk_products_ocr_prompt,
     normalize_bulk_product_items,
     ocr_menu_to_bulk_products,
 )
@@ -72,6 +74,22 @@ def test_menu_write_registers_ocr_menu_to_bulk_products():
     tools = {t.name: t for t in MenuWriteSkill().tool_definitions()}
     assert "ocr_menu_to_bulk_products" in tools
     assert tools["ocr_menu_to_bulk_products"].effect == "read"
+
+
+def test_ocr_prompt_explains_mxn_price_and_variant_mapping():
+    prompt = build_bulk_products_ocr_prompt().lower()
+
+    assert "mxn" in prompt
+    assert "pesos" in prompt
+    assert "100" in prompt
+    assert "option_groups" in prompt
+    assert "price_delta_cents" in prompt
+
+
+def test_coerce_int_rejects_bools_and_fractional_floats():
+    assert _coerce_int(12.5) == 0
+    assert _coerce_int(True) == 0
+    assert _coerce_int("2500") == 2500
 
 
 def test_normalize_requires_name_and_aliases_price_delta():

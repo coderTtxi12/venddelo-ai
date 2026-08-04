@@ -14,8 +14,7 @@ TOOL_GROUPS: list[tuple[str, list[str]]] = [
         [
             "list_categories",
             "list_products",
-            # "search_products",  # disabled — use bulk_search_products
-            "bulk_search_products",
+            "search_products",
             "get_product",
             "bulk_get_products",
             "list_promotions",
@@ -28,7 +27,7 @@ TOOL_GROUPS: list[tuple[str, list[str]]] = [
         [
             "create_category",
             "update_category",
-            # "create_product",  # disabled — use bulk_create_products
+            "create_product",
             "bulk_create_categories",
             "bulk_create_products",
             "ocr_menu_to_bulk_products",
@@ -125,12 +124,8 @@ TOOL_RETURNS_HINTS: dict[str, str] = {
         "products[] FULL detail per row (option_groups[].items[].label, promos, status); "
         "has_more, counts — enough to audit complements without a follow-up fetch."
     ),
-    # "search_products": (
-    #     "products[] with match_score; suggestions[] on weak match. Full product shape per hit."
-    # ),
-    "bulk_search_products": (
-        "results[] per query with products[] (match_score) and suggestions[]; "
-        "one query is valid."
+    "search_products": (
+        "products[] with match_score; suggestions[] on weak match. Full product shape per hit."
     ),
     "get_product": (
         "product (full: option_groups[], promos) or suggestions[] on name miss."
@@ -145,7 +140,7 @@ TOOL_RETURNS_HINTS: dict[str, str] = {
     # Write menu — categories & products
     "create_category": "category (id, name, sort_index, is_active).",
     "update_category": "category (updated fields).",
-    # "create_product": "product (id, name, price_cents, status, category_ids).",
+    "create_product": "product (id, name, price_cents, status, category_ids).",
     "bulk_create_categories": "updated, failed, results[] per row (Added).",
     "bulk_create_products": (
         "updated, failed, results[] per row (Added); may include option_groups."

@@ -13,21 +13,25 @@ def test_build_executor_tool_catalog_is_compact_by_default():
     compact = build_executor_tool_catalog()
     detailed = build_executor_tool_catalog_detailed()
 
-    assert len(compact) < len(detailed) // 3
+    assert len(compact) < len(detailed) // 2
     assert "### Read menu" in compact
-    assert "`search_products` [read]:" in compact
-    assert "Args: query*" in compact
+    assert "`ocr_menu_to_bulk_products` [read]:" in compact
+    assert "Args: storage_paths?" in compact
     assert "active_only" not in compact
-    assert "#### `search_products`" not in compact
+    assert "#### `ocr_menu_to_bulk_products`" not in compact
 
 
-def test_build_executor_tool_catalog_detailed_includes_rich_search_products_entry():
+def test_catalog_restores_single_product_tools_and_only_adds_ocr_tool():
     catalog = build_executor_tool_catalog_detailed()
+    cataloged = {name for _, names in TOOL_GROUPS for name in names}
 
-    assert "#### `search_products` (read)" in catalog
-    assert "Search products by **name**" in catalog
-    assert "`query` (string, required)" in catalog
-    assert "**Output:** `{ ok: bool, summary: string, data: object }`" in catalog
+    assert {"search_products", "create_product", "ocr_menu_to_bulk_products"} <= cataloged
+    assert "bulk_search_products" not in cataloged
+    assert {"search_products", "create_product", "ocr_menu_to_bulk_products"} <= set(
+        TOOL_RETURNS_HINTS
+    )
+    assert "bulk_search_products" not in TOOL_RETURNS_HINTS
+    assert "#### `ocr_menu_to_bulk_products` (read)" in catalog
 
 
 def test_format_tool_catalog_entry_compact_truncates_long_descriptions():
