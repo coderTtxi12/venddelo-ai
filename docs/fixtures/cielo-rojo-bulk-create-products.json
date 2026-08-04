@@ -1,0 +1,944 @@
+{
+  "items": [
+    {
+      "name": "Flautas",
+      "price_cents": 9000,
+      "category_names": ["Antojos"],
+      "description": "Preparadas con lechuga, queso y crema.",
+      "option_groups": [
+        {
+          "title": "Preparación",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Normales", "price_delta_cents": 0 },
+            { "label": "Ahogadas en salsa de la casa (verde o roja)", "price_delta_cents": 2000 }
+          ]
+        },
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Pollo", "price_delta_cents": 0 },
+            { "label": "Res", "price_delta_cents": 0 },
+            { "label": "Cochinita", "price_delta_cents": 0 },
+            { "label": "Mixtas", "price_delta_cents": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tostadas",
+      "price_cents": 6000,
+      "category_names": ["Antojos"],
+      "description": "Preparadas con lechuga, queso, frijoles y crema.",
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Pata", "price_delta_cents": 0 },
+            { "label": "Tinga de pollo", "price_delta_cents": 0 },
+            { "label": "Tinga de res", "price_delta_cents": 0 },
+            { "label": "Cochinita", "price_delta_cents": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Machete",
+      "price_cents": 6000,
+      "category_names": ["Machetes"],
+      "description": "Quesadilla de 32 cm con lechuga, queso y crema, en base de quesillo.",
+      "option_groups": [
+        {
+          "title": "Variante",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Sólo quesillo", "price_delta_cents": 0 },
+            { "label": "Pollo", "price_delta_cents": 1500 },
+            { "label": "Chicharrón", "price_delta_cents": 1500 },
+            { "label": "Hongos", "price_delta_cents": 1500 },
+            { "label": "Tinga de res", "price_delta_cents": 1500 },
+            { "label": "Suadero", "price_delta_cents": 2000 },
+            { "label": "Pastor", "price_delta_cents": 2000 },
+            { "label": "Bistec", "price_delta_cents": 2000 },
+            { "label": "Enchilada", "price_delta_cents": 2000 },
+            { "label": "Arrachera", "price_delta_cents": 3000 },
+            { "label": "Cecina", "price_delta_cents": 3000 },
+            { "label": "Cochinita", "price_delta_cents": 3000 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Huarache",
+      "price_cents": 5500,
+      "category_names": ["Huaraches"],
+      "description": "Preparados con lechuga, queso y crema.",
+      "option_groups": [
+        {
+          "title": "Variante",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Sencillo", "price_delta_cents": 0 },
+            { "label": "Con quesillo", "price_delta_cents": 2500 },
+            { "label": "Pollo", "price_delta_cents": 4500 },
+            { "label": "Chicharrón", "price_delta_cents": 4500 },
+            { "label": "Hongos", "price_delta_cents": 4500 },
+            { "label": "Tinga de res", "price_delta_cents": 4500 },
+            { "label": "Suadero", "price_delta_cents": 5500 },
+            { "label": "Pastor", "price_delta_cents": 5500 },
+            { "label": "Enchilada", "price_delta_cents": 5500 },
+            { "label": "Bistec", "price_delta_cents": 5500 },
+            { "label": "Arrachera", "price_delta_cents": 6500 },
+            { "label": "Cecina", "price_delta_cents": 6500 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pambazo",
+      "price_cents": 5500,
+      "category_names": ["Pambazos"],
+      "description": "Preparados con lechuga, queso y crema.",
+      "option_groups": [
+        {
+          "title": "Variante",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Sencillo (papa y longaniza)", "price_delta_cents": 0 },
+            { "label": "Tinga de pollo", "price_delta_cents": 1500 },
+            { "label": "Tinga de res", "price_delta_cents": 1500 },
+            { "label": "Cochinita", "price_delta_cents": 1500 },
+            { "label": "Suadero", "price_delta_cents": 2500 },
+            { "label": "Enchilada", "price_delta_cents": 2500 },
+            { "label": "Pastor", "price_delta_cents": 2500 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Quesafritas",
+      "price_cents": 4500,
+      "category_names": ["Quesafritas"],
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Queso", "price_delta_cents": 0 },
+            { "label": "Pollo", "price_delta_cents": 0 },
+            { "label": "Chicharrón", "price_delta_cents": 0 },
+            { "label": "Hongos", "price_delta_cents": 0 },
+            { "label": "Suadero", "price_delta_cents": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Gringa con papas",
+      "price_cents": 8500,
+      "category_names": ["Especiales"]
+    },
+    {
+      "name": "Carne asada con guarnición",
+      "price_cents": 13000,
+      "category_names": ["Especiales"],
+      "description": "Con chilaquiles y ensalada."
+    },
+    {
+      "name": "Orden de tostadas con crema",
+      "price_cents": 2000,
+      "category_names": ["Extras"]
+    },
+    {
+      "name": "Queso extra",
+      "price_cents": 1000,
+      "category_names": ["Extras"]
+    },
+    {
+      "name": "Queso extra huaraches",
+      "price_cents": 2000,
+      "category_names": ["Extras"]
+    },
+    {
+      "name": "Orden de papas",
+      "price_cents": 6000,
+      "category_names": ["Extras"]
+    },
+    {
+      "name": "Café Americano",
+      "price_cents": 4500,
+      "category_names": ["Bebidas"]
+    },
+    {
+      "name": "Café de Olla",
+      "price_cents": 5000,
+      "category_names": ["Bebidas"]
+    },
+    {
+      "name": "Chocolate",
+      "price_cents": 5500,
+      "category_names": ["Bebidas"]
+    },
+    {
+      "name": "Té",
+      "price_cents": 3500,
+      "category_names": ["Bebidas"]
+    },
+    {
+      "name": "Malteada",
+      "price_cents": 8000,
+      "category_names": ["Bebidas"],
+      "option_groups": [
+        {
+          "title": "Sabor",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Chocolate", "price_delta_cents": 0 },
+            { "label": "Vainilla", "price_delta_cents": 0 },
+            { "label": "Fresa", "price_delta_cents": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chocomilk",
+      "price_cents": 5500,
+      "category_names": ["Bebidas"]
+    },
+    {
+      "name": "Botella de agua 1L",
+      "price_cents": 3000,
+      "category_names": ["Bebidas"]
+    },
+    {
+      "name": "Agua de sabor natural",
+      "price_cents": 4000,
+      "category_names": ["Bebidas"],
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Medio", "price_delta_cents": 0 },
+            { "label": "Litro", "price_delta_cents": 3000 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Refresco",
+      "price_cents": 4000,
+      "category_names": ["Bebidas"],
+      "description": "Coca Cola, Mundet Rojo, Del Valle, etc."
+    },
+    {
+      "name": "Jugo",
+      "price_cents": 4000,
+      "category_names": ["Bebidas"],
+      "option_groups": [
+        {
+          "title": "Sabor",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Naranja", "price_delta_cents": 0 },
+            { "label": "Frutas", "price_delta_cents": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Agua mineral o sangría preparada",
+      "price_cents": 5500,
+      "category_names": ["Bebidas"]
+    },
+    {
+      "name": "Cerveza",
+      "price_cents": 6500,
+      "category_names": ["Bebidas"],
+      "option_groups": [
+        {
+          "title": "Marca",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Corona", "price_delta_cents": 0 },
+            { "label": "XX Lager", "price_delta_cents": 0 },
+            { "label": "Modelo Especial", "price_delta_cents": 0 },
+            { "label": "Victoria", "price_delta_cents": 0 },
+            { "label": "Indio", "price_delta_cents": 0 }
+          ]
+        },
+        {
+          "title": "Presentación",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Media 355 ml", "price_delta_cents": 0 },
+            { "label": "Michelada", "price_delta_cents": 500 },
+            { "label": "Cubana", "price_delta_cents": 1000 },
+            { "label": "Con gomitas", "price_delta_cents": 1500 },
+            { "label": "Caguamón", "price_delta_cents": 4500 },
+            { "label": "Caguamón michelada", "price_delta_cents": 5500 },
+            { "label": "Caguamón cubana", "price_delta_cents": 6000 },
+            { "label": "Caguamón con gomitas", "price_delta_cents": 6500 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pulque natural",
+      "price_cents": 3500,
+      "category_names": ["Bebidas"],
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Medio", "price_delta_cents": 0 },
+            { "label": "Litro", "price_delta_cents": 1000 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pulque curado",
+      "price_cents": 4500,
+      "category_names": ["Bebidas"],
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Medio", "price_delta_cents": 0 },
+            { "label": "Litro", "price_delta_cents": 3000 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pay de limón",
+      "price_cents": 5500,
+      "category_names": ["Postres"]
+    },
+    {
+      "name": "Flan de la tía",
+      "price_cents": 6000,
+      "category_names": ["Postres"]
+    },
+    {
+      "name": "Duraznos con crema",
+      "price_cents": 5500,
+      "category_names": ["Postres"]
+    },
+    {
+      "name": "Pan de elote",
+      "price_cents": 6500,
+      "category_names": ["Postres"]
+    },
+    {
+      "name": "Mil hojas frutal",
+      "price_cents": 6500,
+      "category_names": ["Postres"]
+    },
+    {
+      "name": "Helado frito",
+      "price_cents": 8500,
+      "category_names": ["Postres"]
+    },
+    {
+      "name": "Torta de chilaquiles",
+      "price_cents": 6000,
+      "category_names": ["Desayunos"],
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Huevos", "price_delta_cents": 0 },
+            { "label": "Pollo", "price_delta_cents": 500 },
+            { "label": "Longaniza", "price_delta_cents": 500 },
+            { "label": "Suadero", "price_delta_cents": 1000 },
+            { "label": "Bistec", "price_delta_cents": 1500 },
+            { "label": "Arrachera", "price_delta_cents": 2500 },
+            { "label": "Cecina", "price_delta_cents": 2500 }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Hot cakes",
+      "price_cents": 8500,
+      "category_names": ["Desayunos"],
+      "option_groups": [
+        {
+          "title": "Variante",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Sencillos", "price_delta_cents": 0 },
+            { "label": "Con tocino", "price_delta_cents": 2500 }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Burrito",
+      "price_cents": 12500,
+      "category_names": ["Desayunos"],
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Chorizo", "price_delta_cents": 0 },
+            { "label": "Pastor", "price_delta_cents": 0 },
+            { "label": "Suadero", "price_delta_cents": 0 },
+            { "label": "Bistec", "price_delta_cents": 0 },
+            { "label": "Cecina", "price_delta_cents": 1000 },
+            { "label": "Cochinita", "price_delta_cents": 1000 },
+            { "label": "Arrachera", "price_delta_cents": 1000 },
+            { "label": "Birria", "price_delta_cents": 1000 }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chilaquiles",
+      "price_cents": 11000,
+      "category_names": ["Desayunos"],
+      "option_groups": [
+        {
+          "title": "Salsa",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Verdes", "price_delta_cents": 0 },
+            { "label": "Rojos", "price_delta_cents": 0 }
+          ]
+        },
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Sencillos", "price_delta_cents": 0 },
+            { "label": "Huevo", "price_delta_cents": 1000 },
+            { "label": "Pollo", "price_delta_cents": 1500 },
+            { "label": "Suadero", "price_delta_cents": 2000 },
+            { "label": "Pastor", "price_delta_cents": 2000 },
+            { "label": "Longaniza", "price_delta_cents": 2000 },
+            { "label": "Bistec", "price_delta_cents": 2500 },
+            { "label": "Arrachera", "price_delta_cents": 4000 },
+            { "label": "Cochinita", "price_delta_cents": 4000 },
+            { "label": "Cecina", "price_delta_cents": 4000 }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Huevos al gusto",
+      "price_cents": 10000,
+      "category_names": ["Desayunos"],
+      "option_groups": [
+        {
+          "title": "Preparación",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "A la mexicana", "price_delta_cents": 0 },
+            { "label": "Con jamón", "price_delta_cents": 0 },
+            { "label": "Con tocino", "price_delta_cents": 0 },
+            { "label": "Con chorizo", "price_delta_cents": 0 },
+            { "label": "Divorciados", "price_delta_cents": 1000 },
+            { "label": "Omelete con champiñones", "price_delta_cents": 2000 },
+            { "label": "Omelete yucateco", "price_delta_cents": 4000 },
+            { "label": "Omelete jalisciense", "price_delta_cents": 4000 }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Molletes (3 pzas)",
+      "price_cents": 8500,
+      "category_names": ["Desayunos"],
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Sencillos", "price_delta_cents": 0 },
+            { "label": "Con jamón", "price_delta_cents": 2500 },
+            { "label": "Con tocino", "price_delta_cents": 2500 },
+            { "label": "Con chorizo", "price_delta_cents": 2500 },
+            { "label": "Suadero", "price_delta_cents": 3000 },
+            { "label": "Pastor", "price_delta_cents": 3000 },
+            { "label": "Cochinita", "price_delta_cents": 5500 },
+            { "label": "Birria", "price_delta_cents": 5500 },
+            { "label": "Cecina", "price_delta_cents": 5500 }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Enchiladas",
+      "price_cents": 13000,
+      "category_names": ["Desayunos"],
+      "option_groups": [
+        {
+          "title": "Salsa",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Verdes", "price_delta_cents": 0 },
+            { "label": "Rojas", "price_delta_cents": 0 }
+          ]
+        },
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Pollo", "price_delta_cents": 0 },
+            { "label": "Bistec", "price_delta_cents": 1000 }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Enmoladas",
+      "price_cents": 14500,
+      "category_names": ["Desayunos"],
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Pollo", "price_delta_cents": 0 },
+            { "label": "Bistec", "price_delta_cents": 1000 }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Suizas",
+      "price_cents": 13500,
+      "category_names": ["Desayunos"],
+      "option_groups": [
+        {
+          "title": "Salsa",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Verdes", "price_delta_cents": 0 },
+            { "label": "Rojas", "price_delta_cents": 0 }
+          ]
+        },
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Pollo", "price_delta_cents": 0 },
+            { "label": "Bistec", "price_delta_cents": 1000 }
+          ]
+        },
+        {
+          "title": "Paquete desayuno",
+          "selection": "single",
+          "required": false,
+          "max_selections": 1,
+          "items": [
+            {
+              "label": "Jugo o fruta + café de olla o americano + pan",
+              "price_delta_cents": 6500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Plato de fruta",
+      "price_cents": 3500,
+      "category_names": ["Desayunos"]
+    },
+    {
+      "name": "Vaso de jugo",
+      "price_cents": 3500,
+      "category_names": ["Desayunos"]
+    },
+    {
+      "name": "Pan de dulce",
+      "price_cents": 2700,
+      "category_names": ["Desayunos"]
+    },
+    {
+      "name": "Salchipulpos con papas (6 pzas)",
+      "price_cents": 9000,
+      "category_names": ["Para los peques"]
+    },
+    {
+      "name": "Waffles",
+      "price_cents": 9000,
+      "category_names": ["Para los peques"]
+    },
+    {
+      "name": "Sincronizada con papas",
+      "price_cents": 8500,
+      "category_names": ["Para los peques"]
+    },
+    {
+      "name": "Nuggets de pollo con papas (8 pzas)",
+      "price_cents": 9000,
+      "category_names": ["Para los peques"]
+    },
+    {
+      "name": "Tacos dorados de pollo",
+      "price_cents": 8000,
+      "category_names": ["Para los peques"]
+    },
+    {
+      "name": "Caldo de panza",
+      "price_cents": 11500,
+      "category_names": ["Caldos"],
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Chico", "price_delta_cents": 0 },
+            { "label": "Grande", "price_delta_cents": 3500 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Panza con lengua (La Mamalona)",
+      "price_cents": 17000,
+      "category_names": ["Caldos"],
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Chico", "price_delta_cents": 0 },
+            { "label": "Grande", "price_delta_cents": 3500 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Birria",
+      "price_cents": 13500,
+      "category_names": ["Caldos"],
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Chico", "price_delta_cents": 0 },
+            { "label": "Grande", "price_delta_cents": 4000 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Quesabirria con consomé",
+      "price_cents": 8000,
+      "category_names": ["Caldos"]
+    },
+    {
+      "name": "Orden de 3 tacos con consomé",
+      "price_cents": 13500,
+      "category_names": ["Caldos"]
+    },
+    {
+      "name": "Birriamen",
+      "price_cents": 14500,
+      "category_names": ["Caldos"],
+      "description": "Ramen con birria."
+    },
+    {
+      "name": "Pozole",
+      "price_cents": 8500,
+      "category_names": ["Caldos"],
+      "option_groups": [
+        {
+          "title": "Tipo",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Maciza", "price_delta_cents": 0 },
+            { "label": "Puerco", "price_delta_cents": 0 },
+            { "label": "Pollo", "price_delta_cents": 0 }
+          ]
+        },
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Chico", "price_delta_cents": 0 },
+            { "label": "Grande", "price_delta_cents": 2500 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pozole vegetariano",
+      "price_cents": 7500,
+      "category_names": ["Caldos"],
+      "description": "Con champiñones.",
+      "option_groups": [
+        {
+          "title": "Tamaño",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Chico", "price_delta_cents": 0 },
+            { "label": "Grande", "price_delta_cents": 2500 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tarrito de consomé",
+      "price_cents": 2000,
+      "category_names": ["Caldos"]
+    },
+    {
+      "name": "Plato de consomé",
+      "price_cents": 3000,
+      "category_names": ["Caldos"]
+    },
+    {
+      "name": "Taco sencillo",
+      "price_cents": 4500,
+      "category_names": ["Tacos"],
+      "description": "Servidos con papas.",
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Suadero", "price_delta_cents": 0 },
+            { "label": "Bistec", "price_delta_cents": 0 },
+            { "label": "Pastor", "price_delta_cents": 0 },
+            { "label": "Longaniza", "price_delta_cents": 0 },
+            { "label": "Campechanos", "price_delta_cents": 0 },
+            { "label": "Chorizo argentino", "price_delta_cents": 0 },
+            { "label": "Chistorra", "price_delta_cents": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Taco especial",
+      "price_cents": 5500,
+      "category_names": ["Tacos"],
+      "description": "Servidos con papas.",
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Arrachera", "price_delta_cents": 0 },
+            { "label": "Cecina", "price_delta_cents": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Taco de guisado",
+      "price_cents": 5000,
+      "category_names": ["Tacos"],
+      "description": "Servidos con papas.",
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Cochinita", "price_delta_cents": 0 },
+            { "label": "Birria", "price_delta_cents": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Volcán con guacamole",
+      "price_cents": 6500,
+      "category_names": ["Volcanes"],
+      "option_groups": [
+        {
+          "title": "Guisado",
+          "selection": "single",
+          "required": true,
+          "max_selections": 1,
+          "items": [
+            { "label": "Suadero", "price_delta_cents": 0 },
+            { "label": "Bistec", "price_delta_cents": 0 },
+            { "label": "Pastor", "price_delta_cents": 0 },
+            { "label": "Longaniza", "price_delta_cents": 0 },
+            { "label": "Campechanos", "price_delta_cents": 0 },
+            { "label": "Chorizo argentino", "price_delta_cents": 0 },
+            { "label": "Chistorra", "price_delta_cents": 0 }
+          ]
+        }
+      ]
+    }
+  ]
+}
