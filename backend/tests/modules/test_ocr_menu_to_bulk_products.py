@@ -4,6 +4,7 @@ import uuid
 from typing import Any
 from unittest.mock import MagicMock
 
+from app.core.config import get_settings
 from app.core.storage import StorageError
 from app.core.vision.ports import VisionAnalysisRequest, VisionAnalysisResult, VisionPort
 from app.modules.assistant.import_asset_paths import import_inbox_prefix
@@ -122,6 +123,7 @@ def test_ocr_happy_path_single_image():
     assert result.data["item_count"] == 1
     assert result.data["items"][0]["name"] == "Agua"
     assert result.data["source_count"] == 1
+    assert result.data["model"] == get_settings().openai_vision_model
     assert len(vision.calls) == 1
     assert vision.calls[0].image_bytes == b"fake-bytes"
 

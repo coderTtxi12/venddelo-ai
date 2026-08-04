@@ -96,10 +96,10 @@ def _normalize_option_groups(raw: Any) -> list[dict[str, Any]]:
         title = str(entry.get("title") or "").strip()
         if not title:
             continue
-        group: dict[str, Any] = {"title": title}
         selection = str(entry.get("selection") or "").strip()
-        if selection in {"single", "multi"}:
-            group["selection"] = selection
+        if selection not in {"single", "multi"}:
+            selection = "single"
+        group: dict[str, Any] = {"title": title, "selection": selection}
         for field in ("required",):
             if field in entry and isinstance(entry[field], bool):
                 group[field] = entry[field]
@@ -217,6 +217,7 @@ def ocr_menu_to_bulk_products(
         "item_count": len(deduped),
         "source_count": len(paths),
         "failed_paths": failed_paths,
+        "model": model,
     }
     if not deduped:
         return ToolResult(
