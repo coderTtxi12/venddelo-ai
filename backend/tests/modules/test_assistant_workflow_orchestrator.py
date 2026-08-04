@@ -128,6 +128,32 @@ def test_workflow_orchestrator_reply_only():
     persist_mock.assert_called_once()
 
 
+def test_workflow_orchestrator_wires_clarify_tool_into_orchestrator():
+    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
+    orchestrator = WorkflowOrchestrator(settings=settings, rollout_skill_ids=("menu_read",))
+    runtime = _runtime_bundle()
+    captured: dict[str, object] = {}
+
+    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
+        captured["orchestrator_tools"] = {tool.name for tool in agent.tools}
+        return FakeStreamedResult(text_delta="Hola")
+
+    with (
+        patch(
+            "app.modules.assistant.agent.workflow.orchestrator.load_workflow_runtime",
+            return_value=runtime,
+        ),
+        patch("app.modules.assistant.agent.workflow.orchestrator.schedule_persist_turn"),
+        patch(
+            "app.modules.assistant.agent.workflow.orchestrator.Runner.run_streamed",
+            side_effect=fake_run_streamed,
+        ),
+    ):
+        asyncio.run(_collect(orchestrator, message="Hola"))
+
+    assert captured["orchestrator_tools"] == {DELEGATE_TASK_NAME, "clarify"}
+
+
 def test_workflow_orchestrator_fallback_when_no_content():
     settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
     orchestrator = WorkflowOrchestrator(settings=settings, rollout_skill_ids=("menu_read",))
@@ -165,7 +191,7 @@ def _run_context(registry, restaurant_id: uuid.UUID, conversation_id: uuid.UUID)
     )
 
 
-def test_delegate_task_runs_restaurant_ops_subagent():
+def test_delegate_task_runs_catalog_agent():
     settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
     context = _workflow_context()
     registry = build_skill_registry(["menu_read"])
@@ -177,7 +203,7 @@ def test_delegate_task_runs_restaurant_ops_subagent():
 
     def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
         name = getattr(agent, "name", "")
-        if name == "RestaurantOpsSubagent":
+        if name == "CatalogAgent":
             assert "Delegated task" in agent_input
             return FakeStreamedResult(final_output=execution)
         raise AssertionError(f"Unexpected agent: {name!r}")
@@ -186,11 +212,7 @@ def test_delegate_task_runs_restaurant_ops_subagent():
         settings=settings,
         workflow_context=context,
         registry=registry,
-        menu_import_registry=None,
-        uow=MagicMock(),
-        restaurant_id=context.restaurant_id,
         ops_run_context=_run_context(registry, context.restaurant_id, context.conversation_id),
-        menu_run_context=None,
         delegation_state=DelegationState(),
         event_sink=sink,
     )
@@ -204,7 +226,7 @@ def test_delegate_task_runs_restaurant_ops_subagent():
                 MagicMock(),
                 json.dumps(
                     {
-                        "subagent": "restaurant_ops_subagent",
+                        "subagent": "catalog_agent",
                         "task": "Listar categorías del menú",
                     }
                 ),
@@ -215,6 +237,84 @@ def test_delegate_task_runs_restaurant_ops_subagent():
     assert payload["ok"] is True
     assert "Tacos" in payload["execution"]["summary"]
     assert any(event.event == "agent.phase" and event.data["phase"] == "executing" for event in side_events)
+
+
+def test_delegate_task_does_not_pass_clarify_tool_into_catalog_agent():
+    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
+    context = _workflow_context()
+    registry = build_skill_registry(["menu_read"])
+    execution = ExecutionRecord(summary="Listo", tools_used=[])
+    captured: dict[str, object] = {}
+
+    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
+        captured["catalog_tools"] = {tool.name for tool in agent.tools}
+        return FakeStreamedResult(final_output=execution)
+
+    tool = build_delegate_task_tool(
+        settings=settings,
+        workflow_context=context,
+        registry=registry,
+        ops_run_context=_run_context(registry, context.restaurant_id, context.conversation_id),
+        delegation_state=DelegationState(),
+    )
+
+    with patch(
+        "app.modules.assistant.agent.workflow.delegate.Runner.run_streamed",
+        side_effect=fake_run_streamed,
+    ):
+        asyncio.run(
+            tool.on_invoke_tool(
+                MagicMock(),
+                json.dumps({"subagent": "catalog_agent", "task": "Listar categorías"}),
+            )
+        )
+
+    assert "clarify" not in captured["catalog_tools"]
+
+
+def test_delegate_task_runs_operations_agent():
+    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
+    context = _workflow_context()
+    registry = build_skill_registry(["menu_write"])
+    execution = ExecutionRecord(
+        summary="Descripción actualizada.",
+        tools_used=["update_restaurant_description"],
+    )
+
+    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
+        name = getattr(agent, "name", "")
+        if name == "OperationsAgent":
+            assert "Delegated task" in agent_input
+            return FakeStreamedResult(final_output=execution)
+        raise AssertionError(f"Unexpected agent: {name!r}")
+
+    tool = build_delegate_task_tool(
+        settings=settings,
+        workflow_context=context,
+        registry=registry,
+        ops_run_context=_run_context(registry, context.restaurant_id, context.conversation_id),
+        delegation_state=DelegationState(),
+    )
+
+    with patch(
+        "app.modules.assistant.agent.workflow.delegate.Runner.run_streamed",
+        side_effect=fake_run_streamed,
+    ):
+        result = asyncio.run(
+            tool.on_invoke_tool(
+                MagicMock(),
+                json.dumps(
+                    {
+                        "subagent": "operations_agent",
+                        "task": "Actualizar la descripción del negocio",
+                    }
+                ),
+            )
+        )
+
+    payload = json.loads(result)
+    assert payload["ok"] is True
+    assert "Descripción" in payload["execution"]["summary"]
 
 
 def test_delegate_task_rejects_over_limit():
@@ -228,18 +328,14 @@ def test_delegate_task_rejects_over_limit():
         settings=settings,
         workflow_context=context,
         registry=registry,
-        menu_import_registry=None,
-        uow=MagicMock(),
-        restaurant_id=context.restaurant_id,
         ops_run_context=_run_context(registry, context.restaurant_id, context.conversation_id),
-        menu_run_context=None,
         delegation_state=state,
     )
 
     result = asyncio.run(
         tool.on_invoke_tool(
             MagicMock(),
-            json.dumps({"subagent": "restaurant_ops_subagent", "task": "Otra cosa"}),
+            json.dumps({"subagent": "catalog_agent", "task": "Otra cosa"}),
         )
     )
     payload = json.loads(result)
@@ -247,20 +343,16 @@ def test_delegate_task_rejects_over_limit():
     assert "limit" in payload["summary"].lower() or "Delegation limit" in payload["summary"]
 
 
-def test_delegate_task_menu_unavailable():
+def test_delegate_task_rejects_menu_subagent():
     settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
-    context = _workflow_context(menu_import_enabled=False)
+    context = _workflow_context()
     registry = build_skill_registry(["menu_read"])
 
     tool = build_delegate_task_tool(
         settings=settings,
         workflow_context=context,
         registry=registry,
-        menu_import_registry=None,
-        uow=MagicMock(),
-        restaurant_id=context.restaurant_id,
         ops_run_context=_run_context(registry, context.restaurant_id, context.conversation_id),
-        menu_run_context=None,
         delegation_state=DelegationState(),
     )
 
@@ -272,54 +364,5 @@ def test_delegate_task_menu_unavailable():
     )
     payload = json.loads(result)
     assert payload["ok"] is False
-    assert "not available" in payload["summary"].lower()
-
-
-def test_delegate_task_runs_menu_subagent():
-    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
-    context = _workflow_context(menu_import_enabled=True)
-    registry = build_skill_registry(["menu_read"])
-    menu_registry = build_skill_registry(["menu_import"])
-    execution = ExecutionRecord(summary="OCR completado; sesión en recolección.")
-    state = DelegationState()
-
-    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
-        name = getattr(agent, "name", "")
-        if name == "MenuSubagent":
-            return FakeStreamedResult(final_output=execution)
-        raise AssertionError(f"Unexpected agent: {name!r}")
-
-    tool = build_delegate_task_tool(
-        settings=settings,
-        workflow_context=context,
-        registry=registry,
-        menu_import_registry=menu_registry,
-        uow=MagicMock(),
-        restaurant_id=context.restaurant_id,
-        ops_run_context=_run_context(registry, context.restaurant_id, context.conversation_id),
-        menu_run_context=_run_context(menu_registry, context.restaurant_id, context.conversation_id),
-        delegation_state=state,
-    )
-
-    with (
-        patch(
-            "app.modules.assistant.agent.workflow.delegate.Runner.run_streamed",
-            side_effect=fake_run_streamed,
-        ),
-        patch(
-            "app.modules.assistant.agent.workflow.delegate.get_active_import_for_conversation",
-            return_value=None,
-        ),
-    ):
-        result = asyncio.run(
-            tool.on_invoke_tool(
-                MagicMock(),
-                json.dumps({"subagent": "menu_subagent", "task": "Importar menú desde PDF"}),
-            )
-        )
-
-    payload = json.loads(result)
-    assert payload["ok"] is True
-    assert state.used_menu_subagent is True
-    assert "OCR" in payload["execution"]["summary"]
+    assert "Invalid subagent" in payload["summary"]
     assert tool.name == DELEGATE_TASK_NAME
