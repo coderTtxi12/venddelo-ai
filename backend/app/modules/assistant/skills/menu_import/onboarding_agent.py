@@ -8,7 +8,7 @@ from app.core.config import Settings
 from app.modules.assistant.agent.model_settings import build_assistant_model_settings
 from app.modules.assistant.agent.run_context import AssistantRunContext
 from app.modules.assistant.agent.tools import build_menu_import_internal_tools
-from app.modules.assistant.agent.workflow.prompts import MENU_SUBAGENT_INSTRUCTIONS
+from app.modules.assistant.skills.menu_import.prompts import MENU_SUBAGENT_INSTRUCTIONS
 from app.modules.assistant.agent.workflow.schemas import ExecutionRecord
 from app.modules.assistant.skills.registry import SkillRegistry
 
