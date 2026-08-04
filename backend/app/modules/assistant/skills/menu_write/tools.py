@@ -21,6 +21,9 @@ from app.modules.assistant.skills.menu_write.bulk_create import (
     bulk_create_categories,
     bulk_create_products,
 )
+from app.modules.assistant.skills.menu_write.ocr_bulk_products import (
+    ocr_menu_to_bulk_products,
+)
 from app.modules.assistant.skills.menu_write.option_item_bulk import (
     bulk_add_option_groups,
     bulk_add_option_items,
@@ -474,6 +477,32 @@ class MenuWriteSkill:
                         },
                     },
                     "required": ["items"],
+                },
+            ),
+            ToolDefinition(
+                name="ocr_menu_to_bulk_products",
+                description=(
+                    "OCR one or more uploaded menu images (storage_path from chat attachments) into "
+                    "JSON {items:[...]} ready for bulk_create_products. Read-only — does not create "
+                    "products. Pass storage_paths (1-5) or storage_path. Uses OPENAI_VISION_MODEL. "
+                    "After OCR, create missing categories then call bulk_create_products (split if >50)."
+                ),
+                effect="read",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "storage_paths": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 1,
+                            "maxItems": 5,
+                        },
+                        "storage_path": {
+                            "type": "string",
+                            "description": "Alias for a single path when storage_paths is omitted.",
+                        },
+                    },
+                    "required": [],
                 },
             ),
             ToolDefinition(
@@ -1503,6 +1532,8 @@ class MenuWriteSkill:
             return bulk_create_products(
                 service, ctx, args, invalidate=_finalize_menu_mutation
             )
+        if tool_name == "ocr_menu_to_bulk_products":
+            return ocr_menu_to_bulk_products(ctx, args)
 
         if tool_name == "update_category":
             category_id_raw = args.get("category_id")

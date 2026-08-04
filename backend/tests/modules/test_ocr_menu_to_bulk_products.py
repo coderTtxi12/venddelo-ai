@@ -14,6 +14,7 @@ from app.modules.assistant.skills.menu_write.ocr_bulk_products import (
     normalize_bulk_product_items,
     ocr_menu_to_bulk_products,
 )
+from app.modules.assistant.skills.menu_write.tools import MenuWriteSkill
 
 
 class StubVision(VisionPort):
@@ -65,6 +66,12 @@ def _ctx(restaurant_id: uuid.UUID | None = None) -> AgentContext:
         uow=MagicMock(),
         effective_skill_ids=["menu_write"],
     )
+
+
+def test_menu_write_registers_ocr_menu_to_bulk_products():
+    tools = {t.name: t for t in MenuWriteSkill().tool_definitions()}
+    assert "ocr_menu_to_bulk_products" in tools
+    assert tools["ocr_menu_to_bulk_products"].effect == "read"
 
 
 def test_normalize_requires_name_and_aliases_price_delta():
