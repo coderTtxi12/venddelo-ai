@@ -9,12 +9,14 @@ from pydantic import BaseModel, Field
 ExecutionStatus = Literal["success", "partial_success", "failed"]
 ExecutedStepStatus = Literal["success", "failed", "skipped"]
 
-DelegateSubagent = Literal["restaurant_ops_subagent", "menu_subagent"]
+DelegateSubagent = Literal["catalog_agent", "operations_agent"]
 
 MAX_DELEGATIONS_PER_TURN = 3
 ORCHESTRATOR_MAX_TURNS = 8
-RESTAURANT_OPS_MAX_TURNS = 12
-MENU_SUBAGENT_MAX_TURNS = 16
+CATALOG_AGENT_MAX_TURNS = 12
+OPERATIONS_AGENT_MAX_TURNS = 12
+RESTAURANT_OPS_MAX_TURNS = CATALOG_AGENT_MAX_TURNS  # back-compat
+MENU_SUBAGENT_MAX_TURNS = 16  # kept for menu_import onboarding_agent (not wired)
 
 
 class ExecutedStep(BaseModel):
