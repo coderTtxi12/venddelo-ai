@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Collection
 from typing import Any
 
 from agents import FunctionTool, RunContextWrapper
@@ -16,6 +17,28 @@ from app.modules.assistant.skills.base import SkillPort, ToolDefinition, ToolRes
 from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.registry import SkillRegistry
 
+# Business-ops tools owned by operations_agent (excluded from catalog_agent).
+OPERATIONS_AGENT_TOOL_NAMES = frozenset(
+    {
+        "get_restaurant_name",
+        "get_restaurant_description",
+        "update_restaurant_description",
+        "get_restaurant_location",
+        "update_restaurant_location",
+        "get_restaurant_schedules",
+        "set_restaurant_schedules",
+        "get_delivery_provider_schedules",
+        "get_restaurant_payment_methods",
+        "set_restaurant_payment_methods",
+        "get_delivery_provider_payment_methods",
+        "get_restaurant_menu_qr",
+        "get_restaurant_public_menu_url",
+        "assign_restaurant_logo",
+        "remove_restaurant_logo",
+        "assign_restaurant_cover",
+        "remove_restaurant_cover",
+    }
+)
 
 def _encode_tool_result(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False, default=str)
@@ -59,6 +82,8 @@ def build_registry_function_tools(
     effective_skill_ids: list[str],
     *,
     expose_menu_import_granular: bool = True,
+    include_tool_names: Collection[str] | None = None,
+    exclude_tool_names: Collection[str] | None = None,
 ) -> list[FunctionTool]:
     """Wrap entitled registry tools for the executor agent."""
     tools: list[FunctionTool] = []
@@ -66,8 +91,14 @@ def build_registry_function_tools(
     hide_menu_import = (
         "menu_import" in effective_skill_ids and not expose_menu_import_granular
     )
+    include = frozenset(include_tool_names) if include_tool_names is not None else None
+    exclude = frozenset(exclude_tool_names) if exclude_tool_names else frozenset()
     for skill_id, tool_def in registry.entitled_tools(effective_skill_ids):
         if hide_menu_import and skill_id == "menu_import":
+            continue
+        if include is not None and tool_def.name not in include:
+            continue
+        if tool_def.name in exclude:
             continue
         if tool_def.name in seen:
             continue
@@ -91,13 +122,31 @@ def build_executor_function_tools(
     *,
     settings: Settings | None = None,
 ) -> list[FunctionTool]:
-    """Executor tools from entitled skills (menu_import is not part of the assistant workflow)."""
+    """Catalog-agent tools from entitled skills (ops tools go to operations_agent)."""
     del settings
     entitled = [skill_id for skill_id in effective_skill_ids if skill_id != "menu_import"]
     return build_registry_function_tools(
         registry,
         entitled,
         expose_menu_import_granular=False,
+        exclude_tool_names=OPERATIONS_AGENT_TOOL_NAMES,
+    )
+
+
+def build_operations_function_tools(
+    registry: SkillRegistry,
+    effective_skill_ids: list[str],
+    *,
+    settings: Settings | None = None,
+) -> list[FunctionTool]:
+    """Business-ops tools for operations_agent only."""
+    del settings
+    entitled = [skill_id for skill_id in effective_skill_ids if skill_id != "menu_import"]
+    return build_registry_function_tools(
+        registry,
+        entitled,
+        expose_menu_import_granular=False,
+        include_tool_names=OPERATIONS_AGENT_TOOL_NAMES,
     )
 
 
