@@ -6,6 +6,7 @@ from app.modules.assistant.agent.tools import (
     OPERATIONS_AGENT_TOOL_NAMES,
     build_executor_function_tools,
     build_operations_function_tools,
+    build_orchestrator_function_tools,
 )
 from app.modules.assistant.agent.workflow.agents import (
     build_catalog_agent,
@@ -32,6 +33,30 @@ def test_operations_agent_exposes_ops_tools_only():
     assert names == OPERATIONS_AGENT_TOOL_NAMES
     assert "list_categories" not in names
     assert "create_product" not in names
+
+
+def test_catalog_agent_excludes_analyze_product_image():
+    registry = build_skill_registry(["menu_intelligence", "menu_write", "menu_read"])
+    names = {tool.name for tool in build_executor_function_tools(registry, ["menu_intelligence", "menu_write", "menu_read"])}
+    assert "analyze_product_image" not in names
+
+
+def test_catalog_agent_excludes_ocr_menu_to_bulk_products():
+    registry = build_skill_registry(["menu_write", "menu_read"])
+    names = {tool.name for tool in build_executor_function_tools(registry, ["menu_write", "menu_read"])}
+    assert "ocr_menu_to_bulk_products" not in names
+    assert "bulk_create_products" in names
+
+
+def test_orchestrator_exposes_ocr_menu_to_bulk_products():
+    registry = build_skill_registry(["menu_write", "menu_read"])
+    names = {tool.name for tool in build_orchestrator_function_tools(registry, ["menu_write", "menu_read"])}
+    assert names == {"ocr_menu_to_bulk_products"}
+
+
+def test_orchestrator_ocr_tool_requires_menu_write_entitlement():
+    registry = build_skill_registry(["menu_read"])
+    assert build_orchestrator_function_tools(registry, ["menu_read"]) == []
 
 
 def test_catalog_agent_excludes_operations_tools():
