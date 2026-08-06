@@ -143,7 +143,28 @@ def build_executor_function_tools(
         registry,
         entitled,
         expose_menu_import_granular=False,
-        exclude_tool_names=OPERATIONS_AGENT_TOOL_NAMES,
+        exclude_tool_names=(
+            OPERATIONS_AGENT_TOOL_NAMES
+            | CATALOG_AGENT_EXCLUDED_TOOL_NAMES
+            | ORCHESTRATOR_DIRECT_TOOL_NAMES
+        ),
+    )
+
+
+def build_orchestrator_function_tools(
+    registry: SkillRegistry,
+    effective_skill_ids: list[str],
+    *,
+    settings: Settings | None = None,
+) -> list[FunctionTool]:
+    """Direct orchestrator tools (not delegated to subagents)."""
+    del settings
+    entitled = [skill_id for skill_id in effective_skill_ids if skill_id != "menu_import"]
+    return build_registry_function_tools(
+        registry,
+        entitled,
+        expose_menu_import_granular=False,
+        include_tool_names=ORCHESTRATOR_DIRECT_TOOL_NAMES,
     )
 
 
