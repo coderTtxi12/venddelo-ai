@@ -1,6 +1,7 @@
 import asyncio
 import json
 import uuid
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 from openai.types.responses.response_text_delta_event import ResponseTextDeltaEvent
@@ -152,6 +153,45 @@ def test_workflow_orchestrator_wires_clarify_tool_into_orchestrator():
         asyncio.run(_collect(orchestrator, message="Hola"))
 
     assert captured["orchestrator_tools"] == {DELEGATE_TASK_NAME, "clarify"}
+
+
+def test_workflow_orchestrator_wires_ocr_tool_when_menu_write_enabled():
+    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
+    orchestrator = WorkflowOrchestrator(
+        settings=settings,
+        rollout_skill_ids=("menu_write", "menu_read"),
+    )
+    runtime = _runtime_bundle()
+    runtime = WorkflowRuntimeBundle(
+        context=replace(runtime.context, effective_skill_ids=["menu_write", "menu_read"]),
+        registry=build_skill_registry(["menu_write", "menu_read"]),
+        menu_import_registry=runtime.menu_import_registry,
+        conversation_id=runtime.conversation_id,
+    )
+    captured: dict[str, object] = {}
+
+    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
+        captured["orchestrator_tools"] = {tool.name for tool in agent.tools}
+        return FakeStreamedResult(text_delta="Hola")
+
+    with (
+        patch(
+            "app.modules.assistant.agent.workflow.orchestrator.load_workflow_runtime",
+            return_value=runtime,
+        ),
+        patch("app.modules.assistant.agent.workflow.orchestrator.schedule_persist_turn"),
+        patch(
+            "app.modules.assistant.agent.workflow.orchestrator.Runner.run_streamed",
+            side_effect=fake_run_streamed,
+        ),
+    ):
+        asyncio.run(_collect(orchestrator, message="Hola"))
+
+    assert captured["orchestrator_tools"] == {
+        DELEGATE_TASK_NAME,
+        "clarify",
+        "ocr_menu_to_bulk_products",
+    }
 
 
 def test_workflow_orchestrator_fallback_when_no_content():
