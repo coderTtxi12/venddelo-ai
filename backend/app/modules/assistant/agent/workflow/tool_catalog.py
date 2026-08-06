@@ -110,6 +110,19 @@ TOOL_GROUPS: list[tuple[str, list[str]]] = [
     ),
 ]
 
+ORCHESTRATOR_TOOL_GROUPS: list[tuple[str, list[str]]] = [
+    (
+        "Menu OCR (orchestrator)",
+        [
+            "ocr_menu_to_bulk_products",
+        ],
+    ),
+]
+
+ORCHESTRATOR_TOOL_RETURNS_HINTS: dict[str, str] = {
+    "ocr_menu_to_bulk_products": "items[], item_count, source_count, failed_paths[], model.",
+}
+
 COMPACT_DESCRIPTION_MAX_LEN = 110
 COMPACT_OPTIONAL_ARG_LIMIT = 3
 
@@ -264,11 +277,16 @@ def _compact_args(schema: dict[str, Any]) -> str:
     return ", ".join(tokens) if tokens else "none"
 
 
-def format_tool_catalog_entry_compact(tool: ToolDefinition) -> str:
+def format_tool_catalog_entry_compact(
+    tool: ToolDefinition,
+    *,
+    returns_hints: dict[str, str] | None = None,
+) -> str:
     summary = _summarize_description(tool.description)
     args = _compact_args(tool.input_schema)
     lines = [f"- `{tool.name}` [{tool.effect}]: {summary} Args: {args}."]
-    returns_hint = TOOL_RETURNS_HINTS.get(tool.name)
+    hint_map = returns_hints if returns_hints is not None else TOOL_RETURNS_HINTS
+    returns_hint = hint_map.get(tool.name)
     if returns_hint:
         lines.append(f"  Returns: {returns_hint}")
     return "\n".join(lines)
@@ -333,11 +351,16 @@ def format_tool_catalog_entry(tool: ToolDefinition) -> str:
     return "\n".join(lines)
 
 
-def _build_catalog(*, compact: bool) -> str:
+def _build_catalog(
+    *,
+    compact: bool,
+    tool_groups: list[tuple[str, list[str]]],
+    returns_hints: dict[str, str] | None = None,
+) -> str:
     tools = _collect_tool_definitions()
     sections: list[str] = []
 
-    for section_title, tool_names in TOOL_GROUPS:
+    for section_title, tool_names in tool_groups:
         section_lines = [f"### {section_title}"]
         missing: list[str] = []
         for tool_name in tool_names:
@@ -346,7 +369,9 @@ def _build_catalog(*, compact: bool) -> str:
                 missing.append(tool_name)
                 continue
             if compact:
-                section_lines.append(format_tool_catalog_entry_compact(tool))
+                section_lines.append(
+                    format_tool_catalog_entry_compact(tool, returns_hints=returns_hints)
+                )
             else:
                 section_lines.append(format_tool_catalog_entry(tool))
                 section_lines.append("")
@@ -361,9 +386,18 @@ def _build_catalog(*, compact: bool) -> str:
 
 def build_executor_tool_catalog(*, compact: bool = True) -> str:
     """Build the executor tool index (compact by default)."""
-    return _build_catalog(compact=compact)
+    return _build_catalog(compact=compact, tool_groups=TOOL_GROUPS)
 
 
 def build_executor_tool_catalog_detailed() -> str:
     """Full tool docs with descriptions and input schemas."""
-    return _build_catalog(compact=False)
+    return _build_catalog(compact=False, tool_groups=TOOL_GROUPS)
+
+
+def build_orchestrator_tool_catalog(*, compact: bool = True) -> str:
+    """Build the orchestrator-only tool index."""
+    return _build_catalog(
+        compact=compact,
+        tool_groups=ORCHESTRATOR_TOOL_GROUPS,
+        returns_hints=ORCHESTRATOR_TOOL_RETURNS_HINTS,
+    )
