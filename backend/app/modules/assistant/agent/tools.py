@@ -17,6 +17,20 @@ from app.modules.assistant.skills.base import SkillPort, ToolDefinition, ToolRes
 from app.modules.assistant.skills.context import AgentContext
 from app.modules.assistant.skills.registry import SkillRegistry
 
+# Temporarily excluded from catalog_agent (re-enable when vision analysis is ready).
+CATALOG_AGENT_EXCLUDED_TOOL_NAMES = frozenset(
+    {
+        "analyze_product_image",
+    }
+)
+
+# Owned by the orchestrator directly — not delegated to catalog_agent.
+ORCHESTRATOR_DIRECT_TOOL_NAMES = frozenset(
+    {
+        "ocr_menu_to_bulk_products",
+    }
+)
+
 # Business-ops tools owned by operations_agent (excluded from catalog_agent).
 OPERATIONS_AGENT_TOOL_NAMES = frozenset(
     {
