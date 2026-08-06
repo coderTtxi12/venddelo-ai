@@ -21,16 +21,15 @@ from app.modules.assistant.skills.menu_import.document_loader import (
 logger = logging.getLogger(__name__)
 
 _IMAGE_VISION_PROMPT = """\
-Describe brevemente en español qué contiene este archivo adjunto.
-Menciona si parece menú, foto de platillo, documento u otro, y 1-2 datos útiles (platillos, precios, secciones).
-Máximo 2 oraciones cortas.
+Describe what this image is about in 1-2 sentences. 
+This will help an agent to get context about the image, and decide if it should be used for a task.
 
 Responde solo JSON: {"description": "..."}\
 """
 
 _DOCX_TEXT_PROMPT = """\
-Resume en 1-2 oraciones en español qué contiene este documento Word.
-Menciona si parece menú, foto de platillo, documento u otro, y 1-2 datos útiles (platillos, precios, secciones).
+Describe what this document is about in 1-2 sentences.
+This will help an agent to get context about the image, and decide if it should be used for a task.
 Archivo: {filename}
 
 Contenido extraído:
