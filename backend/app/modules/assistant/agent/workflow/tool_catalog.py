@@ -92,12 +92,13 @@ TOOL_GROUPS: list[tuple[str, list[str]]] = [
             "apply_menu_theme",
         ],
     ),
-    (
-        "Menu intelligence",
-        [
-            "analyze_product_image",
-        ],
-    ),
+    # Temporarily disabled on catalog_agent — see CATALOG_AGENT_EXCLUDED_TOOL_NAMES.
+    # (
+    #     "Menu intelligence",
+    #     [
+    #         "analyze_product_image",
+    #     ],
+    # ),
     (
         "Promotions",
         [
@@ -191,8 +192,8 @@ TOOL_RETURNS_HINTS: dict[str, str] = {
     "list_menu_themes": "themes[] (id, label, colors{}, typography{}, style_keywords[]).",
     "get_current_menu_theme": "theme (id, label, colors{}, typography{}) or null.",
     "apply_menu_theme": "theme (applied id, label, colors{}, typography{}).",
-    # Menu intelligence
-    "analyze_product_image": "analysis (quality, suggestions; read-only).",
+    # Menu intelligence (temporarily disabled on catalog_agent)
+    # "analyze_product_image": "analysis (quality, suggestions; read-only).",
     # Promotions
     "create_promotion": "promotion (id, type, scope, targets).",
     "update_nxm_promotion": "promotion (products added/removed incrementally).",
