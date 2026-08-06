@@ -491,7 +491,7 @@ class MenuWriteSkill:
             ToolDefinition(
                 name="ocr_menu_to_bulk_products",
                 description=(
-                    "OCR one or more uploaded menu images (storage_path from chat attachments) and "
+                    "Maps a list of products from images or documents. OCR one or more uploaded menu images (storage_path from chat attachments) and "
                     "return only JSON {items:[...]} (bulk product shape). Read-only mapping — does "
                     "not create products or categories. Pass storage_paths (1-5) or storage_path. "
                     "Uses OPENAI_VISION_MODEL. Good for extracting product data from images or documents, before creating "
