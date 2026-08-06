@@ -1,8 +1,11 @@
 from app.modules.assistant.agent.workflow.tool_catalog import (
+    ORCHESTRATOR_TOOL_GROUPS,
+    ORCHESTRATOR_TOOL_RETURNS_HINTS,
     TOOL_GROUPS,
     TOOL_RETURNS_HINTS,
     build_executor_tool_catalog,
     build_executor_tool_catalog_detailed,
+    build_orchestrator_tool_catalog,
     format_tool_catalog_entry,
     format_tool_catalog_entry_compact,
 )
@@ -15,23 +18,35 @@ def test_build_executor_tool_catalog_is_compact_by_default():
 
     assert len(compact) < len(detailed) // 2
     assert "### Read menu" in compact
-    assert "`ocr_menu_to_bulk_products` [read]:" in compact
-    assert "Args: storage_paths?" in compact
+    assert "`ocr_menu_to_bulk_products`" not in compact
     assert "active_only" not in compact
     assert "#### `ocr_menu_to_bulk_products`" not in compact
 
 
-def test_catalog_restores_single_product_tools_and_only_adds_ocr_tool():
+def test_build_orchestrator_tool_catalog_includes_ocr_tool():
+    catalog = build_orchestrator_tool_catalog()
+    assert "### Menu OCR (orchestrator)" in catalog
+    assert "`ocr_menu_to_bulk_products` [read]:" in catalog
+    assert "Args: storage_paths?" in catalog
+
+
+def test_catalog_restores_single_product_tools_without_ocr_tool():
     catalog = build_executor_tool_catalog_detailed()
     cataloged = {name for _, names in TOOL_GROUPS for name in names}
+    orchestrator_cataloged = {
+        name for _, names in ORCHESTRATOR_TOOL_GROUPS for name in names
+    }
 
-    assert {"search_products", "create_product", "ocr_menu_to_bulk_products"} <= cataloged
+    assert {"search_products", "create_product"} <= cataloged
+    assert "ocr_menu_to_bulk_products" not in cataloged
     assert "bulk_search_products" not in cataloged
-    assert {"search_products", "create_product", "ocr_menu_to_bulk_products"} <= set(
-        TOOL_RETURNS_HINTS
-    )
+    assert {"search_products", "create_product"} <= set(TOOL_RETURNS_HINTS)
     assert "bulk_search_products" not in TOOL_RETURNS_HINTS
-    assert "#### `ocr_menu_to_bulk_products` (read)" in catalog
+    assert "ocr_menu_to_bulk_products" in orchestrator_cataloged
+    assert "ocr_menu_to_bulk_products" in ORCHESTRATOR_TOOL_RETURNS_HINTS
+    assert "#### `ocr_menu_to_bulk_products` (read)" in build_orchestrator_tool_catalog(
+        compact=False
+    )
 
 
 def test_format_tool_catalog_entry_compact_truncates_long_descriptions():
