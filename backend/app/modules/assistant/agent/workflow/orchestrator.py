@@ -15,6 +15,9 @@ from app.core.llm.ports import ChatStreamEvent
 from app.db.uow import SqlAlchemyUnitOfWork
 from app.modules.assistant.agent.run_context import AssistantRunContext
 from app.modules.assistant.agent.tracing import assistant_tracing_active
+from app.modules.assistant.agent.tools import (
+    build_orchestrator_function_tools,
+)
 from app.modules.assistant.agent.workflow.agents import build_orchestrator_agent
 from app.modules.assistant.agent.workflow.clarify_registry import get_clarify_registry
 from app.modules.assistant.agent.workflow.clarify_tool import build_clarify_tool
@@ -173,9 +176,14 @@ class WorkflowOrchestrator:
             delegation_state=delegation_state,
             event_sink=sink,
         )
+        orchestrator_direct_tools = build_orchestrator_function_tools(
+            registry,
+            workflow_context.effective_skill_ids,
+            settings=self._settings,
+        )
         orchestrator = build_orchestrator_agent(
             settings=self._settings,
-            tools=[delegate_tool, clarify_tool],
+            tools=[delegate_tool, clarify_tool, *orchestrator_direct_tools],
         )
 
         async def emit() -> AsyncIterator[ChatStreamEvent]:
