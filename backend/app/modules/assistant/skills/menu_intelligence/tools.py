@@ -126,25 +126,26 @@ class MenuIntelligenceSkill:
     id = "menu_intelligence"
 
     def tool_definitions(self) -> list[ToolDefinition]:
+        # Temporarily disabled on catalog_agent — see CATALOG_AGENT_EXCLUDED_TOOL_NAMES.
         return [
-            ToolDefinition(
-                name="analyze_product_image",
-                description=(
-                    "Analyze the product's menu photo with vision AI. Uses image_path from "
-                    "storage plus product name/description and existing complements. Returns "
-                    "visible components and add-on ideas seen in the photo. Read-only."
-                ),
-                effect="read",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "product_id": {"type": "string"},
-                        "name": {"type": "string"},
-                        "product_name": {"type": "string", "description": "Alias for name."},
-                    },
-                    "required": [],
-                },
-            ),
+            # ToolDefinition(
+            #     name="analyze_product_image",
+            #     description=(
+            #         "Analyze the product's menu photo with vision AI. Uses image_path from "
+            #         "storage plus product name/description and existing complements. Returns "
+            #         "visible components and add-on ideas seen in the photo. Read-only."
+            #     ),
+            #     effect="read",
+            #     input_schema={
+            #         "type": "object",
+            #         "properties": {
+            #             "product_id": {"type": "string"},
+            #             "name": {"type": "string"},
+            #             "product_name": {"type": "string", "description": "Alias for name."},
+            #         },
+            #         "required": [],
+            #     },
+            # ),
         ]
 
     def execute(self, tool_name: str, args: dict[str, Any], ctx: AgentContext) -> ToolResult:
