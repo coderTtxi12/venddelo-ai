@@ -30,7 +30,6 @@ TOOL_GROUPS: list[tuple[str, list[str]]] = [
             "create_product",
             "bulk_create_categories",
             "bulk_create_products",
-            "ocr_menu_to_bulk_products",
             "update_product",
             "bulk_update_product_names",
             "bulk_update_product_descriptions",
@@ -146,7 +145,6 @@ TOOL_RETURNS_HINTS: dict[str, str] = {
     "bulk_create_products": (
         "updated, failed, results[] per row (Added); may include option_groups."
     ),
-    "ocr_menu_to_bulk_products": "items[], item_count, source_count, failed_paths[], model.",
     "update_product": "product (updated fields).",
     "bulk_update_product_names": "updated, failed, results[] per row.",
     "bulk_update_product_descriptions": "updated, failed, results[] per row.",
