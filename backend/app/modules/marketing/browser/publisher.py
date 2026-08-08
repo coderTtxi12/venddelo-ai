@@ -1,8 +1,8 @@
-"""Facebook feed publisher via Playwright.
+"""Facebook feed publisher via Playwright + LLM browser agent.
 
 Install browsers after adding the dependency::
 
-    cd backend && pip install playwright==1.49.1 && playwright install chromium
+    cd backend && pip install playwright==1.62.0 && playwright install chromium
 """
 
 from __future__ import annotations
@@ -12,22 +12,6 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
-
-# Facebook DOM selectors — fragile; first-match wins.
-COMPOSER_SELECTORS = [
-    '[aria-label="Create a post"]',
-    '[aria-label="¿Qué estás pensando?"]',
-    'div[role="button"][aria-label*="pensando"]',
-]
-MESSAGE_BOX = 'div[role="textbox"][contenteditable="true"]'
-POST_BUTTONS = [
-    '[aria-label="Post"]',
-    '[aria-label="Publicar"]',
-    'div[aria-label="Post"][role="button"]',
-]
-LOGIN_EMAIL = 'input[name="email"]'
-LOGIN_PASS = 'input[name="pass"]'
-LOGIN_SUBMIT = 'button[name="login"]'
 
 CHALLENGE_URL_FRAGMENTS = (
     "checkpoint",
@@ -71,6 +55,8 @@ class StubFacebookFeedPublisher:
 
 
 class PlaywrightFacebookFeedPublisher:
+    """Launch Chromium, restore session, then let the Agents SDK browser agent publish."""
+
     async def publish(
         self,
         *,
@@ -82,6 +68,7 @@ class PlaywrightFacebookFeedPublisher:
         from playwright.async_api import async_playwright
 
         from app.core.config import get_settings
+        from app.modules.marketing.browser.agent import run_facebook_feed_publish_agent
 
         settings = get_settings()
         headless = not settings.marketing_playwright_headed
@@ -95,19 +82,13 @@ class PlaywrightFacebookFeedPublisher:
                     storage_state=storage_state if storage_state else None
                 )
                 page = await context.new_page()
-                page.set_default_timeout(60_000)
+                page.set_default_timeout(30_000)
 
                 await page.goto(
                     "https://www.facebook.com/", wait_until="domcontentloaded"
                 )
 
-                if await _is_login_form_visible(page):
-                    await page.fill(LOGIN_EMAIL, email)
-                    await page.fill(LOGIN_PASS, password)
-                    await page.click(LOGIN_SUBMIT)
-                    await _wait_for_post_login(page)
-
-                manual_error = await _detect_manual_intervention(page)
+                manual_error = _detect_manual_intervention_url(page.url)
                 if manual_error is not None:
                     new_state = await context.storage_state()
                     return PublishResult(
@@ -117,47 +98,32 @@ class PlaywrightFacebookFeedPublisher:
                         needs_manual_intervention=True,
                     )
 
-                composer = await _first_visible_locator(page, COMPOSER_SELECTORS)
-                if composer is None:
-                    new_state = await context.storage_state()
-                    return PublishResult(
-                        ok=False,
-                        storage_state=new_state,
-                        error="Could not find feed composer",
-                    )
-
-                await composer.click()
-                message_box = page.locator(MESSAGE_BOX).first
-                await message_box.wait_for(state="visible")
-                await message_box.fill(message)
-
-                post_button = await _first_visible_locator(page, POST_BUTTONS)
-                if post_button is None:
-                    new_state = await context.storage_state()
-                    return PublishResult(
-                        ok=False,
-                        storage_state=new_state,
-                        error="Could not find post button",
-                    )
-
-                await post_button.click()
-                await page.wait_for_timeout(3_000)
-
-                manual_error = await _detect_manual_intervention(page)
-                if manual_error is not None:
-                    new_state = await context.storage_state()
-                    return PublishResult(
-                        ok=False,
-                        storage_state=new_state,
-                        error=manual_error,
-                        needs_manual_intervention=True,
-                    )
-
+                agent_result = await run_facebook_feed_publish_agent(
+                    page=page,
+                    email=email,
+                    password=password,
+                    message=message,
+                    settings=settings,
+                )
                 new_state = await context.storage_state()
+
+                if agent_result.ok:
+                    return PublishResult(
+                        ok=True,
+                        storage_state=new_state,
+                        result={
+                            "posted": True,
+                            "summary": agent_result.summary,
+                            "steps": agent_result.steps or [],
+                        },
+                    )
+
                 return PublishResult(
-                    ok=True,
+                    ok=False,
                     storage_state=new_state,
-                    result={"posted": True},
+                    error=agent_result.error or "Browser agent failed",
+                    needs_manual_intervention=agent_result.needs_manual_intervention,
+                    result={"steps": agent_result.steps or []},
                 )
         except Exception as exc:
             logger.exception("playwright facebook publish failed")
@@ -185,54 +151,10 @@ async def _capture_storage_state(context) -> dict[str, Any] | None:
         return None
 
 
-async def _wait_for_post_login(page, timeout_ms: int = 60_000) -> None:
-    for selector in COMPOSER_SELECTORS:
-        try:
-            await page.locator(selector).first.wait_for(
-                state="visible", timeout=timeout_ms
-            )
-            return
-        except Exception:
-            continue
-
-    try:
-        await page.wait_for_url(
-            lambda url: "/login" not in url.lower(),
-            timeout=timeout_ms,
-        )
-        return
-    except Exception:
-        pass
-
-    await page.locator(LOGIN_EMAIL).first.wait_for(state="hidden", timeout=timeout_ms)
-
-
-async def _first_visible_locator(page, selectors: list[str]):
-    from playwright.async_api import Locator
-
-    for selector in selectors:
-        locator: Locator = page.locator(selector).first
-        try:
-            if await locator.is_visible():
-                return locator
-        except Exception:
-            continue
-    return None
-
-
-async def _is_login_form_visible(page) -> bool:
-    try:
-        email = page.locator(LOGIN_EMAIL).first
-        password = page.locator(LOGIN_PASS).first
-        return await email.is_visible() and await password.is_visible()
-    except Exception:
-        return False
-
-
-async def _detect_manual_intervention(page) -> str | None:
-    url = page.url.lower()
+def _detect_manual_intervention_url(url: str) -> str | None:
+    lowered = (url or "").lower()
     for fragment in CHALLENGE_URL_FRAGMENTS:
-        if fragment in url:
+        if fragment in lowered:
             return f"Facebook challenge detected: {fragment}"
     return None
 

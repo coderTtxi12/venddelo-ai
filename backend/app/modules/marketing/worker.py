@@ -21,7 +21,7 @@ from app.modules.marketing.crypto import MarketingCrypto, build_marketing_crypto
 
 logger = logging.getLogger(__name__)
 
-PUBLISH_TIMEOUT_SECONDS = 120
+PUBLISH_TIMEOUT_SECONDS = 300
 
 __all__ = [
     "FacebookFeedPublisher",
