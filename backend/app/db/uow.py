@@ -16,6 +16,7 @@ from app.modules.assistant.adapters import SqlAlchemyAssistantRepository
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
 from app.modules.assistant.skills.menu_import.session_repository import MenuImportSessionRepository
 from app.modules.digital_menu_themes.repository import DigitalMenuThemeRepository
+from app.modules.marketing.adapters import SqlAlchemyMarketingRepository
 from app.modules.menu.adapters import SqlAlchemyMenuRepository
 from app.modules.orders.adapters import SqlAlchemyOrderRepository
 from app.modules.promotions.adapters import SqlAlchemyPromotionRepository
@@ -59,6 +60,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.orders = SqlAlchemyOrderRepository(self.session)
         self.analytics = SqlAlchemyAnalyticsRepository(self.session)
         self.promotions = SqlAlchemyPromotionRepository(self.session)
+        self.marketing = SqlAlchemyMarketingRepository(self.session)
         self.translations = SqlAlchemyTranslationRepository(self.session)
         self.digital_menu_themes = DigitalMenuThemeRepository(self.session)
         self.menu_import_sessions = MenuImportSessionRepository(self.session)
