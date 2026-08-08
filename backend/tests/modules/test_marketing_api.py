@@ -95,6 +95,14 @@ def test_create_facebook_post_returns_202(engine, monkeypatch):
         patch.object(redis_factory, "build_rate_limiter", fake_build_rate_limiter),
     ]
 
+    async def _noop_marketing_task(*_args, **_kwargs) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "app.modules.marketing.api.run_marketing_facebook_post_task",
+        _noop_marketing_task,
+    )
+
     app.dependency_overrides[get_uow] = override_uow
     app.dependency_overrides[get_auth] = lambda: FakeAuth()
     for p in patches:

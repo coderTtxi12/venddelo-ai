@@ -299,6 +299,102 @@ async def test_worker_manual_intervention_persists_storage_state(
 
 @requires_db
 @async_test
+async def test_worker_missing_crypto_key_marks_task_failed(
+    session, engine, monkeypatch
+):
+    monkeypatch.delenv("MARKETING_AGENT_FERNET_KEY", raising=False)
+    monkeypatch.setenv("MARKETING_AGENT_FERNET_KEY", "")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+
+    key = Fernet.generate_key().decode()
+    crypto = MarketingCrypto(key)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restaurant, agent = _seed_restaurant_and_agent(uow, crypto)
+        repo = SqlAlchemyMarketingRepository(uow.session)
+        task = repo.create_task(
+            restaurant_id=restaurant.id,
+            agent_id=agent.id,
+            message="Missing crypto key",
+        )
+        task_id = task.id
+        uow.commit()
+
+    publisher = FakeFacebookFeedPublisher(
+        PublishResult(ok=True, storage_state={"cookies": [], "origins": []})
+    )
+
+    await run_marketing_facebook_post_task(
+        task_id,
+        publisher=publisher,
+        uow_factory=lambda: SqlAlchemyUnitOfWork(factory),
+    )
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        finished = uow.marketing.get_task_by_id(task_id)
+        assert finished is not None
+        assert finished.status == "failed"
+        assert finished.status != "queued"
+        assert "MARKETING_AGENT_FERNET_KEY" in (finished.error or "")
+
+    assert publisher.calls == []
+
+
+@requires_db
+@async_test
+async def test_worker_publisher_exception_persists_storage_state(
+    session, engine, monkeypatch
+):
+    key = Fernet.generate_key().decode()
+    monkeypatch.setenv("MARKETING_AGENT_FERNET_KEY", key)
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+
+    crypto = MarketingCrypto(key)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restaurant, agent = _seed_restaurant_and_agent(uow, crypto)
+        repo = SqlAlchemyMarketingRepository(uow.session)
+        task = repo.create_task(
+            restaurant_id=restaurant.id,
+            agent_id=agent.id,
+            message="Exception with state",
+        )
+        task_id = task.id
+        uow.commit()
+
+    new_state = {"cookies": [{"name": "partial", "value": "1"}], "origins": []}
+
+    class PublisherReturningStateOnRaise:
+        async def publish(self, **kwargs):
+            return PublishResult(
+                ok=False,
+                storage_state=new_state,
+                error="Playwright connection lost",
+            )
+
+    await run_marketing_facebook_post_task(
+        task_id,
+        publisher=PublisherReturningStateOnRaise(),
+        uow_factory=lambda: SqlAlchemyUnitOfWork(factory),
+    )
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        finished = uow.marketing.get_task_by_id(task_id)
+        assert finished is not None
+        assert finished.status == "failed"
+
+        updated_agent = uow.marketing.get_agent(agent.id)
+        assert updated_agent is not None
+        assert updated_agent.storage_state_encrypted is not None
+        assert crypto.decrypt_json(updated_agent.storage_state_encrypted) == new_state
+
+
+@requires_db
+@async_test
 async def test_worker_failure_persists_storage_state(session, engine, monkeypatch):
     key = Fernet.generate_key().decode()
     monkeypatch.setenv("MARKETING_AGENT_FERNET_KEY", key)

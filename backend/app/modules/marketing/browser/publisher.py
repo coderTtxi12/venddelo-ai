@@ -29,14 +29,12 @@ LOGIN_EMAIL = 'input[name="email"]'
 LOGIN_PASS = 'input[name="pass"]'
 LOGIN_SUBMIT = 'button[name="login"]'
 
-CHECKPOINT_URL_FRAGMENT = "checkpoint"
-CHECKPOINT_TEXT_MARKERS = (
-    "two-factor",
-    "two factor",
-    "authentication app",
-    "security check",
-    "captcha",
-    "confirm your identity",
+CHALLENGE_URL_FRAGMENTS = (
+    "checkpoint",
+    "login/device-based",
+    "login/help",
+    "two_step_verification",
+    "recover",
 )
 
 
@@ -88,85 +86,125 @@ class PlaywrightFacebookFeedPublisher:
         settings = get_settings()
         headless = not settings.marketing_playwright_headed
 
+        context = None
+        browser = None
         try:
             async with async_playwright() as playwright:
                 browser = await playwright.chromium.launch(headless=headless)
-                try:
-                    context = await browser.new_context(
-                        storage_state=storage_state if storage_state else None
-                    )
-                    page = await context.new_page()
-                    page.set_default_timeout(60_000)
+                context = await browser.new_context(
+                    storage_state=storage_state if storage_state else None
+                )
+                page = await context.new_page()
+                page.set_default_timeout(60_000)
 
-                    await page.goto("https://www.facebook.com/", wait_until="domcontentloaded")
+                await page.goto(
+                    "https://www.facebook.com/", wait_until="domcontentloaded"
+                )
 
-                    if await _is_login_form_visible(page):
-                        await page.fill(LOGIN_EMAIL, email)
-                        await page.fill(LOGIN_PASS, password)
-                        await page.click(LOGIN_SUBMIT)
-                        await page.wait_for_load_state("networkidle")
+                if await _is_login_form_visible(page):
+                    await page.fill(LOGIN_EMAIL, email)
+                    await page.fill(LOGIN_PASS, password)
+                    await page.click(LOGIN_SUBMIT)
+                    await _wait_for_post_login(page)
 
-                    manual_error = await _detect_manual_intervention(page)
-                    if manual_error is not None:
-                        new_state = await context.storage_state()
-                        return PublishResult(
-                            ok=False,
-                            storage_state=new_state,
-                            error=manual_error,
-                            needs_manual_intervention=True,
-                        )
-
-                    composer = await _first_visible_locator(page, COMPOSER_SELECTORS)
-                    if composer is None:
-                        new_state = await context.storage_state()
-                        return PublishResult(
-                            ok=False,
-                            storage_state=new_state,
-                            error="Could not find feed composer",
-                        )
-
-                    await composer.click()
-                    message_box = page.locator(MESSAGE_BOX).first
-                    await message_box.wait_for(state="visible")
-                    await message_box.fill(message)
-
-                    post_button = await _first_visible_locator(page, POST_BUTTONS)
-                    if post_button is None:
-                        new_state = await context.storage_state()
-                        return PublishResult(
-                            ok=False,
-                            storage_state=new_state,
-                            error="Could not find post button",
-                        )
-
-                    await post_button.click()
-                    await page.wait_for_timeout(3_000)
-
-                    manual_error = await _detect_manual_intervention(page)
-                    if manual_error is not None:
-                        new_state = await context.storage_state()
-                        return PublishResult(
-                            ok=False,
-                            storage_state=new_state,
-                            error=manual_error,
-                            needs_manual_intervention=True,
-                        )
-
+                manual_error = await _detect_manual_intervention(page)
+                if manual_error is not None:
                     new_state = await context.storage_state()
                     return PublishResult(
-                        ok=True,
+                        ok=False,
                         storage_state=new_state,
-                        result={"posted": True},
+                        error=manual_error,
+                        needs_manual_intervention=True,
                     )
-                finally:
-                    await browser.close()
+
+                composer = await _first_visible_locator(page, COMPOSER_SELECTORS)
+                if composer is None:
+                    new_state = await context.storage_state()
+                    return PublishResult(
+                        ok=False,
+                        storage_state=new_state,
+                        error="Could not find feed composer",
+                    )
+
+                await composer.click()
+                message_box = page.locator(MESSAGE_BOX).first
+                await message_box.wait_for(state="visible")
+                await message_box.fill(message)
+
+                post_button = await _first_visible_locator(page, POST_BUTTONS)
+                if post_button is None:
+                    new_state = await context.storage_state()
+                    return PublishResult(
+                        ok=False,
+                        storage_state=new_state,
+                        error="Could not find post button",
+                    )
+
+                await post_button.click()
+                await page.wait_for_timeout(3_000)
+
+                manual_error = await _detect_manual_intervention(page)
+                if manual_error is not None:
+                    new_state = await context.storage_state()
+                    return PublishResult(
+                        ok=False,
+                        storage_state=new_state,
+                        error=manual_error,
+                        needs_manual_intervention=True,
+                    )
+
+                new_state = await context.storage_state()
+                return PublishResult(
+                    ok=True,
+                    storage_state=new_state,
+                    result={"posted": True},
+                )
         except Exception as exc:
             logger.exception("playwright facebook publish failed")
+            captured_state = await _capture_storage_state(context)
             return PublishResult(
                 ok=False,
-                storage_state=None,
+                storage_state=captured_state,
                 error=_safe_error_message(exc),
             )
+        finally:
+            if browser is not None:
+                try:
+                    await browser.close()
+                except Exception:
+                    logger.debug("failed to close playwright browser", exc_info=True)
+
+
+async def _capture_storage_state(context) -> dict[str, Any] | None:
+    if context is None:
+        return None
+    try:
+        return await context.storage_state()
+    except Exception:
+        logger.debug("could not capture storage_state after publish failure", exc_info=True)
+        return None
+
+
+async def _wait_for_post_login(page, timeout_ms: int = 60_000) -> None:
+    for selector in COMPOSER_SELECTORS:
+        try:
+            await page.locator(selector).first.wait_for(
+                state="visible", timeout=timeout_ms
+            )
+            return
+        except Exception:
+            continue
+
+    try:
+        await page.wait_for_url(
+            lambda url: "/login" not in url.lower(),
+            timeout=timeout_ms,
+        )
+        return
+    except Exception:
+        pass
+
+    await page.locator(LOGIN_EMAIL).first.wait_for(state="hidden", timeout=timeout_ms)
 
 
 async def _first_visible_locator(page, selectors: list[str]):
@@ -193,18 +231,9 @@ async def _is_login_form_visible(page) -> bool:
 
 async def _detect_manual_intervention(page) -> str | None:
     url = page.url.lower()
-    if CHECKPOINT_URL_FRAGMENT in url:
-        return "Facebook checkpoint detected"
-
-    try:
-        body_text = (await page.locator("body").inner_text()).lower()
-    except Exception:
-        body_text = ""
-
-    for marker in CHECKPOINT_TEXT_MARKERS:
-        if marker in body_text:
-            return f"Facebook challenge detected: {marker}"
-
+    for fragment in CHALLENGE_URL_FRAGMENTS:
+        if fragment in url:
+            return f"Facebook challenge detected: {fragment}"
     return None
 
 
