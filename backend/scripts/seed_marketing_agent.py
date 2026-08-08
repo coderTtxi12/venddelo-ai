@@ -9,8 +9,14 @@ Local wiring checklist (from backend/):
 
    ``python -m scripts.seed_marketing_agent --email you@example.com --password '...' --label test-agent-1``
 
-5. Restart the API: ``python start.py``.
-6. Postman smoke test:
+5. Bootstrap a real Facebook session (recommended — skip flaky auto-login)::
+
+   ``python -m scripts.bootstrap_marketing_fb_session --label test-agent-1``
+
+   Log in manually in the browser, then press Enter in the terminal.
+
+6. Restart the API: ``python start.py``.
+7. Postman smoke test:
    - ``POST /api/v1/restaurants/{restaurant_id}/marketing/facebook/posts`` with JWT and
      ``{"message":"..."}``.
    - Poll ``GET /api/v1/restaurants/{restaurant_id}/marketing/tasks/{task_id}``.
