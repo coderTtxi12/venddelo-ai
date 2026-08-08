@@ -80,8 +80,10 @@ def build_browser_tools() -> list[FunctionTool]:
             name="click_role",
             description=(
                 "Click by accessible role + name (best for Facebook). "
-                "Examples: role=button name='Publicar'; role=textbox "
-                "name=\"¿Qué estás pensando?\"; role=button name='Iniciar sesión'."
+                "Tries an exact name match first (so name='Post' does not hit "
+                "'Add to your post'), then falls back to substring match. "
+                "Examples: role=button name='Post'; role=button "
+                "name=\"What's on your mind\"; role=button name='Publicar'."
             ),
             params_json_schema={
                 "type": "object",
@@ -97,7 +99,10 @@ def build_browser_tools() -> list[FunctionTool]:
                     "exact": {
                         "type": "boolean",
                         "default": False,
-                        "description": "Exact name match (default false = substring)",
+                        "description": (
+                            "If true, only exact name match. If false (default), "
+                            "try exact first then substring."
+                        ),
                     },
                 },
                 "required": ["role", "name"],
@@ -238,6 +243,19 @@ async def _click(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
         return _err(str(exc), selector=selector)
 
 
+async def _resolve_role_locator(page: Any, *, role: str, name: str, exact: bool) -> Any:
+    """Prefer exact accessible-name match so 'Post' != 'Add to your post'."""
+    exact_locator = page.get_by_role(role, name=name, exact=True)
+    if exact:
+        return exact_locator.first
+    try:
+        if await exact_locator.count() > 0:
+            return exact_locator.first
+    except Exception:
+        pass
+    return page.get_by_role(role, name=name, exact=False).first
+
+
 async def _click_role(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
     browser = ctx.context
     if blocked := _finished_guard(browser):
@@ -249,7 +267,9 @@ async def _click_role(ctx: RunContextWrapper[BrowserRunContext], args: str) -> s
     if not role or not name:
         return _err("role and name are required")
     try:
-        locator = browser.page.get_by_role(role, name=name, exact=exact).first
+        locator = await _resolve_role_locator(
+            browser.page, role=role, name=name, exact=exact
+        )
         await locator.click(timeout=15_000)
         browser.steps.append(f"click_role:{role}:{name}")
         return _ok(clicked_role=role, name=name)
