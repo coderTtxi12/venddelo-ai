@@ -5,14 +5,14 @@
 
 ## Decisión
 
-Opción **A**: Agents SDK + accessibility/ARIA snapshot (sin visión). LangSmith vía `OpenAIAgentsTracingProcessor` + `trace(...)`.
+Opción **B**: Agents SDK + accessibility/ARIA + **visión** (screenshot → `OPENAI_VISION_MODEL`). LangSmith vía `OpenAIAgentsTracingProcessor` + `trace(...)`.
 
 ## Flujo
 
-Playwright launch → storage_state/login helper → Agent loop (`observe` / `click` / `type_text` / …) → `mark_done` | `mark_needs_help` → persistir storage_state.
+Playwright launch → storage_state/login helper → Agent loop (`observe` con ARIA+visión / `click_role` / `click_at` / …) → `mark_done` | `mark_needs_help` → persistir storage_state.
 
 ## Tools
 
-`observe`, `click`, `type_text`, `press_key`, `wait`, `login_if_needed`, `mark_done`, `mark_needs_help`
+`observe` (ARIA + vision JSON), `click`, `click_role`, `click_at`, `type_text`, `press_key`, `wait`, `login_if_needed`, `mark_done`, `mark_needs_help`
 
 Credenciales solo en `login_if_needed` (contexto interno); nunca en prompts ni logs.

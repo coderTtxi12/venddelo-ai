@@ -3,10 +3,17 @@ from __future__ import annotations
 import asyncio
 import json
 from functools import wraps
+from typing import Any
 
 from agents import RunContextWrapper
 
-from app.modules.marketing.browser.tools import BrowserRunContext, _mark_done, _observe
+from app.core.vision.ports import VisionAnalysisRequest, VisionAnalysisResult, VisionPort
+from app.modules.marketing.browser.tools import (
+    BrowserRunContext,
+    _click_at,
+    _mark_done,
+    _observe,
+)
 
 
 def async_test(func):
@@ -31,14 +38,48 @@ class _FakePage:
     def locator(self, _selector: str) -> _FakeLocator:
         return _FakeLocator()
 
+    async def screenshot(self, **_kwargs: Any) -> bytes:
+        return b"fake-png-bytes"
+
+    @property
+    def mouse(self) -> Any:
+        return self
+
+    async def click(self, x: int, y: int) -> None:
+        self.last_click = (x, y)
+
+
+class _StubVision(VisionPort):
+    def analyze_json(self, request: VisionAnalysisRequest) -> VisionAnalysisResult:
+        assert request.image_bytes == b"fake-png-bytes"
+        return VisionAnalysisResult(
+            data={
+                "page_summary": "Facebook feed",
+                "logged_in": True,
+                "composer_visible": True,
+                "targets": [
+                    {
+                        "purpose": "open_composer",
+                        "label": "¿Qué estás pensando?",
+                        "role": "textbox",
+                        "x": 120,
+                        "y": 240,
+                    }
+                ],
+            },
+            model="vision-stub",
+            raw_text="{}",
+        )
+
 
 @async_test
-async def test_observe_returns_url_and_snapshot():
+async def test_observe_returns_aria_and_vision():
     ctx = BrowserRunContext(
         page=_FakePage(),
         email="a@example.com",
         password="secret",
         message="hola",
+        vision=_StubVision(),
     )
     wrapper = RunContextWrapper(context=ctx)
     raw = await _observe(wrapper, "{}")
@@ -46,7 +87,24 @@ async def test_observe_returns_url_and_snapshot():
     assert payload["ok"] is True
     assert "URL: https://www.facebook.com/" in payload["snapshot"]
     assert "heading: Home" in payload["snapshot"]
+    assert payload["vision_raw"]["composer_visible"] is True
     assert "observe" in ctx.steps
+
+
+@async_test
+async def test_click_at_uses_mouse_coordinates():
+    page = _FakePage()
+    ctx = BrowserRunContext(
+        page=page,
+        email="a@example.com",
+        password="secret",
+        message="hola",
+    )
+    wrapper = RunContextWrapper(context=ctx)
+    raw = await _click_at(wrapper, json.dumps({"x": 10, "y": 20}))
+    payload = json.loads(raw)
+    assert payload["ok"] is True
+    assert page.last_click == (10, 20)
 
 
 @async_test

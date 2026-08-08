@@ -24,15 +24,20 @@ Your ONLY goal is to publish the given message as a new post on the user's feed.
 
 Rules:
 1. Always call observe first (and again after significant UI changes).
-2. Use the accessibility/ARIA tree to choose selectors (roles, names, aria-labels).
-3. Prefer Spanish and English UI labels (Publicar / Post, ¿Qué estás pensando? / What's on your mind?).
-4. If you see a login form (email/password), call login_if_needed — never invent credentials.
-5. After login, dismiss cookie/consent dialogs if they block the composer.
-6. Open the feed composer, type the exact message provided, then click Publicar/Post.
-7. When the post is published (composer closed or success UI), call mark_done.
-8. If you hit captcha, 2FA, checkpoint, or are stuck, call mark_needs_help with a short reason.
-9. Do not navigate away from Facebook. Do not message other users. Do not change settings.
-10. Keep actions minimal; avoid unnecessary waits.
+2. observe returns BOTH an ARIA tree and a vision analysis of a screenshot.
+   Prefer vision targets (labels, roles, x/y) when ARIA alone is ambiguous.
+3. Prefer click_role(role, name) for buttons/textboxes. Use click_at(x,y) when
+   vision gives coordinates. Use click(selector) as a fallback.
+4. Prefer Spanish and English UI labels (Publicar / Post, ¿Qué estás pensando? /
+   What's on your mind?).
+5. If you see a login form, call login_if_needed — never invent credentials.
+   If login keeps failing, call mark_needs_help (manual session bootstrap may be needed).
+6. Dismiss cookie/consent dialogs if they block the composer.
+7. Open the feed composer, type the exact message provided, then click Publicar/Post.
+8. When the post is published (composer closed or success UI), call mark_done.
+9. If you hit captcha, 2FA, checkpoint, or are stuck, call mark_needs_help.
+10. Do not navigate away from Facebook. Do not message other users. Do not change settings.
+11. Keep actions minimal; avoid unnecessary waits.
 """.strip()
 
 
@@ -64,6 +69,7 @@ async def run_facebook_feed_publish_agent(
         email=email,
         password=password,
         message=message,
+        settings=settings,
     )
     tools = build_browser_tools()
     agent = Agent[BrowserRunContext](

@@ -9,7 +9,13 @@ from typing import Any, Literal
 
 from agents import FunctionTool, RunContextWrapper
 
+from app.core.config import Settings
+from app.core.vision.ports import VisionPort
 from app.modules.marketing.browser.a11y import capture_aria_snapshot
+from app.modules.marketing.browser.vision_observe import (
+    format_vision_for_agent,
+    observe_with_vision,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +37,8 @@ class BrowserRunContext:
     error: str | None = None
     needs_manual_intervention: bool = False
     steps: list[str] = field(default_factory=list)
+    settings: Settings | None = None
+    vision: VisionPort | None = None
 
 
 def _ok(**payload: Any) -> str:
@@ -46,8 +54,9 @@ def build_browser_tools() -> list[FunctionTool]:
         FunctionTool(
             name="observe",
             description=(
-                "Capture the current page URL and accessibility/ARIA tree. "
-                "Call this before deciding the next action."
+                "Capture URL, accessibility/ARIA tree, AND a vision analysis of a "
+                "viewport screenshot (labels, blockers, suggested click targets with "
+                "x/y). Call this before deciding the next action."
             ),
             params_json_schema={
                 "type": "object",
@@ -59,9 +68,8 @@ def build_browser_tools() -> list[FunctionTool]:
         FunctionTool(
             name="click",
             description=(
-                "Click an element. Prefer CSS selectors from the ARIA tree "
-                "(e.g. role/name based). Examples: "
-                "'[aria-label=\"Publicar\"]', 'button[name=\"login\"]', "
+                "Click an element by CSS/Playwright selector. Examples: "
+                "'[aria-label=\"Publicar\"]', "
                 "'div[role=\"textbox\"][contenteditable=\"true\"]'."
             ),
             params_json_schema={
@@ -76,6 +84,52 @@ def build_browser_tools() -> list[FunctionTool]:
                 "additionalProperties": False,
             },
             on_invoke_tool=_click,
+        ),
+        FunctionTool(
+            name="click_role",
+            description=(
+                "Click by accessible role + name (best for Facebook). "
+                "Examples: role=button name='Publicar'; role=textbox "
+                "name=\"¿Qué estás pensando?\"; role=button name='Iniciar sesión'."
+            ),
+            params_json_schema={
+                "type": "object",
+                "properties": {
+                    "role": {
+                        "type": "string",
+                        "description": "ARIA role: button, textbox, link, etc.",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Accessible name / visible label",
+                    },
+                    "exact": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Exact name match (default false = substring)",
+                    },
+                },
+                "required": ["role", "name"],
+                "additionalProperties": False,
+            },
+            on_invoke_tool=_click_role,
+        ),
+        FunctionTool(
+            name="click_at",
+            description=(
+                "Click at viewport pixel coordinates from vision observe targets "
+                "(x,y from top-left of the screenshot)."
+            ),
+            params_json_schema={
+                "type": "object",
+                "properties": {
+                    "x": {"type": "integer", "minimum": 0},
+                    "y": {"type": "integer", "minimum": 0},
+                },
+                "required": ["x", "y"],
+                "additionalProperties": False,
+            },
+            on_invoke_tool=_click_at,
         ),
         FunctionTool(
             name="type_text",
@@ -189,8 +243,17 @@ async def _observe(ctx: RunContextWrapper[BrowserRunContext], _args: str) -> str
     if blocked := _finished_guard(browser):
         return blocked
     snapshot = await capture_aria_snapshot(browser.page)
+    vision_payload = await observe_with_vision(
+        browser.page,
+        settings=browser.settings,
+        vision=browser.vision,
+    )
     browser.steps.append("observe")
-    return _ok(snapshot=snapshot)
+    return _ok(
+        snapshot=snapshot,
+        vision=format_vision_for_agent(vision_payload),
+        vision_raw=vision_payload.get("analysis"),
+    )
 
 
 async def _click(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
@@ -208,6 +271,43 @@ async def _click(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
         return _ok(clicked=selector)
     except Exception as exc:
         return _err(str(exc), selector=selector)
+
+
+async def _click_role(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
+    browser = ctx.context
+    if blocked := _finished_guard(browser):
+        return blocked
+    data = json.loads(args or "{}")
+    role = str(data.get("role") or "").strip()
+    name = str(data.get("name") or "").strip()
+    exact = bool(data.get("exact", False))
+    if not role or not name:
+        return _err("role and name are required")
+    try:
+        locator = browser.page.get_by_role(role, name=name, exact=exact).first
+        await locator.click(timeout=15_000)
+        browser.steps.append(f"click_role:{role}:{name}")
+        return _ok(clicked_role=role, name=name)
+    except Exception as exc:
+        return _err(str(exc), role=role, name=name)
+
+
+async def _click_at(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
+    browser = ctx.context
+    if blocked := _finished_guard(browser):
+        return blocked
+    data = json.loads(args or "{}")
+    try:
+        x = int(data["x"])
+        y = int(data["y"])
+    except (KeyError, TypeError, ValueError):
+        return _err("x and y integers are required")
+    try:
+        await browser.page.mouse.click(x, y)
+        browser.steps.append(f"click_at:{x},{y}")
+        return _ok(x=x, y=y)
+    except Exception as exc:
+        return _err(str(exc), x=x, y=y)
 
 
 async def _type_text(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
@@ -268,26 +368,49 @@ async def _wait(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
     return _ok(waited_ms=ms)
 
 
+async def _find_login_fields(page: Any) -> tuple[Any, Any, Any] | None:
+    """Return (email, password, submit) locators if a login form looks visible."""
+    candidates = [
+        (
+            page.locator(LOGIN_EMAIL).first,
+            page.locator(LOGIN_PASS).first,
+            page.locator(LOGIN_SUBMIT).first,
+        ),
+        (
+            page.get_by_role("textbox", name="Correo electrónico o número de celular").first,
+            page.get_by_role("textbox", name="Contraseña").first,
+            page.get_by_role("button", name="Iniciar sesión").first,
+        ),
+        (
+            page.get_by_role("textbox", name="Email or phone number").first,
+            page.get_by_role("textbox", name="Password").first,
+            page.get_by_role("button", name="Log in").first,
+        ),
+    ]
+    for email, password, submit in candidates:
+        try:
+            if await email.is_visible() and await password.is_visible():
+                return email, password, submit
+        except Exception:
+            continue
+    return None
+
+
 async def _login_if_needed(ctx: RunContextWrapper[BrowserRunContext], _args: str) -> str:
     browser = ctx.context
     if blocked := _finished_guard(browser):
         return blocked
     page = browser.page
-    try:
-        email = page.locator(LOGIN_EMAIL).first
-        password = page.locator(LOGIN_PASS).first
-        visible = await email.is_visible() and await password.is_visible()
-    except Exception:
-        visible = False
-
-    if not visible:
+    fields = await _find_login_fields(page)
+    if fields is None:
         browser.steps.append("login_if_needed:not_needed")
         return _ok(logged_in=False, reason="login form not visible")
 
+    email, password, submit = fields
     try:
         await email.fill(browser.email)
         await password.fill(browser.password)
-        await page.locator(LOGIN_SUBMIT).first.click(timeout=15_000)
+        await submit.click(timeout=15_000)
         await page.wait_for_timeout(2_000)
         browser.steps.append("login_if_needed:submitted")
         # Never return credentials.
