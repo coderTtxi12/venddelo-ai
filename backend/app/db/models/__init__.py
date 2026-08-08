@@ -6,6 +6,7 @@ from app.db.models.assistant_profile import (
     RestaurantAssistantProfile,
 )
 from app.db.models.digital_menu_theme import DigitalMenuTheme
+from app.db.models.marketing import MarketingAgentAccount, MarketingTask
 from app.db.models.menu_import_session import MenuImportSession
 from app.db.models.delivery import (
     DeliveryAssignment,
@@ -45,6 +46,8 @@ __all__ = [
     "Base",
     "DigitalMenuTheme",
     "MenuImportSession",
+    "MarketingAgentAccount",
+    "MarketingTask",
     "Restaurant",
     "RestaurantMember",
     "RestaurantAdminInvite",
