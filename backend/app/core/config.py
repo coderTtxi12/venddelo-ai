@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     langsmith_project: str = "venddelo-ai"
     langsmith_endpoint: str = "https://api.smith.langchain.com"
     google_maps_api_key: str | None = None
+    marketing_agent_fernet_key: str | None = None
+    marketing_playwright_headed: bool = False
     translation_cache_ttl_seconds: int = 3600
     cors_origins: str = "http://localhost:3000"
     menu_public_domain: str = "mxy.mx"
