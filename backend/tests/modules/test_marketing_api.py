@@ -29,8 +29,14 @@ def async_test(func):
 
 
 class FakeFacebookFeedPublisher:
-    def __init__(self, result: PublishResult) -> None:
+    def __init__(
+        self,
+        result: PublishResult | None = None,
+        *,
+        raise_exc: BaseException | None = None,
+    ) -> None:
         self._result = result
+        self._raise_exc = raise_exc
         self.calls: list[dict[str, object]] = []
 
     async def publish(
@@ -49,6 +55,9 @@ class FakeFacebookFeedPublisher:
                 "message": message,
             }
         )
+        if self._raise_exc is not None:
+            raise self._raise_exc
+        assert self._result is not None
         return self._result
 
 
@@ -247,3 +256,46 @@ async def test_worker_success_persists_storage_state(session, engine, monkeypatc
 
     assert publisher.calls[0]["message"] == "Success path"
     assert publisher.calls[0]["password"] == "secret-pass"
+
+
+@requires_db
+@async_test
+async def test_worker_publisher_exception_marks_task_failed(
+    session, engine, monkeypatch
+):
+    key = Fernet.generate_key().decode()
+    monkeypatch.setenv("MARKETING_AGENT_FERNET_KEY", key)
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+
+    crypto = MarketingCrypto(key)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restaurant, agent = _seed_restaurant_and_agent(uow, crypto)
+        repo = SqlAlchemyMarketingRepository(uow.session)
+        task = repo.create_task(
+            restaurant_id=restaurant.id,
+            agent_id=agent.id,
+            message="Exception path",
+        )
+        task_id = task.id
+        uow.commit()
+
+    publisher = FakeFacebookFeedPublisher(
+        raise_exc=RuntimeError("Playwright connection lost")
+    )
+
+    await run_marketing_facebook_post_task(
+        task_id,
+        publisher=publisher,
+        uow_factory=lambda: SqlAlchemyUnitOfWork(factory),
+    )
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        finished = uow.marketing.get_task_by_id(task_id)
+        assert finished is not None
+        assert finished.status == "failed"
+        assert finished.error == "Playwright connection lost"
+        assert "secret-pass" not in (finished.error or "")
+        assert "agent@example.com" not in (finished.error or "")
