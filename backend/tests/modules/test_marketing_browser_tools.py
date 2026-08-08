@@ -3,16 +3,15 @@ from __future__ import annotations
 import asyncio
 import json
 from functools import wraps
-from typing import Any
 
 from agents import RunContextWrapper
 
-from app.core.vision.ports import VisionAnalysisRequest, VisionAnalysisResult, VisionPort
 from app.modules.marketing.browser.tools import (
     BrowserRunContext,
-    _click_at,
+    _click_role,
     _mark_done,
     _observe,
+    _resolve_role_locator,
 )
 
 
@@ -38,48 +37,14 @@ class _FakePage:
     def locator(self, _selector: str) -> _FakeLocator:
         return _FakeLocator()
 
-    async def screenshot(self, **_kwargs: Any) -> bytes:
-        return b"fake-png-bytes"
-
-    @property
-    def mouse(self) -> Any:
-        return self
-
-    async def click(self, x: int, y: int) -> None:
-        self.last_click = (x, y)
-
-
-class _StubVision(VisionPort):
-    def analyze_json(self, request: VisionAnalysisRequest) -> VisionAnalysisResult:
-        assert request.image_bytes == b"fake-png-bytes"
-        return VisionAnalysisResult(
-            data={
-                "page_summary": "Facebook feed",
-                "logged_in": True,
-                "composer_visible": True,
-                "targets": [
-                    {
-                        "purpose": "open_composer",
-                        "label": "¿Qué estás pensando?",
-                        "role": "textbox",
-                        "x": 120,
-                        "y": 240,
-                    }
-                ],
-            },
-            model="vision-stub",
-            raw_text="{}",
-        )
-
 
 @async_test
-async def test_observe_returns_aria_and_vision():
+async def test_observe_returns_url_and_aria_snapshot():
     ctx = BrowserRunContext(
         page=_FakePage(),
         email="a@example.com",
         password="secret",
         message="hola",
-        vision=_StubVision(),
     )
     wrapper = RunContextWrapper(context=ctx)
     raw = await _observe(wrapper, "{}")
@@ -87,24 +52,8 @@ async def test_observe_returns_aria_and_vision():
     assert payload["ok"] is True
     assert "URL: https://www.facebook.com/" in payload["snapshot"]
     assert "heading: Home" in payload["snapshot"]
-    assert payload["vision_raw"]["composer_visible"] is True
+    assert "vision" not in payload
     assert "observe" in ctx.steps
-
-
-@async_test
-async def test_click_at_uses_mouse_coordinates():
-    page = _FakePage()
-    ctx = BrowserRunContext(
-        page=page,
-        email="a@example.com",
-        password="secret",
-        message="hola",
-    )
-    wrapper = RunContextWrapper(context=ctx)
-    raw = await _click_at(wrapper, json.dumps({"x": 10, "y": 20}))
-    payload = json.loads(raw)
-    assert payload["ok"] is True
-    assert page.last_click == (10, 20)
 
 
 @async_test
@@ -136,3 +85,57 @@ async def test_observe_blocked_after_done():
     raw = await _observe(wrapper, "{}")
     payload = json.loads(raw)
     assert payload["ok"] is False
+
+
+class _CountingLocator:
+    def __init__(self, *, count: int, label: str):
+        self._count = count
+        self.label = label
+        self.clicked = False
+
+    async def count(self) -> int:
+        return self._count
+
+    @property
+    def first(self) -> "_CountingLocator":
+        return self
+
+    async def click(self, timeout: int = 0) -> None:
+        self.clicked = True
+
+
+class _AmbiguousRolePage:
+    """Mirrors Facebook: 'Add to your post' would substring-match name='Post'."""
+
+    def __init__(self) -> None:
+        self.exact_post = _CountingLocator(count=1, label="Post")
+        self.fuzzy = _CountingLocator(count=2, label="Add to your post")
+        self.calls: list[tuple[str, str, bool]] = []
+
+    def get_by_role(self, role: str, *, name: str, exact: bool = False):
+        self.calls.append((role, name, exact))
+        if exact and name == "Post":
+            return self.exact_post
+        return self.fuzzy
+
+
+@async_test
+async def test_click_role_prefers_exact_post_over_add_to_your_post():
+    page = _AmbiguousRolePage()
+    locator = await _resolve_role_locator(page, role="button", name="Post", exact=False)
+    assert locator is page.exact_post
+
+    ctx = BrowserRunContext(
+        page=page,
+        email="a@example.com",
+        password="secret",
+        message="hola",
+    )
+    wrapper = RunContextWrapper(context=ctx)
+    raw = await _click_role(
+        wrapper, json.dumps({"role": "button", "name": "Post", "exact": False})
+    )
+    payload = json.loads(raw)
+    assert payload["ok"] is True
+    assert page.exact_post.clicked is True
+    assert page.fuzzy.clicked is False
