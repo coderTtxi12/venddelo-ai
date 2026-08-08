@@ -11,6 +11,10 @@ from app.modules.marketing.browser.publisher import (
     PublishResult,
     StubFacebookFeedPublisher,
 )
+from app.modules.marketing.browser.session import (
+    decode_storage_state,
+    encode_storage_state,
+)
 from app.modules.marketing.crypto import build_marketing_crypto
 
 logger = logging.getLogger(__name__)
@@ -67,10 +71,8 @@ async def run_marketing_facebook_post_task(
         try:
             email = crypto.decrypt_str(agent.fb_email_encrypted)
             password = crypto.decrypt_str(agent.fb_password_encrypted)
-            storage_state = (
-                crypto.decrypt_json(agent.storage_state_encrypted)
-                if agent.storage_state_encrypted
-                else None
+            storage_state = decode_storage_state(
+                crypto, agent.storage_state_encrypted
             )
         except Exception:
             logger.exception(
@@ -99,14 +101,15 @@ async def run_marketing_facebook_post_task(
                 message=task.message,
             )
 
+            if publish_result.storage_state is not None:
+                uow.marketing.update_agent_session(
+                    agent.id,
+                    storage_state_encrypted=encode_storage_state(
+                        crypto, publish_result.storage_state
+                    ),
+                )
+
             if publish_result.ok:
-                if publish_result.storage_state is not None:
-                    uow.marketing.update_agent_session(
-                        agent.id,
-                        storage_state_encrypted=crypto.encrypt_json(
-                            publish_result.storage_state
-                        ),
-                    )
                 uow.marketing.mark_task_finished(
                     task_id,
                     status="succeeded",

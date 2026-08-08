@@ -242,3 +242,107 @@ async def test_worker_decrypt_failure_marks_task_failed(session, engine, monkeyp
         assert finished.error == "Failed to decrypt agent credentials"
 
     assert publisher.calls == []
+
+
+@requires_db
+@async_test
+async def test_worker_manual_intervention_persists_storage_state(
+    session, engine, monkeypatch
+):
+    key = Fernet.generate_key().decode()
+    monkeypatch.setenv("MARKETING_AGENT_FERNET_KEY", key)
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+
+    crypto = MarketingCrypto(key)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restaurant, agent = _seed_restaurant_and_agent(uow, crypto)
+        repo = SqlAlchemyMarketingRepository(uow.session)
+        task = repo.create_task(
+            restaurant_id=restaurant.id,
+            agent_id=agent.id,
+            message="Checkpoint path",
+        )
+        task_id = task.id
+        uow.commit()
+
+    new_state = {"cookies": [{"name": "checkpoint", "value": "1"}], "origins": []}
+    publisher = FakeFacebookFeedPublisher(
+        PublishResult(
+            ok=False,
+            needs_manual_intervention=True,
+            storage_state=new_state,
+            error="Facebook checkpoint",
+        )
+    )
+
+    await run_marketing_facebook_post_task(
+        task_id,
+        publisher=publisher,
+        uow_factory=lambda: SqlAlchemyUnitOfWork(factory),
+    )
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        finished = uow.marketing.get_task_by_id(task_id)
+        assert finished is not None
+        assert finished.status == "failed"
+        assert finished.error == "Facebook checkpoint"
+
+        updated_agent = uow.marketing.get_agent(agent.id)
+        assert updated_agent is not None
+        assert updated_agent.status == "needs_manual_intervention"
+        assert updated_agent.storage_state_encrypted is not None
+        assert crypto.decrypt_json(updated_agent.storage_state_encrypted) == new_state
+
+
+@requires_db
+@async_test
+async def test_worker_failure_persists_storage_state(session, engine, monkeypatch):
+    key = Fernet.generate_key().decode()
+    monkeypatch.setenv("MARKETING_AGENT_FERNET_KEY", key)
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+
+    crypto = MarketingCrypto(key)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restaurant, agent = _seed_restaurant_and_agent(uow, crypto)
+        repo = SqlAlchemyMarketingRepository(uow.session)
+        task = repo.create_task(
+            restaurant_id=restaurant.id,
+            agent_id=agent.id,
+            message="Failure path",
+        )
+        task_id = task.id
+        uow.commit()
+
+    new_state = {"cookies": [{"name": "partial", "value": "1"}], "origins": []}
+    publisher = FakeFacebookFeedPublisher(
+        PublishResult(
+            ok=False,
+            needs_manual_intervention=False,
+            storage_state=new_state,
+            error="Publish failed",
+        )
+    )
+
+    await run_marketing_facebook_post_task(
+        task_id,
+        publisher=publisher,
+        uow_factory=lambda: SqlAlchemyUnitOfWork(factory),
+    )
+
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        finished = uow.marketing.get_task_by_id(task_id)
+        assert finished is not None
+        assert finished.status == "failed"
+        assert finished.error == "Publish failed"
+
+        updated_agent = uow.marketing.get_agent(agent.id)
+        assert updated_agent is not None
+        assert updated_agent.status == "active"
+        assert updated_agent.storage_state_encrypted is not None
+        assert crypto.decrypt_json(updated_agent.storage_state_encrypted) == new_state
