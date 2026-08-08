@@ -9,13 +9,7 @@ from typing import Any, Literal
 
 from agents import FunctionTool, RunContextWrapper
 
-from app.core.config import Settings
-from app.core.vision.ports import VisionPort
 from app.modules.marketing.browser.a11y import capture_aria_snapshot
-from app.modules.marketing.browser.vision_observe import (
-    format_vision_for_agent,
-    observe_with_vision,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +31,6 @@ class BrowserRunContext:
     error: str | None = None
     needs_manual_intervention: bool = False
     steps: list[str] = field(default_factory=list)
-    settings: Settings | None = None
-    vision: VisionPort | None = None
 
 
 def _ok(**payload: Any) -> str:
@@ -54,9 +46,8 @@ def build_browser_tools() -> list[FunctionTool]:
         FunctionTool(
             name="observe",
             description=(
-                "Capture URL, accessibility/ARIA tree, AND a vision analysis of a "
-                "viewport screenshot (labels, blockers, suggested click targets with "
-                "x/y). Call this before deciding the next action."
+                "Capture the current page URL and accessibility/ARIA tree. "
+                "Call this before deciding the next action."
             ),
             params_json_schema={
                 "type": "object",
@@ -113,23 +104,6 @@ def build_browser_tools() -> list[FunctionTool]:
                 "additionalProperties": False,
             },
             on_invoke_tool=_click_role,
-        ),
-        FunctionTool(
-            name="click_at",
-            description=(
-                "Click at viewport pixel coordinates from vision observe targets "
-                "(x,y from top-left of the screenshot)."
-            ),
-            params_json_schema={
-                "type": "object",
-                "properties": {
-                    "x": {"type": "integer", "minimum": 0},
-                    "y": {"type": "integer", "minimum": 0},
-                },
-                "required": ["x", "y"],
-                "additionalProperties": False,
-            },
-            on_invoke_tool=_click_at,
         ),
         FunctionTool(
             name="type_text",
@@ -243,17 +217,8 @@ async def _observe(ctx: RunContextWrapper[BrowserRunContext], _args: str) -> str
     if blocked := _finished_guard(browser):
         return blocked
     snapshot = await capture_aria_snapshot(browser.page)
-    vision_payload = await observe_with_vision(
-        browser.page,
-        settings=browser.settings,
-        vision=browser.vision,
-    )
     browser.steps.append("observe")
-    return _ok(
-        snapshot=snapshot,
-        vision=format_vision_for_agent(vision_payload),
-        vision_raw=vision_payload.get("analysis"),
-    )
+    return _ok(snapshot=snapshot)
 
 
 async def _click(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
@@ -290,24 +255,6 @@ async def _click_role(ctx: RunContextWrapper[BrowserRunContext], args: str) -> s
         return _ok(clicked_role=role, name=name)
     except Exception as exc:
         return _err(str(exc), role=role, name=name)
-
-
-async def _click_at(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
-    browser = ctx.context
-    if blocked := _finished_guard(browser):
-        return blocked
-    data = json.loads(args or "{}")
-    try:
-        x = int(data["x"])
-        y = int(data["y"])
-    except (KeyError, TypeError, ValueError):
-        return _err("x and y integers are required")
-    try:
-        await browser.page.mouse.click(x, y)
-        browser.steps.append(f"click_at:{x},{y}")
-        return _ok(x=x, y=y)
-    except Exception as exc:
-        return _err(str(exc), x=x, y=y)
 
 
 async def _type_text(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
