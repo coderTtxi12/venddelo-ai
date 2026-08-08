@@ -75,7 +75,6 @@ async def run_facebook_feed_publish_agent(
         email=email,
         password=password,
         message=message,
-        settings=settings,
     )
     tools = build_browser_tools()
     agent = Agent[BrowserRunContext](
@@ -90,8 +89,10 @@ async def run_facebook_feed_publish_agent(
     )
 
     prompt = (
-        "Publish this exact message to the Facebook feed:\n\n"
-        f"{message}\n\n"
+        "Publish this exact message to the Facebook feed.\n\n"
+        "<<<MESSAGE>>>\n"
+        f"{message}\n"
+        "<<<END_MESSAGE>>>\n\n"
         "Start by observing the page, then take actions until the post is published."
     )
 
