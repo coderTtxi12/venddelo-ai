@@ -3,49 +3,29 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Any, Protocol
 
 from app.db.uow import SqlAlchemyUnitOfWork
+from app.modules.marketing.browser.publisher import (
+    FacebookFeedPublisher,
+    PlaywrightFacebookFeedPublisher,
+    PublishResult,
+    StubFacebookFeedPublisher,
+)
 from app.modules.marketing.crypto import build_marketing_crypto
 
 logger = logging.getLogger(__name__)
 
-
-@dataclass
-class PublishResult:
-    ok: bool
-    storage_state: dict[str, Any] | None
-    error: str | None = None
-    needs_manual_intervention: bool = False
-    result: dict[str, Any] | None = None
-
-
-class FacebookFeedPublisher(Protocol):
-    async def publish(
-        self,
-        *,
-        email: str,
-        password: str,
-        storage_state: dict[str, Any] | None,
-        message: str,
-    ) -> PublishResult: ...
-
-
-class StubFacebookFeedPublisher:
-    async def publish(
-        self,
-        *,
-        email: str,
-        password: str,
-        storage_state: dict[str, Any] | None,
-        message: str,
-    ) -> PublishResult:
-        return PublishResult(ok=False, storage_state=None, error="publisher not wired")
+__all__ = [
+    "FacebookFeedPublisher",
+    "PlaywrightFacebookFeedPublisher",
+    "PublishResult",
+    "StubFacebookFeedPublisher",
+    "run_marketing_facebook_post_task",
+]
 
 
 def _default_publisher() -> FacebookFeedPublisher:
-    return StubFacebookFeedPublisher()
+    return PlaywrightFacebookFeedPublisher()
 
 
 def _publisher_error_message(exc: BaseException) -> str:
@@ -84,13 +64,26 @@ async def run_marketing_facebook_post_task(
             return
 
         crypto = build_marketing_crypto()
-        email = crypto.decrypt_str(agent.fb_email_encrypted)
-        password = crypto.decrypt_str(agent.fb_password_encrypted)
-        storage_state = (
-            crypto.decrypt_json(agent.storage_state_encrypted)
-            if agent.storage_state_encrypted
-            else None
-        )
+        try:
+            email = crypto.decrypt_str(agent.fb_email_encrypted)
+            password = crypto.decrypt_str(agent.fb_password_encrypted)
+            storage_state = (
+                crypto.decrypt_json(agent.storage_state_encrypted)
+                if agent.storage_state_encrypted
+                else None
+            )
+        except Exception:
+            logger.exception(
+                "marketing facebook post credential decrypt failed task_id=%s",
+                task_id,
+            )
+            uow.marketing.mark_task_finished(
+                task_id,
+                status="failed",
+                error="Failed to decrypt agent credentials",
+            )
+            uow.commit()
+            return
 
         logger.info(
             "marketing facebook post started task_id=%s agent_id=%s",
