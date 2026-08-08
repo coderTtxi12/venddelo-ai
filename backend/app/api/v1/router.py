@@ -4,6 +4,7 @@ from app.modules.analytics.api import router as analytics_router
 from app.modules.assistant.api import router as assistant_router
 from app.modules.delivery_providers.api import router as delivery_providers_router
 from app.modules.health.api import router as health_router
+from app.modules.marketing.api import router as marketing_router
 from app.modules.menu.api import router as menu_router
 from app.modules.menu.ws import router as menu_ws_router
 from app.modules.orders.api import router as orders_router
@@ -20,6 +21,7 @@ api_v1_router.include_router(delivery_providers_router)
 api_v1_router.include_router(restaurants_router)
 api_v1_router.include_router(menu_router)
 api_v1_router.include_router(promotions_router)
+api_v1_router.include_router(marketing_router)
 api_v1_router.include_router(orders_router)
 api_v1_router.include_router(analytics_router)
 api_v1_router.include_router(orders_ws_router)

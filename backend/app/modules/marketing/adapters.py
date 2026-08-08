@@ -113,6 +113,10 @@ class SqlAlchemyMarketingRepository(MarketingRepository):
         )
         return self._task_to_dto(row) if row else None
 
+    def get_task_by_id(self, task_id: uuid.UUID) -> MarketingTaskDTO | None:
+        row = self._session.get(MarketingTask, task_id)
+        return self._task_to_dto(row) if row else None
+
     def mark_task_running(self, task_id: uuid.UUID) -> None:
         row = self._session.get(MarketingTask, task_id)
         if row is None:

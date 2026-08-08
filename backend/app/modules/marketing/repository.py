@@ -43,6 +43,9 @@ class MarketingRepository(ABC):
     ) -> MarketingTaskDTO | None: ...
 
     @abstractmethod
+    def get_task_by_id(self, task_id: uuid.UUID) -> MarketingTaskDTO | None: ...
+
+    @abstractmethod
     def mark_task_running(self, task_id: uuid.UUID) -> None: ...
 
     @abstractmethod
