@@ -10,13 +10,7 @@ from agents import FunctionTool, RunContextWrapper
 
 from app.modules.marketing.browser.a11y import capture_aria_snapshot
 
-logger = logging.getLogger(__name__)
-
 Outcome = Literal["pending", "done", "needs_help"]
-
-LOGIN_EMAIL = 'input[name="email"]'
-LOGIN_PASS = 'input[name="pass"]'
-LOGIN_SUBMIT = 'button[name="login"]'
 
 
 @dataclass
@@ -95,14 +89,6 @@ def build_browser_tools() -> list[FunctionTool]:
                         "type": "string",
                         "description": "Accessible name / visible label",
                     },
-                    "exact": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "If true, only exact name match. If false (default), "
-                            "try exact first then substring."
-                        ),
-                    },
                 },
                 "required": ["role", "name"],
                 "additionalProperties": False,
@@ -160,20 +146,6 @@ def build_browser_tools() -> list[FunctionTool]:
                 "additionalProperties": False,
             },
             on_invoke_tool=_wait,
-        ),
-        FunctionTool(
-            name="login_if_needed",
-            description=(
-                "If a Facebook login form is visible, fill credentials from the "
-                "secure server context and submit. Do not invent credentials. "
-                "Call this when you see email/password fields."
-            ),
-            params_json_schema={
-                "type": "object",
-                "properties": {},
-                "additionalProperties": False,
-            },
-            on_invoke_tool=_login_if_needed,
         ),
         FunctionTool(
             name="mark_done",
@@ -260,13 +232,10 @@ async def _click_role(ctx: RunContextWrapper[BrowserRunContext], args: str) -> s
     data = json.loads(args or "{}")
     role = str(data.get("role") or "").strip()
     name = str(data.get("name") or "").strip()
-    exact = bool(data.get("exact", False))
     if not role or not name:
         return _err("role and name are required")
     try:
-        locator = await _resolve_role_locator(
-            browser.page, role=role, name=name, exact=exact
-        )
+        locator = await _resolve_role_locator(browser.page, role=role, name=name)
         await locator.click(timeout=15_000)
         browser.steps.append(f"click_role:{role}:{name}")
         return _ok(clicked_role=role, name=name)
