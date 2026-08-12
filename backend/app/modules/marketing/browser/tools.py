@@ -332,58 +332,6 @@ async def _wait(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
     return _ok(waited_ms=ms)
 
 
-async def _find_login_fields(page: Any) -> tuple[Any, Any, Any] | None:
-    """Return (email, password, submit) locators if a login form looks visible."""
-    candidates = [
-        (
-            page.locator(LOGIN_EMAIL).first,
-            page.locator(LOGIN_PASS).first,
-            page.locator(LOGIN_SUBMIT).first,
-        ),
-        (
-            page.get_by_role("textbox", name="Correo electrónico o número de celular").first,
-            page.get_by_role("textbox", name="Contraseña").first,
-            page.get_by_role("button", name="Iniciar sesión").first,
-        ),
-        (
-            page.get_by_role("textbox", name="Email or phone number").first,
-            page.get_by_role("textbox", name="Password").first,
-            page.get_by_role("button", name="Log in").first,
-        ),
-    ]
-    for email, password, submit in candidates:
-        try:
-            if await email.is_visible() and await password.is_visible():
-                return email, password, submit
-        except Exception:
-            continue
-    return None
-
-
-async def _login_if_needed(ctx: RunContextWrapper[BrowserRunContext], _args: str) -> str:
-    browser = ctx.context
-    if blocked := _finished_guard(browser):
-        return blocked
-    page = browser.page
-    fields = await _find_login_fields(page)
-    if fields is None:
-        browser.steps.append("login_if_needed:not_needed")
-        return _ok(logged_in=False, reason="login form not visible")
-
-    email, password, submit = fields
-    try:
-        await email.fill(browser.email)
-        await password.fill(browser.password)
-        await submit.click(timeout=15_000)
-        await page.wait_for_timeout(2_000)
-        browser.steps.append("login_if_needed:submitted")
-        # Never return credentials.
-        return _ok(logged_in=True, submitted=True)
-    except Exception:
-        logger.warning("login_if_needed failed")
-        return _err("login submit failed")
-
-
 async def _mark_done(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
     data = json.loads(args or "{}")
     summary = str(data.get("summary") or "posted").strip()
