@@ -55,30 +55,30 @@ def build_browser_tools() -> list[FunctionTool]:
             },
             on_invoke_tool=_observe,
         ),
-        FunctionTool(
-            name="click",
-            description=(
-                "Click an element by CSS/Playwright selector. Examples: "
-                "'[aria-label=\"Publicar\"]', "
-                "'div[role=\"textbox\"][contenteditable=\"true\"]'."
-            ),
-            params_json_schema={
-                "type": "object",
-                "properties": {
-                    "selector": {
-                        "type": "string",
-                        "description": "CSS or Playwright selector for the element",
-                    },
-                },
-                "required": ["selector"],
-                "additionalProperties": False,
-            },
-            on_invoke_tool=_click,
-        ),
+        # FunctionTool(
+        #     name="click",
+        #     description=(
+        #         "Click an element by CSS/Playwright selector. Examples: "
+        #         "'[aria-label=\"Publicar\"]', "
+        #         "'div[role=\"textbox\"][contenteditable=\"true\"]'."
+        #     ),
+        #     params_json_schema={
+        #         "type": "object",
+        #         "properties": {
+        #             "selector": {
+        #                 "type": "string",
+        #                 "description": "CSS or Playwright selector for the element",
+        #             },
+        #         },
+        #         "required": ["selector"],
+        #         "additionalProperties": False,
+        #     },
+        #     on_invoke_tool=_click,
+        # ),
         FunctionTool(
             name="click_role",
             description=(
-                "Click by accessible role + name (best for Facebook). "
+                "Click by accessible role + name. "
                 "Tries an exact name match first (so name='Post' does not hit "
                 "'Add to your post'), then falls back to substring match. "
                 "Examples: role=button name='Post'; role=button "
