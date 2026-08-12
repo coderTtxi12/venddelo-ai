@@ -242,11 +242,9 @@ async def _click(ctx: RunContextWrapper[BrowserRunContext], args: str) -> str:
         return _err(str(exc), selector=selector)
 
 
-async def _resolve_role_locator(page: Any, *, role: str, name: str, exact: bool) -> Any:
+async def _resolve_role_locator(page: Any, *, role: str, name: str) -> Any:
     """Prefer exact accessible-name match so 'Post' != 'Add to your post'."""
     exact_locator = page.get_by_role(role, name=name, exact=True)
-    if exact:
-        return exact_locator.first
     try:
         if await exact_locator.count() > 0:
             return exact_locator.first
