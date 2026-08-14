@@ -45,7 +45,9 @@ def test_catalog_restores_single_product_tools_without_ocr_tool():
     assert {"search_products", "create_product"} <= set(TOOL_RETURNS_HINTS)
     assert "bulk_search_products" not in TOOL_RETURNS_HINTS
     assert "ocr_menu_to_bulk_products" in orchestrator_cataloged
+    assert "list_products" in orchestrator_cataloged
     assert "ocr_menu_to_bulk_products" in ORCHESTRATOR_TOOL_RETURNS_HINTS
+    assert "list_products" in ORCHESTRATOR_TOOL_RETURNS_HINTS
     assert "#### `ocr_menu_to_bulk_products` (read)" in build_orchestrator_tool_catalog(
         compact=False
     )
