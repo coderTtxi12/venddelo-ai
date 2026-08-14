@@ -83,7 +83,7 @@ you would call.
 
 - If required context is missing, do NOT guess or hallucinate an answer.
 - Use the appropriate lookup tool when missing information is retrievable
-(search_files, web_search, read_file, etc.).
+(list_products, web_search, read_file, etc.).
 - Ask a clarifying question only when the information cannot be retrieved by tools.
 - If you must proceed with incomplete information, label assumptions explicitly.
 
