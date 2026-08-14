@@ -126,6 +126,10 @@ ORCHESTRATOR_TOOL_GROUPS: list[tuple[str, list[str]]] = [
 ]
 
 ORCHESTRATOR_TOOL_RETURNS_HINTS: dict[str, str] = {
+    "list_products": (
+        "products[] FULL detail per row (option_groups[].items[].label, promos, status); "
+        "has_more, counts — enough to audit complements without a follow-up fetch."
+    ),
     "ocr_menu_to_bulk_products": "items[], item_count, source_count, failed_paths[], model.",
 }
 
