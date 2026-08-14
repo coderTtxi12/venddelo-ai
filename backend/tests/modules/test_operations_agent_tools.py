@@ -51,12 +51,22 @@ def test_catalog_agent_excludes_ocr_menu_to_bulk_products():
 def test_orchestrator_exposes_ocr_menu_to_bulk_products():
     registry = build_skill_registry(["menu_write", "menu_read"])
     names = {tool.name for tool in build_orchestrator_function_tools(registry, ["menu_write", "menu_read"])}
-    assert names == {"ocr_menu_to_bulk_products"}
+    assert names == {"ocr_menu_to_bulk_products", "list_products"}
 
 
 def test_orchestrator_ocr_tool_requires_menu_write_entitlement():
     registry = build_skill_registry(["menu_read"])
-    assert build_orchestrator_function_tools(registry, ["menu_read"]) == []
+    names = {tool.name for tool in build_orchestrator_function_tools(registry, ["menu_read"])}
+    assert names == {"list_products"}
+
+
+def test_catalog_agent_keeps_list_products_when_orchestrator_also_has_it():
+    registry = build_skill_registry(["menu_write", "menu_read"])
+    catalog_names = {
+        tool.name for tool in build_executor_function_tools(registry, ["menu_write", "menu_read"])
+    }
+    assert "list_products" in catalog_names
+    assert "ocr_menu_to_bulk_products" not in catalog_names
 
 
 def test_catalog_agent_excludes_operations_tools():
