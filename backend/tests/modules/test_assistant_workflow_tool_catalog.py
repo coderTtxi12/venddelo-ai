@@ -28,6 +28,8 @@ def test_build_orchestrator_tool_catalog_includes_ocr_tool():
     assert "### Menu OCR (orchestrator)" in catalog
     assert "`ocr_menu_to_bulk_products` [read]:" in catalog
     assert "Args: storage_paths?" in catalog
+    assert "### Read menu (orchestrator)" in catalog
+    assert "`list_products` [read]:" in catalog
 
 
 def test_catalog_restores_single_product_tools_without_ocr_tool():
