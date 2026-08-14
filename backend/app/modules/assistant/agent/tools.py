@@ -24,10 +24,18 @@ CATALOG_AGENT_EXCLUDED_TOOL_NAMES = frozenset(
     }
 )
 
-# Owned by the orchestrator directly — not delegated to catalog_agent.
+# Exclusive to the orchestrator — not available on catalog_agent.
+ORCHESTRATOR_EXCLUSIVE_TOOL_NAMES = frozenset(
+    {
+        "ocr_menu_to_bulk_products",
+    }
+)
+
+# Direct orchestrator tools (exclusive + shared reads like list_products).
 ORCHESTRATOR_DIRECT_TOOL_NAMES = frozenset(
     {
         "ocr_menu_to_bulk_products",
+        "list_products",
     }
 )
 
