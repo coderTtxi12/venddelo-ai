@@ -103,6 +103,7 @@ def build_delegate_task_tool(
             parsed = {}
         subagent_raw = parsed.get("subagent")
         task = parsed.get("task")
+        context_raw = parsed.get("context")
         if subagent_raw not in _VALID_SUBAGENTS:
             return json.dumps(
                 {
@@ -118,6 +119,11 @@ def build_delegate_task_tool(
                 {"ok": False, "summary": "task must be a non-empty string."},
                 ensure_ascii=False,
             )
+        context = (
+            context_raw.strip()
+            if isinstance(context_raw, str) and context_raw.strip()
+            else None
+        )
 
         subagent: DelegateSubagent = subagent_raw  # type: ignore[assignment]
         if delegation_state.count >= MAX_DELEGATIONS_PER_TURN:
@@ -140,6 +146,7 @@ def build_delegate_task_tool(
                 registry=registry,
                 ops_run_context=ops_run_context,
                 task=task.strip(),
+                context=context,
                 event_sink=event_sink,
             )
 
@@ -149,6 +156,7 @@ def build_delegate_task_tool(
             registry=registry,
             ops_run_context=ops_run_context,
             task=task.strip(),
+            context=context,
             event_sink=event_sink,
         )
 
@@ -216,6 +224,7 @@ async def _run_catalog_agent(
     registry: SkillRegistry,
     ops_run_context: AssistantRunContext,
     task: str,
+    context: str | None,
     event_sink: EventSink | None,
 ) -> str:
     await _emit(
@@ -229,7 +238,7 @@ async def _run_catalog_agent(
     )
     return await _run_subagent_execution(
         agent=agent,
-        agent_input=catalog_agent_input(workflow_context, task),
+        agent_input=catalog_agent_input(workflow_context, task, context_text=context),
         run_context=ops_run_context,
         max_turns=CATALOG_AGENT_MAX_TURNS,
         registry=registry,
@@ -246,6 +255,7 @@ async def _run_operations_agent(
     registry: SkillRegistry,
     ops_run_context: AssistantRunContext,
     task: str,
+    context: str | None,
     event_sink: EventSink | None,
 ) -> str:
     await _emit(
@@ -259,7 +269,7 @@ async def _run_operations_agent(
     )
     return await _run_subagent_execution(
         agent=agent,
-        agent_input=operations_agent_input(workflow_context, task),
+        agent_input=operations_agent_input(workflow_context, task, context_text=context),
         run_context=ops_run_context,
         max_turns=OPERATIONS_AGENT_MAX_TURNS,
         registry=registry,
