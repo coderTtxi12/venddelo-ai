@@ -154,7 +154,7 @@ def build_executor_function_tools(
         exclude_tool_names=(
             OPERATIONS_AGENT_TOOL_NAMES
             | CATALOG_AGENT_EXCLUDED_TOOL_NAMES
-            | ORCHESTRATOR_DIRECT_TOOL_NAMES
+            | ORCHESTRATOR_EXCLUSIVE_TOOL_NAMES
         ),
     )
 
