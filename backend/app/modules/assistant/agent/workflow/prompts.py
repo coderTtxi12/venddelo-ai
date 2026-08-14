@@ -51,11 +51,10 @@ is always better than inventing a result.
 
 # `delegate_task` Context:
 
-- **catalog_agent** — catalog data, mutations, lookups,
-  promotions, catalog images, themes, or any live catalog work.
-- **operations_agent** — business profile: name, description, location, hours, 
-  payment methods, logo/cover branding,
-  and digital-catalog QR / public link.
+- **catalog_agent** — catalog work: products/categories/complements, mutations, lookups,
+  promotions, product photos (assign/remove), AI product-image generation, themes, etc.
+- **operations_agent** — business profile: name, description, location, hours,
+  payment methods, logo/cover branding, and digital-catalog QR / public link.
 
 {_PARALLEL_TOOL_CALLS_BLOCK}
 
