@@ -112,6 +112,12 @@ TOOL_GROUPS: list[tuple[str, list[str]]] = [
 
 ORCHESTRATOR_TOOL_GROUPS: list[tuple[str, list[str]]] = [
     (
+        "Read menu (orchestrator)",
+        [
+            "list_products",
+        ],
+    ),
+    (
         "Menu OCR (orchestrator)",
         [
             "ocr_menu_to_bulk_products",
