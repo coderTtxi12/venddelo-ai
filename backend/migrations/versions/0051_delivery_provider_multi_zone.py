@@ -397,6 +397,25 @@ def downgrade() -> None:
         unique=False,
     )
 
+    connection.execute(
+        text(
+            """
+            DELETE FROM delivery_provider_pricing_configs c
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM (
+                    SELECT DISTINCT ON (delivery_provider_id) id, delivery_provider_id
+                    FROM delivery_provider_zones
+                    WHERE is_active = true
+                    ORDER BY delivery_provider_id, priority ASC, created_at ASC
+                ) pz
+                WHERE pz.delivery_provider_id = c.delivery_provider_id
+                  AND c.zone_id = pz.id
+            )
+            """
+        )
+    )
+
     op.create_unique_constraint(
         op.f("uq_delivery_provider_pricing_configs_delivery_provider_id"),
         "delivery_provider_pricing_configs",
