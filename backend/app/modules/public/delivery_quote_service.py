@@ -119,7 +119,9 @@ class PublicDeliveryQuoteService:
 
         schedules = list(self._repo.list_schedules(provider_id))
         if not schedules:
-            self._repo.seed_default_schedules(provider_id)
+            zone = self._repo.get_primary_zone(provider_id)
+            if zone is not None:
+                self._repo.seed_default_schedules(provider_id, zone.id)
             schedules = list(self._repo.list_schedules(provider_id))
 
         timezone = self._repo.get_provider_timezone(provider_id)
@@ -239,7 +241,9 @@ class PublicDeliveryQuoteService:
 
         pricing_dto = self._repo.get_pricing_config(provider_id)
         if pricing_dto is None:
-            self._repo.seed_default_pricing_config(provider_id)
+            zone = self._repo.get_primary_zone(provider_id)
+            if zone is not None:
+                self._repo.seed_default_pricing_config(provider_id, zone.id)
             pricing_dto = self._repo.get_pricing_config(provider_id)
         if pricing_dto is None:
             return ResolvedDeliveryQuote(

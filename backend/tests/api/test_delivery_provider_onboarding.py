@@ -42,8 +42,9 @@ def _clean_delivery_onboarding_tables(engine):
         conn.execute(
             text(
                 """
-                TRUNCATE delivery_provider_schedules, delivery_provider_zones,
-                         delivery_provider_members, delivery_providers, users
+                TRUNCATE delivery_provider_pricing_configs, delivery_provider_schedules,
+                         delivery_provider_zones, delivery_provider_members,
+                         delivery_providers, users
                 RESTART IDENTITY CASCADE
                 """
             )
@@ -160,9 +161,12 @@ def test_delivery_provider_me_after_onboarding(client, engine):
     assert payload["member_role"] == "owner"
     assert payload["provider"]["status"] == "pending_review"
     assert payload["provider"]["name"] == "Mexy Reparto"
-    assert payload["primary_zone"] is not None
-    assert payload["primary_zone"]["name"] == "Cobertura principal"
-    assert payload["primary_zone"]["polygon"]["type"] == "Polygon"
+    assert len(payload["zones"]) == 1
+    assert payload["zones"][0]["name"] == "Cobertura principal"
+    assert payload["zones"][0]["polygon"]["type"] == "Polygon"
+    assert payload["zones"][0]["weather_mode"] == "none"
+    assert payload["zones"][0]["service_manually_enabled"] is True
+    assert payload["zones"][0]["restaurant_count"] == 0
 
 
 @requires_db
@@ -174,28 +178,13 @@ def test_delivery_provider_profile_update(client):
     )
     assert create.status_code == 201
 
-    updated_polygon = {
-        "type": "Polygon",
-        "coordinates": [
-            [
-                [-99.1400, 19.4326],
-                [-99.1250, 19.4326],
-                [-99.1250, 19.4450],
-                [-99.1400, 19.4326],
-            ]
-        ],
-    }
-
     patch = client.patch(
         "/api/v1/delivery-providers/me",
         json={
-            **ONBOARDING_PAYLOAD,
             "company_name": "Mexy Reparto Actualizado",
             "responsible_name": "Ana García",
-            "service_zone_name": "Zona norte",
-            "service_zone_polygon": updated_polygon,
-            "center_lat": 19.438,
-            "center_lng": -99.132,
+            "responsible_phone": "+525512345678",
+            "whatsapp_phone": "+525587654321",
         },
         headers=AUTH,
     )
@@ -207,9 +196,7 @@ def test_delivery_provider_profile_update(client):
     me = client.get("/api/v1/delivery-providers/me", headers=AUTH)
     assert me.status_code == 200
     payload = me.json()
-    assert payload["primary_zone"]["name"] == "Zona norte"
-    assert payload["primary_zone"]["center_lat"] == 19.438
-    assert payload["primary_zone"]["polygon"]["coordinates"][0][0][0] == -99.14
+    assert payload["zones"][0]["name"] == "Cobertura principal"
 
 
 @requires_db

@@ -36,9 +36,12 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderServiceStatusDTO,
     DeliveryProviderServiceStatusUpdate,
     DeliveryProviderWeatherModeUpdate,
+    DeliveryProviderZoneDTO,
+    DeliveryProviderZoneWrite,
     DeliveryPricingQuoteDTO,
     DeliveryPricingSimulateRequest,
     DeliveryWeatherMode,
+    GeoJsonPolygon,
 )
 
 PAYMENT_METHOD_KEYS: frozenset[str] = frozenset({"cash", "transfer", "card_terminal"})
@@ -56,14 +59,68 @@ class DeliveryProviderService:
             self._repo.claim_admin_invites(user_id, email)
             found = self._repo.get_for_user(user_id)
         if found is None:
-            return DeliveryProviderMeResponse(provider=None, member_role=None, primary_zone=None)
+            return DeliveryProviderMeResponse(provider=None, member_role=None, zones=[])
         provider, member_role = found
-        primary_zone = self._repo.get_primary_zone(provider.id)
+        zones = list(self._repo.list_zones(provider.id))
         return DeliveryProviderMeResponse(
             provider=provider,
             member_role=member_role,
-            primary_zone=primary_zone,
+            zones=zones,
         )
+
+    def list_zones(self, user_id: uuid.UUID) -> list[DeliveryProviderZoneDTO]:
+        provider = self._require_provider(user_id)
+        return list(self._repo.list_zones(provider.id))
+
+    def get_zone(self, user_id: uuid.UUID, zone_id: uuid.UUID) -> DeliveryProviderZoneDTO:
+        provider = self._require_provider(user_id)
+        zone = self._repo.get_zone(provider.id, zone_id)
+        if zone is None:
+            raise NotFoundError("Zona no encontrada")
+        return zone
+
+    def create_zone(
+        self, user_id: uuid.UUID, data: DeliveryProviderZoneWrite
+    ) -> DeliveryProviderZoneDTO:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, member_role = found
+        require_write_provider_config(member_role)
+        name, geojson = self._validated_zone_write(data)
+        return self._repo.create_zone(
+            provider.id,
+            name=name,
+            geojson=geojson,
+            center_lat=data.center_lat,
+            center_lng=data.center_lng,
+        )
+
+    def update_zone(
+        self, user_id: uuid.UUID, zone_id: uuid.UUID, data: DeliveryProviderZoneWrite
+    ) -> DeliveryProviderZoneDTO:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, member_role = found
+        require_write_provider_config(member_role)
+        name, geojson = self._validated_zone_write(data)
+        return self._repo.update_zone(
+            provider.id,
+            zone_id,
+            name=name,
+            geojson=geojson,
+            center_lat=data.center_lat,
+            center_lng=data.center_lng,
+        )
+
+    def delete_zone(self, user_id: uuid.UUID, zone_id: uuid.UUID) -> None:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, member_role = found
+        require_write_provider_config(member_role)
+        self._repo.delete_zone(provider.id, zone_id)
 
     def list_admin_invites(self, user_id: uuid.UUID) -> list[DeliveryProviderAdminInviteDTO]:
         provider_id = self._require_owner_provider_id(user_id)
@@ -101,20 +158,8 @@ class DeliveryProviderService:
 
         provider, member_role = found
         require_write_provider_config(member_role)
-        polygon = data.service_zone_polygon
-        if polygon.type != "Polygon":
-            raise ValidationError("El cerco debe ser un polígono")
-        ring = polygon.coordinates[0] if polygon.coordinates else []
-        if len(ring) < 4:
-            raise ValidationError("Dibuja un cerco con al menos 3 puntos")
 
         logo_path = self._upload_logo_if_present(data.logo_base64, data.logo_file_name)
-        geojson = json.dumps(
-            {
-                "type": "Polygon",
-                "coordinates": polygon.coordinates,
-            }
-        )
 
         return self._repo.update_profile(
             provider.id,
@@ -123,10 +168,6 @@ class DeliveryProviderService:
             responsible_phone=data.responsible_phone.strip(),
             whatsapp_phone=data.whatsapp_phone.strip(),
             logo_path=logo_path,
-            zone_name=data.service_zone_name.strip() or "Cobertura principal",
-            zone_geojson=geojson,
-            center_lat=data.center_lat,
-            center_lng=data.center_lng,
         )
 
     def submit_onboarding(
@@ -136,11 +177,7 @@ class DeliveryProviderService:
             raise ConflictError("Ya tienes un proveedor de delivery registrado")
 
         polygon = data.service_zone_polygon
-        if polygon.type != "Polygon":
-            raise ValidationError("El cerco debe ser un polígono")
-        ring = polygon.coordinates[0] if polygon.coordinates else []
-        if len(ring) < 4:
-            raise ValidationError("Dibuja un cerco con al menos 3 puntos")
+        self._validate_zone_polygon(polygon)
 
         slug = self._generate_unique_slug(data.company_name)
         logo_path = self._upload_logo_if_present(data.logo_base64, data.logo_file_name)
@@ -206,9 +243,11 @@ class DeliveryProviderService:
             raise NotFoundError("No tienes un proveedor de delivery registrado")
 
         provider, _member_role = found
+        # Task 3: require zone_id query
         rows = list(self._repo.list_schedules(provider.id))
         if not rows:
-            self._repo.seed_default_schedules(provider.id)
+            zone_id = self._require_primary_zone_id(provider.id)
+            self._repo.seed_default_schedules(provider.id, zone_id)
             rows = list(self._repo.list_schedules(provider.id))
         return rows
 
@@ -280,7 +319,8 @@ class DeliveryProviderService:
         require_write_provider_config(member_role)
         schedules = list(self._repo.list_schedules(provider.id))
         if not schedules:
-            self._repo.seed_default_schedules(provider.id)
+            zone_id = self._require_primary_zone_id(provider.id)
+            self._repo.seed_default_schedules(provider.id, zone_id)
             schedules = list(self._repo.list_schedules(provider.id))
         self._repo.set_service_manually_enabled(provider.id, data.manually_enabled)
         return self._build_service_status(provider.id, schedules)
@@ -293,9 +333,11 @@ class DeliveryProviderService:
             raise NotFoundError("No tienes un proveedor de delivery registrado")
 
         provider, _member_role = found
+        # Task 3: require zone_id query
         schedules = list(self._repo.list_schedules(provider.id))
         if not schedules:
-            self._repo.seed_default_schedules(provider.id)
+            zone_id = self._require_primary_zone_id(provider.id)
+            self._repo.seed_default_schedules(provider.id, zone_id)
             schedules = list(self._repo.list_schedules(provider.id))
         return provider, schedules
 
@@ -322,6 +364,7 @@ class DeliveryProviderService:
 
     def get_pricing(self, user_id: uuid.UUID) -> DeliveryProviderPricingResponse:
         provider = self._require_provider(user_id)
+        # Task 3: require zone_id query
         config = self._load_pricing_config(provider.id)
         weather_mode = self._repo.get_weather_mode(provider.id)
         return DeliveryProviderPricingResponse(
@@ -427,8 +470,38 @@ class DeliveryProviderService:
     def _load_pricing_config(self, provider_id: uuid.UUID) -> DeliveryProviderPricingConfigDTO:
         config = self._repo.get_pricing_config(provider_id)
         if config is None:
-            self._repo.seed_default_pricing_config(provider_id)
+            zone_id = self._require_primary_zone_id(provider_id)
+            self._repo.seed_default_pricing_config(provider_id, zone_id)
             config = self._repo.get_pricing_config(provider_id)
         if config is None:
             raise NotFoundError("No se encontró configuración de tarifas")
         return config
+
+    def _require_primary_zone_id(self, provider_id: uuid.UUID) -> uuid.UUID:
+        zone = self._repo.get_primary_zone(provider_id)
+        if zone is None:
+            raise NotFoundError("No se encontró zona de cobertura")
+        return zone.id
+
+    def _validated_zone_write(self, data: DeliveryProviderZoneWrite) -> tuple[str, str]:
+        name = data.name.strip()
+        if not name:
+            raise ValidationError("El nombre de la zona es obligatorio")
+
+        polygon = data.polygon
+        self._validate_zone_polygon(polygon)
+        geojson = json.dumps(
+            {
+                "type": "Polygon",
+                "coordinates": polygon.coordinates,
+            }
+        )
+        return name, geojson
+
+    @staticmethod
+    def _validate_zone_polygon(polygon: GeoJsonPolygon) -> None:
+        if polygon.type != "Polygon":
+            raise ValidationError("El cerco debe ser un polígono")
+        ring = polygon.coordinates[0] if polygon.coordinates else []
+        if len(ring) < 4:
+            raise ValidationError("Dibuja un cerco con al menos 3 puntos")

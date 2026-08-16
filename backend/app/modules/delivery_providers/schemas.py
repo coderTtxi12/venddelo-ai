@@ -53,6 +53,16 @@ class DeliveryProviderZoneDTO(BaseModel):
     polygon: GeoJsonPolygon | None = None
     center_lat: float | None = None
     center_lng: float | None = None
+    weather_mode: DeliveryWeatherMode = "none"
+    service_manually_enabled: bool = True
+    restaurant_count: int = 0
+
+
+class DeliveryProviderZoneWrite(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    polygon: GeoJsonPolygon
+    center_lat: float | None = None
+    center_lng: float | None = None
 
 
 class DeliveryProviderProfileUpdate(BaseModel):
@@ -60,10 +70,6 @@ class DeliveryProviderProfileUpdate(BaseModel):
     responsible_name: str = Field(min_length=2, max_length=200)
     responsible_phone: str = Field(min_length=8, max_length=20)
     whatsapp_phone: str = Field(min_length=8, max_length=20)
-    service_zone_name: str = Field(default="Cobertura principal", max_length=200)
-    service_zone_polygon: GeoJsonPolygon
-    center_lat: float | None = None
-    center_lng: float | None = None
     logo_base64: str | None = None
     logo_file_name: str | None = None
 
@@ -71,7 +77,7 @@ class DeliveryProviderProfileUpdate(BaseModel):
 class DeliveryProviderMeResponse(BaseModel):
     provider: DeliveryProviderDTO | None
     member_role: str | None = None
-    primary_zone: DeliveryProviderZoneDTO | None = None
+    zones: list[DeliveryProviderZoneDTO] = []
 
 
 class DeliveryProviderScheduleCreate(BaseModel):

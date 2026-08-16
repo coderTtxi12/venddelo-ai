@@ -5,8 +5,11 @@ import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime, time
 
-from sqlalchemy import or_, select, text
+from sqlalchemy import func, or_, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
+from app.core.exceptions import ConflictError, NotFoundError
 
 from app.db.models.delivery import (
     DeliveryProvider,
@@ -183,26 +186,216 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         self._session.flush()
 
     def get_primary_zone(self, provider_id: uuid.UUID) -> DeliveryProviderZoneDTO | None:
+        zones = self.list_zones(provider_id)
+        return zones[0] if zones else None
+
+    def list_zones(self, provider_id: uuid.UUID) -> Sequence[DeliveryProviderZoneDTO]:
+        rows = (
+            self._session.execute(
+                text(
+                    """
+                    SELECT z.id, z.name, z.center_lat, z.center_lng,
+                           z.weather_mode, z.service_manually_enabled,
+                           ST_AsGeoJSON(z.boundary::geometry) AS boundary_geojson,
+                           COUNT(rdp.id) AS restaurant_count
+                    FROM delivery_provider_zones z
+                    LEFT JOIN restaurant_delivery_providers rdp ON rdp.zone_id = z.id
+                    WHERE z.delivery_provider_id = :provider_id AND z.is_active = true
+                    GROUP BY z.id
+                    ORDER BY z.priority ASC, z.created_at ASC
+                    """
+                ),
+                {"provider_id": str(provider_id)},
+            )
+            .mappings()
+            .all()
+        )
+        return [self._zone_dto_from_row(row) for row in rows]
+
+    def get_zone(
+        self, provider_id: uuid.UUID, zone_id: uuid.UUID
+    ) -> DeliveryProviderZoneDTO | None:
         row = (
             self._session.execute(
                 text(
                     """
-                    SELECT id, name, center_lat, center_lng,
-                           ST_AsGeoJSON(boundary::geometry) AS boundary_geojson
-                    FROM delivery_provider_zones
-                    WHERE delivery_provider_id = :provider_id AND is_active = true
-                    ORDER BY priority ASC, created_at ASC
-                    LIMIT 1
+                    SELECT z.id, z.name, z.center_lat, z.center_lng,
+                           z.weather_mode, z.service_manually_enabled,
+                           ST_AsGeoJSON(z.boundary::geometry) AS boundary_geojson,
+                           COUNT(rdp.id) AS restaurant_count
+                    FROM delivery_provider_zones z
+                    LEFT JOIN restaurant_delivery_providers rdp ON rdp.zone_id = z.id
+                    WHERE z.delivery_provider_id = :provider_id
+                      AND z.id = :zone_id
+                      AND z.is_active = true
+                    GROUP BY z.id
                     """
                 ),
-                {"provider_id": str(provider_id)},
+                {"provider_id": str(provider_id), "zone_id": str(zone_id)},
             )
             .mappings()
             .first()
         )
         if row is None:
             return None
+        return self._zone_dto_from_row(row)
 
+    def create_zone(
+        self,
+        provider_id: uuid.UUID,
+        *,
+        name: str,
+        geojson: str,
+        center_lat: float | None,
+        center_lng: float | None,
+    ) -> DeliveryProviderZoneDTO:
+        zone = DeliveryProviderZone(
+            delivery_provider_id=provider_id,
+            name=name,
+            zone_kind="polygon",
+            is_active=True,
+            priority=0,
+            center_lat=center_lat,
+            center_lng=center_lng,
+            weather_mode="none",
+            service_manually_enabled=True,
+        )
+        self._session.add(zone)
+        try:
+            self._session.flush()
+        except IntegrityError as exc:
+            self._session.rollback()
+            raise ConflictError("Ya existe una zona con ese nombre") from exc
+
+        try:
+            self._session.execute(
+                text(
+                    """
+                    UPDATE delivery_provider_zones
+                    SET boundary = ST_SetSRID(ST_GeomFromGeoJSON(:geojson), 4326)::geography
+                    WHERE id = :zone_id
+                    """
+                ),
+                {"geojson": geojson, "zone_id": str(zone.id)},
+            )
+            self._session.flush()
+        except IntegrityError as exc:
+            self._session.rollback()
+            raise ConflictError("Ya existe una zona con ese nombre") from exc
+
+        self.seed_default_schedules(provider_id, zone.id)
+        self.seed_default_pricing_config(provider_id, zone.id)
+        created = self.get_zone(provider_id, zone.id)
+        if created is None:
+            raise ValueError("Failed to load created zone")
+        return created
+
+    def update_zone(
+        self,
+        provider_id: uuid.UUID,
+        zone_id: uuid.UUID,
+        *,
+        name: str,
+        geojson: str,
+        center_lat: float | None,
+        center_lng: float | None,
+    ) -> DeliveryProviderZoneDTO:
+        zone = self._session.scalar(
+            select(DeliveryProviderZone).where(
+                DeliveryProviderZone.id == zone_id,
+                DeliveryProviderZone.delivery_provider_id == provider_id,
+                DeliveryProviderZone.is_active.is_(True),
+            )
+        )
+        if zone is None:
+            raise NotFoundError("Zona no encontrada")
+
+        zone.name = name
+        zone.center_lat = center_lat
+        zone.center_lng = center_lng
+        try:
+            self._session.flush()
+        except IntegrityError as exc:
+            self._session.rollback()
+            raise ConflictError("Ya existe una zona con ese nombre") from exc
+
+        try:
+            self._session.execute(
+                text(
+                    """
+                    UPDATE delivery_provider_zones
+                    SET boundary = ST_SetSRID(ST_GeomFromGeoJSON(:geojson), 4326)::geography,
+                        center_lat = :center_lat,
+                        center_lng = :center_lng,
+                        name = :zone_name
+                    WHERE id = :zone_id
+                    """
+                ),
+                {
+                    "geojson": geojson,
+                    "zone_id": str(zone_id),
+                    "center_lat": center_lat,
+                    "center_lng": center_lng,
+                    "zone_name": name,
+                },
+            )
+            self._session.flush()
+        except IntegrityError as exc:
+            self._session.rollback()
+            raise ConflictError("Ya existe una zona con ese nombre") from exc
+
+        updated = self.get_zone(provider_id, zone_id)
+        if updated is None:
+            raise NotFoundError("Zona no encontrada")
+        return updated
+
+    def delete_zone(self, provider_id: uuid.UUID, zone_id: uuid.UUID) -> None:
+        if self.count_zones(provider_id) <= 1:
+            raise ConflictError("Debes conservar al menos una zona")
+
+        zone = self._session.scalar(
+            select(DeliveryProviderZone).where(
+                DeliveryProviderZone.id == zone_id,
+                DeliveryProviderZone.delivery_provider_id == provider_id,
+                DeliveryProviderZone.is_active.is_(True),
+            )
+        )
+        if zone is None:
+            raise NotFoundError("Zona no encontrada")
+
+        partnership_count = self.count_partnerships_for_zone(zone_id)
+        if partnership_count > 0:
+            message = (
+                "Reasigna 1 negocio antes de eliminar esta zona"
+                if partnership_count == 1
+                else f"Reasigna {partnership_count} negocios antes de eliminar esta zona"
+            )
+            raise ConflictError(message)
+
+        self._session.delete(zone)
+        self._session.flush()
+
+    def count_partnerships_for_zone(self, zone_id: uuid.UUID) -> int:
+        count = self._session.scalar(
+            select(func.count())
+            .select_from(RestaurantDeliveryProvider)
+            .where(RestaurantDeliveryProvider.zone_id == zone_id)
+        )
+        return int(count or 0)
+
+    def count_zones(self, provider_id: uuid.UUID) -> int:
+        count = self._session.scalar(
+            select(func.count())
+            .select_from(DeliveryProviderZone)
+            .where(
+                DeliveryProviderZone.delivery_provider_id == provider_id,
+                DeliveryProviderZone.is_active.is_(True),
+            )
+        )
+        return int(count or 0)
+
+    @staticmethod
+    def _zone_dto_from_row(row) -> DeliveryProviderZoneDTO:
         polygon: GeoJsonPolygon | None = None
         raw_geojson = row["boundary_geojson"]
         if raw_geojson:
@@ -219,6 +412,9 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             polygon=polygon,
             center_lat=row["center_lat"],
             center_lng=row["center_lng"],
+            weather_mode=row["weather_mode"],
+            service_manually_enabled=row["service_manually_enabled"],
+            restaurant_count=int(row["restaurant_count"] or 0),
         )
 
     def point_in_primary_zone(
@@ -262,10 +458,6 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         responsible_phone: str,
         whatsapp_phone: str,
         logo_path: str | None,
-        zone_name: str,
-        zone_geojson: str,
-        center_lat: float | None,
-        center_lng: float | None,
     ) -> DeliveryProviderDTO:
         provider = self._session.get(DeliveryProvider, provider_id)
         if provider is None:
@@ -279,57 +471,21 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         if logo_path is not None:
             provider.logo_path = logo_path
 
-        zone = self._session.scalar(
-            select(DeliveryProviderZone)
-            .where(
-                DeliveryProviderZone.delivery_provider_id == provider_id,
-                DeliveryProviderZone.is_active.is_(True),
-            )
-            .order_by(DeliveryProviderZone.priority.asc(), DeliveryProviderZone.created_at.asc())
-            .limit(1)
-        )
-        if zone is None:
-            zone = DeliveryProviderZone(
-                delivery_provider_id=provider_id,
-                name=zone_name,
-                zone_kind="polygon",
-                is_active=True,
-                priority=0,
-            )
-            self._session.add(zone)
-            self._session.flush()
-        else:
-            zone.name = zone_name
-            zone.center_lat = center_lat
-            zone.center_lng = center_lng
-
-        self._session.execute(
-            text(
-                """
-                UPDATE delivery_provider_zones
-                SET boundary = ST_SetSRID(ST_GeomFromGeoJSON(:geojson), 4326)::geography,
-                    center_lat = :center_lat,
-                    center_lng = :center_lng,
-                    name = :zone_name
-                WHERE id = :zone_id
-                """
-            ),
-            {
-                "geojson": zone_geojson,
-                "zone_id": str(zone.id),
-                "center_lat": center_lat,
-                "center_lng": center_lng,
-                "zone_name": zone_name,
-            },
-        )
         self._session.flush()
         self._session.refresh(provider)
         return DeliveryProviderDTO.model_validate(provider)
 
     def list_schedules(self, provider_id: uuid.UUID) -> Sequence[DeliveryProviderScheduleDTO]:
+        zone_id = self._primary_zone_id(provider_id)
+        if zone_id is None:
+            return []
+
         rows = self._session.scalars(
             select(DeliveryProviderSchedule)
-            .where(DeliveryProviderSchedule.delivery_provider_id == provider_id)
+            .where(
+                DeliveryProviderSchedule.delivery_provider_id == provider_id,
+                DeliveryProviderSchedule.zone_id == zone_id,
+            )
             .order_by(
                 DeliveryProviderSchedule.schedule_kind.asc(),
                 DeliveryProviderSchedule.day_of_week.asc(),
@@ -348,7 +504,8 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             raise ValueError("Delivery provider has no active zone")
 
         self._session.query(DeliveryProviderSchedule).filter_by(
-            delivery_provider_id=provider_id
+            delivery_provider_id=provider_id,
+            zone_id=zone_id,
         ).delete()
         for entry in schedules:
             self._session.add(
@@ -363,16 +520,10 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             )
         self._session.flush()
 
-    def seed_default_schedules(
-        self, provider_id: uuid.UUID, zone_id: uuid.UUID | None = None
-    ) -> None:
-        resolved_zone_id = zone_id or self._primary_zone_id(provider_id)
-        if resolved_zone_id is None:
-            return
-
+    def seed_default_schedules(self, provider_id: uuid.UUID, zone_id: uuid.UUID) -> None:
         existing = self._session.scalar(
             select(DeliveryProviderSchedule.id)
-            .where(DeliveryProviderSchedule.delivery_provider_id == provider_id)
+            .where(DeliveryProviderSchedule.zone_id == zone_id)
             .limit(1)
         )
         if existing is not None:
@@ -383,7 +534,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
                 self._session.add(
                     DeliveryProviderSchedule(
                         delivery_provider_id=provider_id,
-                        zone_id=resolved_zone_id,
+                        zone_id=zone_id,
                         schedule_kind=schedule_kind,
                         day_of_week=day_of_week,
                         opens_at=opens_at,
@@ -413,9 +564,14 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         return provider.timezone
 
     def get_pricing_config(self, provider_id: uuid.UUID) -> DeliveryProviderPricingConfigDTO | None:
+        zone_id = self._primary_zone_id(provider_id)
+        if zone_id is None:
+            return None
+
         row = self._session.scalar(
             select(DeliveryProviderPricingConfig).where(
-                DeliveryProviderPricingConfig.delivery_provider_id == provider_id
+                DeliveryProviderPricingConfig.delivery_provider_id == provider_id,
+                DeliveryProviderPricingConfig.zone_id == zone_id,
             )
         )
         if row is None:
@@ -427,7 +583,8 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
     ) -> DeliveryProviderPricingConfigDTO:
         row = self._session.scalar(
             select(DeliveryProviderPricingConfig).where(
-                DeliveryProviderPricingConfig.delivery_provider_id == provider_id
+                DeliveryProviderPricingConfig.delivery_provider_id == provider_id,
+                DeliveryProviderPricingConfig.zone_id == zone_id,
             )
         )
         payload = config_to_json(self._pricing_config_from_dto(config))
@@ -448,16 +605,10 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         self._session.flush()
         return self._pricing_dto_from_row(row)
 
-    def seed_default_pricing_config(
-        self, provider_id: uuid.UUID, zone_id: uuid.UUID | None = None
-    ) -> None:
-        resolved_zone_id = zone_id or self._primary_zone_id(provider_id)
-        if resolved_zone_id is None:
-            return
-
+    def seed_default_pricing_config(self, provider_id: uuid.UUID, zone_id: uuid.UUID) -> None:
         existing = self._session.scalar(
             select(DeliveryProviderPricingConfig.id).where(
-                DeliveryProviderPricingConfig.delivery_provider_id == provider_id
+                DeliveryProviderPricingConfig.zone_id == zone_id
             )
         )
         if existing is not None:
@@ -468,7 +619,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         self._session.add(
             DeliveryProviderPricingConfig(
                 delivery_provider_id=provider_id,
-                zone_id=resolved_zone_id,
+                zone_id=zone_id,
                 inside_polygon=payload["inside_polygon"],  # type: ignore[arg-type]
                 outside_polygon=payload["outside_polygon"],  # type: ignore[arg-type]
             )

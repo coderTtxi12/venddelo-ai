@@ -24,6 +24,8 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderPricingResponse,
     DeliveryProviderPricingUpdate,
     DeliveryProviderWeatherModeUpdate,
+    DeliveryProviderZoneDTO,
+    DeliveryProviderZoneWrite,
     DeliveryPricingQuoteDTO,
     DeliveryPricingSimulateRequest,
 )
@@ -78,6 +80,55 @@ def update_my_delivery_provider(
     service: DeliveryProviderService = Depends(_service),
 ) -> DeliveryProviderDTO:
     return service.update_profile(user.id, data)
+
+
+@router.get("/me/zones", response_model=list[DeliveryProviderZoneDTO])
+def list_my_delivery_provider_zones(
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> list[DeliveryProviderZoneDTO]:
+    return service.list_zones(user.id)
+
+
+@router.post(
+    "/me/zones",
+    response_model=DeliveryProviderZoneDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_my_delivery_provider_zone(
+    data: DeliveryProviderZoneWrite,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> DeliveryProviderZoneDTO:
+    return service.create_zone(user.id, data)
+
+
+@router.get("/me/zones/{zone_id}", response_model=DeliveryProviderZoneDTO)
+def get_my_delivery_provider_zone(
+    zone_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> DeliveryProviderZoneDTO:
+    return service.get_zone(user.id, zone_id)
+
+
+@router.patch("/me/zones/{zone_id}", response_model=DeliveryProviderZoneDTO)
+def update_my_delivery_provider_zone(
+    zone_id: UUID,
+    data: DeliveryProviderZoneWrite,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> DeliveryProviderZoneDTO:
+    return service.update_zone(user.id, zone_id, data)
+
+
+@router.delete("/me/zones/{zone_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_delivery_provider_zone(
+    zone_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> None:
+    service.delete_zone(user.id, zone_id)
 
 
 @router.get("/me/admin-invites", response_model=list[DeliveryProviderAdminInviteDTO])

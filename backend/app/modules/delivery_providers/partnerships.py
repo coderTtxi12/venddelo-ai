@@ -61,7 +61,9 @@ class DeliveryPartnershipService:
             return []
         rows = list(self._repo.list_schedules(provider_id))
         if not rows:
-            self._repo.seed_default_schedules(provider_id)
+            zone = self._repo.get_primary_zone(provider_id)
+            if zone is not None:
+                self._repo.seed_default_schedules(provider_id, zone.id)
             rows = list(self._repo.list_schedules(provider_id))
         return rows
 

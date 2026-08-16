@@ -125,8 +125,6 @@ def test_operator_cannot_update_profile(client):
                 "responsible_name": "Nombre",
                 "responsible_phone": "+525512345678",
                 "whatsapp_phone": "+525512345678",
-                "service_zone_name": "Zona",
-                "service_zone_polygon": ONBOARDING_PAYLOAD["service_zone_polygon"],
             },
             headers=AUTH,
         )

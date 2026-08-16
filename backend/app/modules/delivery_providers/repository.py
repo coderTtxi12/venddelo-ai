@@ -50,6 +50,46 @@ class DeliveryProviderRepository(ABC):
     def get_primary_zone(self, provider_id: uuid.UUID) -> DeliveryProviderZoneDTO | None: ...
 
     @abstractmethod
+    def list_zones(self, provider_id: uuid.UUID) -> Sequence[DeliveryProviderZoneDTO]: ...
+
+    @abstractmethod
+    def get_zone(
+        self, provider_id: uuid.UUID, zone_id: uuid.UUID
+    ) -> DeliveryProviderZoneDTO | None: ...
+
+    @abstractmethod
+    def create_zone(
+        self,
+        provider_id: uuid.UUID,
+        *,
+        name: str,
+        geojson: str,
+        center_lat: float | None,
+        center_lng: float | None,
+    ) -> DeliveryProviderZoneDTO: ...
+
+    @abstractmethod
+    def update_zone(
+        self,
+        provider_id: uuid.UUID,
+        zone_id: uuid.UUID,
+        *,
+        name: str,
+        geojson: str,
+        center_lat: float | None,
+        center_lng: float | None,
+    ) -> DeliveryProviderZoneDTO: ...
+
+    @abstractmethod
+    def delete_zone(self, provider_id: uuid.UUID, zone_id: uuid.UUID) -> None: ...
+
+    @abstractmethod
+    def count_partnerships_for_zone(self, zone_id: uuid.UUID) -> int: ...
+
+    @abstractmethod
+    def count_zones(self, provider_id: uuid.UUID) -> int: ...
+
+    @abstractmethod
     def point_in_primary_zone(
         self, provider_id: uuid.UUID, latitude: float, longitude: float
     ) -> bool: ...
@@ -64,10 +104,6 @@ class DeliveryProviderRepository(ABC):
         responsible_phone: str,
         whatsapp_phone: str,
         logo_path: str | None,
-        zone_name: str,
-        zone_geojson: str,
-        center_lat: float | None,
-        center_lng: float | None,
     ) -> DeliveryProviderDTO: ...
 
     @abstractmethod
@@ -81,9 +117,7 @@ class DeliveryProviderRepository(ABC):
     ) -> None: ...
 
     @abstractmethod
-    def seed_default_schedules(
-        self, provider_id: uuid.UUID, zone_id: uuid.UUID | None = None
-    ) -> None: ...
+    def seed_default_schedules(self, provider_id: uuid.UUID, zone_id: uuid.UUID) -> None: ...
 
     @abstractmethod
     def get_service_manually_enabled(self, provider_id: uuid.UUID) -> bool: ...
@@ -103,9 +137,7 @@ class DeliveryProviderRepository(ABC):
     ) -> DeliveryProviderPricingConfigDTO: ...
 
     @abstractmethod
-    def seed_default_pricing_config(
-        self, provider_id: uuid.UUID, zone_id: uuid.UUID | None = None
-    ) -> None: ...
+    def seed_default_pricing_config(self, provider_id: uuid.UUID, zone_id: uuid.UUID) -> None: ...
 
     @abstractmethod
     def list_payment_methods(
