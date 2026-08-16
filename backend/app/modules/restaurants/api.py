@@ -94,6 +94,7 @@ def list_my_restaurants(
 def get_mexy_coverage(
     latitude: float | None = Query(None),
     longitude: float | None = Query(None),
+    user: UserDTO = Depends(get_synced_user),
     partnership: DeliveryPartnershipService = Depends(_partnership_service),
 ) -> MexyCoverageResponse:
     if latitude is None or longitude is None:
