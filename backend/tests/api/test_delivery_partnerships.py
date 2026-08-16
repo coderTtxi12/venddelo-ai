@@ -10,6 +10,8 @@ from tests.api.test_delivery_provider_onboarding import ONBOARDING_PAYLOAD
 from tests.conftest import requires_db
 
 MEXY_USER = uuid.UUID("33333333-3333-3333-3333-333333333333")
+COVERED_LAT = 19.4326
+COVERED_LNG = -99.1332
 
 
 @pytest.fixture(autouse=True)
@@ -82,16 +84,19 @@ def test_onboarding_with_delivery_creates_mexy_partnership_request(client, engin
         assert link is not None
         assert link.status == "pending"
         assert link.is_default is False
+        assert link.zone_id is not None
 
 
 @requires_db
-def test_request_partnership_creates_mexy_provider_when_missing(client, engine):
+def test_request_partnership_without_coverage_returns_null(client, engine):
     create_resp = client.post(
         "/api/v1/restaurants",
         json={
             "name": "Auto Mexy",
             "subdomain": "auto-mexy",
             "delivery_enabled": True,
+            "latitude": 0.0,
+            "longitude": 0.0,
         },
         headers=AUTH,
     )
@@ -103,18 +108,17 @@ def test_request_partnership_creates_mexy_provider_when_missing(client, engine):
     )
     assert request_resp.status_code == 200
     body = request_resp.json()
-    assert body["partnership"] is not None
-    assert body["partnership"]["status"] == "pending"
-    assert body["partnership"]["provider_name"] == "Mexy Reparto"
+    assert body["partnership"] is None
 
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     with factory() as session:
         from app.db.models.delivery import DeliveryProvider
 
+        assert session.query(RestaurantDeliveryProvider).count() == 0
         provider = session.scalar(
             select(DeliveryProvider).where(DeliveryProvider.slug == "mexy-reparto")
         )
-        assert provider is not None
+        assert provider is None
 
 
 @requires_db
@@ -127,6 +131,8 @@ def test_restaurant_can_read_delivery_partnership_status(client, engine):
             "name": "Status Check",
             "subdomain": "status-check",
             "delivery_enabled": True,
+            "latitude": COVERED_LAT,
+            "longitude": COVERED_LNG,
         },
         headers=AUTH,
     )
@@ -175,6 +181,8 @@ def test_enabling_delivery_later_creates_mexy_request(client, engine):
             "name": "Toggle Delivery",
             "subdomain": "toggle-delivery",
             "delivery_enabled": False,
+            "latitude": COVERED_LAT,
+            "longitude": COVERED_LNG,
         },
         headers=AUTH,
     )
@@ -257,6 +265,8 @@ def test_accepting_partnership_clears_duplicate_pending_requests(client, engine)
             "subdomain": "wild-rooster-dup",
             "delivery_enabled": True,
             "address": "Calle Principal 1",
+            "latitude": COVERED_LAT,
+            "longitude": COVERED_LNG,
         },
         headers=AUTH,
     )
@@ -264,7 +274,14 @@ def test_accepting_partnership_clears_duplicate_pending_requests(client, engine)
 
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     with factory() as session:
-        from app.db.models.delivery import DeliveryProvider
+        from app.db.models.delivery import DeliveryProvider, DeliveryProviderZone
+
+        legacy_zone = session.scalar(
+            select(DeliveryProviderZone).where(
+                DeliveryProviderZone.delivery_provider_id == provider_id
+            )
+        )
+        assert legacy_zone is not None
 
         legacy_provider = DeliveryProvider(
             name="Mexy Legacy",
@@ -280,6 +297,7 @@ def test_accepting_partnership_clears_duplicate_pending_requests(client, engine)
             RestaurantDeliveryProvider(
                 restaurant_id=restaurant_id,
                 delivery_provider_id=legacy_provider.id,
+                zone_id=legacy_zone.id,
                 status="pending",
                 is_default=False,
             )
@@ -326,12 +344,16 @@ def test_accepting_partnership_clears_duplicate_pending_requests(client, engine)
 
 @requires_db
 def test_delivery_provider_member_sees_platform_requests_with_non_mexy_slug(client, engine):
+    _create_mexy_provider(client)
+
     create_resp = client.post(
         "/api/v1/restaurants",
         json={
             "name": "Non Mexy Slug",
             "subdomain": "non-mexy-slug",
             "delivery_enabled": True,
+            "latitude": COVERED_LAT,
+            "longitude": COVERED_LNG,
         },
         headers=AUTH,
     )
@@ -341,6 +363,7 @@ def test_delivery_provider_member_sees_platform_requests_with_non_mexy_slug(clie
         headers=AUTH,
     )
     assert request_resp.status_code == 200
+    assert request_resp.json()["partnership"] is not None
 
     from app.api.deps import get_auth
     from app.core.security import AuthenticatedUser, AuthPort
@@ -374,12 +397,16 @@ def test_delivery_provider_member_sees_platform_requests_with_non_mexy_slug(clie
 
 @requires_db
 def test_mexy_courier_sees_requests_on_platform_provider(client, engine):
+    platform_provider_id = _create_mexy_provider(client)
+
     create_resp = client.post(
         "/api/v1/restaurants",
         json={
             "name": "Platform Link",
             "subdomain": "platform-link",
             "delivery_enabled": True,
+            "latitude": COVERED_LAT,
+            "longitude": COVERED_LNG,
         },
         headers=AUTH,
     )
@@ -390,8 +417,9 @@ def test_mexy_courier_sees_requests_on_platform_provider(client, engine):
         headers=AUTH,
     )
     assert request_resp.status_code == 200
+    assert request_resp.json()["partnership"] is not None
 
-    courier_provider_id = _create_mexy_provider(client)
+    courier_provider_id = platform_provider_id
 
     from app.api.deps import get_auth
     from app.core.security import AuthenticatedUser, AuthPort
@@ -413,11 +441,11 @@ def test_mexy_courier_sees_requests_on_platform_provider(client, engine):
     with factory() as session:
         from app.db.models.delivery import DeliveryProvider
 
-        platform_id = session.scalar(
+        provider_ids = session.scalars(
             select(DeliveryProvider.id).where(DeliveryProvider.slug == "mexy-reparto")
-        )
-        assert platform_id is not None
-        assert courier_provider_id != platform_id
+        ).all()
+        assert len(provider_ids) == 1
+        assert provider_ids[0] == courier_provider_id
 
     app.dependency_overrides[get_auth] = lambda: __import__(
         "tests.api.test_api_v1", fromlist=["FakeAuth"]
@@ -435,6 +463,8 @@ def test_provider_lists_accepts_and_rejects_partnership_requests(client, engine)
             "subdomain": "bistro-norte",
             "delivery_enabled": True,
             "address": "Calle Norte 45",
+            "latitude": COVERED_LAT,
+            "longitude": COVERED_LNG,
             "whatsapp_phone": "+525512345678",
             "owner_contact_name": "Ana Dueña",
             "owner_phone": "+525598765432",
@@ -518,6 +548,8 @@ def test_provider_lists_accepts_and_rejects_partnership_requests(client, engine)
             "name": "Rechazado",
             "subdomain": "rechazado",
             "delivery_enabled": True,
+            "latitude": COVERED_LAT,
+            "longitude": COVERED_LNG,
         },
         headers=AUTH,
     )
@@ -564,6 +596,8 @@ def test_restaurant_reads_provider_schedules_and_payments_when_partnership_activ
             "name": "Provider Data Bistro",
             "subdomain": "provider-data-bistro",
             "delivery_enabled": True,
+            "latitude": COVERED_LAT,
+            "longitude": COVERED_LNG,
         },
         headers=AUTH,
     )
@@ -610,6 +644,8 @@ def test_restaurant_provider_data_empty_when_partnership_pending(client, engine)
             "name": "Pending Bistro",
             "subdomain": "pending-bistro",
             "delivery_enabled": True,
+            "latitude": COVERED_LAT,
+            "longitude": COVERED_LNG,
         },
         headers=AUTH,
     )
@@ -644,6 +680,8 @@ def test_restaurant_cannot_enable_delivery_payment_unavailable_from_provider(cli
             "name": "Payment Guard Bistro",
             "subdomain": "payment-guard-bistro",
             "delivery_enabled": True,
+            "latitude": COVERED_LAT,
+            "longitude": COVERED_LNG,
         },
         headers=AUTH,
     )

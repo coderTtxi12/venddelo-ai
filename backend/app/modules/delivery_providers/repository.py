@@ -4,6 +4,7 @@ import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
+from app.modules.delivery_providers.matching import MexyZoneMatchCandidate
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
     DeliveryProviderAdminInviteCreate,
@@ -177,8 +178,13 @@ class DeliveryProviderRepository(ABC):
 
     @abstractmethod
     def ensure_partnership_request(
-        self, restaurant_id: uuid.UUID, provider_id: uuid.UUID
+        self, restaurant_id: uuid.UUID, provider_id: uuid.UUID, zone_id: uuid.UUID
     ) -> bool: ...
+
+    @abstractmethod
+    def list_mexy_zone_match_candidates(
+        self, latitude: float, longitude: float
+    ) -> Sequence[MexyZoneMatchCandidate]: ...
 
     @abstractmethod
     def list_pending_partnership_requests(

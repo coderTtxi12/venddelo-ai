@@ -8,6 +8,7 @@ from app.api.deps import (
     pagination_params,
     require_owned_restaurant,
 )
+from app.core.exceptions import ValidationError
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
@@ -31,6 +32,7 @@ from app.modules.restaurants.schemas import (
 from app.modules.delivery_providers.schemas import (
     DeliveryProviderPaymentMethodDTO,
     DeliveryProviderScheduleDTO,
+    MexyCoverageResponse,
     RestaurantDeliveryPartnershipResponse,
 )
 from app.modules.restaurants.service import RestaurantService
@@ -86,6 +88,17 @@ def list_my_restaurants(
     service: RestaurantService = Depends(_service),
 ) -> CursorPage[RestaurantDTO]:
     return service.list_for_owner(user.id, params)
+
+
+@router.get("/mexy-coverage", response_model=MexyCoverageResponse)
+def get_mexy_coverage(
+    latitude: float | None = Query(None),
+    longitude: float | None = Query(None),
+    partnership: DeliveryPartnershipService = Depends(_partnership_service),
+) -> MexyCoverageResponse:
+    if latitude is None or longitude is None:
+        raise ValidationError("El negocio no tiene ubicación")
+    return partnership.get_mexy_coverage(latitude, longitude)
 
 
 @router.get("/check-subdomain", response_model=SubdomainAvailabilityDTO)

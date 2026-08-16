@@ -223,6 +223,17 @@ class RestaurantDeliveryPartnershipResponse(BaseModel):
     partnership: RestaurantDeliveryPartnershipDTO | None = None
 
 
+class MexyCoverageZoneDTO(BaseModel):
+    id: uuid.UUID
+    name: str
+    provider_name: str
+
+
+class MexyCoverageResponse(BaseModel):
+    zone: MexyCoverageZoneDTO | None = None
+    distance_km: float | None = None
+
+
 class DeliveryProviderAdminInviteDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -30,6 +30,7 @@ from app.modules.delivery_providers.constants import (
     MEXY_PROVIDER_SLUG_PREFIX,
     is_mexy_provider_slug,
 )
+from app.modules.delivery_providers.matching import MexyZoneMatchCandidate
 from app.modules.delivery_providers.pricing import (
     config_from_json,
     config_to_json,
@@ -808,7 +809,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         return provider.id
 
     def ensure_partnership_request(
-        self, restaurant_id: uuid.UUID, provider_id: uuid.UUID
+        self, restaurant_id: uuid.UUID, provider_id: uuid.UUID, zone_id: uuid.UUID
     ) -> bool:
         existing = self._session.scalar(
             select(RestaurantDeliveryProvider).where(
@@ -822,12 +823,60 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         link = RestaurantDeliveryProvider(
             restaurant_id=restaurant_id,
             delivery_provider_id=provider_id,
+            zone_id=zone_id,
             status="pending",
             is_default=False,
         )
         self._session.add(link)
         self._session.flush()
         return True
+
+    def list_mexy_zone_match_candidates(
+        self, latitude: float, longitude: float
+    ) -> Sequence[MexyZoneMatchCandidate]:
+        rows = self._session.execute(
+            text(
+                """
+                SELECT z.id,
+                       z.name,
+                       z.delivery_provider_id,
+                       z.priority,
+                       z.created_at,
+                       p.name AS provider_name,
+                       ST_Distance(
+                         z.boundary,
+                         ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
+                       ) AS distance_m,
+                       (pc.outside_polygon->>'max_distance_km')::float AS max_km
+                FROM delivery_provider_zones z
+                JOIN delivery_providers p ON p.id = z.delivery_provider_id
+                JOIN delivery_provider_pricing_configs pc ON pc.zone_id = z.id
+                WHERE z.is_active = true
+                  AND z.boundary IS NOT NULL
+                  AND (p.slug = :legacy_slug OR p.slug LIKE :slug_pattern)
+                """
+            ),
+            {
+                "lat": latitude,
+                "lng": longitude,
+                "legacy_slug": MEXY_LEGACY_SLUG,
+                "slug_pattern": f"{MEXY_PROVIDER_SLUG_PREFIX}%",
+            },
+        ).mappings()
+
+        return [
+            MexyZoneMatchCandidate(
+                id=row["id"],
+                name=row["name"],
+                provider_id=row["delivery_provider_id"],
+                provider_name=row["provider_name"],
+                priority=int(row["priority"]),
+                created_at=row["created_at"],
+                distance_km=float(row["distance_m"]) / 1000.0,
+                max_km=float(row["max_km"]),
+            )
+            for row in rows
+        ]
 
     def list_pending_partnership_requests(
         self, provider_id: uuid.UUID

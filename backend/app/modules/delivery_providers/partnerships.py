@@ -4,12 +4,14 @@ import uuid
 from collections.abc import Sequence
 
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
+from app.modules.delivery_providers.matching import match_mexy_zone
 from app.modules.delivery_providers.permissions import require_manage_partnerships
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
     DeliveryProviderPaymentMethodDTO,
     DeliveryProviderScheduleDTO,
+    MexyCoverageResponse,
     RestaurantDeliveryPartnershipDTO,
     RestaurantDeliveryPartnershipResponse,
 )
@@ -32,8 +34,39 @@ class DeliveryPartnershipService:
     def ensure_mexy_request_for_restaurant(self, restaurant_id: uuid.UUID) -> bool:
         if self._repo.get_mexy_partnership_for_restaurant(restaurant_id) is not None:
             return False
-        provider_id = self._repo.get_or_create_mexy_provider_id()
-        return self._repo.ensure_partnership_request(restaurant_id, provider_id)
+        if self._restaurant_repo is None:
+            return False
+
+        restaurant = self._restaurant_repo.get(restaurant_id)
+        if (
+            restaurant is None
+            or restaurant.latitude is None
+            or restaurant.longitude is None
+        ):
+            return False
+
+        matched = match_mexy_zone(
+            self._repo.list_mexy_zone_match_candidates(
+                restaurant.latitude,
+                restaurant.longitude,
+            )
+        )
+        if matched is None:
+            return False
+
+        _zone, _distance_km, provider_id, zone_id = matched
+        return self._repo.ensure_partnership_request(restaurant_id, provider_id, zone_id)
+
+    def get_mexy_coverage(
+        self, latitude: float, longitude: float
+    ) -> MexyCoverageResponse:
+        matched = match_mexy_zone(
+            self._repo.list_mexy_zone_match_candidates(latitude, longitude)
+        )
+        if matched is None:
+            return MexyCoverageResponse(zone=None, distance_km=None)
+        zone, distance_km, _provider_id, _zone_id = matched
+        return MexyCoverageResponse(zone=zone, distance_km=distance_km)
 
     def request_mexy_partnership(
         self, restaurant_id: uuid.UUID, *, delivery_enabled: bool
