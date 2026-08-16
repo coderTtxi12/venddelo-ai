@@ -180,7 +180,10 @@ export default function HoursPage() {
                   restaurant.takeout_enabled ? styles.deliveryBlock : styles.deliveryBlockOnly
                 }
               >
-                <DeliveryPartnershipStatus partnership={deliveryPartnership} />
+                <DeliveryPartnershipStatus
+                  partnership={deliveryPartnership}
+                  deliveryEnabled={restaurant.delivery_enabled}
+                />
                 <div className={styles.deliveryHoursEmbed}>
                   <DashboardRestaurantHours
                     section="delivery"

@@ -987,6 +987,7 @@ export default function SettingsPage() {
         {deliveryEnabled ? (
           <DeliveryPartnershipStatus
             partnership={deliveryPartnership}
+            deliveryEnabled={deliveryEnabled}
             loading={deliveryPartnershipLoading}
             requestError={deliveryPartnershipError}
           />

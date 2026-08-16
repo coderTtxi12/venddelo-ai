@@ -103,6 +103,8 @@ export type RestaurantDeliveryPartnership = {
   id: string;
   provider_name: string;
   provider_slug: string;
+  zone_id: string | null;
+  zone_name: string | null;
   status: 'pending' | 'active' | 'suspended';
   is_default: boolean;
   created_at: string;
