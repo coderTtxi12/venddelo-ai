@@ -76,6 +76,11 @@ def _invite_and_claim_operator(client, provider_id: uuid.UUID) -> None:
         app.dependency_overrides.pop(get_auth, None)
 
 
+def _primary_zone_id(client) -> str:
+    zones = client.get("/api/v1/delivery-providers/me/zones", headers=AUTH).json()
+    return zones[0]["id"]
+
+
 @requires_db
 def test_owner_can_invite_operator(client, engine):
     _create_provider(client)
@@ -137,6 +142,7 @@ def test_operator_cannot_update_profile(client):
 def test_operator_can_update_weather_mode(client):
     provider_id = _create_provider(client)
     _invite_and_claim_operator(client, provider_id)
+    zone_id = _primary_zone_id(client)
 
     app.dependency_overrides[get_auth] = lambda: FakeAuth(
         user_id=OPERATOR,
@@ -144,7 +150,7 @@ def test_operator_can_update_weather_mode(client):
     )
     try:
         updated = client.patch(
-            "/api/v1/delivery-providers/me/pricing/weather-mode",
+            f"/api/v1/delivery-providers/me/pricing/weather-mode?zone_id={zone_id}",
             json={"weather_mode": "light"},
             headers=AUTH,
         )
@@ -154,10 +160,39 @@ def test_operator_can_update_weather_mode(client):
         app.dependency_overrides.pop(get_auth, None)
 
 
+def _default_pricing_update_payload() -> dict:
+    from app.modules.delivery_providers.pricing import config_to_json, default_pricing_config
+
+    return {"config": config_to_json(default_pricing_config())}
+
+
+@requires_db
+def test_operator_cannot_update_pricing(client):
+    provider_id = _create_provider(client)
+    _invite_and_claim_operator(client, provider_id)
+    zone_id = _primary_zone_id(client)
+
+    app.dependency_overrides[get_auth] = lambda: FakeAuth(
+        user_id=OPERATOR,
+        email="operador@empresa.com",
+    )
+    try:
+        blocked = client.put(
+            f"/api/v1/delivery-providers/me/pricing?zone_id={zone_id}",
+            json=_default_pricing_update_payload(),
+            headers=AUTH,
+        )
+        assert blocked.status_code == 403
+        assert blocked.json()["error"]["message"] == "Tu rol no permite modificar esta configuración"
+    finally:
+        app.dependency_overrides.pop(get_auth, None)
+
+
 @requires_db
 def test_operator_can_simulate_pricing(client):
     provider_id = _create_provider(client)
     _invite_and_claim_operator(client, provider_id)
+    zone_id = _primary_zone_id(client)
 
     app.dependency_overrides[get_auth] = lambda: FakeAuth(
         user_id=OPERATOR,
@@ -165,7 +200,7 @@ def test_operator_can_simulate_pricing(client):
     )
     try:
         quote = client.post(
-            "/api/v1/delivery-providers/me/pricing/simulate",
+            f"/api/v1/delivery-providers/me/pricing/simulate?zone_id={zone_id}",
             json={"inside_polygon": True, "is_night": False},
             headers=AUTH,
         )

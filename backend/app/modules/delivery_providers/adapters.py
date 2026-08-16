@@ -475,17 +475,21 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         self._session.refresh(provider)
         return DeliveryProviderDTO.model_validate(provider)
 
-    def list_schedules(self, provider_id: uuid.UUID) -> Sequence[DeliveryProviderScheduleDTO]:
-        zone_id = self._primary_zone_id(provider_id)
-        if zone_id is None:
-            return []
+    def assert_zone_on_provider(self, provider_id: uuid.UUID, zone_id: uuid.UUID) -> None:
+        zone = self._session.scalar(
+            select(DeliveryProviderZone.id).where(
+                DeliveryProviderZone.id == zone_id,
+                DeliveryProviderZone.delivery_provider_id == provider_id,
+                DeliveryProviderZone.is_active.is_(True),
+            )
+        )
+        if zone is None:
+            raise NotFoundError("Zona no encontrada")
 
+    def list_schedules(self, zone_id: uuid.UUID) -> Sequence[DeliveryProviderScheduleDTO]:
         rows = self._session.scalars(
             select(DeliveryProviderSchedule)
-            .where(
-                DeliveryProviderSchedule.delivery_provider_id == provider_id,
-                DeliveryProviderSchedule.zone_id == zone_id,
-            )
+            .where(DeliveryProviderSchedule.zone_id == zone_id)
             .order_by(
                 DeliveryProviderSchedule.schedule_kind.asc(),
                 DeliveryProviderSchedule.day_of_week.asc(),
@@ -496,21 +500,18 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
 
     def set_schedules(
         self,
-        provider_id: uuid.UUID,
+        zone_id: uuid.UUID,
         schedules: Sequence[DeliveryProviderScheduleCreate],
     ) -> None:
-        zone_id = self._primary_zone_id(provider_id)
-        if zone_id is None:
-            raise ValueError("Delivery provider has no active zone")
+        zone = self._session.get(DeliveryProviderZone, zone_id)
+        if zone is None:
+            raise ValueError("Zone not found")
 
-        self._session.query(DeliveryProviderSchedule).filter_by(
-            delivery_provider_id=provider_id,
-            zone_id=zone_id,
-        ).delete()
+        self._session.query(DeliveryProviderSchedule).filter_by(zone_id=zone_id).delete()
         for entry in schedules:
             self._session.add(
                 DeliveryProviderSchedule(
-                    delivery_provider_id=provider_id,
+                    delivery_provider_id=zone.delivery_provider_id,
                     zone_id=zone_id,
                     schedule_kind=entry.schedule_kind,
                     day_of_week=entry.day_of_week,
@@ -543,16 +544,16 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
                 )
         self._session.flush()
 
-    def get_service_manually_enabled(self, provider_id: uuid.UUID) -> bool:
-        zone = self._primary_zone_row(provider_id)
+    def get_service_manually_enabled(self, zone_id: uuid.UUID) -> bool:
+        zone = self._session.get(DeliveryProviderZone, zone_id)
         if zone is None:
-            raise ValueError("Delivery provider not found")
+            raise ValueError("Zone not found")
         return zone.service_manually_enabled
 
-    def set_service_manually_enabled(self, provider_id: uuid.UUID, enabled: bool) -> bool:
-        zone = self._primary_zone_row(provider_id)
+    def set_service_manually_enabled(self, zone_id: uuid.UUID, enabled: bool) -> bool:
+        zone = self._session.get(DeliveryProviderZone, zone_id)
         if zone is None:
-            raise ValueError("Delivery provider not found")
+            raise ValueError("Zone not found")
         zone.service_manually_enabled = enabled
         self._session.flush()
         return zone.service_manually_enabled
@@ -563,14 +564,9 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             raise ValueError("Delivery provider not found")
         return provider.timezone
 
-    def get_pricing_config(self, provider_id: uuid.UUID) -> DeliveryProviderPricingConfigDTO | None:
-        zone_id = self._primary_zone_id(provider_id)
-        if zone_id is None:
-            return None
-
+    def get_pricing_config(self, zone_id: uuid.UUID) -> DeliveryProviderPricingConfigDTO | None:
         row = self._session.scalar(
             select(DeliveryProviderPricingConfig).where(
-                DeliveryProviderPricingConfig.delivery_provider_id == provider_id,
                 DeliveryProviderPricingConfig.zone_id == zone_id,
             )
         )
@@ -579,21 +575,20 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         return self._pricing_dto_from_row(row)
 
     def set_pricing_config(
-        self, provider_id: uuid.UUID, config: DeliveryProviderPricingConfigDTO
+        self, zone_id: uuid.UUID, config: DeliveryProviderPricingConfigDTO
     ) -> DeliveryProviderPricingConfigDTO:
-        zone_id = self._primary_zone_id(provider_id)
-        if zone_id is None:
-            raise ValueError("Delivery provider has no active zone")
+        zone = self._session.get(DeliveryProviderZone, zone_id)
+        if zone is None:
+            raise ValueError("Zone not found")
         row = self._session.scalar(
             select(DeliveryProviderPricingConfig).where(
-                DeliveryProviderPricingConfig.delivery_provider_id == provider_id,
                 DeliveryProviderPricingConfig.zone_id == zone_id,
             )
         )
         payload = config_to_json(self._pricing_config_from_dto(config))
         if row is None:
             row = DeliveryProviderPricingConfig(
-                delivery_provider_id=provider_id,
+                delivery_provider_id=zone.delivery_provider_id,
                 zone_id=zone_id,
                 inside_polygon=payload["inside_polygon"],  # type: ignore[arg-type]
                 outside_polygon=payload["outside_polygon"],  # type: ignore[arg-type]
@@ -673,16 +668,16 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             )
         self._session.flush()
 
-    def get_weather_mode(self, provider_id: uuid.UUID) -> str:
-        zone = self._primary_zone_row(provider_id)
+    def get_weather_mode(self, zone_id: uuid.UUID) -> str:
+        zone = self._session.get(DeliveryProviderZone, zone_id)
         if zone is None:
-            raise ValueError("Delivery provider not found")
+            raise ValueError("Zone not found")
         return zone.weather_mode
 
-    def set_weather_mode(self, provider_id: uuid.UUID, weather_mode: str) -> str:
-        zone = self._primary_zone_row(provider_id)
+    def set_weather_mode(self, zone_id: uuid.UUID, weather_mode: str) -> str:
+        zone = self._session.get(DeliveryProviderZone, zone_id)
         if zone is None:
-            raise ValueError("Delivery provider not found")
+            raise ValueError("Zone not found")
         zone.weather_mode = weather_mode
         self._session.flush()
         return zone.weather_mode
@@ -984,6 +979,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             id=link.id,
             provider_name=provider.name,
             provider_slug=provider.slug,
+            zone_id=link.zone_id,
             status=link.status,  # type: ignore[arg-type]
             is_default=link.is_default,
             created_at=link.created_at,

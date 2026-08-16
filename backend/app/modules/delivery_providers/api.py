@@ -1,8 +1,9 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api.deps import get_synced_user
+from app.core.exceptions import ValidationError
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.infra.storage.factory import build_storage
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
@@ -34,6 +35,12 @@ from app.modules.delivery_providers.service import DeliveryProviderService
 from app.modules.users.schemas import UserDTO
 
 router = APIRouter(prefix="/delivery-providers", tags=["delivery-providers"])
+
+
+def _require_zone_id(zone_id: UUID | None = Query(default=None)) -> UUID:
+    if zone_id is None:
+        raise ValidationError("Indica la zona")
+    return zone_id
 
 
 def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeliveryProviderService:
@@ -171,19 +178,21 @@ def remove_my_delivery_provider_admin_invite(
 
 @router.get("/me/schedules", response_model=list[DeliveryProviderScheduleDTO])
 def list_my_delivery_provider_schedules(
+    zone_id: UUID = Depends(_require_zone_id),
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryProviderService = Depends(_service),
 ) -> list[DeliveryProviderScheduleDTO]:
-    return service.list_schedules(user.id)
+    return service.list_schedules(user.id, zone_id)
 
 
 @router.put("/me/schedules", status_code=status.HTTP_204_NO_CONTENT)
 def set_my_delivery_provider_schedules(
     schedules: list[DeliveryProviderScheduleCreate],
+    zone_id: UUID = Depends(_require_zone_id),
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryProviderService = Depends(_service),
 ) -> None:
-    service.set_schedules(user.id, schedules)
+    service.set_schedules(user.id, zone_id, schedules)
 
 
 @router.get("/me/payment-methods", response_model=list[DeliveryProviderPaymentMethodDTO])
@@ -205,54 +214,60 @@ def set_my_delivery_provider_payment_methods(
 
 @router.get("/me/service-status", response_model=DeliveryProviderServiceStatusDTO)
 def get_my_delivery_provider_service_status(
+    zone_id: UUID = Depends(_require_zone_id),
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryProviderService = Depends(_service),
 ) -> DeliveryProviderServiceStatusDTO:
-    return service.get_service_status(user.id)
+    return service.get_service_status(user.id, zone_id)
 
 
 @router.patch("/me/service-status", response_model=DeliveryProviderServiceStatusDTO)
 def update_my_delivery_provider_service_status(
     data: DeliveryProviderServiceStatusUpdate,
+    zone_id: UUID = Depends(_require_zone_id),
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryProviderService = Depends(_service),
 ) -> DeliveryProviderServiceStatusDTO:
-    return service.update_service_status(user.id, data)
+    return service.update_service_status(user.id, zone_id, data)
 
 
 @router.get("/me/pricing", response_model=DeliveryProviderPricingResponse)
 def get_my_delivery_provider_pricing(
+    zone_id: UUID = Depends(_require_zone_id),
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryProviderService = Depends(_service),
 ) -> DeliveryProviderPricingResponse:
-    return service.get_pricing(user.id)
+    return service.get_pricing(user.id, zone_id)
 
 
 @router.put("/me/pricing", response_model=DeliveryProviderPricingResponse)
 def update_my_delivery_provider_pricing(
     data: DeliveryProviderPricingUpdate,
+    zone_id: UUID = Depends(_require_zone_id),
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryProviderService = Depends(_service),
 ) -> DeliveryProviderPricingResponse:
-    return service.update_pricing(user.id, data)
+    return service.update_pricing(user.id, zone_id, data)
 
 
 @router.patch("/me/pricing/weather-mode", response_model=DeliveryProviderPricingResponse)
 def update_my_delivery_provider_weather_mode(
     data: DeliveryProviderWeatherModeUpdate,
+    zone_id: UUID = Depends(_require_zone_id),
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryProviderService = Depends(_service),
 ) -> DeliveryProviderPricingResponse:
-    return service.update_weather_mode(user.id, data)
+    return service.update_weather_mode(user.id, zone_id, data)
 
 
 @router.post("/me/pricing/simulate", response_model=DeliveryPricingQuoteDTO)
 def simulate_my_delivery_provider_pricing(
     data: DeliveryPricingSimulateRequest,
+    zone_id: UUID = Depends(_require_zone_id),
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryProviderService = Depends(_service),
 ) -> DeliveryPricingQuoteDTO:
-    return service.simulate_pricing(user.id, data)
+    return service.simulate_pricing(user.id, zone_id, data)
 
 
 @router.get("/me/partnership-requests", response_model=list[DeliveryPartnershipRequestDTO])

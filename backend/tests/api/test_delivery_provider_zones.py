@@ -219,6 +219,36 @@ def test_operator_can_list_zones(client):
 
 
 @requires_db
+def test_pricing_requires_zone_id(client):
+    client.post("/api/v1/delivery-providers/onboarding", json=ONBOARDING_PAYLOAD, headers=AUTH)
+    resp = client.get("/api/v1/delivery-providers/me/pricing", headers=AUTH)
+    assert resp.status_code == 400
+    assert resp.json()["error"]["message"] == "Indica la zona"
+
+
+@requires_db
+def test_two_zones_have_independent_weather(client):
+    client.post("/api/v1/delivery-providers/onboarding", json=ONBOARDING_PAYLOAD, headers=AUTH)
+    zones = client.get("/api/v1/delivery-providers/me/zones", headers=AUTH).json()
+    z0 = zones[0]["id"]
+    created = client.post(
+        "/api/v1/delivery-providers/me/zones",
+        json={"name": "Norte", "polygon": SAMPLE_POLYGON, "center_lat": 19.44, "center_lng": -99.12},
+        headers=AUTH,
+    ).json()
+    z1 = created["id"]
+    client.patch(
+        f"/api/v1/delivery-providers/me/pricing/weather-mode?zone_id={z1}",
+        json={"weather_mode": "heavy"},
+        headers=AUTH,
+    )
+    w0 = client.get(f"/api/v1/delivery-providers/me/pricing?zone_id={z0}", headers=AUTH).json()
+    w1 = client.get(f"/api/v1/delivery-providers/me/pricing?zone_id={z1}", headers=AUTH).json()
+    assert w0["weather_mode"] == "none"
+    assert w1["weather_mode"] == "heavy"
+
+
+@requires_db
 def test_operator_cannot_patch_or_delete_zone(client):
     create = client.post(
         "/api/v1/delivery-providers/onboarding",

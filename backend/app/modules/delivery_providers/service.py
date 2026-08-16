@@ -237,22 +237,22 @@ class DeliveryProviderService:
         stored = self._storage.upload(path, raw, "image/webp" if ext == "webp" else content_type)
         return stored.path
 
-    def list_schedules(self, user_id: uuid.UUID) -> list[DeliveryProviderScheduleDTO]:
-        found = self._repo.get_for_user(user_id)
-        if found is None:
-            raise NotFoundError("No tienes un proveedor de delivery registrado")
-
-        provider, _member_role = found
-        # Task 3: require zone_id query
-        rows = list(self._repo.list_schedules(provider.id))
+    def list_schedules(
+        self, user_id: uuid.UUID, zone_id: uuid.UUID
+    ) -> list[DeliveryProviderScheduleDTO]:
+        provider = self._require_provider(user_id)
+        self._repo.assert_zone_on_provider(provider.id, zone_id)
+        rows = list(self._repo.list_schedules(zone_id))
         if not rows:
-            zone_id = self._require_primary_zone_id(provider.id)
             self._repo.seed_default_schedules(provider.id, zone_id)
-            rows = list(self._repo.list_schedules(provider.id))
+            rows = list(self._repo.list_schedules(zone_id))
         return rows
 
     def set_schedules(
-        self, user_id: uuid.UUID, schedules: list[DeliveryProviderScheduleCreate]
+        self,
+        user_id: uuid.UUID,
+        zone_id: uuid.UUID,
+        schedules: list[DeliveryProviderScheduleCreate],
     ) -> None:
         found = self._repo.get_for_user(user_id)
         if found is None:
@@ -260,8 +260,9 @@ class DeliveryProviderService:
 
         provider, member_role = found
         require_write_provider_config(member_role)
+        self._repo.assert_zone_on_provider(provider.id, zone_id)
         self._validate_schedules(schedules)
-        self._repo.set_schedules(provider.id, schedules)
+        self._repo.set_schedules(zone_id, schedules)
 
     def list_payment_methods(self, user_id: uuid.UUID) -> list[DeliveryProviderPaymentMethodDTO]:
         provider = self._require_provider(user_id)
@@ -305,48 +306,49 @@ class DeliveryProviderService:
                     "La hora de cierre debe ser posterior a la de apertura en cada turno"
                 )
 
-    def get_service_status(self, user_id: uuid.UUID) -> DeliveryProviderServiceStatusDTO:
-        provider, schedules = self._provider_schedules_for_user(user_id)
-        return self._build_service_status(provider.id, schedules)
+    def get_service_status(
+        self, user_id: uuid.UUID, zone_id: uuid.UUID
+    ) -> DeliveryProviderServiceStatusDTO:
+        provider, schedules = self._provider_schedules_for_zone(user_id, zone_id)
+        return self._build_service_status(zone_id, schedules, provider.id)
 
     def update_service_status(
-        self, user_id: uuid.UUID, data: DeliveryProviderServiceStatusUpdate
+        self,
+        user_id: uuid.UUID,
+        zone_id: uuid.UUID,
+        data: DeliveryProviderServiceStatusUpdate,
     ) -> DeliveryProviderServiceStatusDTO:
         found = self._repo.get_for_user(user_id)
         if found is None:
             raise NotFoundError("No tienes un proveedor de delivery registrado")
         provider, member_role = found
-        require_write_provider_config(member_role)
-        schedules = list(self._repo.list_schedules(provider.id))
+        require_manage_weather(member_role)
+        self._repo.assert_zone_on_provider(provider.id, zone_id)
+        schedules = list(self._repo.list_schedules(zone_id))
         if not schedules:
-            zone_id = self._require_primary_zone_id(provider.id)
             self._repo.seed_default_schedules(provider.id, zone_id)
-            schedules = list(self._repo.list_schedules(provider.id))
-        self._repo.set_service_manually_enabled(provider.id, data.manually_enabled)
-        return self._build_service_status(provider.id, schedules)
+            schedules = list(self._repo.list_schedules(zone_id))
+        self._repo.set_service_manually_enabled(zone_id, data.manually_enabled)
+        return self._build_service_status(zone_id, schedules, provider.id)
 
-    def _provider_schedules_for_user(
-        self, user_id: uuid.UUID
+    def _provider_schedules_for_zone(
+        self, user_id: uuid.UUID, zone_id: uuid.UUID
     ) -> tuple[DeliveryProviderDTO, list[DeliveryProviderScheduleDTO]]:
-        found = self._repo.get_for_user(user_id)
-        if found is None:
-            raise NotFoundError("No tienes un proveedor de delivery registrado")
-
-        provider, _member_role = found
-        # Task 3: require zone_id query
-        schedules = list(self._repo.list_schedules(provider.id))
+        provider = self._require_provider(user_id)
+        self._repo.assert_zone_on_provider(provider.id, zone_id)
+        schedules = list(self._repo.list_schedules(zone_id))
         if not schedules:
-            zone_id = self._require_primary_zone_id(provider.id)
             self._repo.seed_default_schedules(provider.id, zone_id)
-            schedules = list(self._repo.list_schedules(provider.id))
+            schedules = list(self._repo.list_schedules(zone_id))
         return provider, schedules
 
     def _build_service_status(
         self,
-        provider_id: uuid.UUID,
+        zone_id: uuid.UUID,
         schedules: list[DeliveryProviderScheduleDTO],
+        provider_id: uuid.UUID,
     ) -> DeliveryProviderServiceStatusDTO:
-        manually_enabled = self._repo.get_service_manually_enabled(provider_id)
+        manually_enabled = self._repo.get_service_manually_enabled(zone_id)
         timezone = self._repo.get_provider_timezone(provider_id)
         resolved = resolve_service_status(
             manually_enabled=manually_enabled,
@@ -362,24 +364,30 @@ class DeliveryProviderService:
             timezone=resolved.timezone,
         )
 
-    def get_pricing(self, user_id: uuid.UUID) -> DeliveryProviderPricingResponse:
+    def get_pricing(
+        self, user_id: uuid.UUID, zone_id: uuid.UUID
+    ) -> DeliveryProviderPricingResponse:
         provider = self._require_provider(user_id)
-        # Task 3: require zone_id query
-        config = self._load_pricing_config(provider.id)
-        weather_mode = self._repo.get_weather_mode(provider.id)
+        self._repo.assert_zone_on_provider(provider.id, zone_id)
+        config = self._load_pricing_config(zone_id, provider.id)
+        weather_mode = self._repo.get_weather_mode(zone_id)
         return DeliveryProviderPricingResponse(
             weather_mode=weather_mode,  # type: ignore[arg-type]
             config=config,
         )
 
     def update_pricing(
-        self, user_id: uuid.UUID, data: DeliveryProviderPricingUpdate
+        self,
+        user_id: uuid.UUID,
+        zone_id: uuid.UUID,
+        data: DeliveryProviderPricingUpdate,
     ) -> DeliveryProviderPricingResponse:
         found = self._repo.get_for_user(user_id)
         if found is None:
             raise NotFoundError("No tienes un proveedor de delivery registrado")
         provider, member_role = found
         require_write_provider_config(member_role)
+        self._repo.assert_zone_on_provider(provider.id, zone_id)
         parsed = config_from_json(
             {
                 "inside_polygon": data.config.inside_polygon.model_dump(),
@@ -391,29 +399,37 @@ class DeliveryProviderService:
         except ValueError as exc:
             raise ValidationError(str(exc)) from exc
 
-        saved = self._repo.set_pricing_config(provider.id, data.config)
-        weather_mode = self._repo.get_weather_mode(provider.id)
+        saved = self._repo.set_pricing_config(zone_id, data.config)
+        weather_mode = self._repo.get_weather_mode(zone_id)
         return DeliveryProviderPricingResponse(
             weather_mode=weather_mode,  # type: ignore[arg-type]
             config=saved,
         )
 
     def update_weather_mode(
-        self, user_id: uuid.UUID, data: DeliveryProviderWeatherModeUpdate
+        self,
+        user_id: uuid.UUID,
+        zone_id: uuid.UUID,
+        data: DeliveryProviderWeatherModeUpdate,
     ) -> DeliveryProviderPricingResponse:
         found = self._repo.get_for_user(user_id)
         if found is None:
             raise NotFoundError("No tienes un proveedor de delivery registrado")
         provider, member_role = found
         require_manage_weather(member_role)
-        self._repo.set_weather_mode(provider.id, data.weather_mode)
-        return self.get_pricing(user_id)
+        self._repo.assert_zone_on_provider(provider.id, zone_id)
+        self._repo.set_weather_mode(zone_id, data.weather_mode)
+        return self.get_pricing(user_id, zone_id)
 
     def simulate_pricing(
-        self, user_id: uuid.UUID, data: DeliveryPricingSimulateRequest
+        self,
+        user_id: uuid.UUID,
+        zone_id: uuid.UUID,
+        data: DeliveryPricingSimulateRequest,
     ) -> DeliveryPricingQuoteDTO:
         provider = self._require_provider(user_id)
-        config_dto = self._load_pricing_config(provider.id)
+        self._repo.assert_zone_on_provider(provider.id, zone_id)
+        config_dto = self._load_pricing_config(zone_id, provider.id)
         parsed = config_from_json(
             {
                 "inside_polygon": config_dto.inside_polygon.model_dump(),
@@ -423,7 +439,7 @@ class DeliveryProviderService:
         weather_mode: DeliveryWeatherMode = (
             data.weather_mode
             if data.weather_mode is not None
-            else self._repo.get_weather_mode(provider.id)  # type: ignore[assignment]
+            else self._repo.get_weather_mode(zone_id)  # type: ignore[assignment]
         )
         quote = quote_delivery_fee(
             parsed,
@@ -467,21 +483,16 @@ class DeliveryProviderService:
             raise ValidationError("Correo electrónico inválido")
         return normalized
 
-    def _load_pricing_config(self, provider_id: uuid.UUID) -> DeliveryProviderPricingConfigDTO:
-        config = self._repo.get_pricing_config(provider_id)
+    def _load_pricing_config(
+        self, zone_id: uuid.UUID, provider_id: uuid.UUID
+    ) -> DeliveryProviderPricingConfigDTO:
+        config = self._repo.get_pricing_config(zone_id)
         if config is None:
-            zone_id = self._require_primary_zone_id(provider_id)
             self._repo.seed_default_pricing_config(provider_id, zone_id)
-            config = self._repo.get_pricing_config(provider_id)
+            config = self._repo.get_pricing_config(zone_id)
         if config is None:
             raise NotFoundError("No se encontró configuración de tarifas")
         return config
-
-    def _require_primary_zone_id(self, provider_id: uuid.UUID) -> uuid.UUID:
-        zone = self._repo.get_primary_zone(provider_id)
-        if zone is None:
-            raise NotFoundError("No se encontró zona de cobertura")
-        return zone.id
 
     def _validated_zone_write(self, data: DeliveryProviderZoneWrite) -> tuple[str, str]:
         name = data.name.strip()

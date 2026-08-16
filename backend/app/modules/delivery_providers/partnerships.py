@@ -56,15 +56,16 @@ class DeliveryPartnershipService:
     def get_active_provider_schedules(
         self, restaurant_id: uuid.UUID
     ) -> list[DeliveryProviderScheduleDTO]:
-        provider_id = self._active_partnership_provider_id(restaurant_id)
-        if provider_id is None:
+        partnership = self._repo.get_mexy_partnership_for_restaurant(restaurant_id)
+        if partnership is None or partnership.status != "active":
             return []
-        rows = list(self._repo.list_schedules(provider_id))
+        zone_id = partnership.zone_id
+        rows = list(self._repo.list_schedules(zone_id))
         if not rows:
-            zone = self._repo.get_primary_zone(provider_id)
-            if zone is not None:
-                self._repo.seed_default_schedules(provider_id, zone.id)
-            rows = list(self._repo.list_schedules(provider_id))
+            provider_id = self._repo.get_mexy_provider_id()
+            if provider_id is not None:
+                self._repo.seed_default_schedules(provider_id, zone_id)
+            rows = list(self._repo.list_schedules(zone_id))
         return rows
 
     def get_active_provider_payment_methods(

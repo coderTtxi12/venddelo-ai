@@ -117,16 +117,15 @@ class PublicDeliveryQuoteService:
                 provider_id=None,
             )
 
-        schedules = list(self._repo.list_schedules(provider_id))
+        zone_id = partnership.zone_id
+        schedules = list(self._repo.list_schedules(zone_id))
         if not schedules:
-            zone = self._repo.get_primary_zone(provider_id)
-            if zone is not None:
-                self._repo.seed_default_schedules(provider_id, zone.id)
-            schedules = list(self._repo.list_schedules(provider_id))
+            self._repo.seed_default_schedules(provider_id, zone_id)
+            schedules = list(self._repo.list_schedules(zone_id))
 
         timezone = self._repo.get_provider_timezone(provider_id)
         service_status = resolve_service_status(
-            manually_enabled=self._repo.get_service_manually_enabled(provider_id),
+            manually_enabled=self._repo.get_service_manually_enabled(zone_id),
             schedules=schedules,
             timezone=timezone,
             now=now,
@@ -171,7 +170,7 @@ class PublicDeliveryQuoteService:
         status = _partnership_status(partnership)
         provider_name = partnership.provider_name if partnership else None
 
-        if not service.available or service.provider_id is None:
+        if not service.available or service.provider_id is None or partnership is None:
             return ResolvedDeliveryQuote(
                 available=False,
                 reason=service.reason,
@@ -183,7 +182,8 @@ class PublicDeliveryQuoteService:
             )
 
         provider_id = service.provider_id
-        weather_mode: DeliveryWeatherMode = self._repo.get_weather_mode(provider_id)  # type: ignore[assignment]
+        zone_id = partnership.zone_id
+        weather_mode: DeliveryWeatherMode = self._repo.get_weather_mode(zone_id)  # type: ignore[assignment]
         if restaurant.latitude is None or restaurant.longitude is None:
             return ResolvedDeliveryQuote(
                 available=False,
@@ -239,12 +239,10 @@ class PublicDeliveryQuoteService:
                     weather_mode=weather_mode,
                 )
 
-        pricing_dto = self._repo.get_pricing_config(provider_id)
+        pricing_dto = self._repo.get_pricing_config(zone_id)
         if pricing_dto is None:
-            zone = self._repo.get_primary_zone(provider_id)
-            if zone is not None:
-                self._repo.seed_default_pricing_config(provider_id, zone.id)
-            pricing_dto = self._repo.get_pricing_config(provider_id)
+            self._repo.seed_default_pricing_config(provider_id, zone_id)
+            pricing_dto = self._repo.get_pricing_config(zone_id)
         if pricing_dto is None:
             return ResolvedDeliveryQuote(
                 available=False,
@@ -264,7 +262,7 @@ class PublicDeliveryQuoteService:
             }
         )
 
-        schedules = list(self._repo.list_schedules(provider_id))
+        schedules = list(self._repo.list_schedules(zone_id))
         timezone = self._repo.get_provider_timezone(provider_id)
 
         if not inside_polygon and not is_within_regular_schedule(

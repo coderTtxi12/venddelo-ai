@@ -212,6 +212,7 @@ class RestaurantDeliveryPartnershipDTO(BaseModel):
     id: uuid.UUID
     provider_name: str
     provider_slug: str
+    zone_id: uuid.UUID
     status: Literal["pending", "active", "suspended"]
     is_default: bool
     created_at: datetime

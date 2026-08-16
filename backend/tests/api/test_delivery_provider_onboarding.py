@@ -36,6 +36,11 @@ ONBOARDING_PAYLOAD = {
 }
 
 
+def _primary_zone_id(client) -> str:
+    zones = client.get("/api/v1/delivery-providers/me/zones", headers=AUTH).json()
+    return zones[0]["id"]
+
+
 @pytest.fixture(autouse=True)
 def _clean_delivery_onboarding_tables(engine):
     with engine.begin() as conn:
@@ -207,8 +212,12 @@ def test_delivery_provider_schedules_list_and_update(client):
         headers=AUTH,
     )
     assert create.status_code == 201
+    zone_id = _primary_zone_id(client)
 
-    listed = client.get("/api/v1/delivery-providers/me/schedules", headers=AUTH)
+    listed = client.get(
+        f"/api/v1/delivery-providers/me/schedules?zone_id={zone_id}",
+        headers=AUTH,
+    )
     assert listed.status_code == 200
     rows = listed.json()
     assert len(rows) == 14
@@ -234,13 +243,16 @@ def test_delivery_provider_schedules_list_and_update(client):
         )
 
     put = client.put(
-        "/api/v1/delivery-providers/me/schedules",
+        f"/api/v1/delivery-providers/me/schedules?zone_id={zone_id}",
         json=updated_payload,
         headers=AUTH,
     )
     assert put.status_code == 204, put.text
 
-    listed_after = client.get("/api/v1/delivery-providers/me/schedules", headers=AUTH)
+    listed_after = client.get(
+        f"/api/v1/delivery-providers/me/schedules?zone_id={zone_id}",
+        headers=AUTH,
+    )
     assert listed_after.status_code == 200
     after_rows = listed_after.json()
     monday_regular = next(
@@ -260,9 +272,10 @@ def test_delivery_provider_schedules_rejects_invalid_window(client):
         headers=AUTH,
     )
     assert create.status_code == 201
+    zone_id = _primary_zone_id(client)
 
     put = client.put(
-        "/api/v1/delivery-providers/me/schedules",
+        f"/api/v1/delivery-providers/me/schedules?zone_id={zone_id}",
         json=[
             {
                 "schedule_kind": "regular",
@@ -284,8 +297,12 @@ def test_delivery_provider_service_status_toggle(client):
         headers=AUTH,
     )
     assert create.status_code == 201
+    zone_id = _primary_zone_id(client)
 
-    status = client.get("/api/v1/delivery-providers/me/service-status", headers=AUTH)
+    status = client.get(
+        f"/api/v1/delivery-providers/me/service-status?zone_id={zone_id}",
+        headers=AUTH,
+    )
     assert status.status_code == 200
     body = status.json()
     assert body["manually_enabled"] is True
@@ -294,7 +311,7 @@ def test_delivery_provider_service_status_toggle(client):
     assert body["status_reason"] in {"active", "manual_off", "outside_schedule"}
 
     off = client.patch(
-        "/api/v1/delivery-providers/me/service-status",
+        f"/api/v1/delivery-providers/me/service-status?zone_id={zone_id}",
         json={"manually_enabled": False},
         headers=AUTH,
     )
@@ -305,7 +322,7 @@ def test_delivery_provider_service_status_toggle(client):
     assert off_body["status_reason"] == "manual_off"
 
     on = client.patch(
-        "/api/v1/delivery-providers/me/service-status",
+        f"/api/v1/delivery-providers/me/service-status?zone_id={zone_id}",
         json={"manually_enabled": True},
         headers=AUTH,
     )
@@ -321,8 +338,12 @@ def test_delivery_provider_pricing_defaults_and_simulate(client):
         headers=AUTH,
     )
     assert create.status_code == 201
+    zone_id = _primary_zone_id(client)
 
-    pricing = client.get("/api/v1/delivery-providers/me/pricing", headers=AUTH)
+    pricing = client.get(
+        f"/api/v1/delivery-providers/me/pricing?zone_id={zone_id}",
+        headers=AUTH,
+    )
     assert pricing.status_code == 200
     body = pricing.json()
     assert body["weather_mode"] == "none"
@@ -332,7 +353,7 @@ def test_delivery_provider_pricing_defaults_and_simulate(client):
     assert len(body["config"]["outside_polygon"]["brackets"]) == 18
 
     simulate_inside = client.post(
-        "/api/v1/delivery-providers/me/pricing/simulate",
+        f"/api/v1/delivery-providers/me/pricing/simulate?zone_id={zone_id}",
         json={"inside_polygon": True, "is_night": False},
         headers=AUTH,
     )
@@ -340,7 +361,7 @@ def test_delivery_provider_pricing_defaults_and_simulate(client):
     assert simulate_inside.json()["total_cents"] == 3500
 
     simulate_outside = client.post(
-        "/api/v1/delivery-providers/me/pricing/simulate",
+        f"/api/v1/delivery-providers/me/pricing/simulate?zone_id={zone_id}",
         json={"inside_polygon": False, "distance_km": 8.5, "weather_mode": "light"},
         headers=AUTH,
     )
@@ -348,7 +369,7 @@ def test_delivery_provider_pricing_defaults_and_simulate(client):
     assert simulate_outside.json()["total_cents"] == 12500
 
     weather = client.patch(
-        "/api/v1/delivery-providers/me/pricing/weather-mode",
+        f"/api/v1/delivery-providers/me/pricing/weather-mode?zone_id={zone_id}",
         json={"weather_mode": "heavy"},
         headers=AUTH,
     )
