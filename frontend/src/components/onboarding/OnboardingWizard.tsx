@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
 import { OnboardingScheduleEditor } from '@/components/onboarding/OnboardingScheduleEditor';
+import { DeliveryCoverageCard } from '@/components/onboarding/DeliveryCoverageCard';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
 import { RestaurantLocationMapPicker } from '@/components/settings/RestaurantLocationMapPicker';
 import type { RestaurantLocationMapPickerHandle } from '@/components/settings/RestaurantLocationMapPicker';
 import { RestaurantPlaceAutocomplete } from '@/components/settings/RestaurantPlaceAutocomplete';
 import { useAuth } from '@/hooks/useAuth';
-import { checkRestaurantSubdomainAvailability } from '@/lib/api/restaurants';
+import { checkRestaurantSubdomainAvailability, getMexyCoverage } from '@/lib/api/restaurants';
 import { createDefaultOnboardingData } from '@/lib/onboarding/defaults';
 import { normalizeOnboardingScheduleDrafts } from '@/lib/onboarding/schedule';
 import {
@@ -20,6 +21,7 @@ import {
   stepIndex,
 } from '@/lib/onboarding/storage';
 import { submitOnboarding } from '@/lib/onboarding/submitOnboarding';
+import type { MexyCoverageResponse } from '@/lib/api/types';
 import type { OnboardingData, OnboardingStepId } from '@/lib/onboarding/types';
 import { validateStep } from '@/lib/onboarding/validation';
 import { prepareImageForUpload } from '@/lib/image/convertToWebp';
@@ -145,6 +147,8 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
   const [subdomainChecking, setSubdomainChecking] = useState(false);
   const [subdomainVerified, setSubdomainVerified] = useState(false);
   const [subdomainCheckError, setSubdomainCheckError] = useState<string | null>(null);
+  const [mexyCoverage, setMexyCoverage] = useState<MexyCoverageResponse | null>(null);
+  const [mexyCoverageLoading, setMexyCoverageLoading] = useState(false);
 
   const visibleSteps = useMemo(() => getVisibleSteps(data), [data]);
   const currentIndex = stepIndex(visibleSteps, currentStepId);
@@ -224,6 +228,38 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
       window.clearTimeout(timer);
     };
   }, [accessToken, currentStepId, data.subdomain]);
+
+  useEffect(() => {
+    if (currentStepId !== 'orderTypes') return;
+    if (!accessToken) return;
+
+    const { latitude, longitude } = data.location;
+    if (latitude == null || longitude == null) {
+      setMexyCoverage({ zone: null, distance_km: null });
+      setMexyCoverageLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setMexyCoverageLoading(true);
+
+    void getMexyCoverage(accessToken, latitude, longitude)
+      .then((result) => {
+        if (cancelled) return;
+        setMexyCoverage(result);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setMexyCoverage({ zone: null, distance_km: null });
+      })
+      .finally(() => {
+        if (!cancelled) setMexyCoverageLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, currentStepId, data.location.latitude, data.location.longitude]);
 
   useEffect(() => {
     const saved = loadOnboardingState(userId);
@@ -719,25 +755,37 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
           </div>
         );
 
-      case 'orderTypes':
+      case 'orderTypes': {
+        const hasCoords =
+          data.location.latitude != null && data.location.longitude != null;
+        const coverageToShow =
+          mexyCoverage ??
+          (!hasCoords ? { zone: null, distance_km: null } : null);
+
         return (
           <div className={styles.optionList}>
-            <label
-              className={`${styles.optionCard} ${data.deliveryEnabled ? styles.optionCardActive : ''}`}
-            >
-              <div className={styles.optionMeta}>
-                <span className={styles.optionTitle}>{RESTAURANT_SERVICE_LABELS.delivery}</span>
-                <span className={styles.optionHint}>Llevamos el pedido hasta tu cliente. Servicio por Mexy Reparto.</span>
-              </div>
-              <span className={styles.switch}>
-                <input
-                  type="checkbox"
-                  checked={data.deliveryEnabled}
-                  onChange={(e) => patchData({ deliveryEnabled: e.target.checked })}
-                />
-                <span className={styles.slider} />
-              </span>
-            </label>
+            <div className={styles.deliverySection}>
+              <label
+                className={`${styles.optionCard} ${data.deliveryEnabled ? styles.optionCardActive : ''}`}
+              >
+                <div className={styles.optionMeta}>
+                  <span className={styles.optionTitle}>{RESTAURANT_SERVICE_LABELS.delivery}</span>
+                  <span className={styles.optionHint}>Llevamos el pedido hasta tu cliente. Servicio por Mexy Reparto.</span>
+                </div>
+                <span className={styles.switch}>
+                  <input
+                    type="checkbox"
+                    checked={data.deliveryEnabled}
+                    onChange={(e) => patchData({ deliveryEnabled: e.target.checked })}
+                  />
+                  <span className={styles.slider} />
+                </span>
+              </label>
+
+              {!mexyCoverageLoading && coverageToShow ? (
+                <DeliveryCoverageCard coverage={coverageToShow} />
+              ) : null}
+            </div>
 
             <label
               className={`${styles.optionCard} ${data.takeoutEnabled ? styles.optionCardActive : ''}`}
@@ -757,6 +805,7 @@ export default function OnboardingWizard({ userId, onComplete }: OnboardingWizar
             </label>
           </div>
         );
+      }
 
       case 'paymentMethods':
         return (

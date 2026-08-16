@@ -113,6 +113,17 @@ export type RestaurantDeliveryPartnershipResponse = {
   partnership: RestaurantDeliveryPartnership | null;
 };
 
+export type MexyCoverageZone = {
+  id: string;
+  name: string;
+  provider_name: string;
+};
+
+export type MexyCoverageResponse = {
+  zone: MexyCoverageZone | null;
+  distance_km: number | null;
+};
+
 export type DeliveryProviderScheduleKind = 'regular' | 'night';
 
 export type DeliveryProviderSchedule = {

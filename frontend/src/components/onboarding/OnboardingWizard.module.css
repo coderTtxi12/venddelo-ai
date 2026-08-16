@@ -468,6 +468,11 @@
   max-width: 28rem;
 }
 
+.deliverySection {
+  display: flex;
+  flex-direction: column;
+}
+
 .optionCard {
   display: flex;
   align-items: center;

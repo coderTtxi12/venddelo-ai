@@ -6,6 +6,7 @@ import type {
   Restaurant,
   RestaurantAccessListResponse,
   RestaurantAdminInvite,
+  MexyCoverageResponse,
   RestaurantDeliveryPartnershipResponse,
   RestaurantMeResponse,
   RestaurantMember,
@@ -265,4 +266,9 @@ export function listActiveDeliveryProviderPaymentMethods(token: string, restaura
     `/restaurants/${restaurantId}/delivery-partnership/payment-methods`,
     { token },
   );
+}
+
+export function getMexyCoverage(token: string, latitude: number, longitude: number) {
+  const q = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude) });
+  return apiRequest<MexyCoverageResponse>(`/restaurants/mexy-coverage?${q}`, { token });
 }
