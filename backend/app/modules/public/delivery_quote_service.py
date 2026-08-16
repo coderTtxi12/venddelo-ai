@@ -118,6 +118,15 @@ class PublicDeliveryQuoteService:
             )
 
         zone_id = partnership.zone_id
+        if zone_id is None:
+            return ResolvedDeliveryService(
+                available=False,
+                reason="El servicio de reparto no está disponible.",
+                partnership_status=status,
+                provider_name=partnership.provider_name,
+                provider_id=provider_id,
+            )
+
         schedules = list(self._repo.list_schedules(zone_id))
         if not schedules:
             self._repo.seed_default_schedules(provider_id, zone_id)
@@ -183,6 +192,17 @@ class PublicDeliveryQuoteService:
 
         provider_id = service.provider_id
         zone_id = partnership.zone_id
+        if zone_id is None:
+            return ResolvedDeliveryQuote(
+                available=False,
+                reason="El servicio de reparto no está disponible.",
+                delivery_fee_cents=0,
+                inside_polygon=False,
+                distance_km=None,
+                provider_name=provider_name,
+                partnership_status=status,
+            )
+
         weather_mode: DeliveryWeatherMode = self._repo.get_weather_mode(zone_id)  # type: ignore[assignment]
         if restaurant.latitude is None or restaurant.longitude is None:
             return ResolvedDeliveryQuote(
@@ -196,8 +216,8 @@ class PublicDeliveryQuoteService:
                 weather_mode=weather_mode,
             )
 
-        inside_polygon = self._repo.point_in_primary_zone(
-            provider_id,
+        inside_polygon = self._repo.point_in_zone(
+            zone_id,
             delivery_latitude,
             delivery_longitude,
         )

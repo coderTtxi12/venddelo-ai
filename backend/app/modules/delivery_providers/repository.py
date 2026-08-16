@@ -96,6 +96,9 @@ class DeliveryProviderRepository(ABC):
     ) -> bool: ...
 
     @abstractmethod
+    def point_in_zone(self, zone_id: uuid.UUID, latitude: float, longitude: float) -> bool: ...
+
+    @abstractmethod
     def update_profile(
         self,
         provider_id: uuid.UUID,
@@ -188,12 +191,12 @@ class DeliveryProviderRepository(ABC):
 
     @abstractmethod
     def list_pending_partnership_requests(
-        self, provider_id: uuid.UUID
+        self, provider_id: uuid.UUID, zone_id: uuid.UUID | None = None
     ) -> Sequence[DeliveryPartnershipRequestDTO]: ...
 
     @abstractmethod
     def list_active_partnership_requests(
-        self, provider_id: uuid.UUID
+        self, provider_id: uuid.UUID, zone_id: uuid.UUID | None = None
     ) -> Sequence[DeliveryPartnershipRequestDTO]: ...
 
     @abstractmethod
@@ -203,6 +206,11 @@ class DeliveryProviderRepository(ABC):
 
     @abstractmethod
     def reject_partnership_request(self, link_id: uuid.UUID, provider_id: uuid.UUID) -> None: ...
+
+    @abstractmethod
+    def reassign_partnership_zone(
+        self, link_id: uuid.UUID, provider_id: uuid.UUID, zone_id: uuid.UUID
+    ) -> DeliveryPartnershipRequestDTO: ...
 
     @abstractmethod
     def get_partnership_provider_id(self, link_id: uuid.UUID) -> uuid.UUID | None: ...

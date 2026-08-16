@@ -183,6 +183,11 @@ class DeliveryPricingQuoteDTO(BaseModel):
     is_night: bool
 
 
+class DeliveryPartnershipZoneRefDTO(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class DeliveryPartnershipRestaurantDTO(BaseModel):
     id: uuid.UUID
     name: str
@@ -205,14 +210,20 @@ class DeliveryPartnershipRequestDTO(BaseModel):
     is_default: bool
     created_at: datetime
     activated_at: datetime | None = None
+    zone: DeliveryPartnershipZoneRefDTO
     restaurant: DeliveryPartnershipRestaurantDTO
+
+
+class DeliveryPartnershipZoneUpdate(BaseModel):
+    zone_id: uuid.UUID
 
 
 class RestaurantDeliveryPartnershipDTO(BaseModel):
     id: uuid.UUID
     provider_name: str
     provider_slug: str
-    zone_id: uuid.UUID
+    zone_id: uuid.UUID | None
+    zone_name: str | None = None
     status: Literal["pending", "active", "suspended"]
     is_default: bool
     created_at: datetime

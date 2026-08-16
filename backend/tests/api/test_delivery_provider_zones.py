@@ -9,7 +9,10 @@ from app.core.security import AuthenticatedUser, AuthPort
 from app.db.models.delivery import RestaurantDeliveryProvider
 from app.db.models.restaurant import Restaurant
 from app.main import app
-from tests.api.test_delivery_provider_onboarding import AUTH, ONBOARDING_PAYLOAD, SAMPLE_POLYGON
+from tests.api.test_api_v1 import AUTH, OWNER
+from tests.api.test_delivery_partnerships import COVERED_LAT, COVERED_LNG, _create_mexy_provider
+from tests.api.test_delivery_provider_onboarding import ONBOARDING_PAYLOAD, SAMPLE_POLYGON
+from tests.api.test_delivery_zone_matching import FAR_POLYGON
 from tests.conftest import requires_db
 
 OPERATOR = uuid.UUID("33333333-3333-3333-3333-333333333333")
@@ -292,3 +295,157 @@ def test_operator_cannot_patch_or_delete_zone(client):
         )
     finally:
         app.dependency_overrides.pop(get_auth, None)
+
+
+def _mexy_auth_override() -> None:
+    from app.api.deps import get_auth
+    from app.core.security import AuthenticatedUser, AuthPort
+    from app.main import app
+
+    class MexyAuth(AuthPort):
+        def verify_token(self, token: str) -> AuthenticatedUser:
+            return AuthenticatedUser(id=OPERATOR, email="mexy@example.com")
+
+    app.dependency_overrides[get_auth] = MexyAuth
+
+
+def _owner_auth_override() -> None:
+    from app.api.deps import get_auth
+    from app.main import app
+
+    app.dependency_overrides[get_auth] = lambda: FakeAuth(OWNER)
+
+
+def _accept_restaurant_partnership(client, subdomain: str) -> str:
+    _mexy_auth_override()
+    listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
+    assert listed.status_code == 200, listed.text
+    link_id = next(
+        item["id"] for item in listed.json() if item["restaurant"]["subdomain"] == subdomain
+    )
+    accepted = client.post(
+        f"/api/v1/delivery-providers/me/partnership-requests/{link_id}/accept",
+        headers=AUTH,
+    )
+    assert accepted.status_code == 200, accepted.text
+    _owner_auth_override()
+    return link_id
+
+
+@requires_db
+def test_quote_uses_assigned_zone_weather_not_other_zone(client):
+    _create_mexy_provider(client)
+    zones = client.get("/api/v1/delivery-providers/me/zones", headers=AUTH).json()
+    assigned_zone_id = zones[0]["id"]
+
+    norte = client.post(
+        "/api/v1/delivery-providers/me/zones",
+        json={"name": "Norte", "polygon": FAR_POLYGON, "center_lat": 19.385, "center_lng": -99.045},
+        headers=AUTH,
+    )
+    assert norte.status_code == 201, norte.text
+    norte_zone_id = norte.json()["id"]
+
+    create_resp = client.post(
+        "/api/v1/restaurants",
+        json={
+            "name": "Zone Quote Test",
+            "subdomain": "zone-quote-test",
+            "delivery_enabled": True,
+            "latitude": COVERED_LAT,
+            "longitude": COVERED_LNG,
+        },
+        headers=AUTH,
+    )
+    assert create_resp.status_code == 201, create_resp.text
+    _accept_restaurant_partnership(client, "zone-quote-test")
+
+    client.patch(
+        f"/api/v1/delivery-providers/me/pricing/weather-mode?zone_id={norte_zone_id}",
+        json={"weather_mode": "intense"},
+        headers=AUTH,
+    )
+
+    quote_ok = client.post(
+        "/api/v1/public/restaurants/zone-quote-test/delivery-quote",
+        json={"latitude": COVERED_LAT, "longitude": COVERED_LNG},
+    )
+    assert quote_ok.status_code == 200, quote_ok.text
+    assert quote_ok.json()["available"] is True
+
+    client.patch(
+        f"/api/v1/delivery-providers/me/pricing/weather-mode?zone_id={assigned_zone_id}",
+        json={"weather_mode": "intense"},
+        headers=AUTH,
+    )
+
+    quote_blocked = client.post(
+        "/api/v1/public/restaurants/zone-quote-test/delivery-quote",
+        json={"latitude": COVERED_LAT, "longitude": COVERED_LNG},
+    )
+    assert quote_blocked.status_code == 200, quote_blocked.text
+    assert quote_blocked.json()["available"] is False
+    assert "lluvia intensa" in (quote_blocked.json().get("reason") or "").lower()
+
+
+@requires_db
+def test_reassign_partnership_zone_allows_deleting_original_zone(client, engine):
+    _create_mexy_provider(client)
+    zones = client.get("/api/v1/delivery-providers/me/zones", headers=AUTH).json()
+    zone_a_id = zones[0]["id"]
+
+    zone_b = client.post(
+        "/api/v1/delivery-providers/me/zones",
+        json={"name": "Norte", "polygon": FAR_POLYGON, "center_lat": 19.385, "center_lng": -99.045},
+        headers=AUTH,
+    )
+    assert zone_b.status_code == 201, zone_b.text
+    zone_b_id = zone_b.json()["id"]
+
+    create_resp = client.post(
+        "/api/v1/restaurants",
+        json={
+            "name": "Reassign Test",
+            "subdomain": "reassign-test",
+            "delivery_enabled": True,
+            "latitude": COVERED_LAT,
+            "longitude": COVERED_LNG,
+        },
+        headers=AUTH,
+    )
+    assert create_resp.status_code == 201, create_resp.text
+
+    _mexy_auth_override()
+    pending = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
+    assert pending.status_code == 200, pending.text
+    link_id = pending.json()[0]["id"]
+    assert pending.json()[0]["zone"]["id"] == zone_a_id
+
+    reassigned = client.patch(
+        f"/api/v1/delivery-providers/me/partnerships/{link_id}",
+        json={"zone_id": zone_b_id},
+        headers=AUTH,
+    )
+    assert reassigned.status_code == 200, reassigned.text
+    assert reassigned.json()["zone"]["id"] == zone_b_id
+
+    filtered = client.get(
+        f"/api/v1/delivery-providers/me/partnership-requests?zone_id={zone_b_id}",
+        headers=AUTH,
+    )
+    assert filtered.status_code == 200, filtered.text
+    assert any(item["id"] == link_id for item in filtered.json())
+
+    not_on_a = client.get(
+        f"/api/v1/delivery-providers/me/partnership-requests?zone_id={zone_a_id}",
+        headers=AUTH,
+    )
+    assert not_on_a.status_code == 200, not_on_a.text
+    assert not any(item["id"] == link_id for item in not_on_a.json())
+
+    deleted = client.delete(
+        f"/api/v1/delivery-providers/me/zones/{zone_a_id}",
+        headers=AUTH,
+    )
+    assert deleted.status_code == 204, deleted.text
+    _owner_auth_override()

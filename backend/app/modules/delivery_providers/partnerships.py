@@ -93,6 +93,8 @@ class DeliveryPartnershipService:
         if partnership is None or partnership.status != "active":
             return []
         zone_id = partnership.zone_id
+        if zone_id is None:
+            return []
         rows = list(self._repo.list_schedules(zone_id))
         if not rows:
             provider_id = self._repo.get_mexy_provider_id()
@@ -194,12 +196,14 @@ class DeliveryPartnershipService:
 
         self.seed_restaurant_delivery_payment_methods(restaurant_id)
 
-    def list_pending_requests(self, user_id: uuid.UUID) -> list[DeliveryPartnershipRequestDTO]:
+    def list_pending_requests(
+        self, user_id: uuid.UUID, zone_id: uuid.UUID | None = None
+    ) -> list[DeliveryPartnershipRequestDTO]:
         self._require_delivery_provider_member(user_id)
 
         by_restaurant: dict[uuid.UUID, DeliveryPartnershipRequestDTO] = {}
         for provider_id in self._repo.get_mexy_provider_ids():
-            for request in self._repo.list_pending_partnership_requests(provider_id):
+            for request in self._repo.list_pending_partnership_requests(provider_id, zone_id):
                 restaurant_id = request.restaurant.id
                 existing = by_restaurant.get(restaurant_id)
                 if existing is None or request.created_at > existing.created_at:
@@ -207,13 +211,15 @@ class DeliveryPartnershipService:
 
         return sorted(by_restaurant.values(), key=lambda item: item.created_at, reverse=True)
 
-    def list_active_requests(self, user_id: uuid.UUID) -> list[DeliveryPartnershipRequestDTO]:
+    def list_active_requests(
+        self, user_id: uuid.UUID, zone_id: uuid.UUID | None = None
+    ) -> list[DeliveryPartnershipRequestDTO]:
         self._require_delivery_provider_member(user_id)
 
         seen: set[uuid.UUID] = set()
         partnerships: list[DeliveryPartnershipRequestDTO] = []
         for provider_id in self._repo.get_mexy_provider_ids():
-            for partnership in self._repo.list_active_partnership_requests(provider_id):
+            for partnership in self._repo.list_active_partnership_requests(provider_id, zone_id):
                 if partnership.id in seen:
                     continue
                 seen.add(partnership.id)
@@ -233,6 +239,13 @@ class DeliveryPartnershipService:
         self._require_partnership_manager(user_id)
         provider_id = self._require_delivery_provider_mexy_link(user_id, link_id)
         self._repo.reject_partnership_request(link_id, provider_id)
+
+    def reassign_zone(
+        self, user_id: uuid.UUID, link_id: uuid.UUID, zone_id: uuid.UUID
+    ) -> DeliveryPartnershipRequestDTO:
+        self._require_partnership_manager(user_id)
+        provider_id = self._require_delivery_provider_mexy_link(user_id, link_id)
+        return self._repo.reassign_partnership_zone(link_id, provider_id, zone_id)
 
     def _require_delivery_provider_member(self, user_id: uuid.UUID) -> str:
         found = self._repo.get_for_user(user_id)

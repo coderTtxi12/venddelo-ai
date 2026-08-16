@@ -40,6 +40,7 @@ from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
     DeliveryPartnershipRestaurantDTO,
+    DeliveryPartnershipZoneRefDTO,
     DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
     DeliveryProviderMemberDTO,
@@ -439,6 +440,34 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
                 ),
                 {
                     "provider_id": str(provider_id),
+                    "lat": latitude,
+                    "lng": longitude,
+                },
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            return False
+        return bool(row["inside"])
+
+    def point_in_zone(self, zone_id: uuid.UUID, latitude: float, longitude: float) -> bool:
+        row = (
+            self._session.execute(
+                text(
+                    """
+                    SELECT ST_Contains(
+                        boundary::geometry,
+                        ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)
+                    ) AS inside
+                    FROM delivery_provider_zones
+                    WHERE id = :zone_id
+                      AND is_active = true
+                      AND boundary IS NOT NULL
+                    """
+                ),
+                {
+                    "zone_id": str(zone_id),
                     "lat": latitude,
                     "lng": longitude,
                 },
@@ -879,44 +908,70 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         ]
 
     def list_pending_partnership_requests(
-        self, provider_id: uuid.UUID
+        self, provider_id: uuid.UUID, zone_id: uuid.UUID | None = None
     ) -> Sequence[DeliveryPartnershipRequestDTO]:
-        rows = self._session.execute(
-            select(RestaurantDeliveryProvider, Restaurant, User.display_name)
+        query = (
+            select(
+                RestaurantDeliveryProvider,
+                Restaurant,
+                User.display_name,
+                DeliveryProviderZone,
+            )
             .join(Restaurant, Restaurant.id == RestaurantDeliveryProvider.restaurant_id)
+            .join(
+                DeliveryProviderZone,
+                DeliveryProviderZone.id == RestaurantDeliveryProvider.zone_id,
+            )
             .outerjoin(User, User.id == Restaurant.owner_id)
             .where(
                 RestaurantDeliveryProvider.delivery_provider_id == provider_id,
                 RestaurantDeliveryProvider.status == "pending",
                 Restaurant.is_active.is_(True),
             )
-            .order_by(RestaurantDeliveryProvider.created_at.desc())
+        )
+        if zone_id is not None:
+            query = query.where(RestaurantDeliveryProvider.zone_id == zone_id)
+        rows = self._session.execute(
+            query.order_by(RestaurantDeliveryProvider.created_at.desc())
         ).all()
         return [
-            self._partnership_dto_from_row(link, restaurant, owner_display_name)
-            for link, restaurant, owner_display_name in rows
+            self._partnership_dto_from_row(link, restaurant, owner_display_name, zone)
+            for link, restaurant, owner_display_name, zone in rows
         ]
 
     def list_active_partnership_requests(
-        self, provider_id: uuid.UUID
+        self, provider_id: uuid.UUID, zone_id: uuid.UUID | None = None
     ) -> Sequence[DeliveryPartnershipRequestDTO]:
-        rows = self._session.execute(
-            select(RestaurantDeliveryProvider, Restaurant, User.display_name)
+        query = (
+            select(
+                RestaurantDeliveryProvider,
+                Restaurant,
+                User.display_name,
+                DeliveryProviderZone,
+            )
             .join(Restaurant, Restaurant.id == RestaurantDeliveryProvider.restaurant_id)
+            .join(
+                DeliveryProviderZone,
+                DeliveryProviderZone.id == RestaurantDeliveryProvider.zone_id,
+            )
             .outerjoin(User, User.id == Restaurant.owner_id)
             .where(
                 RestaurantDeliveryProvider.delivery_provider_id == provider_id,
                 RestaurantDeliveryProvider.status == "active",
                 Restaurant.is_active.is_(True),
             )
-            .order_by(
+        )
+        if zone_id is not None:
+            query = query.where(RestaurantDeliveryProvider.zone_id == zone_id)
+        rows = self._session.execute(
+            query.order_by(
                 RestaurantDeliveryProvider.activated_at.desc().nullslast(),
                 RestaurantDeliveryProvider.created_at.desc(),
             )
         ).all()
         return [
-            self._partnership_dto_from_row(link, restaurant, owner_display_name)
-            for link, restaurant, owner_display_name in rows
+            self._partnership_dto_from_row(link, restaurant, owner_display_name, zone)
+            for link, restaurant, owner_display_name, zone in rows
         ]
 
     def accept_partnership_request(
@@ -925,8 +980,17 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         from app.core.exceptions import NotFoundError, ValidationError
 
         row = self._session.execute(
-            select(RestaurantDeliveryProvider, Restaurant, User.display_name)
+            select(
+                RestaurantDeliveryProvider,
+                Restaurant,
+                User.display_name,
+                DeliveryProviderZone,
+            )
             .join(Restaurant, Restaurant.id == RestaurantDeliveryProvider.restaurant_id)
+            .join(
+                DeliveryProviderZone,
+                DeliveryProviderZone.id == RestaurantDeliveryProvider.zone_id,
+            )
             .outerjoin(User, User.id == Restaurant.owner_id)
             .where(
                 RestaurantDeliveryProvider.id == link_id,
@@ -936,7 +1000,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         if row is None:
             raise NotFoundError("Solicitud de partnership no encontrada")
 
-        link, restaurant, owner_display_name = row
+        link, restaurant, owner_display_name, zone = row
         if link.status != "pending":
             raise ValidationError("Esta solicitud ya fue procesada")
 
@@ -950,7 +1014,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         link.is_default = True
         link.activated_at = now
         self._session.flush()
-        return self._partnership_dto_from_row(link, restaurant, owner_display_name)
+        return self._partnership_dto_from_row(link, restaurant, owner_display_name, zone)
 
     def _resolve_duplicate_mexy_partnerships_before_accept(
         self,
@@ -994,6 +1058,41 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         self._session.delete(link)
         self._session.flush()
 
+    def reassign_partnership_zone(
+        self, link_id: uuid.UUID, provider_id: uuid.UUID, zone_id: uuid.UUID
+    ) -> DeliveryPartnershipRequestDTO:
+        self.assert_zone_on_provider(provider_id, zone_id)
+
+        row = self._session.execute(
+            select(
+                RestaurantDeliveryProvider,
+                Restaurant,
+                User.display_name,
+                DeliveryProviderZone,
+            )
+            .join(Restaurant, Restaurant.id == RestaurantDeliveryProvider.restaurant_id)
+            .join(
+                DeliveryProviderZone,
+                DeliveryProviderZone.id == RestaurantDeliveryProvider.zone_id,
+            )
+            .outerjoin(User, User.id == Restaurant.owner_id)
+            .where(
+                RestaurantDeliveryProvider.id == link_id,
+                RestaurantDeliveryProvider.delivery_provider_id == provider_id,
+            )
+        ).first()
+        if row is None:
+            raise NotFoundError("Solicitud de partnership no encontrada")
+
+        link, restaurant, owner_display_name, _current_zone = row
+        link.zone_id = zone_id
+        self._session.flush()
+
+        new_zone = self._session.get(DeliveryProviderZone, zone_id)
+        if new_zone is None:
+            raise NotFoundError("Zona no encontrada")
+        return self._partnership_dto_from_row(link, restaurant, owner_display_name, new_zone)
+
     def get_partnership_provider_id(self, link_id: uuid.UUID) -> uuid.UUID | None:
         return self._session.scalar(
             select(RestaurantDeliveryProvider.delivery_provider_id).where(
@@ -1005,10 +1104,14 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         self, restaurant_id: uuid.UUID
     ) -> RestaurantDeliveryPartnershipDTO | None:
         row = self._session.execute(
-            select(RestaurantDeliveryProvider, DeliveryProvider)
+            select(RestaurantDeliveryProvider, DeliveryProvider, DeliveryProviderZone)
             .join(
                 DeliveryProvider,
                 DeliveryProvider.id == RestaurantDeliveryProvider.delivery_provider_id,
+            )
+            .join(
+                DeliveryProviderZone,
+                DeliveryProviderZone.id == RestaurantDeliveryProvider.zone_id,
             )
             .where(
                 RestaurantDeliveryProvider.restaurant_id == restaurant_id,
@@ -1020,7 +1123,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         if row is None:
             return None
 
-        link, provider = row
+        link, provider, zone = row
         if not is_mexy_provider_slug(provider.slug):
             return None
 
@@ -1029,6 +1132,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             provider_name=provider.name,
             provider_slug=provider.slug,
             zone_id=link.zone_id,
+            zone_name=zone.name,
             status=link.status,  # type: ignore[arg-type]
             is_default=link.is_default,
             created_at=link.created_at,
@@ -1040,13 +1144,19 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         link: RestaurantDeliveryProvider,
         restaurant: Restaurant,
         owner_display_name: str | None = None,
+        zone: DeliveryProviderZone | None = None,
     ) -> DeliveryPartnershipRequestDTO:
+        zone_ref = DeliveryPartnershipZoneRefDTO(
+            id=zone.id if zone is not None else link.zone_id,
+            name=zone.name if zone is not None else "",
+        )
         return DeliveryPartnershipRequestDTO(
             id=link.id,
             status=link.status,
             is_default=link.is_default,
             created_at=link.created_at,
             activated_at=link.activated_at,
+            zone=zone_ref,
             restaurant=DeliveryPartnershipRestaurantDTO(
                 id=restaurant.id,
                 name=restaurant.name,

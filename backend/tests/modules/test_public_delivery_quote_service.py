@@ -78,7 +78,7 @@ def _active_outside_quote_repo() -> MagicMock:
     repo.get_service_manually_enabled.return_value = True
     repo.get_weather_mode.return_value = "none"
     repo.get_pricing_config.return_value = _pricing_config()
-    repo.point_in_primary_zone.return_value = False
+    repo.point_in_zone.return_value = False
     return repo
 
 
@@ -193,3 +193,52 @@ def test_resolve_delivery_service_blocks_when_delivery_disabled():
 
     assert resolved.available is False
     assert resolved.partnership_status == "none"
+
+
+def test_quote_delivery_uses_assigned_zone_for_point_in_zone():
+    repo = _active_outside_quote_repo()
+    zone_id = repo.get_mexy_partnership_for_restaurant.return_value.zone_id
+    service = PublicDeliveryQuoteService(repo)
+    now = datetime(2026, 6, 22, 18, 0, tzinfo=UTC)
+
+    with (
+        patch(
+            "app.modules.public.delivery_quote_service.get_settings",
+            return_value=MagicMock(google_maps_api_key="test-key"),
+        ),
+        patch(
+            "app.modules.public.delivery_quote_service.fetch_driving_distance_km",
+            return_value=5.0,
+        ),
+    ):
+        service.quote_delivery(
+            _restaurant(),
+            delivery_latitude=19.45,
+            delivery_longitude=-99.12,
+            now=now,
+        )
+
+    repo.point_in_zone.assert_called_once_with(zone_id, 19.45, -99.12)
+
+
+def test_resolve_delivery_service_blocks_when_partnership_has_no_zone():
+    repo = MagicMock()
+    partnership = RestaurantDeliveryPartnershipDTO(
+        id=uuid.uuid4(),
+        provider_name="Mexy",
+        provider_slug="mexy",
+        zone_id=None,
+        zone_name=None,
+        status="active",
+        is_default=True,
+        created_at=datetime.now(),
+        activated_at=datetime.now(),
+    )
+    repo.get_mexy_partnership_for_restaurant.return_value = partnership
+    repo.get_mexy_provider_id.return_value = uuid.uuid4()
+
+    service = PublicDeliveryQuoteService(repo)
+    resolved = service.resolve_delivery_service(_restaurant())
+
+    assert resolved.available is False
+    assert resolved.partnership_status == "active"

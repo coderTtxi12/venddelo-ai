@@ -9,6 +9,7 @@ from app.infra.storage.factory import build_storage
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
+    DeliveryPartnershipZoneUpdate,
     DeliveryProviderAdminInviteCreate,
     DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
@@ -272,18 +273,33 @@ def simulate_my_delivery_provider_pricing(
 
 @router.get("/me/partnership-requests", response_model=list[DeliveryPartnershipRequestDTO])
 def list_my_partnership_requests(
+    zone_id: UUID | None = Query(default=None),
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryPartnershipService = Depends(_partnership_service),
 ) -> list[DeliveryPartnershipRequestDTO]:
-    return service.list_pending_requests(user.id)
+    return service.list_pending_requests(user.id, zone_id)
 
 
 @router.get("/me/partnerships", response_model=list[DeliveryPartnershipRequestDTO])
 def list_my_active_partnerships(
+    zone_id: UUID | None = Query(default=None),
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryPartnershipService = Depends(_partnership_service),
 ) -> list[DeliveryPartnershipRequestDTO]:
-    return service.list_active_requests(user.id)
+    return service.list_active_requests(user.id, zone_id)
+
+
+@router.patch(
+    "/me/partnerships/{link_id}",
+    response_model=DeliveryPartnershipRequestDTO,
+)
+def reassign_partnership_zone(
+    link_id: UUID,
+    data: DeliveryPartnershipZoneUpdate,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryPartnershipService = Depends(_partnership_service),
+) -> DeliveryPartnershipRequestDTO:
+    return service.reassign_zone(user.id, link_id, data.zone_id)
 
 
 @router.post(
