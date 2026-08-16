@@ -350,9 +350,6 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         return updated
 
     def delete_zone(self, provider_id: uuid.UUID, zone_id: uuid.UUID) -> None:
-        if self.count_zones(provider_id) <= 1:
-            raise ConflictError("Debes conservar al menos una zona")
-
         zone = self._session.scalar(
             select(DeliveryProviderZone).where(
                 DeliveryProviderZone.id == zone_id,
@@ -362,6 +359,9 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         )
         if zone is None:
             raise NotFoundError("Zona no encontrada")
+
+        if self.count_zones(provider_id) <= 1:
+            raise ConflictError("Debes conservar al menos una zona")
 
         partnership_count = self.count_partnerships_for_zone(zone_id)
         if partnership_count > 0:
@@ -581,6 +581,9 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
     def set_pricing_config(
         self, provider_id: uuid.UUID, config: DeliveryProviderPricingConfigDTO
     ) -> DeliveryProviderPricingConfigDTO:
+        zone_id = self._primary_zone_id(provider_id)
+        if zone_id is None:
+            raise ValueError("Delivery provider has no active zone")
         row = self._session.scalar(
             select(DeliveryProviderPricingConfig).where(
                 DeliveryProviderPricingConfig.delivery_provider_id == provider_id,
@@ -588,9 +591,6 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             )
         )
         payload = config_to_json(self._pricing_config_from_dto(config))
-        zone_id = self._primary_zone_id(provider_id)
-        if zone_id is None:
-            raise ValueError("Delivery provider has no active zone")
         if row is None:
             row = DeliveryProviderPricingConfig(
                 delivery_provider_id=provider_id,
