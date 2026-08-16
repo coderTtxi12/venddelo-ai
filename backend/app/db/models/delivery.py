@@ -39,10 +39,6 @@ class DeliveryProvider(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         String(64), nullable=False, server_default="America/Mexico_City"
     )
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="draft")
-    service_manually_enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true"
-    )
-    weather_mode: Mapped[str] = mapped_column(String, nullable=False, server_default="none")
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     members: Mapped[list["DeliveryProviderMember"]] = relationship(
@@ -81,10 +77,6 @@ class DeliveryProvider(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint(
             "status IN ('draft','pending_review','active','rejected','suspended')",
             name="status_allowed",
-        ),
-        CheckConstraint(
-            "weather_mode IN ('none','light','heavy','intense')",
-            name="weather_mode_allowed",
         ),
         Index("ix_delivery_providers_status", "status"),
     )
@@ -159,6 +151,10 @@ class DeliveryProviderZone(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     radius_meters: Mapped[int | None] = mapped_column(Integer, nullable=True)
     priority: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="0")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    weather_mode: Mapped[str] = mapped_column(String, nullable=False, server_default="none")
+    service_manually_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
 
     delivery_provider: Mapped["DeliveryProvider"] = relationship(back_populates="zones")
     tariffs: Mapped[list["DeliveryProviderTariff"]] = relationship(back_populates="zone")
@@ -167,6 +163,10 @@ class DeliveryProviderZone(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint(
             "zone_kind IN ('polygon','radius')",
             name="zone_kind_allowed",
+        ),
+        CheckConstraint(
+            "weather_mode IN ('none','light','heavy','intense')",
+            name="ck_delivery_provider_zones_weather_mode_allowed",
         ),
         Index("ix_delivery_provider_zones_lookup", "delivery_provider_id", "is_active"),
     )
@@ -178,6 +178,11 @@ class DeliveryProviderSchedule(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     delivery_provider_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("delivery_providers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    zone_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_provider_zones.id", ondelete="CASCADE"),
         nullable=False,
     )
     schedule_kind: Mapped[str] = mapped_column(String, nullable=False, server_default="regular")
@@ -195,7 +200,7 @@ class DeliveryProviderSchedule(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("day_of_week BETWEEN 0 AND 6", name="day_of_week_range"),
         Index(
             "ix_delivery_provider_schedules_lookup",
-            "delivery_provider_id",
+            "zone_id",
             "schedule_kind",
             "day_of_week",
         ),
@@ -258,6 +263,11 @@ class DeliveryProviderPricingConfig(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         PG_UUID(as_uuid=True),
         ForeignKey("delivery_providers.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    zone_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_provider_zones.id", ondelete="CASCADE"),
+        nullable=False,
         unique=True,
     )
     inside_polygon: Mapped[dict] = mapped_column(JSONB, nullable=False)
@@ -277,6 +287,11 @@ class RestaurantDeliveryProvider(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     delivery_provider_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("delivery_providers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    zone_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_provider_zones.id", ondelete="RESTRICT"),
         nullable=False,
     )
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="pending")

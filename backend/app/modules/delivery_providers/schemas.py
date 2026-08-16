@@ -42,7 +42,6 @@ class DeliveryProviderDTO(BaseModel):
     logo_path: str | None
     timezone: str
     status: str
-    service_manually_enabled: bool
     submitted_at: datetime | None
     created_at: datetime
     updated_at: datetime

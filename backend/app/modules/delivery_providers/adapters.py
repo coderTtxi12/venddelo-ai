@@ -148,10 +148,32 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         )
         self._session.flush()
         self._session.refresh(provider)
-        self.seed_default_schedules(provider.id)
-        self.seed_default_pricing_config(provider.id)
+        self.seed_default_schedules(provider.id, zone.id)
+        self.seed_default_pricing_config(provider.id, zone.id)
         self.seed_default_payment_methods(provider.id)
         return DeliveryProviderDTO.model_validate(provider)
+
+    def _primary_zone_id(self, provider_id: uuid.UUID) -> uuid.UUID | None:
+        return self._session.scalar(
+            select(DeliveryProviderZone.id)
+            .where(
+                DeliveryProviderZone.delivery_provider_id == provider_id,
+                DeliveryProviderZone.is_active.is_(True),
+            )
+            .order_by(DeliveryProviderZone.priority.asc(), DeliveryProviderZone.created_at.asc())
+            .limit(1)
+        )
+
+    def _primary_zone_row(self, provider_id: uuid.UUID) -> DeliveryProviderZone | None:
+        return self._session.scalar(
+            select(DeliveryProviderZone)
+            .where(
+                DeliveryProviderZone.delivery_provider_id == provider_id,
+                DeliveryProviderZone.is_active.is_(True),
+            )
+            .order_by(DeliveryProviderZone.priority.asc(), DeliveryProviderZone.created_at.asc())
+            .limit(1)
+        )
 
     def set_logo_path(self, provider_id: uuid.UUID, logo_path: str) -> None:
         provider = self._session.get(DeliveryProvider, provider_id)
@@ -321,6 +343,10 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         provider_id: uuid.UUID,
         schedules: Sequence[DeliveryProviderScheduleCreate],
     ) -> None:
+        zone_id = self._primary_zone_id(provider_id)
+        if zone_id is None:
+            raise ValueError("Delivery provider has no active zone")
+
         self._session.query(DeliveryProviderSchedule).filter_by(
             delivery_provider_id=provider_id
         ).delete()
@@ -328,6 +354,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             self._session.add(
                 DeliveryProviderSchedule(
                     delivery_provider_id=provider_id,
+                    zone_id=zone_id,
                     schedule_kind=entry.schedule_kind,
                     day_of_week=entry.day_of_week,
                     opens_at=entry.opens_at,
@@ -336,7 +363,13 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             )
         self._session.flush()
 
-    def seed_default_schedules(self, provider_id: uuid.UUID) -> None:
+    def seed_default_schedules(
+        self, provider_id: uuid.UUID, zone_id: uuid.UUID | None = None
+    ) -> None:
+        resolved_zone_id = zone_id or self._primary_zone_id(provider_id)
+        if resolved_zone_id is None:
+            return
+
         existing = self._session.scalar(
             select(DeliveryProviderSchedule.id)
             .where(DeliveryProviderSchedule.delivery_provider_id == provider_id)
@@ -350,6 +383,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
                 self._session.add(
                     DeliveryProviderSchedule(
                         delivery_provider_id=provider_id,
+                        zone_id=resolved_zone_id,
                         schedule_kind=schedule_kind,
                         day_of_week=day_of_week,
                         opens_at=opens_at,
@@ -359,18 +393,18 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         self._session.flush()
 
     def get_service_manually_enabled(self, provider_id: uuid.UUID) -> bool:
-        provider = self._session.get(DeliveryProvider, provider_id)
-        if provider is None:
+        zone = self._primary_zone_row(provider_id)
+        if zone is None:
             raise ValueError("Delivery provider not found")
-        return provider.service_manually_enabled
+        return zone.service_manually_enabled
 
     def set_service_manually_enabled(self, provider_id: uuid.UUID, enabled: bool) -> bool:
-        provider = self._session.get(DeliveryProvider, provider_id)
-        if provider is None:
+        zone = self._primary_zone_row(provider_id)
+        if zone is None:
             raise ValueError("Delivery provider not found")
-        provider.service_manually_enabled = enabled
+        zone.service_manually_enabled = enabled
         self._session.flush()
-        return provider.service_manually_enabled
+        return zone.service_manually_enabled
 
     def get_provider_timezone(self, provider_id: uuid.UUID) -> str:
         provider = self._session.get(DeliveryProvider, provider_id)
@@ -397,9 +431,13 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             )
         )
         payload = config_to_json(self._pricing_config_from_dto(config))
+        zone_id = self._primary_zone_id(provider_id)
+        if zone_id is None:
+            raise ValueError("Delivery provider has no active zone")
         if row is None:
             row = DeliveryProviderPricingConfig(
                 delivery_provider_id=provider_id,
+                zone_id=zone_id,
                 inside_polygon=payload["inside_polygon"],  # type: ignore[arg-type]
                 outside_polygon=payload["outside_polygon"],  # type: ignore[arg-type]
             )
@@ -410,7 +448,13 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         self._session.flush()
         return self._pricing_dto_from_row(row)
 
-    def seed_default_pricing_config(self, provider_id: uuid.UUID) -> None:
+    def seed_default_pricing_config(
+        self, provider_id: uuid.UUID, zone_id: uuid.UUID | None = None
+    ) -> None:
+        resolved_zone_id = zone_id or self._primary_zone_id(provider_id)
+        if resolved_zone_id is None:
+            return
+
         existing = self._session.scalar(
             select(DeliveryProviderPricingConfig.id).where(
                 DeliveryProviderPricingConfig.delivery_provider_id == provider_id
@@ -424,6 +468,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         self._session.add(
             DeliveryProviderPricingConfig(
                 delivery_provider_id=provider_id,
+                zone_id=resolved_zone_id,
                 inside_polygon=payload["inside_polygon"],  # type: ignore[arg-type]
                 outside_polygon=payload["outside_polygon"],  # type: ignore[arg-type]
             )
@@ -478,18 +523,18 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         self._session.flush()
 
     def get_weather_mode(self, provider_id: uuid.UUID) -> str:
-        provider = self._session.get(DeliveryProvider, provider_id)
-        if provider is None:
+        zone = self._primary_zone_row(provider_id)
+        if zone is None:
             raise ValueError("Delivery provider not found")
-        return provider.weather_mode
+        return zone.weather_mode
 
     def set_weather_mode(self, provider_id: uuid.UUID, weather_mode: str) -> str:
-        provider = self._session.get(DeliveryProvider, provider_id)
-        if provider is None:
+        zone = self._primary_zone_row(provider_id)
+        if zone is None:
             raise ValueError("Delivery provider not found")
-        provider.weather_mode = weather_mode
+        zone.weather_mode = weather_mode
         self._session.flush()
-        return provider.weather_mode
+        return zone.weather_mode
 
     @staticmethod
     def _pricing_config_from_dto(config: DeliveryProviderPricingConfigDTO):
@@ -610,12 +655,9 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             slug=MEXY_PROVIDER_SLUG,
             status="active",
             timezone="America/Mexico_City",
-            service_manually_enabled=True,
         )
         self._session.add(provider)
         self._session.flush()
-        self.seed_default_schedules(provider.id)
-        self.seed_default_pricing_config(provider.id)
         self.seed_default_payment_methods(provider.id)
         return provider.id
 
