@@ -3,8 +3,9 @@
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
+import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
-import type { DeliveryPartnershipRequest } from '@/lib/api/types';
+import type { DeliveryPartnershipRequest, DeliveryProviderZone } from '@/lib/api/types';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ExpandableText } from '@/components/partnerships/ExpandableText';
 import { RestaurantLocationPreview } from '@/components/partnerships/RestaurantLocationPreview';
@@ -14,8 +15,12 @@ import styles from './PartnershipRequestCard.module.css';
 type PartnershipRequestCardProps = {
   request: DeliveryPartnershipRequest;
   busy: boolean;
+  zones: DeliveryProviderZone[];
+  canReassign: boolean;
+  reassigning?: boolean;
   onAccept: () => void;
   onReject: () => void;
+  onZoneChange?: (zoneId: string) => void;
 };
 
 function formatRequestedAt(iso: string): string {
@@ -40,8 +45,12 @@ function RestaurantLogo({ name, logoPath }: { name: string; logoPath: string | n
 export function PartnershipRequestCard({
   request,
   busy,
+  zones,
+  canReassign,
+  reassigning = false,
   onAccept,
   onReject,
+  onZoneChange,
 }: PartnershipRequestCardProps) {
   const { restaurant } = request;
   const ownerLabel = restaurant.owner_display_name?.trim() || 'Dueño del restaurante';
@@ -62,10 +71,31 @@ export function PartnershipRequestCard({
               {restaurant.subdomain}
             </span>
             <span className={styles.chipMuted}>
+              <PlaceOutlinedIcon sx={{ fontSize: 14 }} aria-hidden />
+              {request.zone.name}
+            </span>
+            <span className={styles.chipMuted}>
               <AccessTimeOutlinedIcon sx={{ fontSize: 14 }} aria-hidden />
               {formatRequestedAt(request.created_at)}
             </span>
           </div>
+          {canReassign && zones.length > 1 && onZoneChange ? (
+            <label className={styles.zoneSelectWrap}>
+              <span className={styles.zoneSelectLabel}>Zona</span>
+              <select
+                className={styles.zoneSelect}
+                value={request.zone.id}
+                disabled={busy || reassigning}
+                onChange={(event) => onZoneChange(event.target.value)}
+              >
+                {zones.map((zone) => (
+                  <option key={zone.id} value={zone.id}>
+                    {zone.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
         </div>
         <div className={styles.headerActions}>
           <button

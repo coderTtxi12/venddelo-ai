@@ -120,6 +120,58 @@
   border: 1px solid var(--color-border);
 }
 
+.zoneFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.zoneFilterChip {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+  line-height: 1.2;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.zoneFilterChip:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
+  color: var(--color-text);
+}
+
+.zoneFilterChipActive {
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.zoneGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.zoneGroup + .zoneGroup {
+  margin-top: 0.35rem;
+}
+
+.zoneHeading {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
 @media (max-width: 900px) {
   .header {
     flex-direction: column;

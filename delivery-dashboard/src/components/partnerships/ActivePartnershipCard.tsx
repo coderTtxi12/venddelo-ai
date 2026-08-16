@@ -3,8 +3,9 @@
 import CheckCircleOutlineOutlinedIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
+import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
-import type { DeliveryPartnershipRequest } from '@/lib/api/types';
+import type { DeliveryPartnershipRequest, DeliveryProviderZone } from '@/lib/api/types';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ExpandableText } from '@/components/partnerships/ExpandableText';
 import { RestaurantLocationPreview } from '@/components/partnerships/RestaurantLocationPreview';
@@ -14,6 +15,10 @@ import activeStyles from './ActivePartnershipCard.module.css';
 
 type ActivePartnershipCardProps = {
   partnership: DeliveryPartnershipRequest;
+  zones: DeliveryProviderZone[];
+  canReassign: boolean;
+  reassigning?: boolean;
+  onZoneChange?: (zoneId: string) => void;
 };
 
 function formatDate(iso: string): string {
@@ -35,7 +40,13 @@ function RestaurantLogo({ name, logoPath }: { name: string; logoPath: string | n
   return <span className={styles.logoFallback}>{name.charAt(0).toUpperCase()}</span>;
 }
 
-export function ActivePartnershipCard({ partnership }: ActivePartnershipCardProps) {
+export function ActivePartnershipCard({
+  partnership,
+  zones,
+  canReassign,
+  reassigning = false,
+  onZoneChange,
+}: ActivePartnershipCardProps) {
   const { restaurant } = partnership;
   const ownerLabel = restaurant.owner_display_name?.trim() || 'Dueño del restaurante';
   const ownerPhone = restaurant.owner_phone?.trim();
@@ -60,9 +71,30 @@ export function ActivePartnershipCard({ partnership }: ActivePartnershipCardProp
               Activo
             </span>
             <span className={styles.chipMuted}>
+              <PlaceOutlinedIcon sx={{ fontSize: 14 }} aria-hidden />
+              {partnership.zone.name}
+            </span>
+            <span className={styles.chipMuted}>
               Desde {formatDate(activeSince)}
             </span>
           </div>
+          {canReassign && zones.length > 1 && onZoneChange ? (
+            <label className={styles.zoneSelectWrap}>
+              <span className={styles.zoneSelectLabel}>Zona</span>
+              <select
+                className={styles.zoneSelect}
+                value={partnership.zone.id}
+                disabled={reassigning}
+                onChange={(event) => onZoneChange(event.target.value)}
+              >
+                {zones.map((zone) => (
+                  <option key={zone.id} value={zone.id}>
+                    {zone.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
         </div>
       </header>
 

@@ -1,28 +1,69 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivePartnershipCard } from '@/components/partnerships/ActivePartnershipCard';
 import { PartnershipRequestCard } from '@/components/partnerships/PartnershipRequestCard';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
+import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
+import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { useAuth } from '@/hooks/useAuth';
 import {
   acceptPartnershipRequest,
   listActivePartnerships,
   listPartnershipRequests,
+  reassignPartnershipZone,
   rejectPartnershipRequest,
 } from '@/lib/api/partnerships';
-import type { DeliveryPartnershipRequest } from '@/lib/api/types';
+import type { DeliveryPartnershipRequest, DeliveryProviderZone } from '@/lib/api/types';
 import styles from './PartnershipsPage.module.css';
 
 type Tab = 'pending' | 'active';
 
+type ZoneGroup = {
+  zone: { id: string; name: string };
+  items: DeliveryPartnershipRequest[];
+};
+
+function groupItemsByZone(
+  items: DeliveryPartnershipRequest[],
+  zones: DeliveryProviderZone[],
+): ZoneGroup[] {
+  const byZone = new Map<string, DeliveryPartnershipRequest[]>();
+  for (const item of items) {
+    const rows = byZone.get(item.zone.id) ?? [];
+    rows.push(item);
+    byZone.set(item.zone.id, rows);
+  }
+
+  const groups: ZoneGroup[] = [];
+  for (const zone of zones) {
+    const zoneItems = byZone.get(zone.id);
+    if (zoneItems?.length) {
+      groups.push({ zone: { id: zone.id, name: zone.name }, items: zoneItems });
+      byZone.delete(zone.id);
+    }
+  }
+
+  for (const zoneItems of byZone.values()) {
+    if (zoneItems.length > 0) {
+      groups.push({ zone: zoneItems[0].zone, items: zoneItems });
+    }
+  }
+
+  return groups;
+}
+
 export default function PartnershipsPage() {
   const { accessToken } = useAuth();
+  const { zones } = useDeliveryZone();
+  const { canManagePartnerships } = useDeliveryProviderAccess();
   const [tab, setTab] = useState<Tab>('pending');
+  const [filterZoneId, setFilterZoneId] = useState<string | null>(null);
   const [requests, setRequests] = useState<DeliveryPartnershipRequest[]>([]);
   const [activePartnerships, setActivePartnerships] = useState<DeliveryPartnershipRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [reassigningId, setReassigningId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
@@ -77,8 +118,110 @@ export default function PartnershipsPage() {
     }
   }
 
+  async function handleReassign(linkId: string, zoneId: string, source: Tab) {
+    if (!accessToken) return;
+    setReassigningId(linkId);
+    setError(null);
+    try {
+      const updated = await reassignPartnershipZone(accessToken, linkId, zoneId);
+      const updater = (prev: DeliveryPartnershipRequest[]) =>
+        prev.map((row) => (row.id === linkId ? updated : row));
+      if (source === 'pending') {
+        setRequests(updater);
+      } else {
+        setActivePartnerships(updater);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo reasignar la zona');
+    } finally {
+      setReassigningId(null);
+    }
+  }
+
   const pendingCount = requests.length;
   const activeCount = activePartnerships.length;
+
+  const tabItems = tab === 'pending' ? requests : activePartnerships;
+
+  const filteredItems = useMemo(() => {
+    if (!filterZoneId) return tabItems;
+    return tabItems.filter((item) => item.zone.id === filterZoneId);
+  }, [filterZoneId, tabItems]);
+
+  const groupedItems = useMemo(
+    () => (filterZoneId ? null : groupItemsByZone(filteredItems, zones)),
+    [filterZoneId, filteredItems, zones],
+  );
+
+  const zoneFilterEmpty = filterZoneId !== null && tabItems.length > 0 && filteredItems.length === 0;
+
+  const cardProps = {
+    zones,
+    canReassign: canManagePartnerships,
+  };
+
+  function renderPendingCard(request: DeliveryPartnershipRequest) {
+    return (
+      <PartnershipRequestCard
+        key={request.id}
+        request={request}
+        busy={busyId === request.id}
+        reassigning={reassigningId === request.id}
+        onAccept={() => void handleAccept(request.id)}
+        onReject={() => void handleReject(request.id)}
+        onZoneChange={(zoneId) => void handleReassign(request.id, zoneId, 'pending')}
+        {...cardProps}
+      />
+    );
+  }
+
+  function renderActiveCard(partnership: DeliveryPartnershipRequest) {
+    return (
+      <ActivePartnershipCard
+        key={partnership.id}
+        partnership={partnership}
+        reassigning={reassigningId === partnership.id}
+        onZoneChange={(zoneId) => void handleReassign(partnership.id, zoneId, 'active')}
+        {...cardProps}
+      />
+    );
+  }
+
+  function renderList() {
+    if (zoneFilterEmpty) {
+      return (
+        <div className={styles.empty}>
+          <p className={styles.emptyTitle}>Nadie en esta zona todavía</p>
+          <p className={styles.emptySubtitle}>
+            Las solicitudes de esta zona aparecerán aquí.
+          </p>
+        </div>
+      );
+    }
+
+    if (filterZoneId) {
+      return (
+        <div className={styles.list}>
+          {filteredItems.map((item) =>
+            tab === 'pending' ? renderPendingCard(item) : renderActiveCard(item),
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className={styles.list}>
+        {groupedItems?.map((group) => (
+          <section key={group.zone.id} className={styles.zoneGroup}>
+            <h3 className={styles.zoneHeading}>{group.zone.name}</h3>
+            {group.items.map((item) =>
+              tab === 'pending' ? renderPendingCard(item) : renderActiveCard(item),
+            )}
+          </section>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <PanelPageShell
@@ -101,6 +244,28 @@ export default function PartnershipsPage() {
         ) : undefined
       }
     >
+      {zones.length > 0 ? (
+        <div className={styles.zoneFilters} role="group" aria-label="Filtrar por zona">
+          <button
+            type="button"
+            className={`${styles.zoneFilterChip} ${filterZoneId === null ? styles.zoneFilterChipActive : ''}`}
+            onClick={() => setFilterZoneId(null)}
+          >
+            Todas
+          </button>
+          {zones.map((zone) => (
+            <button
+              key={zone.id}
+              type="button"
+              className={`${styles.zoneFilterChip} ${filterZoneId === zone.id ? styles.zoneFilterChipActive : ''}`}
+              onClick={() => setFilterZoneId(zone.id)}
+            >
+              {zone.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className={styles.tabs} role="tablist" aria-label="Secciones de restaurantes">
         <button
           type="button"
@@ -140,17 +305,7 @@ export default function PartnershipsPage() {
             </p>
           </div>
         ) : (
-          <div className={styles.list}>
-            {requests.map((request) => (
-              <PartnershipRequestCard
-                key={request.id}
-                request={request}
-                busy={busyId === request.id}
-                onAccept={() => void handleAccept(request.id)}
-                onReject={() => void handleReject(request.id)}
-              />
-            ))}
-          </div>
+          renderList()
         )
       ) : activePartnerships.length === 0 ? (
         <div className={styles.empty}>
@@ -160,11 +315,7 @@ export default function PartnershipsPage() {
           </p>
         </div>
       ) : (
-        <div className={styles.list}>
-          {activePartnerships.map((partnership) => (
-            <ActivePartnershipCard key={partnership.id} partnership={partnership} />
-          ))}
-        </div>
+        renderList()
       )}
     </PanelPageShell>
   );
