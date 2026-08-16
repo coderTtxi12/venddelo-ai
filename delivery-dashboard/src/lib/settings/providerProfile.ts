@@ -73,9 +73,7 @@ export function validateServiceZone(
 }
 
 export function validateProviderProfile(data: ProviderProfileForm): string | null {
-  const coreError = validateProviderProfileCore(data);
-  if (coreError) return coreError;
-  return validateServiceZone(data);
+  return validateProviderProfileCore(data);
 }
 
 export function buildProfileUpdatePayload(data: ProviderProfileForm) {

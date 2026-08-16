@@ -289,7 +289,6 @@ def test_accepting_partnership_clears_duplicate_pending_requests(client, engine)
             slug="mexy",
             status="active",
             timezone="America/Mexico_City",
-            service_manually_enabled=True,
         )
         session.add(legacy_provider)
         session.flush()

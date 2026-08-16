@@ -8,7 +8,7 @@ import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import WorkOutlineOutlinedIcon from '@mui/icons-material/WorkOutlineOutlined';
 import { DeliveryProviderHoursEditor } from '@/components/settings/DeliveryProviderHoursEditor';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
-import { ServiceZoneMapDrawer } from '@/components/onboarding/ServiceZoneMapDrawer';
+import Link from 'next/link';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
@@ -261,13 +261,6 @@ export default function SettingsPage() {
     setError(null);
   }, []);
 
-  const handleServiceZonePolygonChange = useCallback(
-    (polygon: OnboardingData['serviceZonePolygon']) => {
-      patchForm({ serviceZonePolygon: polygon });
-    },
-    [patchForm],
-  );
-
   const handleImagePick = async (file: File) => {
     try {
       const stored = await fileToStoredImage(file);
@@ -505,7 +498,7 @@ export default function SettingsPage() {
   return (
     <PanelPageShell
       title="Configuración"
-      subtitle="Edita el logo, contacto y zona de reparto de tu empresa de delivery."
+      subtitle="Edita el logo y contacto de tu empresa de delivery."
       styles={{
         page: styles.page,
         header: styles.header,
@@ -672,33 +665,17 @@ export default function SettingsPage() {
               Zona de reparto
             </h2>
             <p className={styles.panelHint}>
-              Ajusta el nombre y el polígono del área donde realizas entregas.
+              El nombre y el polígono de cobertura se configuran en Cerco geográfico.
             </p>
-            <label className={`${styles.label} ${styles.formGridFull}`}>
-              Nombre de la zona
-              <input
-                className={styles.input}
-                value={form.serviceZoneName}
-                placeholder="Cobertura principal"
-                onChange={(e) => patchForm({ serviceZoneName: e.target.value })}
-              />
-            </label>
-            <div className={styles.mapWrap}>
-              <ServiceZoneMapDrawer
-                polygon={form.serviceZonePolygon}
-                searchAddress={form.serviceZoneSearchAddress}
-                centerLat={form.serviceZoneCenterLat}
-                centerLng={form.serviceZoneCenterLng}
-                onSearchPlaceChange={(place) =>
-                  patchForm({
-                    serviceZoneSearchAddress: place.address,
-                    serviceZoneCenterLat: place.latitude,
-                    serviceZoneCenterLng: place.longitude,
-                  })
-                }
-                onPolygonChange={handleServiceZonePolygonChange}
-              />
+            <div className={`${styles.readonlyField} ${styles.formGridFull}`}>
+              <span className={styles.readonlyLabel}>Zona seleccionada</span>
+              <span className={styles.readonlyValue}>
+                {form.serviceZoneName || 'Sin zona'}
+              </span>
             </div>
+            <Link href="/cerco-geografico" className={styles.secondaryBtn}>
+              Ir a Cerco geográfico
+            </Link>
           </section>
           </fieldset>
 

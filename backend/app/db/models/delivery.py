@@ -169,6 +169,12 @@ class DeliveryProviderZone(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="ck_delivery_provider_zones_weather_mode_allowed",
         ),
         Index("ix_delivery_provider_zones_lookup", "delivery_provider_id", "is_active"),
+        Index(
+            "uq_delivery_provider_zones_name_per_provider",
+            "delivery_provider_id",
+            text("lower(btrim(name))"),
+            unique=True,
+        ),
     )
 
 

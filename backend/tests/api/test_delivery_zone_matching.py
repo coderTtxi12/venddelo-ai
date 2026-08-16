@@ -118,7 +118,7 @@ def test_mexy_coverage_preview_null_when_out_of_range(client):
 def test_mexy_coverage_preview_missing_coords_returns_400(client):
     resp = client.get("/api/v1/restaurants/mexy-coverage", headers=AUTH)
     assert resp.status_code == 400
-    assert resp.json()["detail"] == "El negocio no tiene ubicación"
+    assert resp.json()["error"]["message"] == "El negocio no tiene ubicación"
 
 
 @requires_db
