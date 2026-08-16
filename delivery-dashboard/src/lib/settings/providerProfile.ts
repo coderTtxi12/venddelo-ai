@@ -1,7 +1,7 @@
 import type { DeliveryProviderMeResponse } from '@/lib/api/types';
 import { parseE164Phone } from '@/lib/phone/parseE164';
 import { buildPhoneE164 } from '@/lib/onboarding/validation';
-import type { GeoJsonPolygon, OnboardingData } from '@/lib/onboarding/types';
+import type { OnboardingData } from '@/lib/onboarding/types';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 
 export type ProviderProfileForm = OnboardingData;
@@ -12,7 +12,7 @@ export function providerProfileFromApi(response: DeliveryProviderMeResponse): Pr
 
   const responsible = parseE164Phone(provider.responsible_phone);
   const whatsapp = parseE164Phone(provider.whatsapp_phone);
-  const zone = response.primary_zone;
+  const zone = response.zones[0] ?? null;
 
   return {
     companyName: provider.name,
@@ -83,10 +83,6 @@ export function buildProfileUpdatePayload(data: ProviderProfileForm) {
     responsible_name: data.responsibleName.trim(),
     responsible_phone: buildPhoneE164(data.responsiblePhoneCountryIso, data.responsiblePhoneLocal),
     whatsapp_phone: buildPhoneE164(data.whatsappCountryIso, data.whatsappLocal),
-    service_zone_name: data.serviceZoneName.trim() || 'Cobertura principal',
-    service_zone_polygon: data.serviceZonePolygon as GeoJsonPolygon,
-    center_lat: data.serviceZoneCenterLat,
-    center_lng: data.serviceZoneCenterLng,
     logo_base64: logoIsNewUpload ? data.logoDataUrl : null,
     logo_file_name: logoIsNewUpload ? data.logoFileName : null,
   };

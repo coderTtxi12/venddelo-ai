@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { DeliveryProviderHoursEditor } from '@/components/settings/DeliveryProviderHoursEditor';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
+import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { useAuth } from '@/hooks/useAuth';
 import {
   listMyDeliveryProviderSchedules,
@@ -15,6 +16,7 @@ import styles from './SettingsPage.module.css';
 
 export default function SchedulesPage() {
   const { accessToken } = useAuth();
+  const { selectedZoneId } = useDeliveryZone();
   const { canWriteProviderConfig, isOperator } = useDeliveryProviderAccess();
   const [schedules, setSchedules] = useState<DeliveryProviderSchedule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,12 +28,12 @@ export default function SchedulesPage() {
     let cancelled = false;
 
     async function loadSchedules() {
-      if (!accessToken) return;
+      if (!accessToken || !selectedZoneId) return;
       setLoading(true);
       setError(null);
 
       try {
-        const rows = await listMyDeliveryProviderSchedules(accessToken);
+        const rows = await listMyDeliveryProviderSchedules(accessToken, selectedZoneId);
         if (!cancelled) setSchedules(rows);
       } catch (err) {
         console.error(err);
@@ -47,13 +49,17 @@ export default function SchedulesPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, selectedZoneId]);
 
   const handleSaveSchedules = async (
-    payload: Parameters<typeof setMyDeliveryProviderSchedules>[1],
+    payload: Parameters<typeof setMyDeliveryProviderSchedules>[2],
   ) => {
     if (!accessToken) {
       setError('No hay sesión activa. Inicia sesión de nuevo.');
+      return;
+    }
+    if (!selectedZoneId) {
+      setError('Selecciona una zona de reparto.');
       return;
     }
 
@@ -62,8 +68,8 @@ export default function SchedulesPage() {
     setSuccess(null);
 
     try {
-      await setMyDeliveryProviderSchedules(accessToken, payload);
-      const updated = await listMyDeliveryProviderSchedules(accessToken);
+      await setMyDeliveryProviderSchedules(accessToken, selectedZoneId, payload);
+      const updated = await listMyDeliveryProviderSchedules(accessToken, selectedZoneId);
       setSchedules(updated);
       setSuccess('Horarios guardados correctamente.');
     } catch (err) {

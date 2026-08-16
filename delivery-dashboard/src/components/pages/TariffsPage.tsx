@@ -6,6 +6,7 @@ import CheckCircleOutlineOutlinedIcon from '@mui/icons-material/CheckCircleOutli
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
+import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { useAuth } from '@/hooks/useAuth';
 import {
   getMyDeliveryProviderPricing,
@@ -64,6 +65,7 @@ type BracketField = keyof Pick<
 
 export default function TariffsPage() {
   const { accessToken } = useAuth();
+  const { selectedZoneId } = useDeliveryZone();
   const { canWriteProviderConfig, canManageWeather, isOperator } = useDeliveryProviderAccess();
   const tariffsReadOnly = !canWriteProviderConfig;
   const [config, setConfig] = useState<DeliveryProviderPricingConfig>(() =>
@@ -98,12 +100,12 @@ export default function TariffsPage() {
     let cancelled = false;
 
     async function load() {
-      if (!accessToken) return;
+      if (!accessToken || !selectedZoneId) return;
       setLoading(true);
       setError(null);
 
       try {
-        const response = await getMyDeliveryProviderPricing(accessToken);
+        const response = await getMyDeliveryProviderPricing(accessToken, selectedZoneId);
         if (cancelled) return;
         setConfig(response.config);
         setInitialConfig(response.config);
@@ -120,7 +122,7 @@ export default function TariffsPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, selectedZoneId]);
 
   useEffect(() => {
     return () => {
@@ -228,7 +230,7 @@ export default function TariffsPage() {
   };
 
   const handleSave = async () => {
-    if (!accessToken || !isDirty) return;
+    if (!accessToken || !selectedZoneId || !isDirty) return;
 
     const bracketError = validateBracketsClient(
       config.outside_polygon.brackets,
@@ -244,7 +246,7 @@ export default function TariffsPage() {
     setSuccess(null);
 
     try {
-      const saved = await updateMyDeliveryProviderPricing(accessToken, { config });
+      const saved = await updateMyDeliveryProviderPricing(accessToken, selectedZoneId, { config });
       setConfig(saved.config);
       setInitialConfig(saved.config);
       setWeatherMode(saved.weather_mode);
@@ -258,7 +260,7 @@ export default function TariffsPage() {
   };
 
   const handleWeatherChange = async (mode: DeliveryWeatherMode) => {
-    if (!accessToken || weatherSaving || mode === weatherMode) return;
+    if (!accessToken || !selectedZoneId || weatherSaving || mode === weatherMode) return;
 
     setWeatherSaving(true);
     setError(null);
@@ -266,7 +268,9 @@ export default function TariffsPage() {
     setWeatherSuccess(null);
 
     try {
-      const saved = await updateMyDeliveryProviderWeatherMode(accessToken, { weather_mode: mode });
+      const saved = await updateMyDeliveryProviderWeatherMode(accessToken, selectedZoneId, {
+        weather_mode: mode,
+      });
       setWeatherMode(saved.weather_mode);
       setConfig(saved.config);
       setInitialConfig(saved.config);
@@ -300,6 +304,10 @@ export default function TariffsPage() {
       setSimError('No hay sesión activa. Inicia sesión de nuevo.');
       return;
     }
+    if (!selectedZoneId) {
+      setSimError('Selecciona una zona de reparto.');
+      return;
+    }
 
     if (!simInside) {
       const distance = Number.parseFloat(simDistance.replace(',', '.'));
@@ -316,7 +324,7 @@ export default function TariffsPage() {
 
     try {
       const distance = Number.parseFloat(simDistance.replace(',', '.'));
-      const result = await simulateMyDeliveryProviderPricing(accessToken, {
+      const result = await simulateMyDeliveryProviderPricing(accessToken, selectedZoneId, {
         inside_polygon: simInside,
         distance_km: simInside ? null : distance,
         is_night: simInside ? simNight : false,
@@ -332,7 +340,7 @@ export default function TariffsPage() {
     } finally {
       setSimulating(false);
     }
-  }, [accessToken, config.outside_polygon.max_distance_km, simDistance, simInside, simNight, simWeather]);
+  }, [accessToken, config.outside_polygon.max_distance_km, selectedZoneId, simDistance, simInside, simNight, simWeather]);
 
   return (
     <PanelPageShell

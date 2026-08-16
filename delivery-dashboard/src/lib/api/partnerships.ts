@@ -29,3 +29,14 @@ export function rejectPartnershipRequest(token: string, linkId: string) {
     token,
   });
 }
+
+export function reassignPartnershipZone(token: string, linkId: string, zoneId: string) {
+  return apiRequest<DeliveryPartnershipRequest>(
+    `/delivery-providers/me/partnerships/${linkId}`,
+    {
+      method: 'PATCH',
+      token,
+      body: { zone_id: zoneId },
+    },
+  );
+}

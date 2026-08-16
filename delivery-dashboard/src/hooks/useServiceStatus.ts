@@ -9,7 +9,7 @@ import { ApiError } from '@/lib/api/types';
 import type { DeliveryProviderServiceStatus } from '@/lib/api/types';
 import { useAuth } from '@/hooks/useAuth';
 
-export function useServiceStatus() {
+export function useServiceStatus(zoneId: string | null) {
   const { accessToken } = useAuth();
   const [status, setStatus] = useState<DeliveryProviderServiceStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -17,14 +17,14 @@ export function useServiceStatus() {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!accessToken) {
+    if (!accessToken || !zoneId) {
       setStatus(null);
       setLoading(false);
       return null;
     }
 
     try {
-      const next = await getMyDeliveryProviderServiceStatus(accessToken);
+      const next = await getMyDeliveryProviderServiceStatus(accessToken, zoneId);
       setStatus(next);
       setError(null);
       return next;
@@ -35,7 +35,7 @@ export function useServiceStatus() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [accessToken, zoneId]);
 
   useEffect(() => {
     setLoading(true);
@@ -44,13 +44,13 @@ export function useServiceStatus() {
 
   const setManuallyEnabled = useCallback(
     async (manuallyEnabled: boolean) => {
-      if (!accessToken || saving) return null;
+      if (!accessToken || !zoneId || saving) return null;
 
       setSaving(true);
       setError(null);
 
       try {
-        const confirmed = await updateMyDeliveryProviderServiceStatus(accessToken, {
+        const confirmed = await updateMyDeliveryProviderServiceStatus(accessToken, zoneId, {
           manually_enabled: manuallyEnabled,
         });
         setStatus(confirmed);
@@ -67,7 +67,7 @@ export function useServiceStatus() {
         setSaving(false);
       }
     },
-    [accessToken, saving],
+    [accessToken, zoneId, saving],
   );
 
   return {

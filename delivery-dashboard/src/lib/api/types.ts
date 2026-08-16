@@ -40,12 +40,22 @@ export type DeliveryProviderZone = {
   polygon: GeoJsonPolygon | null;
   center_lat: number | null;
   center_lng: number | null;
+  weather_mode: DeliveryWeatherMode;
+  service_manually_enabled: boolean;
+  restaurant_count: number;
+};
+
+export type DeliveryProviderZoneWrite = {
+  name: string;
+  polygon: GeoJsonPolygon;
+  center_lat?: number | null;
+  center_lng?: number | null;
 };
 
 export type DeliveryProviderMeResponse = {
   provider: DeliveryProvider | null;
   member_role: string | null;
-  primary_zone: DeliveryProviderZone | null;
+  zones: DeliveryProviderZone[];
 };
 
 export type DeliveryProviderAdminInvite = {
@@ -69,10 +79,6 @@ export type DeliveryProviderProfileUpdate = {
   responsible_name: string;
   responsible_phone: string;
   whatsapp_phone: string;
-  service_zone_name: string;
-  service_zone_polygon: GeoJsonPolygon;
-  center_lat: number | null;
-  center_lng: number | null;
   logo_base64: string | null;
   logo_file_name: string | null;
 };
@@ -209,5 +215,6 @@ export type DeliveryPartnershipRequest = {
   is_default: boolean;
   created_at: string;
   activated_at: string | null;
+  zone: { id: string; name: string };
   restaurant: DeliveryPartnershipRestaurant;
 };

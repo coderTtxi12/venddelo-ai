@@ -1,6 +1,7 @@
 'use client';
 
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
+import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { useServiceStatus } from '@/hooks/useServiceStatus';
 import type { DeliveryProviderServiceStatusReason } from '@/lib/api/types';
 import styles from './ServiceStatusToggle.module.css';
@@ -28,7 +29,8 @@ function statusCopy(
 
 export default function ServiceStatusToggle() {
   const { canWriteProviderConfig } = useDeliveryProviderAccess();
-  const { status, loading, saving, setManuallyEnabled } = useServiceStatus();
+  const { selectedZoneId } = useDeliveryZone();
+  const { status, loading, saving, setManuallyEnabled } = useServiceStatus(selectedZoneId);
 
   if (loading) {
     return (

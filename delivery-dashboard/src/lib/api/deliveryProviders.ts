@@ -14,12 +14,53 @@ import type {
   DeliveryProviderServiceStatus,
   DeliveryProviderServiceStatusUpdate,
   DeliveryProviderWeatherModeUpdate,
+  DeliveryProviderZone,
+  DeliveryProviderZoneWrite,
   DeliveryPricingQuote,
   DeliveryPricingSimulateRequest,
 } from './types';
 
+function withZoneId(path: string, zoneId: string): string {
+  return `${path}?zone_id=${encodeURIComponent(zoneId)}`;
+}
+
 export function getMyDeliveryProvider(token: string) {
   return apiRequest<DeliveryProviderMeResponse>('/delivery-providers/me', { token });
+}
+
+export function listMyDeliveryProviderZones(token: string) {
+  return apiRequest<DeliveryProviderZone[]>('/delivery-providers/me/zones', { token });
+}
+
+export function getMyDeliveryProviderZone(token: string, zoneId: string) {
+  return apiRequest<DeliveryProviderZone>(`/delivery-providers/me/zones/${zoneId}`, { token });
+}
+
+export function createMyDeliveryProviderZone(token: string, body: DeliveryProviderZoneWrite) {
+  return apiRequest<DeliveryProviderZone>('/delivery-providers/me/zones', {
+    method: 'POST',
+    token,
+    body,
+  });
+}
+
+export function patchMyDeliveryProviderZone(
+  token: string,
+  zoneId: string,
+  body: DeliveryProviderZoneWrite,
+) {
+  return apiRequest<DeliveryProviderZone>(`/delivery-providers/me/zones/${zoneId}`, {
+    method: 'PATCH',
+    token,
+    body,
+  });
+}
+
+export function deleteMyDeliveryProviderZone(token: string, zoneId: string) {
+  return apiRequest<void>(`/delivery-providers/me/zones/${zoneId}`, {
+    method: 'DELETE',
+    token,
+  });
 }
 
 export function listMyDeliveryProviderAdminInvites(token: string) {
@@ -61,15 +102,19 @@ export function updateMyDeliveryProvider(token: string, body: DeliveryProviderPr
   });
 }
 
-export function listMyDeliveryProviderSchedules(token: string) {
-  return apiRequest<DeliveryProviderSchedule[]>('/delivery-providers/me/schedules', { token });
+export function listMyDeliveryProviderSchedules(token: string, zoneId: string) {
+  return apiRequest<DeliveryProviderSchedule[]>(
+    withZoneId('/delivery-providers/me/schedules', zoneId),
+    { token },
+  );
 }
 
 export function setMyDeliveryProviderSchedules(
   token: string,
+  zoneId: string,
   schedules: DeliveryProviderScheduleCreateInput[],
 ) {
-  return apiRequest<void>('/delivery-providers/me/schedules', {
+  return apiRequest<void>(withZoneId('/delivery-providers/me/schedules', zoneId), {
     method: 'PUT',
     token,
     body: schedules,
@@ -93,56 +138,76 @@ export function setMyDeliveryProviderPaymentMethods(
   });
 }
 
-export function getMyDeliveryProviderServiceStatus(token: string) {
-  return apiRequest<DeliveryProviderServiceStatus>('/delivery-providers/me/service-status', {
-    token,
-  });
+export function getMyDeliveryProviderServiceStatus(token: string, zoneId: string) {
+  return apiRequest<DeliveryProviderServiceStatus>(
+    withZoneId('/delivery-providers/me/service-status', zoneId),
+    { token },
+  );
 }
 
 export function updateMyDeliveryProviderServiceStatus(
   token: string,
+  zoneId: string,
   body: DeliveryProviderServiceStatusUpdate,
 ) {
-  return apiRequest<DeliveryProviderServiceStatus>('/delivery-providers/me/service-status', {
-    method: 'PATCH',
-    token,
-    body,
-  });
+  return apiRequest<DeliveryProviderServiceStatus>(
+    withZoneId('/delivery-providers/me/service-status', zoneId),
+    {
+      method: 'PATCH',
+      token,
+      body,
+    },
+  );
 }
 
-export function getMyDeliveryProviderPricing(token: string) {
-  return apiRequest<DeliveryProviderPricingResponse>('/delivery-providers/me/pricing', { token });
+export function getMyDeliveryProviderPricing(token: string, zoneId: string) {
+  return apiRequest<DeliveryProviderPricingResponse>(
+    withZoneId('/delivery-providers/me/pricing', zoneId),
+    { token },
+  );
 }
 
 export function updateMyDeliveryProviderPricing(
   token: string,
+  zoneId: string,
   body: DeliveryProviderPricingUpdate,
 ) {
-  return apiRequest<DeliveryProviderPricingResponse>('/delivery-providers/me/pricing', {
-    method: 'PUT',
-    token,
-    body,
-  });
+  return apiRequest<DeliveryProviderPricingResponse>(
+    withZoneId('/delivery-providers/me/pricing', zoneId),
+    {
+      method: 'PUT',
+      token,
+      body,
+    },
+  );
 }
 
 export function updateMyDeliveryProviderWeatherMode(
   token: string,
+  zoneId: string,
   body: DeliveryProviderWeatherModeUpdate,
 ) {
-  return apiRequest<DeliveryProviderPricingResponse>('/delivery-providers/me/pricing/weather-mode', {
-    method: 'PATCH',
-    token,
-    body,
-  });
+  return apiRequest<DeliveryProviderPricingResponse>(
+    withZoneId('/delivery-providers/me/pricing/weather-mode', zoneId),
+    {
+      method: 'PATCH',
+      token,
+      body,
+    },
+  );
 }
 
 export function simulateMyDeliveryProviderPricing(
   token: string,
+  zoneId: string,
   body: DeliveryPricingSimulateRequest,
 ) {
-  return apiRequest<DeliveryPricingQuote>('/delivery-providers/me/pricing/simulate', {
-    method: 'POST',
-    token,
-    body,
-  });
+  return apiRequest<DeliveryPricingQuote>(
+    withZoneId('/delivery-providers/me/pricing/simulate', zoneId),
+    {
+      method: 'POST',
+      token,
+      body,
+    },
+  );
 }

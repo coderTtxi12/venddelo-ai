@@ -11,6 +11,7 @@ import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCou
 import { ServiceZoneMapDrawer } from '@/components/onboarding/ServiceZoneMapDrawer';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
+import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { useAuth } from '@/hooks/useAuth';
 import { memberRoleLabel } from '@/lib/access/deliveryProviderPermissions';
 import {
@@ -82,6 +83,7 @@ function memberSecondaryLabel(member: DeliveryProviderMember): string | null {
 
 export default function SettingsPage() {
   const { accessToken } = useAuth();
+  const { selectedZoneId } = useDeliveryZone();
   const { canManageMembers, canWriteProviderConfig, isOperator } = useDeliveryProviderAccess();
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -199,12 +201,12 @@ export default function SettingsPage() {
     let cancelled = false;
 
     async function loadSchedules() {
-      if (!accessToken) return;
+      if (!accessToken || !selectedZoneId) return;
       setSchedulesLoading(true);
       setScheduleError(null);
 
       try {
-        const rows = await listMyDeliveryProviderSchedules(accessToken);
+        const rows = await listMyDeliveryProviderSchedules(accessToken, selectedZoneId);
         if (!cancelled) setSchedules(rows);
       } catch (err) {
         console.error(err);
@@ -220,7 +222,7 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, selectedZoneId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -315,9 +317,13 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveSchedules = async (payload: Parameters<typeof setMyDeliveryProviderSchedules>[1]) => {
+  const handleSaveSchedules = async (payload: Parameters<typeof setMyDeliveryProviderSchedules>[2]) => {
     if (!accessToken) {
       setScheduleError('No hay sesión activa. Inicia sesión de nuevo.');
+      return;
+    }
+    if (!selectedZoneId) {
+      setScheduleError('Selecciona una zona de reparto.');
       return;
     }
 
@@ -326,8 +332,8 @@ export default function SettingsPage() {
     setScheduleSuccess(null);
 
     try {
-      await setMyDeliveryProviderSchedules(accessToken, payload);
-      const updated = await listMyDeliveryProviderSchedules(accessToken);
+      await setMyDeliveryProviderSchedules(accessToken, selectedZoneId, payload);
+      const updated = await listMyDeliveryProviderSchedules(accessToken, selectedZoneId);
       setSchedules(updated);
       setScheduleSuccess('Horarios guardados correctamente.');
     } catch (err) {
