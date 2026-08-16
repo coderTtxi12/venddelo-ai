@@ -1,0 +1,84 @@
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.deleteBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid color-mix(in srgb, #b91c1c 35%, var(--color-border));
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: #b91c1c;
+  font-weight: 700;
+  padding: 0.55rem 0.9rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.deleteBtn:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #b91c1c;
+}
+
+.deleteBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  padding: 1rem;
+}
+
+.modal {
+  width: 100%;
+  max-width: 720px;
+  max-height: min(92vh, 900px);
+  overflow: auto;
+  background: var(--color-surface);
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+  padding: 1.25rem 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.modalHint {
+  margin: -0.35rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.modalActions .primaryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}

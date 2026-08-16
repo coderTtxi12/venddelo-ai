@@ -83,7 +83,7 @@ function memberSecondaryLabel(member: DeliveryProviderMember): string | null {
 
 export default function SettingsPage() {
   const { accessToken } = useAuth();
-  const { selectedZoneId } = useDeliveryZone();
+  const { selectedZoneId, selectedZone } = useDeliveryZone();
   const { canManageMembers, canWriteProviderConfig, isOperator } = useDeliveryProviderAccess();
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -130,7 +130,7 @@ export default function SettingsPage() {
         const response = await getMyDeliveryProvider(accessToken);
         if (cancelled) return;
 
-        const profile = providerProfileFromApi(response);
+        const profile = providerProfileFromApi(response, selectedZone);
         if (!profile) {
           setError('No encontramos tu perfil de delivery. Completa el onboarding primero.');
           return;
@@ -153,7 +153,7 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, selectedZone]);
 
   useEffect(() => {
     let cancelled = false;
@@ -300,7 +300,7 @@ export default function SettingsPage() {
         buildProfileUpdatePayload(form),
       );
       const refreshed = await getMyDeliveryProvider(accessToken);
-      const nextForm = providerProfileFromApi(refreshed) ?? form;
+      const nextForm = providerProfileFromApi(refreshed, selectedZone) ?? form;
       setForm(nextForm);
       setInitialForm(nextForm);
       setSlug(updated.slug);

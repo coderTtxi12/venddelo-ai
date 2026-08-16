@@ -1,62 +1,80 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
+import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import { ServiceZoneMapDrawer } from '@/components/onboarding/ServiceZoneMapDrawer';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import ZoneSwitcher from '@/components/zones/ZoneSwitcher';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
+import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { useAuth } from '@/hooks/useAuth';
-import { getMyDeliveryProvider, updateMyDeliveryProvider } from '@/lib/api/deliveryProviders';
+import { getMyDeliveryProviderZone } from '@/lib/api/deliveryProviders';
 import { ApiError } from '@/lib/api/types';
-import { createDefaultOnboardingData } from '@/lib/onboarding/defaults';
 import type { OnboardingData } from '@/lib/onboarding/types';
+import { validateServiceZone } from '@/lib/settings/providerProfile';
 import {
-  buildProfileUpdatePayload,
-  providerProfileFromApi,
-  validateServiceZone,
-} from '@/lib/settings/providerProfile';
+  buildZoneWritePayload,
+  createEmptyZoneForm,
+  zoneDeleteBlockedMessage,
+  zoneFieldsDirty,
+  zoneFormFromApi,
+  type ZoneFormState,
+} from '@/lib/settings/zoneProfile';
 import styles from './SettingsPage.module.css';
-
-function zoneFieldsDirty(current: OnboardingData, initial: OnboardingData): boolean {
-  return (
-    current.serviceZoneName !== initial.serviceZoneName ||
-    JSON.stringify(current.serviceZonePolygon) !== JSON.stringify(initial.serviceZonePolygon) ||
-    current.serviceZoneCenterLat !== initial.serviceZoneCenterLat ||
-    current.serviceZoneCenterLng !== initial.serviceZoneCenterLng
-  );
-}
+import createStyles from './ServiceZonePage.module.css';
 
 export default function ServiceZonePage() {
   const { accessToken } = useAuth();
   const { canWriteProviderConfig, isOperator } = useDeliveryProviderAccess();
-  const [form, setForm] = useState<OnboardingData>(() => createDefaultOnboardingData());
-  const [initialForm, setInitialForm] = useState<OnboardingData>(() => createDefaultOnboardingData());
+  const {
+    zones,
+    selectedZoneId,
+    selectedZone,
+    createZone,
+    updateZone,
+    deleteZone,
+    refreshZones,
+  } = useDeliveryZone();
+
+  const [form, setForm] = useState<ZoneFormState>(() => createEmptyZoneForm());
+  const [initialForm, setInitialForm] = useState<ZoneFormState>(() => createEmptyZoneForm());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createForm, setCreateForm] = useState<ZoneFormState>(() => createEmptyZoneForm());
+  const [creating, setCreating] = useState(false);
 
   const isDirty = useMemo(() => zoneFieldsDirty(form, initialForm), [form, initialForm]);
+  const restaurantCount = selectedZone?.restaurant_count ?? 0;
+  const deleteBlocked = restaurantCount > 0;
+  const canDeleteZone = canWriteProviderConfig && zones.length > 1;
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      if (!accessToken) return;
+      if (!accessToken || !selectedZoneId) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
+      setSuccess(null);
 
       try {
-        const response = await getMyDeliveryProvider(accessToken);
+        const zone = await getMyDeliveryProviderZone(accessToken, selectedZoneId);
         if (cancelled) return;
 
-        const profile = providerProfileFromApi(response);
-        if (!profile) {
-          setError('No encontramos tu perfil de delivery. Completa el onboarding primero.');
-          return;
-        }
-
-        setForm(profile);
-        setInitialForm(profile);
+        const nextForm = zoneFormFromApi(zone);
+        setForm(nextForm);
+        setInitialForm(nextForm);
       } catch (err) {
         console.error(err);
         if (!cancelled) {
@@ -71,9 +89,9 @@ export default function ServiceZonePage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, selectedZoneId]);
 
-  const patchForm = useCallback((patch: Partial<OnboardingData>) => {
+  const patchForm = useCallback((patch: Partial<ZoneFormState>) => {
     setForm((prev) => ({ ...prev, ...patch }));
     setSuccess(null);
     setError(null);
@@ -87,8 +105,8 @@ export default function ServiceZonePage() {
   );
 
   const handleSave = async () => {
-    if (!accessToken) {
-      setError('No hay sesión activa. Inicia sesión de nuevo.');
+    if (!accessToken || !selectedZoneId) {
+      setError('Selecciona una zona de reparto.');
       return;
     }
 
@@ -103,9 +121,8 @@ export default function ServiceZonePage() {
     setSuccess(null);
 
     try {
-      await updateMyDeliveryProvider(accessToken, buildProfileUpdatePayload(form));
-      const refreshed = await getMyDeliveryProvider(accessToken);
-      const nextForm = providerProfileFromApi(refreshed) ?? form;
+      const updated = await updateZone(selectedZoneId, buildZoneWritePayload(form));
+      const nextForm = zoneFormFromApi(updated);
       setForm(nextForm);
       setInitialForm(nextForm);
       setSuccess('Cerco geográfico guardado correctamente.');
@@ -121,80 +138,262 @@ export default function ServiceZonePage() {
     }
   };
 
-  return (
-    <PanelPageShell
-      title="Cerco geográfico"
-      subtitle="Define el área donde realizas entregas. Ajusta el nombre de la zona y dibuja el polígono en el mapa."
-      styles={{
-        page: styles.page,
-        header: styles.header,
-        title: styles.title,
-        subtitle: styles.subtitle,
-        empty: styles.loading,
-      }}
-      action={
-        canWriteProviderConfig ? (
-          <button
-            type="button"
-            className={styles.primaryBtn}
-            disabled={loading || saving || !isDirty}
-            onClick={() => void handleSave()}
-          >
-            {saving ? 'Guardando…' : 'Guardar cambios'}
-          </button>
-        ) : null
+  const handleDeleteZone = async () => {
+    if (!selectedZoneId || deleteBlocked) return;
+
+    setDeleting(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await deleteZone(selectedZoneId);
+      setDeleteDialogOpen(false);
+      setSuccess('Zona eliminada correctamente.');
+    } catch (err) {
+      console.error(err);
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('No se pudo eliminar la zona. Intenta de nuevo.');
       }
-    >
-      {loading ? (
-        <p className={styles.loading} role="status">
-          Cargando zona de reparto…
-        </p>
-      ) : (
-        <section className={styles.panel} aria-labelledby="service-zone-panel">
-          {isOperator ? (
-            <div className={styles.operatorNotice} role="status">
-              Tu rol de Operador permite consultar el cerco geográfico, pero no editarlo.
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleCreateZone = async () => {
+    const validationError = validateServiceZone(createForm);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    if (!createForm.serviceZoneName.trim()) {
+      setError('Ingresa un nombre para la nueva zona.');
+      return;
+    }
+
+    setCreating(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await createZone(buildZoneWritePayload(createForm));
+      setCreateDialogOpen(false);
+      setCreateForm(createEmptyZoneForm());
+      setSuccess('Zona creada correctamente.');
+      await refreshZones();
+    } catch (err) {
+      console.error(err);
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('No se pudo crear la zona. Intenta de nuevo.');
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const openCreateDialog = () => {
+    setCreateForm(createEmptyZoneForm());
+    setCreateDialogOpen(true);
+  };
+
+  return (
+    <>
+      <PanelPageShell
+        title="Cerco geográfico"
+        subtitle="Define el área donde realizas entregas. Ajusta el nombre de la zona y dibuja el polígono en el mapa."
+        styles={{
+          page: styles.page,
+          header: styles.header,
+          title: styles.title,
+          subtitle: styles.subtitle,
+          empty: styles.loading,
+        }}
+        action={
+          canWriteProviderConfig ? (
+            <div className={createStyles.headerActions}>
+              {canDeleteZone ? (
+                <button
+                  type="button"
+                  className={createStyles.deleteBtn}
+                  disabled={loading || deleting || deleteBlocked}
+                  title={deleteBlocked ? zoneDeleteBlockedMessage(restaurantCount) : 'Eliminar zona'}
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  <DeleteOutlineOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
+                  Eliminar zona
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                disabled={loading || saving || !isDirty || !selectedZoneId}
+                onClick={() => void handleSave()}
+              >
+                {saving ? 'Guardando…' : 'Guardar cambios'}
+              </button>
             </div>
-          ) : null}
-          {error ? (
-            <div className={styles.errorBanner} role="alert">
-              {error}
+          ) : null
+        }
+      >
+        <ZoneSwitcher onAddZone={openCreateDialog} />
+
+        {!selectedZoneId ? (
+          <p className={styles.loading} role="status">
+            Selecciona o crea una zona de reparto para continuar.
+          </p>
+        ) : loading ? (
+          <p className={styles.loading} role="status">
+            Cargando zona de reparto…
+          </p>
+        ) : (
+          <section className={styles.panel} aria-labelledby="service-zone-panel">
+            {isOperator ? (
+              <div className={styles.operatorNotice} role="status">
+                Tu rol de Operador permite consultar el cerco geográfico, pero no editarlo.
+              </div>
+            ) : null}
+            {deleteBlocked ? (
+              <div className={styles.operatorNotice} role="status">
+                {zoneDeleteBlockedMessage(restaurantCount)}
+              </div>
+            ) : null}
+            {error ? (
+              <div className={styles.errorBanner} role="alert">
+                {error}
+              </div>
+            ) : null}
+            {success ? (
+              <div className={styles.successBanner} role="status">
+                {success}
+              </div>
+            ) : null}
+            <fieldset disabled={!canWriteProviderConfig} className={styles.readOnlyFieldset}>
+              <label className={`${styles.label} ${styles.formGridFull}`}>
+                Nombre de la zona
+                <input
+                  className={styles.input}
+                  value={form.serviceZoneName}
+                  placeholder="Cobertura principal"
+                  onChange={(e) => patchForm({ serviceZoneName: e.target.value })}
+                />
+              </label>
+              <div className={styles.mapWrap}>
+                <ServiceZoneMapDrawer
+                  polygon={form.serviceZonePolygon}
+                  searchAddress={form.serviceZoneSearchAddress}
+                  centerLat={form.serviceZoneCenterLat}
+                  centerLng={form.serviceZoneCenterLng}
+                  onSearchPlaceChange={(place) =>
+                    patchForm({
+                      serviceZoneSearchAddress: place.address,
+                      serviceZoneCenterLat: place.latitude,
+                      serviceZoneCenterLng: place.longitude,
+                    })
+                  }
+                  onPolygonChange={handleServiceZonePolygonChange}
+                />
+              </div>
+            </fieldset>
+          </section>
+        )}
+      </PanelPageShell>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Eliminar zona"
+        body={
+          <>
+            ¿Seguro que quieres eliminar la zona <strong>{selectedZone?.name}</strong>? Esta acción no
+            se puede deshacer.
+          </>
+        }
+        confirmLabel="Eliminar zona"
+        confirming={deleting}
+        confirmDisabled={deleteBlocked}
+        onCancel={() => {
+          if (!deleting) setDeleteDialogOpen(false);
+        }}
+        onConfirm={() => void handleDeleteZone()}
+      />
+
+      {createDialogOpen ? (
+        <div
+          className={createStyles.modalBackdrop}
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !creating) setCreateDialogOpen(false);
+          }}
+        >
+          <div
+            className={createStyles.modal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-zone-title"
+          >
+            <h2 id="create-zone-title" className={createStyles.modalTitle}>
+              Nueva zona de reparto
+            </h2>
+            <p className={createStyles.modalHint}>
+              Asigna un nombre y dibuja el polígono de cobertura para la nueva zona.
+            </p>
+
+            <label className={styles.label}>
+              Nombre de la zona
+              <input
+                className={styles.input}
+                value={createForm.serviceZoneName}
+                placeholder="Cobertura norte"
+                onChange={(e) =>
+                  setCreateForm((prev) => ({ ...prev, serviceZoneName: e.target.value }))
+                }
+              />
+            </label>
+
+            <div className={styles.mapWrap}>
+              <ServiceZoneMapDrawer
+                polygon={createForm.serviceZonePolygon}
+                searchAddress={createForm.serviceZoneSearchAddress}
+                centerLat={createForm.serviceZoneCenterLat}
+                centerLng={createForm.serviceZoneCenterLng}
+                onSearchPlaceChange={(place) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    serviceZoneSearchAddress: place.address,
+                    serviceZoneCenterLat: place.latitude,
+                    serviceZoneCenterLng: place.longitude,
+                  }))
+                }
+                onPolygonChange={(polygon) =>
+                  setCreateForm((prev) => ({ ...prev, serviceZonePolygon: polygon }))
+                }
+              />
             </div>
-          ) : null}
-          {success ? (
-            <div className={styles.successBanner} role="status">
-              {success}
+
+            <div className={createStyles.modalActions}>
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                disabled={creating}
+                onClick={() => setCreateDialogOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                disabled={creating}
+                onClick={() => void handleCreateZone()}
+              >
+                <AddOutlinedIcon sx={{ fontSize: 16 }} aria-hidden />
+                {creating ? 'Creando…' : 'Crear zona'}
+              </button>
             </div>
-          ) : null}
-          <fieldset disabled={!canWriteProviderConfig} className={styles.readOnlyFieldset}>
-          <label className={`${styles.label} ${styles.formGridFull}`}>
-            Nombre de la zona
-            <input
-              className={styles.input}
-              value={form.serviceZoneName}
-              placeholder="Cobertura principal"
-              onChange={(e) => patchForm({ serviceZoneName: e.target.value })}
-            />
-          </label>
-          <div className={styles.mapWrap}>
-            <ServiceZoneMapDrawer
-              polygon={form.serviceZonePolygon}
-              searchAddress={form.serviceZoneSearchAddress}
-              centerLat={form.serviceZoneCenterLat}
-              centerLng={form.serviceZoneCenterLng}
-              onSearchPlaceChange={(place) =>
-                patchForm({
-                  serviceZoneSearchAddress: place.address,
-                  serviceZoneCenterLat: place.latitude,
-                  serviceZoneCenterLng: place.longitude,
-                })
-              }
-              onPolygonChange={handleServiceZonePolygonChange}
-            />
           </div>
-          </fieldset>
-        </section>
-      )}
-    </PanelPageShell>
+        </div>
+      ) : null}
+    </>
   );
 }

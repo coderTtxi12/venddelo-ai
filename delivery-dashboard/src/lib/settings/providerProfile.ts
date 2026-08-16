@@ -1,4 +1,4 @@
-import type { DeliveryProviderMeResponse } from '@/lib/api/types';
+import type { DeliveryProviderMeResponse, DeliveryProviderZone } from '@/lib/api/types';
 import { parseE164Phone } from '@/lib/phone/parseE164';
 import { buildPhoneE164 } from '@/lib/onboarding/validation';
 import type { OnboardingData } from '@/lib/onboarding/types';
@@ -6,13 +6,16 @@ import { storagePublicUrl } from '@/lib/storage/publicUrl';
 
 export type ProviderProfileForm = OnboardingData;
 
-export function providerProfileFromApi(response: DeliveryProviderMeResponse): ProviderProfileForm | null {
+export function providerProfileFromApi(
+  response: DeliveryProviderMeResponse,
+  selectedZone?: DeliveryProviderZone | null,
+): ProviderProfileForm | null {
   const provider = response.provider;
   if (!provider) return null;
 
   const responsible = parseE164Phone(provider.responsible_phone);
   const whatsapp = parseE164Phone(provider.whatsapp_phone);
-  const zone = response.zones[0] ?? null;
+  const zone = selectedZone ?? response.zones[0] ?? null;
 
   return {
     companyName: provider.name,

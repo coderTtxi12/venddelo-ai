@@ -3,6 +3,7 @@
 import MenuOutlinedIcon from '@mui/icons-material/MenuOutlined';
 import { useAuth } from '@/hooks/useAuth';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
+import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { useMobileSidebar } from '@/contexts/MobileSidebarContext';
 import ServiceStatusToggle from '@/components/ui/ServiceStatusToggle';
 import styles from './TopBar.module.css';
@@ -10,6 +11,7 @@ import styles from './TopBar.module.css';
 export default function TopBar() {
   const { user, logout } = useAuth();
   const { memberRoleLabel, loading: roleLoading } = useDeliveryProviderAccess();
+  const { loading: zonesLoading, zones, selectedZoneId, setSelectedZoneId } = useDeliveryZone();
   const { isMobileDrawer, isDrawerOpen, toggleDrawer } = useMobileSidebar();
 
   return (
@@ -40,6 +42,25 @@ export default function TopBar() {
       </div>
 
       <div className={styles.actions}>
+        {zones.length > 0 ? (
+          <label className={styles.zoneSelectWrap}>
+            <span className={styles.zoneSelectLabel}>Zona</span>
+            <select
+              className={styles.zoneSelect}
+              value={selectedZoneId ?? ''}
+              disabled={zonesLoading || !selectedZoneId}
+              aria-label="Zona de reparto"
+              onChange={(event) => setSelectedZoneId(event.target.value)}
+            >
+              {zones.map((zone) => (
+                <option key={zone.id} value={zone.id}>
+                  {zone.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
         <ServiceStatusToggle />
 
         <div className={styles.userInfo}>

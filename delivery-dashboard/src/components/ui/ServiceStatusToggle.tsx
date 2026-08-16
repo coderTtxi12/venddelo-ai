@@ -28,7 +28,7 @@ function statusCopy(
 }
 
 export default function ServiceStatusToggle() {
-  const { canWriteProviderConfig } = useDeliveryProviderAccess();
+  const { canManagePartnerships } = useDeliveryProviderAccess();
   const { selectedZoneId } = useDeliveryZone();
   const { status, loading, saving, setManuallyEnabled } = useServiceStatus(selectedZoneId);
 
@@ -67,10 +67,10 @@ export default function ServiceStatusToggle() {
         <input
           type="checkbox"
           checked={status.manually_enabled}
-          disabled={saving || !canWriteProviderConfig}
+          disabled={saving || !canManagePartnerships}
           aria-label="Activar o pausar servicio de reparto"
           onChange={(event) => {
-            if (!canWriteProviderConfig) return;
+            if (!canManagePartnerships) return;
             void setManuallyEnabled(event.target.checked);
           }}
         />
