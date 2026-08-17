@@ -188,12 +188,19 @@ def test_claim_driver_on_get_me(client, engine):
         assert me.json()["provider"]["id"] == str(provider_id)
 
         drivers = client.get("/api/v1/delivery-providers/me/drivers", headers=AUTH)
-        assert drivers.status_code == 200, drivers.text
-        row = next(item for item in drivers.json() if item["id"] == driver_id)
-        assert row["status"] == "active"
-        assert row["user_id"] == str(RIDER)
+        assert drivers.status_code == 403
+        assert (
+            drivers.json()["error"]["message"]
+            == "Tu rol no permite ver esta información"
+        )
     finally:
-        app.dependency_overrides.pop(get_auth, None)
+        app.dependency_overrides[get_auth] = lambda: FakeAuth()
+
+    drivers = client.get("/api/v1/delivery-providers/me/drivers", headers=AUTH)
+    assert drivers.status_code == 200, drivers.text
+    row = next(item for item in drivers.json() if item["id"] == driver_id)
+    assert row["status"] == "active"
+    assert row["user_id"] == str(RIDER)
 
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     with factory() as session:

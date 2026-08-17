@@ -34,13 +34,45 @@
 
 .card {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto;
   gap: 1rem;
   align-items: center;
-  padding: 1rem 1.1rem;
+  padding: 0;
   border: 1px solid var(--color-border);
   border-radius: 14px;
   background: var(--color-surface);
+  overflow: hidden;
+}
+
+.cardSelected {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+
+.cardMainButton {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  align-items: center;
+  width: 100%;
+  padding: 1rem 1.1rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.cardMainButton:disabled {
+  cursor: default;
+}
+
+.cardAside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 1rem 1.1rem 1rem 0;
 }
 
 .photo {
@@ -193,7 +225,40 @@
 .actions {
   display: flex;
   justify-content: flex-end;
+  gap: 0.65rem;
   margin-top: 1rem;
+}
+
+.cancelButton {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.6rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.cancelButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.editButton {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: var(--color-background);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.editButton:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  color: var(--color-primary);
 }
 
 .submitButton {
@@ -214,11 +279,17 @@
 
 @media (max-width: 768px) {
   .card {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: 1fr;
+  }
+
+  .cardAside {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.1rem 1rem;
   }
 
   .chips {
-    grid-column: 1 / -1;
     justify-content: flex-start;
   }
 

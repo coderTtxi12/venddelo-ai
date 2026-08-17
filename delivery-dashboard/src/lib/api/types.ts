@@ -292,3 +292,27 @@ export type DeliveryDriverCreateInput = {
   insurance_document_base64: string;
   insurance_document_file_name?: string | null;
 };
+
+export type DeliveryDriverUpdateInput = {
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  email?: string;
+  compartment_size?: DeliveryDriverCompartmentSize;
+  plate?: string;
+  motorcycle_brand?: string;
+  motorcycle_color?: string;
+  credit_limit_cents?: number;
+  status?: DeliveryDriverStatus;
+};
+
+export type DeliveryDriverDocumentsUpdateInput = {
+  profile_photo_base64?: string;
+  profile_photo_file_name?: string | null;
+  ine_document_base64?: string;
+  ine_document_file_name?: string | null;
+  license_document_base64?: string;
+  license_document_file_name?: string | null;
+  insurance_document_base64?: string;
+  insurance_document_file_name?: string | null;
+};

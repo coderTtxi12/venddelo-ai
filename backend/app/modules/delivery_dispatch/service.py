@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import re
 import uuid
 
@@ -20,7 +21,10 @@ from app.modules.delivery_dispatch.schemas import (
     SearchLeadTimeDTO,
     SearchLeadTimeUpdate,
 )
-from app.modules.delivery_providers.permissions import require_write_provider_config
+from app.modules.delivery_providers.permissions import (
+    require_view_drivers,
+    require_write_provider_config,
+)
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.db.models.delivery import (
     DeliveryProviderAssignmentSettings,
@@ -82,7 +86,8 @@ class DeliveryDispatchService:
         self._storage = storage
 
     def list_drivers(self, user_id: uuid.UUID) -> list[DeliveryDriverDTO]:
-        provider_id = self._require_provider_id(user_id)
+        provider_id, member_role = self._require_provider_with_role(user_id)
+        require_view_drivers(member_role)
         rows = self._session.scalars(
             select(DeliveryDriver)
             .where(DeliveryDriver.delivery_provider_id == provider_id)
@@ -91,7 +96,8 @@ class DeliveryDispatchService:
         return [DeliveryDriverDTO.model_validate(row) for row in rows]
 
     def get_driver(self, user_id: uuid.UUID, driver_id: uuid.UUID) -> DeliveryDriverDTO:
-        provider_id = self._require_provider_id(user_id)
+        provider_id, member_role = self._require_provider_with_role(user_id)
+        require_view_drivers(member_role)
         row = self._get_driver_or_raise(provider_id, driver_id)
         return DeliveryDriverDTO.model_validate(row)
 
@@ -329,7 +335,10 @@ class DeliveryDispatchService:
         if content_type not in _ALLOWED_DOCUMENT_TYPES:
             raise ValidationError("El archivo debe ser una imagen o un PDF")
 
-        raw = base64.b64decode(match.group(2), validate=True)
+        try:
+            raw = base64.b64decode(match.group(2), validate=True)
+        except binascii.Error as exc:
+            raise ValidationError("Formato de archivo inválido") from exc
         if len(raw) > _MAX_DOCUMENT_BYTES:
             raise ValidationError("El archivo no puede superar 8 MB")
 

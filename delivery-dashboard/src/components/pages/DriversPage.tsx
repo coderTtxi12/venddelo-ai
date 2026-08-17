@@ -4,10 +4,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PanelPageShell, type PanelPageStyles } from '@/components/pages/PanelPageShell';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useAuth } from '@/hooks/useAuth';
-import { createMyDeliveryDriver, listMyDeliveryDrivers } from '@/lib/api/deliveryProviders';
-import type { DeliveryDriver, DeliveryDriverCompartmentSize } from '@/lib/api/types';
+import {
+  createMyDeliveryDriver,
+  listMyDeliveryDrivers,
+  patchMyDeliveryDriver,
+  uploadMyDeliveryDriverDocuments,
+} from '@/lib/api/deliveryProviders';
+import type {
+  DeliveryDriver,
+  DeliveryDriverCompartmentSize,
+  DeliveryDriverStatus,
+} from '@/lib/api/types';
 import { prepareImageForUpload } from '@/lib/image/convertToWebp';
-import { formatMoney, pesosInputToCents } from '@/lib/pricing/tariffUtils';
+import { centsToPesosInput, formatMoney, pesosInputToCents } from '@/lib/pricing/tariffUtils';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import panelStyles from './PartnershipsPage.module.css';
 import styles from './DriversPage.module.css';
@@ -28,6 +37,7 @@ type DriverFormState = {
   motorcycle_brand: string;
   motorcycle_color: string;
   credit_limit_pesos: string;
+  status: DeliveryDriverStatus;
   profile_photo_base64: string;
   profile_photo_file_name: string | null;
   ine_document_base64: string;
@@ -49,6 +59,7 @@ function createEmptyForm(): DriverFormState {
     motorcycle_brand: '',
     motorcycle_color: '',
     credit_limit_pesos: '500',
+    status: 'invited',
     profile_photo_base64: '',
     profile_photo_file_name: null,
     ine_document_base64: '',
@@ -58,6 +69,33 @@ function createEmptyForm(): DriverFormState {
     insurance_document_base64: '',
     insurance_document_file_name: null,
   };
+}
+
+function driverToForm(driver: DeliveryDriver): DriverFormState {
+  return {
+    first_name: driver.first_name,
+    last_name: driver.last_name,
+    phone: driver.phone,
+    email: driver.email,
+    compartment_size: driver.compartment_size,
+    plate: driver.plate,
+    motorcycle_brand: driver.motorcycle_brand,
+    motorcycle_color: driver.motorcycle_color,
+    credit_limit_pesos: centsToPesosInput(driver.credit_limit_cents),
+    status: driver.status,
+    profile_photo_base64: '',
+    profile_photo_file_name: null,
+    ine_document_base64: '',
+    ine_document_file_name: null,
+    license_document_base64: '',
+    license_document_file_name: null,
+    insurance_document_base64: '',
+    insurance_document_file_name: null,
+  };
+}
+
+function resolveCreditLimitCents(pesosInput: string): number {
+  return pesosInput.trim() === '' ? 50000 : pesosInputToCents(pesosInput);
 }
 
 async function fileToDataUrl(file: File): Promise<{ dataUrl: string; fileName: string }> {
@@ -103,6 +141,7 @@ export default function DriversPage() {
   const { canWriteProviderConfig } = useDeliveryProviderAccess();
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
   const [form, setForm] = useState<DriverFormState>(() => createEmptyForm());
+  const [editingDriverId, setEditingDriverId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -157,6 +196,46 @@ export default function DriversPage() {
     setSuccess(null);
 
     try {
+      if (editingDriverId) {
+        const updated = await patchMyDeliveryDriver(accessToken, editingDriverId, {
+          first_name: form.first_name.trim(),
+          last_name: form.last_name.trim(),
+          phone: form.phone.trim(),
+          email: form.email.trim(),
+          compartment_size: form.compartment_size,
+          plate: form.plate.trim(),
+          motorcycle_brand: form.motorcycle_brand.trim(),
+          motorcycle_color: form.motorcycle_color.trim(),
+          credit_limit_cents: resolveCreditLimitCents(form.credit_limit_pesos),
+          status: form.status,
+        });
+
+        const hasDocumentUpdates =
+          form.profile_photo_base64 ||
+          form.ine_document_base64 ||
+          form.license_document_base64 ||
+          form.insurance_document_base64;
+
+        const saved = hasDocumentUpdates
+          ? await uploadMyDeliveryDriverDocuments(accessToken, editingDriverId, {
+              profile_photo_base64: form.profile_photo_base64 || undefined,
+              profile_photo_file_name: form.profile_photo_file_name,
+              ine_document_base64: form.ine_document_base64 || undefined,
+              ine_document_file_name: form.ine_document_file_name,
+              license_document_base64: form.license_document_base64 || undefined,
+              license_document_file_name: form.license_document_file_name,
+              insurance_document_base64: form.insurance_document_base64 || undefined,
+              insurance_document_file_name: form.insurance_document_file_name,
+            })
+          : updated;
+
+        setDrivers((prev) => prev.map((row) => (row.id === saved.id ? saved : row)));
+        setEditingDriverId(null);
+        setForm(createEmptyForm());
+        setSuccess('Cambios guardados.');
+        return;
+      }
+
       const created = await createMyDeliveryDriver(accessToken, {
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
@@ -166,7 +245,7 @@ export default function DriversPage() {
         plate: form.plate.trim(),
         motorcycle_brand: form.motorcycle_brand.trim(),
         motorcycle_color: form.motorcycle_color.trim(),
-        credit_limit_cents: pesosInputToCents(form.credit_limit_pesos) || 50000,
+        credit_limit_cents: resolveCreditLimitCents(form.credit_limit_pesos),
         profile_photo_base64: form.profile_photo_base64,
         profile_photo_file_name: form.profile_photo_file_name,
         ine_document_base64: form.ine_document_base64,
@@ -180,11 +259,33 @@ export default function DriversPage() {
       setForm(createEmptyForm());
       setSuccess('Repartidor registrado. Debe iniciar sesión con Google usando el mismo correo.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo dar de alta al repartidor');
+      setError(
+        err instanceof Error
+          ? err.message
+          : editingDriverId
+            ? 'No se pudieron guardar los cambios'
+            : 'No se pudo dar de alta al repartidor',
+      );
     } finally {
       setSubmitting(false);
     }
   }
+
+  function handleEditDriver(driver: DeliveryDriver) {
+    setEditingDriverId(driver.id);
+    setForm(driverToForm(driver));
+    setError(null);
+    setSuccess(null);
+  }
+
+  function handleCancelEdit() {
+    setEditingDriverId(null);
+    setForm(createEmptyForm());
+    setError(null);
+    setSuccess(null);
+  }
+
+  const isEditing = editingDriverId !== null;
 
   const formReady =
     form.first_name.trim() &&
@@ -194,10 +295,11 @@ export default function DriversPage() {
     form.plate.trim() &&
     form.motorcycle_brand.trim() &&
     form.motorcycle_color.trim() &&
-    form.profile_photo_base64 &&
-    form.ine_document_base64 &&
-    form.license_document_base64 &&
-    form.insurance_document_base64;
+    (isEditing ||
+      (form.profile_photo_base64 &&
+        form.ine_document_base64 &&
+        form.license_document_base64 &&
+        form.insurance_document_base64));
 
   return (
     <PanelPageShell
@@ -219,11 +321,12 @@ export default function DriversPage() {
       {canWriteProviderConfig ? (
         <section className={styles.formSection} aria-labelledby="driver-form-title">
           <h2 id="driver-form-title" className={styles.formTitle}>
-            Dar de alta
+            {isEditing ? 'Editar repartidor' : 'Dar de alta'}
           </h2>
           <p className={styles.formSubtitle}>
-            Sube foto y documentos (imagen o PDF, máximo 8 MB cada uno). El crédito en efectivo
-            predeterminado es $500 MXN.
+            {isEditing
+              ? 'Actualiza la ficha del repartidor. Los documentos son opcionales al editar; sube uno nuevo solo si quieres reemplazarlo.'
+              : 'Sube foto y documentos (imagen o PDF, máximo 8 MB cada uno). El crédito en efectivo predeterminado es $500 MXN.'}
           </p>
           <form onSubmit={handleSubmit}>
             <div className={styles.formGrid}>
@@ -314,6 +417,28 @@ export default function DriversPage() {
                   required
                 />
               </div>
+              {isEditing ? (
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="driver-status">
+                    Estado
+                  </label>
+                  <select
+                    id="driver-status"
+                    className={styles.select}
+                    value={form.status}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        status: event.target.value as DeliveryDriverStatus,
+                      }))
+                    }
+                  >
+                    <option value="invited">Invitado</option>
+                    <option value="active">Activo</option>
+                    <option value="blocked">Bloqueado</option>
+                  </select>
+                </div>
+              ) : null}
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="driver-plate">
                   Placa
@@ -366,7 +491,7 @@ export default function DriversPage() {
                   onChange={(event) =>
                     void handleFileChange('profile_photo', event.target.files?.[0] ?? null)
                   }
-                  required={!form.profile_photo_base64}
+                  required={!isEditing && !form.profile_photo_base64}
                 />
               </div>
               <div className={styles.field}>
@@ -381,7 +506,7 @@ export default function DriversPage() {
                   onChange={(event) =>
                     void handleFileChange('ine_document', event.target.files?.[0] ?? null)
                   }
-                  required={!form.ine_document_base64}
+                  required={!isEditing && !form.ine_document_base64}
                 />
               </div>
               <div className={styles.field}>
@@ -396,7 +521,7 @@ export default function DriversPage() {
                   onChange={(event) =>
                     void handleFileChange('license_document', event.target.files?.[0] ?? null)
                   }
-                  required={!form.license_document_base64}
+                  required={!isEditing && !form.license_document_base64}
                 />
               </div>
               <div className={styles.field}>
@@ -411,17 +536,31 @@ export default function DriversPage() {
                   onChange={(event) =>
                     void handleFileChange('insurance_document', event.target.files?.[0] ?? null)
                   }
-                  required={!form.insurance_document_base64}
+                  required={!isEditing && !form.insurance_document_base64}
                 />
               </div>
             </div>
             <div className={styles.actions}>
+              {isEditing ? (
+                <button
+                  type="button"
+                  className={styles.cancelButton}
+                  onClick={handleCancelEdit}
+                  disabled={submitting}
+                >
+                  Cancelar
+                </button>
+              ) : null}
               <button
                 type="submit"
                 className={styles.submitButton}
                 disabled={submitting || !formReady}
               >
-                {submitting ? 'Guardando…' : 'Dar de alta'}
+                {submitting
+                  ? 'Guardando…'
+                  : isEditing
+                    ? 'Guardar cambios'
+                    : 'Dar de alta'}
               </button>
             </div>
           </form>
@@ -443,23 +582,47 @@ export default function DriversPage() {
         <div className={styles.list}>
           {sortedDrivers.map((driver) => {
             const availableCents = driver.credit_limit_cents - driver.credit_held_cents;
+            const isSelected = editingDriverId === driver.id;
             return (
-              <article key={driver.id} className={styles.card}>
-                <DriverAvatar driver={driver} />
-                <div className={styles.main}>
-                  <h3 className={styles.name}>
-                    {driver.first_name} {driver.last_name}
-                  </h3>
-                  <p className={styles.meta}>{driver.email}</p>
-                  <div className={styles.details}>
-                    <span>Crédito disponible: {formatMoney(availableCents)}</span>
-                    <span>Compartimento: {compartmentLabel(driver.compartment_size)}</span>
+              <article
+                key={driver.id}
+                className={`${styles.card}${isSelected ? ` ${styles.cardSelected}` : ''}`}
+              >
+                <button
+                  type="button"
+                  className={styles.cardMainButton}
+                  onClick={() => {
+                    if (canWriteProviderConfig) handleEditDriver(driver);
+                  }}
+                  disabled={!canWriteProviderConfig}
+                >
+                  <DriverAvatar driver={driver} />
+                  <div className={styles.main}>
+                    <h3 className={styles.name}>
+                      {driver.first_name} {driver.last_name}
+                    </h3>
+                    <p className={styles.meta}>{driver.email}</p>
+                    <div className={styles.details}>
+                      <span>Crédito disponible: {formatMoney(availableCents)}</span>
+                      <span>Compartimento: {compartmentLabel(driver.compartment_size)}</span>
+                    </div>
                   </div>
-                </div>
-                <div className={styles.chips}>
-                  <span className={statusChipClass(driver.status)}>{statusLabel(driver.status)}</span>
-                  {driver.is_online ? (
-                    <span className={`${styles.chip} ${styles.chipOnline}`}>En línea</span>
+                </button>
+                <div className={styles.cardAside}>
+                  <div className={styles.chips}>
+                    <span className={statusChipClass(driver.status)}>{statusLabel(driver.status)}</span>
+                    {driver.is_online ? (
+                      <span className={`${styles.chip} ${styles.chipOnline}`}>En línea</span>
+                    ) : null}
+                  </div>
+                  {canWriteProviderConfig ? (
+                    <button
+                      type="button"
+                      className={styles.editButton}
+                      onClick={() => handleEditDriver(driver)}
+                    >
+                      Editar
+                    </button>
                   ) : null}
                 </div>
               </article>

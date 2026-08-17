@@ -9,6 +9,7 @@ InvitableMemberRole = Literal["admin", "operator"]
 
 _WRITE_CONFIG_ROLES = frozenset({"owner", "admin"})
 _OPERATOR_WRITE_ROLES = frozenset({"owner", "admin", "operator"})
+_VIEW_DRIVERS_ROLES = frozenset({"owner", "admin", "operator"})
 
 
 def can_manage_members(role: str | None) -> bool:
@@ -29,6 +30,15 @@ def can_manage_weather(role: str | None) -> bool:
 
 def can_simulate_pricing(role: str | None) -> bool:
     return role in _OPERATOR_WRITE_ROLES
+
+
+def can_view_drivers(role: str | None) -> bool:
+    return role in _VIEW_DRIVERS_ROLES
+
+
+def require_view_drivers(role: str | None) -> None:
+    if not can_view_drivers(role):
+        raise ForbiddenError("Tu rol no permite ver esta información")
 
 
 def require_write_provider_config(role: str | None) -> None:

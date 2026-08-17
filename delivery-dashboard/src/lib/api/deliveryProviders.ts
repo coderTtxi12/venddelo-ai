@@ -24,6 +24,8 @@ import type {
   DeliverySearchLeadTimeUpdate,
   DeliveryDriver,
   DeliveryDriverCreateInput,
+  DeliveryDriverDocumentsUpdateInput,
+  DeliveryDriverUpdateInput,
 } from './types';
 
 function withZoneId(path: string, zoneId: string): string {
@@ -258,6 +260,30 @@ export function listMyDeliveryDrivers(token: string) {
 
 export function createMyDeliveryDriver(token: string, body: DeliveryDriverCreateInput) {
   return apiRequest<DeliveryDriver>('/delivery-providers/me/drivers', {
+    method: 'POST',
+    token,
+    body,
+  });
+}
+
+export function patchMyDeliveryDriver(
+  token: string,
+  driverId: string,
+  body: DeliveryDriverUpdateInput,
+) {
+  return apiRequest<DeliveryDriver>(`/delivery-providers/me/drivers/${driverId}`, {
+    method: 'PATCH',
+    token,
+    body,
+  });
+}
+
+export function uploadMyDeliveryDriverDocuments(
+  token: string,
+  driverId: string,
+  body: DeliveryDriverDocumentsUpdateInput,
+) {
+  return apiRequest<DeliveryDriver>(`/delivery-providers/me/drivers/${driverId}/documents`, {
     method: 'POST',
     token,
     body,
