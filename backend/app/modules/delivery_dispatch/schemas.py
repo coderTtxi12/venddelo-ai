@@ -206,10 +206,18 @@ class PublicDispatchTrackingDTO(BaseModel):
     eta_seconds: int | None = None
 
 
+class RiderAssignmentDTO(BaseModel):
+    id: uuid.UUID
+    status: str
+    restaurant_name: str
+    dropoff_address: str
+
+
 class RiderProfileDTO(DeliveryDriverDTO):
     last_lat: float | None = None
     last_lng: float | None = None
     location_updated_at: datetime | None = None
+    assignments: list[RiderAssignmentDTO] = Field(default_factory=list)
 
 
 class RiderOnlineUpdate(BaseModel):
@@ -221,6 +229,10 @@ class RiderLocationUpdate(BaseModel):
     longitude: float = Field(ge=-180, le=180)
 
 
+class RiderFcmTokenUpdate(BaseModel):
+    fcm_token: str = Field(min_length=1)
+
+
 class RiderOfferDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -229,6 +241,11 @@ class RiderOfferDTO(BaseModel):
     status: str
     case_applied: str
     expires_at: datetime
+    restaurant_name: str
+    dropoff_address: str
+    collect_cents: int
+    payment_method: str
+    package_count: int
 
 
 class DeliveryTaskPayload(BaseModel):

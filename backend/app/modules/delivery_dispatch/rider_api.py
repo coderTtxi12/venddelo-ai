@@ -10,6 +10,8 @@ from app.api.deps import get_synced_user
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.modules.delivery_dispatch.schemas import (
     DeliveryTaskPayload,
+    RiderAssignmentDTO,
+    RiderFcmTokenUpdate,
     RiderLocationUpdate,
     RiderOfferDTO,
     RiderOnlineUpdate,
@@ -77,6 +79,51 @@ def reject_rider_offer(
     service: RiderDispatchService = Depends(_rider_service),
 ) -> RiderOfferDTO:
     return service.reject_offer(user, offer_id)
+
+
+@rider_router.put("/me/fcm-token", response_model=RiderProfileDTO)
+def put_rider_fcm_token(
+    data: RiderFcmTokenUpdate,
+    user: UserDTO = Depends(get_synced_user),
+    service: RiderDispatchService = Depends(_rider_service),
+) -> RiderProfileDTO:
+    return service.set_fcm_token(user, data.fcm_token)
+
+
+@rider_router.post(
+    "/me/assignments/{request_id}/picked-up",
+    response_model=RiderAssignmentDTO,
+)
+def post_rider_picked_up(
+    request_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    service: RiderDispatchService = Depends(_rider_service),
+) -> RiderAssignmentDTO:
+    return service.transition_assignment(user, request_id, "picked_up")
+
+
+@rider_router.post(
+    "/me/assignments/{request_id}/in-transit",
+    response_model=RiderAssignmentDTO,
+)
+def post_rider_in_transit(
+    request_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    service: RiderDispatchService = Depends(_rider_service),
+) -> RiderAssignmentDTO:
+    return service.transition_assignment(user, request_id, "in_transit")
+
+
+@rider_router.post(
+    "/me/assignments/{request_id}/delivered",
+    response_model=RiderAssignmentDTO,
+)
+def post_rider_delivered(
+    request_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    service: RiderDispatchService = Depends(_rider_service),
+) -> RiderAssignmentDTO:
+    return service.transition_assignment(user, request_id, "delivered")
 
 
 @internal_router.post(

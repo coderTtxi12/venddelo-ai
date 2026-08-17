@@ -43,6 +43,7 @@ from app.modules.delivery_dispatch.schemas import (
     DispatchRequestCreate,
     DispatchRequestDTO,
     PublicDispatchTrackingDTO,
+    RiderAssignmentDTO,
     RiderOfferDTO,
     RiderProfileDTO,
     SearchLeadTimeDTO,
@@ -63,6 +64,7 @@ from app.modules.delivery_providers.permissions import (
 )
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
+from app.db.models.restaurant import Restaurant
 from app.modules.restaurants.schemas import RestaurantDTO
 from app.modules.users.schemas import UserDTO
 
@@ -786,6 +788,15 @@ class RestaurantDispatchService:
             )
 
 
+_ACTIVE_ASSIGNMENT_STATUSES = frozenset({"assigned", "picked_up", "in_transit"})
+_ASSIGNMENT_STATUS_ORDER = {"in_transit": 0, "picked_up": 1, "assigned": 2}
+_ASSIGNMENT_TRANSITIONS = {
+    "picked_up": "assigned",
+    "in_transit": "picked_up",
+    "delivered": "in_transit",
+}
+
+
 class RiderDispatchService:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -797,14 +808,14 @@ class RiderDispatchService:
             raise ForbiddenError(
                 "Tu correo no está dado de alta. Pide a Mexy que te registre."
             )
-        return RiderProfileDTO.model_validate(driver)
+        return self._to_profile(driver)
 
     def set_online(self, user: UserDTO, is_online: bool) -> RiderProfileDTO:
         driver = self._require_driver(user)
         driver.is_online = is_online
         self._session.flush()
         self._session.refresh(driver)
-        return RiderProfileDTO.model_validate(driver)
+        return self._to_profile(driver)
 
     def update_location(
         self,
@@ -818,7 +829,14 @@ class RiderDispatchService:
         driver.location_updated_at = datetime.now(UTC)
         self._session.flush()
         self._session.refresh(driver)
-        return RiderProfileDTO.model_validate(driver)
+        return self._to_profile(driver)
+
+    def set_fcm_token(self, user: UserDTO, fcm_token: str) -> RiderProfileDTO:
+        driver = self._require_driver(user)
+        driver.fcm_token = fcm_token
+        self._session.flush()
+        self._session.refresh(driver)
+        return self._to_profile(driver)
 
     def list_offers(self, user: UserDTO) -> list[RiderOfferDTO]:
         driver = self._require_driver(user)
@@ -832,7 +850,7 @@ class RiderDispatchService:
             )
             .order_by(DeliveryDispatchOffer.expires_at.asc())
         ).all()
-        return [RiderOfferDTO.model_validate(row) for row in rows]
+        return [self._to_offer_dto(row) for row in rows]
 
     def accept_offer(self, user: UserDTO, offer_id: uuid.UUID) -> RiderOfferDTO:
         driver = self._require_driver(user)
@@ -890,7 +908,7 @@ class RiderDispatchService:
                 locked_driver.credit_held_cents += row.collect_cents
         self._session.flush()
         self._session.refresh(offer)
-        return RiderOfferDTO.model_validate(offer)
+        return self._to_offer_dto(offer)
 
     def reject_offer(self, user: UserDTO, offer_id: uuid.UUID) -> RiderOfferDTO:
         driver = self._require_driver(user)
@@ -915,7 +933,29 @@ class RiderDispatchService:
         reject_offer_and_search(self._session, offer, request, now)
         self._session.flush()
         self._session.refresh(offer)
-        return RiderOfferDTO.model_validate(offer)
+        return self._to_offer_dto(offer)
+
+    def transition_assignment(
+        self,
+        user: UserDTO,
+        request_id: uuid.UUID,
+        new_status: str,
+    ) -> RiderAssignmentDTO:
+        expected = _ASSIGNMENT_TRANSITIONS[new_status]
+        driver = self._require_driver(user)
+        request = self._session.scalar(
+            select(DeliveryDispatchRequest)
+            .where(DeliveryDispatchRequest.id == request_id)
+            .with_for_update()
+        )
+        if request is None or request.assigned_driver_id != driver.id:
+            raise NotFoundError("Solicitud de delivery no encontrada")
+        if request.status != expected:
+            raise ConflictError("No puedes cambiar el estado de este envío")
+        request.status = new_status
+        self._session.flush()
+        self._session.refresh(request)
+        return self._to_assignment_dto(request)
 
     def _require_driver(self, user: UserDTO) -> DeliveryDriver:
         claim_drivers(self._session, user.id, user.email or "")
@@ -931,4 +971,57 @@ class RiderDispatchService:
             select(DeliveryDriver)
             .where(DeliveryDriver.user_id == user_id)
             .order_by(DeliveryDriver.created_at.desc())
+        )
+
+    def _to_profile(self, driver: DeliveryDriver) -> RiderProfileDTO:
+        profile = RiderProfileDTO.model_validate(driver)
+        profile.assignments = self._list_assignments(driver.id)
+        return profile
+
+    def _list_assignments(self, driver_id: uuid.UUID) -> list[RiderAssignmentDTO]:
+        rows = self._session.execute(
+            select(DeliveryDispatchRequest, Restaurant.name).join(
+                Restaurant, Restaurant.id == DeliveryDispatchRequest.restaurant_id
+            ).where(
+                DeliveryDispatchRequest.assigned_driver_id == driver_id,
+                DeliveryDispatchRequest.status.in_(_ACTIVE_ASSIGNMENT_STATUSES),
+            )
+        ).all()
+        assignments = [self._to_assignment_dto(row, restaurant_name) for row, restaurant_name in rows]
+        assignments.sort(key=lambda item: _ASSIGNMENT_STATUS_ORDER.get(item.status, 99))
+        return assignments
+
+    def _to_assignment_dto(
+        self,
+        request: DeliveryDispatchRequest,
+        restaurant_name: str | None = None,
+    ) -> RiderAssignmentDTO:
+        if restaurant_name is None:
+            restaurant = self._session.get(Restaurant, request.restaurant_id)
+            restaurant_name = restaurant.name if restaurant is not None else ""
+        return RiderAssignmentDTO(
+            id=request.id,
+            status=request.status,
+            restaurant_name=restaurant_name,
+            dropoff_address=request.dropoff_address,
+        )
+
+    def _to_offer_dto(self, offer: DeliveryDispatchOffer) -> RiderOfferDTO:
+        request = offer.request
+        if request is None:
+            request = self._session.get(DeliveryDispatchRequest, offer.request_id)
+        if request is None:
+            raise NotFoundError("Solicitud de delivery no encontrada")
+        restaurant = self._session.get(Restaurant, request.restaurant_id)
+        return RiderOfferDTO(
+            id=offer.id,
+            request_id=offer.request_id,
+            status=offer.status,
+            case_applied=offer.case_applied,
+            expires_at=offer.expires_at,
+            restaurant_name=restaurant.name if restaurant is not None else "",
+            dropoff_address=request.dropoff_address,
+            collect_cents=request.collect_cents,
+            payment_method=request.payment_method,
+            package_count=request.package_count,
         )
