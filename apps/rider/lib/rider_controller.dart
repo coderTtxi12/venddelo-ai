@@ -10,19 +10,25 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'api.dart';
 import 'config.dart';
+import 'location_auth.dart';
+import 'location_permission.dart';
 import 'location_task.dart';
 import 'models.dart';
 
 class RiderController extends ChangeNotifier {
-  RiderController({RiderApi? api})
-    : _api =
-          api ??
-          RiderApi(
-            tokenProvider: () =>
-                Supabase.instance.client.auth.currentSession?.accessToken,
-          );
+  RiderController({
+    RiderApi? api,
+    Future<bool> Function()? openAppSettingsImpl,
+  }) : _api =
+           api ??
+           RiderApi(
+             tokenProvider: () =>
+                 Supabase.instance.client.auth.currentSession?.accessToken,
+           ),
+       _openAppSettings = openAppSettingsImpl ?? Geolocator.openAppSettings;
 
   final RiderApi _api;
+  final Future<bool> Function() _openAppSettings;
 
   RiderProfile? profile;
   RiderOffer? offer;
@@ -30,15 +36,21 @@ class RiderController extends ChangeNotifier {
   bool loading = true;
   bool notRegistered = false;
   bool onlineBusy = false;
+  bool offerBusy = false;
+  bool needsLocationSettings = false;
 
   Timer? _offerPoll;
   StreamSubscription<RemoteMessage>? _fcmForeground;
+  StreamSubscription<AuthState>? _authSub;
+  bool _listeningTaskData = false;
 
   Future<void> bootstrap() async {
     loading = true;
     errorMessage = null;
     notRegistered = false;
     notifyListeners();
+    _listenTaskData();
+    _listenAuth();
     try {
       await refreshMe();
       await _setupFcm();
@@ -71,6 +83,7 @@ class RiderController extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    await _persistSessionToLocationTask();
     try {
       final offers = await _api.listOffers();
       offer = offers.isEmpty ? null : offers.first;
@@ -98,6 +111,7 @@ class RiderController extends ChangeNotifier {
         await _stopOnlineServices();
         profile = await _api.setOnline(false);
         offer = null;
+        needsLocationSettings = false;
       }
     } on ApiException catch (error) {
       errorMessage = error.message;
@@ -109,11 +123,18 @@ class RiderController extends ChangeNotifier {
     }
   }
 
+  Future<void> openLocationSettings() async {
+    await _openAppSettings();
+  }
+
   Future<void> acceptOffer() async {
     final current = offer;
-    if (current == null) {
+    if (current == null || offerBusy) {
       return;
     }
+    offerBusy = true;
+    errorMessage = null;
+    notifyListeners();
     try {
       await _api.acceptOffer(current.id);
       offer = null;
@@ -121,22 +142,29 @@ class RiderController extends ChangeNotifier {
     } on ApiException catch (error) {
       errorMessage = error.message;
       await refreshOffers();
+    } finally {
+      offerBusy = false;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<void> rejectOffer() async {
     final current = offer;
-    if (current == null) {
+    if (current == null || offerBusy) {
       return;
     }
+    offerBusy = true;
+    errorMessage = null;
+    notifyListeners();
     try {
       await _api.rejectOffer(current.id);
       offer = null;
     } on ApiException catch (error) {
       errorMessage = error.message;
+    } finally {
+      offerBusy = false;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<void> transitionAssignment(String requestId, String action) async {
@@ -150,13 +178,7 @@ class RiderController extends ChangeNotifier {
   }
 
   Future<void> _startOnlineServices() async {
-    final token = Supabase.instance.client.auth.currentSession?.accessToken;
-    if (token != null) {
-      await saveLocationTaskCredentials(
-        apiBaseUrl: AppConfig.apiBaseUrl,
-        accessToken: token,
-      );
-    }
+    await _persistSessionToLocationTask();
     initLocationForegroundTask();
     await startLocationForegroundTask();
     _offerPoll?.cancel();
@@ -175,22 +197,21 @@ class RiderController extends ChangeNotifier {
   Future<void> _ensureLocationPermissions() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
+      needsLocationSettings = false;
       throw const ApiException(400, 'Activa el GPS para ponerte en línea.');
     }
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      throw const ApiException(
-        400,
-        'Necesitamos tu ubicación para ofrecerte envíos.',
-      );
-    }
     if (permission == LocationPermission.whileInUse) {
       permission = await Geolocator.requestPermission();
     }
+    if (!canGoOnlineWithPermission(permission)) {
+      needsLocationSettings = shouldOfferLocationSettings(permission);
+      throw const ApiException(400, alwaysLocationRequiredMessage);
+    }
+    needsLocationSettings = false;
   }
 
   Future<void> _requestNotificationPermission() async {
@@ -221,12 +242,66 @@ class RiderController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  void _listenTaskData() {
+    if (_listeningTaskData) {
+      return;
+    }
+    FlutterForegroundTask.addTaskDataCallback(_onTaskData);
+    _listeningTaskData = true;
+  }
+
+  void _listenAuth() {
+    _authSub ??= Supabase.instance.client.auth.onAuthStateChange.listen((
+      data,
+    ) {
+      final session = data.session;
+      if (session != null) {
+        unawaited(_persistSessionToLocationTask(session));
+      }
+    });
+  }
+
+  void _onTaskData(Object data) {
+    if (data == locationAuthFailedEvent) {
+      unawaited(_forceOfflineAfterAuthFailure());
+    }
+  }
+
+  Future<void> _persistSessionToLocationTask([Session? session]) async {
+    final current = session ?? Supabase.instance.client.auth.currentSession;
+    if (current == null) {
+      return;
+    }
+    await saveLocationTaskCredentials(
+      apiBaseUrl: AppConfig.apiBaseUrl,
+      accessToken: current.accessToken,
+      refreshToken: current.refreshToken ?? '',
+      supabaseUrl: AppConfig.supabaseUrl,
+      supabaseAnonKey: AppConfig.supabaseAnonKey,
+    );
+  }
+
+  Future<void> _forceOfflineAfterAuthFailure() async {
+    errorMessage = locationAuthFailedMessage;
+    offer = null;
+    await _stopOnlineServices();
+    try {
+      profile = await _api.setOnline(false);
+    } catch (_) {}
+    notifyListeners();
+  }
+
   bool get showIosKillWarning => !kIsWeb && Platform.isIOS;
 
   @override
   void dispose() {
     _offerPoll?.cancel();
     unawaited(_fcmForeground?.cancel());
+    unawaited(_authSub?.cancel());
+    if (_listeningTaskData) {
+      FlutterForegroundTask.removeTaskDataCallback(_onTaskData);
+      _listeningTaskData = false;
+    }
     super.dispose();
   }
 }

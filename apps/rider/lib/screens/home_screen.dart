@@ -54,6 +54,17 @@ class HomeScreen extends StatelessWidget {
                     style: TextStyle(color: Theme.of(context).colorScheme.error),
                   ),
                 ),
+              if (controller.needsLocationSettings)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: controller.openLocationSettings,
+                      child: const Text('Abrir ajustes'),
+                    ),
+                  ),
+                ),
               if (jobs.current == null)
                 const Padding(
                   padding: EdgeInsets.all(16),

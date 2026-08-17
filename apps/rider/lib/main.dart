@@ -156,6 +156,8 @@ class _AuthGateState extends State<AuthGate> {
         if (controller.offer != null) {
           return OfferScreen(
             offer: controller.offer!,
+            errorMessage: controller.errorMessage,
+            busy: controller.offerBusy,
             onAccept: controller.acceptOffer,
             onReject: controller.rejectOffer,
           );

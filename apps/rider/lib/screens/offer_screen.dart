@@ -11,11 +11,15 @@ class OfferScreen extends StatefulWidget {
     required this.offer,
     required this.onAccept,
     required this.onReject,
+    this.errorMessage,
+    this.busy = false,
   });
 
   final RiderOffer offer;
   final VoidCallback onAccept;
   final VoidCallback onReject;
+  final String? errorMessage;
+  final bool busy;
 
   @override
   State<OfferScreen> createState() => _OfferScreenState();
@@ -71,14 +75,24 @@ class _OfferScreenState extends State<OfferScreen> {
               const SizedBox(height: 8),
               Text('Cobrar: \$$collect · ${_paymentLabel(widget.offer.paymentMethod)}'),
               Text('Paquetes: ${widget.offer.packageCount}'),
+              if (widget.errorMessage != null && widget.errorMessage!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    widget.errorMessage!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ),
+              ],
               const Spacer(),
               FilledButton(
-                onPressed: remaining == 0 ? null : widget.onAccept,
+                onPressed: remaining == 0 || widget.busy ? null : widget.onAccept,
                 child: const Text('Aceptar'),
               ),
               const SizedBox(height: 12),
               OutlinedButton(
-                onPressed: widget.onReject,
+                onPressed: widget.busy ? null : widget.onReject,
                 child: const Text('Rechazar'),
               ),
             ],
