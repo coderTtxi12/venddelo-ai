@@ -6,10 +6,12 @@ import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessCont
 import { useAuth } from '@/hooks/useAuth';
 import {
   createMyDeliveryDriver,
+  getMyDeliveryDriver,
   listMyDeliveryDrivers,
   patchMyDeliveryDriver,
   uploadMyDeliveryDriverDocuments,
 } from '@/lib/api/deliveryProviders';
+import type { DeliveryDriverUpdateInput } from '@/lib/api/types';
 import type {
   DeliveryDriver,
   DeliveryDriverCompartmentSize,
@@ -94,8 +96,19 @@ function driverToForm(driver: DeliveryDriver): DriverFormState {
   };
 }
 
-function resolveCreditLimitCents(pesosInput: string): number {
+function resolveCreateCreditLimitCents(pesosInput: string): number {
   return pesosInput.trim() === '' ? 50000 : pesosInputToCents(pesosInput);
+}
+
+function applyEditCreditLimitCents(
+  body: DeliveryDriverUpdateInput,
+  pesosInput: string,
+): DeliveryDriverUpdateInput {
+  const trimmed = pesosInput.trim();
+  if (trimmed === '') {
+    return body;
+  }
+  return { ...body, credit_limit_cents: pesosInputToCents(trimmed) };
 }
 
 async function fileToDataUrl(file: File): Promise<{ dataUrl: string; fileName: string }> {
@@ -187,6 +200,22 @@ export default function DriversPage() {
     }
   }
 
+  async function reloadEditedDriverFromServer(driverId: string) {
+    if (!accessToken) return;
+    try {
+      const fresh = await getMyDeliveryDriver(accessToken, driverId);
+      setDrivers((prev) => prev.map((row) => (row.id === fresh.id ? fresh : row)));
+      setForm(driverToForm(fresh));
+    } catch {
+      const rows = await listMyDeliveryDrivers(accessToken);
+      setDrivers(rows);
+      const fresh = rows.find((row) => row.id === driverId);
+      if (fresh) {
+        setForm(driverToForm(fresh));
+      }
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!accessToken || !canWriteProviderConfig) return;
@@ -195,39 +224,45 @@ export default function DriversPage() {
     setError(null);
     setSuccess(null);
 
-    try {
-      if (editingDriverId) {
-        const updated = await patchMyDeliveryDriver(accessToken, editingDriverId, {
-          first_name: form.first_name.trim(),
-          last_name: form.last_name.trim(),
-          phone: form.phone.trim(),
-          email: form.email.trim(),
-          compartment_size: form.compartment_size,
-          plate: form.plate.trim(),
-          motorcycle_brand: form.motorcycle_brand.trim(),
-          motorcycle_color: form.motorcycle_color.trim(),
-          credit_limit_cents: resolveCreditLimitCents(form.credit_limit_pesos),
-          status: form.status,
-        });
+    const editingId = editingDriverId;
 
+    try {
+      if (editingId) {
         const hasDocumentUpdates =
           form.profile_photo_base64 ||
           form.ine_document_base64 ||
           form.license_document_base64 ||
           form.insurance_document_base64;
 
-        const saved = hasDocumentUpdates
-          ? await uploadMyDeliveryDriverDocuments(accessToken, editingDriverId, {
-              profile_photo_base64: form.profile_photo_base64 || undefined,
-              profile_photo_file_name: form.profile_photo_file_name,
-              ine_document_base64: form.ine_document_base64 || undefined,
-              ine_document_file_name: form.ine_document_file_name,
-              license_document_base64: form.license_document_base64 || undefined,
-              license_document_file_name: form.license_document_file_name,
-              insurance_document_base64: form.insurance_document_base64 || undefined,
-              insurance_document_file_name: form.insurance_document_file_name,
-            })
-          : updated;
+        if (hasDocumentUpdates) {
+          await uploadMyDeliveryDriverDocuments(accessToken, editingId, {
+            profile_photo_base64: form.profile_photo_base64 || undefined,
+            profile_photo_file_name: form.profile_photo_file_name,
+            ine_document_base64: form.ine_document_base64 || undefined,
+            ine_document_file_name: form.ine_document_file_name,
+            license_document_base64: form.license_document_base64 || undefined,
+            license_document_file_name: form.license_document_file_name,
+            insurance_document_base64: form.insurance_document_base64 || undefined,
+            insurance_document_file_name: form.insurance_document_file_name,
+          });
+        }
+
+        const patchBody = applyEditCreditLimitCents(
+          {
+            first_name: form.first_name.trim(),
+            last_name: form.last_name.trim(),
+            phone: form.phone.trim(),
+            email: form.email.trim(),
+            compartment_size: form.compartment_size,
+            plate: form.plate.trim(),
+            motorcycle_brand: form.motorcycle_brand.trim(),
+            motorcycle_color: form.motorcycle_color.trim(),
+            status: form.status,
+          },
+          form.credit_limit_pesos,
+        );
+
+        const saved = await patchMyDeliveryDriver(accessToken, editingId, patchBody);
 
         setDrivers((prev) => prev.map((row) => (row.id === saved.id ? saved : row)));
         setEditingDriverId(null);
@@ -245,7 +280,7 @@ export default function DriversPage() {
         plate: form.plate.trim(),
         motorcycle_brand: form.motorcycle_brand.trim(),
         motorcycle_color: form.motorcycle_color.trim(),
-        credit_limit_cents: resolveCreditLimitCents(form.credit_limit_pesos),
+        credit_limit_cents: resolveCreateCreditLimitCents(form.credit_limit_pesos),
         profile_photo_base64: form.profile_photo_base64,
         profile_photo_file_name: form.profile_photo_file_name,
         ine_document_base64: form.ine_document_base64,
@@ -262,10 +297,13 @@ export default function DriversPage() {
       setError(
         err instanceof Error
           ? err.message
-          : editingDriverId
+          : editingId
             ? 'No se pudieron guardar los cambios'
             : 'No se pudo dar de alta al repartidor',
       );
+      if (editingId) {
+        await reloadEditedDriverFromServer(editingId);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -414,7 +452,7 @@ export default function DriversPage() {
                   onChange={(event) =>
                     setForm((prev) => ({ ...prev, credit_limit_pesos: event.target.value }))
                   }
-                  required
+                  required={!isEditing}
                 />
               </div>
               {isEditing ? (

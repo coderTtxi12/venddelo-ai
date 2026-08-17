@@ -244,6 +244,37 @@ def test_patch_cannot_change_credit_held_cents(client, engine):
 
 
 @requires_db
+def test_patch_credit_limit_below_held_returns_400(client, engine):
+    _create_provider(client)
+
+    created = client.post(
+        "/api/v1/delivery-providers/me/drivers",
+        json=_driver_create_payload(),
+        headers=AUTH,
+    )
+    assert created.status_code == 201, created.text
+    driver_id = created.json()["id"]
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        driver = session.get(DeliveryDriver, uuid.UUID(driver_id))
+        assert driver is not None
+        driver.credit_held_cents = 12000
+        session.commit()
+
+    patched = client.patch(
+        f"/api/v1/delivery-providers/me/drivers/{driver_id}",
+        json={"credit_limit_cents": 10000},
+        headers=AUTH,
+    )
+    assert patched.status_code == 400
+    assert (
+        patched.json()["error"]["message"]
+        == "El límite de crédito no puede ser menor que el crédito retenido"
+    )
+
+
+@requires_db
 def test_patch_blocked_forces_offline(client, engine):
     _create_provider(client)
 

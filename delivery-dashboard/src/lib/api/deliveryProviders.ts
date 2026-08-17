@@ -266,6 +266,10 @@ export function createMyDeliveryDriver(token: string, body: DeliveryDriverCreate
   });
 }
 
+export function getMyDeliveryDriver(token: string, driverId: string) {
+  return apiRequest<DeliveryDriver>(`/delivery-providers/me/drivers/${driverId}`, { token });
+}
+
 export function patchMyDeliveryDriver(
   token: string,
   driverId: string,

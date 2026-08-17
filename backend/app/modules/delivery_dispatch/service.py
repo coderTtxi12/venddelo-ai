@@ -214,6 +214,12 @@ class DeliveryDispatchService:
             if status == "blocked":
                 row.is_online = False
 
+        if "credit_limit_cents" in updates and updates["credit_limit_cents"] is not None:
+            if updates["credit_limit_cents"] < row.credit_held_cents:
+                raise ValidationError(
+                    "El límite de crédito no puede ser menor que el crédito retenido"
+                )
+
         for field in ("first_name", "last_name", "phone", "plate", "motorcycle_brand", "motorcycle_color"):
             if field in updates and updates[field] is not None:
                 updates[field] = updates[field].strip()
