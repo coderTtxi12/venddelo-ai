@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { usePathname } from 'next/navigation';
 import CheckOutlinedIcon from '@mui/icons-material/CheckOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import styles from './ZonePicker.module.css';
 
 export default function ZonePicker() {
+  const pathname = usePathname();
   const listId = useId();
   const { loading, zones, selectedZoneId, selectedZone, setSelectedZoneId } = useDeliveryZone();
   const [open, setOpen] = useState(false);
@@ -89,7 +91,7 @@ export default function ZonePicker() {
     }
   };
 
-  if (zones.length === 0) return null;
+  if (pathname === '/repartidores' || pathname === '/asignacion' || zones.length === 0) return null;
 
   const activeId = zones[activeIndex] ? `${listId}-${zones[activeIndex].id}` : undefined;
   const disabled = loading || !selectedZoneId;
