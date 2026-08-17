@@ -218,3 +218,33 @@ export type DeliveryPartnershipRequest = {
   zone: { id: string; name: string };
   restaurant: DeliveryPartnershipRestaurant;
 };
+
+export type DeliveryAssignmentSettings = {
+  offer_timeout_seconds: number;
+  pre_free_eta_seconds: number;
+  driver_location_staleness_seconds: number;
+  min_protected_drivers: number;
+  high_demand_available_drivers_max: number;
+  high_demand_occupied_ratio: number;
+  high_demand_pending_min: number;
+  near_destination_radius_meters: number;
+  max_extra_route_minutes: number;
+  max_pickup_detour_minutes: number;
+  max_destination_detour_minutes: number;
+  max_active_packages_per_driver: number;
+  assignment_retry_seconds: number;
+  assignment_timeout_seconds: number;
+  pre_free_speed_mps: number;
+};
+
+export type DeliveryAssignmentSettingsUpdate = Omit<
+  DeliveryAssignmentSettings,
+  'pre_free_speed_mps'
+>;
+
+export type DeliverySearchLeadTime = {
+  prep_minutes: number;
+  search_ahead_minutes: number;
+};
+
+export type DeliverySearchLeadTimeUpdate = DeliverySearchLeadTime;

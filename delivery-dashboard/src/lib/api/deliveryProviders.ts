@@ -1,5 +1,7 @@
 import { apiRequest } from './client';
 import type {
+  DeliveryAssignmentSettings,
+  DeliveryAssignmentSettingsUpdate,
   DeliveryProvider,
   DeliveryProviderAdminInvite,
   DeliveryProviderMember,
@@ -18,6 +20,8 @@ import type {
   DeliveryProviderZoneWrite,
   DeliveryPricingQuote,
   DeliveryPricingSimulateRequest,
+  DeliverySearchLeadTime,
+  DeliverySearchLeadTimeUpdate,
 } from './types';
 
 function withZoneId(path: string, zoneId: string): string {
@@ -210,4 +214,38 @@ export function simulateMyDeliveryProviderPricing(
       body,
     },
   );
+}
+
+export function getMyDeliveryProviderAssignmentSettings(token: string) {
+  return apiRequest<DeliveryAssignmentSettings>('/delivery-providers/me/assignment-settings', {
+    token,
+  });
+}
+
+export function patchMyDeliveryProviderAssignmentSettings(
+  token: string,
+  body: DeliveryAssignmentSettingsUpdate,
+) {
+  return apiRequest<DeliveryAssignmentSettings>('/delivery-providers/me/assignment-settings', {
+    method: 'PATCH',
+    token,
+    body,
+  });
+}
+
+export function getMyDeliveryProviderSearchLeadTimes(token: string) {
+  return apiRequest<DeliverySearchLeadTime[]>('/delivery-providers/me/search-lead-times', {
+    token,
+  });
+}
+
+export function patchMyDeliveryProviderSearchLeadTimes(
+  token: string,
+  body: DeliverySearchLeadTimeUpdate[],
+) {
+  return apiRequest<DeliverySearchLeadTime[]>('/delivery-providers/me/search-lead-times', {
+    method: 'PATCH',
+    token,
+    body,
+  });
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
 import MailOutlineOutlinedIcon from '@mui/icons-material/MailOutlineOutlined';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
@@ -17,17 +18,26 @@ import { memberRoleLabel } from '@/lib/access/deliveryProviderPermissions';
 import {
   addMyDeliveryProviderAdminInvite,
   getMyDeliveryProvider,
+  getMyDeliveryProviderAssignmentSettings,
+  getMyDeliveryProviderSearchLeadTimes,
   listMyDeliveryProviderAdminInvites,
   listMyDeliveryProviderMembers,
   listMyDeliveryProviderPaymentMethods,
   listMyDeliveryProviderSchedules,
+  patchMyDeliveryProviderAssignmentSettings,
+  patchMyDeliveryProviderSearchLeadTimes,
   removeMyDeliveryProviderAdminInvite,
   setMyDeliveryProviderPaymentMethods,
   setMyDeliveryProviderSchedules,
   updateMyDeliveryProvider,
 } from '@/lib/api/deliveryProviders';
 import { ApiError } from '@/lib/api/types';
-import type { DeliveryProviderAdminInvite, DeliveryProviderMember } from '@/lib/api/types';
+import type {
+  DeliveryAssignmentSettingsUpdate,
+  DeliveryProviderAdminInvite,
+  DeliveryProviderMember,
+  DeliverySearchLeadTime,
+} from '@/lib/api/types';
 import { prepareImageForUpload } from '@/lib/image/convertToWebp';
 import { createDefaultOnboardingData } from '@/lib/onboarding/defaults';
 import type { OnboardingData } from '@/lib/onboarding/types';
@@ -115,8 +125,23 @@ export default function SettingsPage() {
   const [adminError, setAdminError] = useState<string | null>(null);
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [removingInviteId, setRemovingInviteId] = useState<string | null>(null);
+  const [assignmentSettings, setAssignmentSettings] =
+    useState<DeliveryAssignmentSettingsUpdate | null>(null);
+  const [initialAssignmentSettings, setInitialAssignmentSettings] =
+    useState<DeliveryAssignmentSettingsUpdate | null>(null);
+  const [leadTimes, setLeadTimes] = useState<DeliverySearchLeadTime[]>([]);
+  const [initialLeadTimes, setInitialLeadTimes] = useState<DeliverySearchLeadTime[]>([]);
+  const [assignmentLoading, setAssignmentLoading] = useState(true);
+  const [assignmentSaving, setAssignmentSaving] = useState(false);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [assignmentSuccess, setAssignmentSuccess] = useState<string | null>(null);
 
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
+  const isAssignmentDirty =
+    assignmentSettings !== null &&
+    initialAssignmentSettings !== null &&
+    (JSON.stringify(assignmentSettings) !== JSON.stringify(initialAssignmentSettings) ||
+      JSON.stringify(leadTimes) !== JSON.stringify(initialLeadTimes));
 
   useEffect(() => {
     let cancelled = false;
@@ -250,6 +275,41 @@ export default function SettingsPage() {
     }
 
     void loadPayments();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAssignment() {
+      if (!accessToken) return;
+      setAssignmentLoading(true);
+      setAssignmentError(null);
+
+      try {
+        const [settings, rows] = await Promise.all([
+          getMyDeliveryProviderAssignmentSettings(accessToken),
+          getMyDeliveryProviderSearchLeadTimes(accessToken),
+        ]);
+        if (cancelled) return;
+        const { pre_free_speed_mps: _ignored, ...editable } = settings;
+        setAssignmentSettings(editable);
+        setInitialAssignmentSettings(editable);
+        setLeadTimes(rows);
+        setInitialLeadTimes(rows);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) {
+          setAssignmentError('No se pudo cargar la configuración de asignación.');
+        }
+      } finally {
+        if (!cancelled) setAssignmentLoading(false);
+      }
+    }
+
+    void loadAssignment();
     return () => {
       cancelled = true;
     };
@@ -461,6 +521,60 @@ export default function SettingsPage() {
       }
     } finally {
       setOperatorSaving(false);
+    }
+  };
+
+  const patchAssignmentField = <K extends keyof DeliveryAssignmentSettingsUpdate>(
+    field: K,
+    value: DeliveryAssignmentSettingsUpdate[K],
+  ) => {
+    setAssignmentSettings((current) => (current ? { ...current, [field]: value } : current));
+    setAssignmentSuccess(null);
+    setAssignmentError(null);
+  };
+
+  const patchLeadTime = (prepMinutes: number, searchAheadMinutes: number) => {
+    setLeadTimes((current) =>
+      current.map((row) =>
+        row.prep_minutes === prepMinutes
+          ? { ...row, search_ahead_minutes: searchAheadMinutes }
+          : row,
+      ),
+    );
+    setAssignmentSuccess(null);
+    setAssignmentError(null);
+  };
+
+  const handleSaveAssignment = async () => {
+    if (!accessToken || !assignmentSettings) {
+      setAssignmentError('No hay sesión activa. Inicia sesión de nuevo.');
+      return;
+    }
+
+    setAssignmentSaving(true);
+    setAssignmentError(null);
+    setAssignmentSuccess(null);
+
+    try {
+      const [updatedSettings, updatedLeadTimes] = await Promise.all([
+        patchMyDeliveryProviderAssignmentSettings(accessToken, assignmentSettings),
+        patchMyDeliveryProviderSearchLeadTimes(accessToken, leadTimes),
+      ]);
+      const { pre_free_speed_mps: _ignored, ...editable } = updatedSettings;
+      setAssignmentSettings(editable);
+      setInitialAssignmentSettings(editable);
+      setLeadTimes(updatedLeadTimes);
+      setInitialLeadTimes(updatedLeadTimes);
+      setAssignmentSuccess('Configuración de asignación guardada.');
+    } catch (err) {
+      console.error(err);
+      if (err instanceof ApiError) {
+        setAssignmentError(err.message);
+      } else {
+        setAssignmentError('No se pudo guardar la configuración de asignación.');
+      }
+    } finally {
+      setAssignmentSaving(false);
     }
   };
 
@@ -922,6 +1036,199 @@ export default function SettingsPage() {
                 Guardando métodos de pago…
               </p>
             ) : null}
+          </section>
+
+          <section className={styles.panel} aria-labelledby="settings-assignment">
+            <h2 id="settings-assignment" className={styles.panelTitle}>
+              <AssignmentOutlinedIcon sx={{ fontSize: 20 }} aria-hidden />
+              Asignación
+            </h2>
+            <p className={styles.panelHint}>por empresa, no por zona</p>
+            {assignmentError ? (
+              <div className={styles.errorBanner} role="alert">
+                {assignmentError}
+              </div>
+            ) : null}
+            {assignmentSuccess ? (
+              <div className={styles.successBanner} role="status">
+                {assignmentSuccess}
+              </div>
+            ) : null}
+            {assignmentLoading || !assignmentSettings ? (
+              <p className={styles.loading} role="status">
+                Cargando asignación…
+              </p>
+            ) : (
+              <fieldset disabled={!canWriteProviderConfig} className={styles.readOnlyFieldset}>
+                <div className={styles.assignmentTableWrap}>
+                  <table className={styles.assignmentTable}>
+                    <thead>
+                      <tr>
+                        <th scope="col">Preparación (min)</th>
+                        <th scope="col">Anticipo de búsqueda (min)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leadTimes.map((row) => (
+                        <tr key={row.prep_minutes}>
+                          <td>{row.prep_minutes}</td>
+                          <td>
+                              <input
+                                className={styles.input}
+                                type="number"
+                                min={0}
+                                aria-label={`Anticipo de búsqueda para ${row.prep_minutes} minutos de preparación`}
+                                value={row.search_ahead_minutes}
+                                onChange={(event) =>
+                                  patchLeadTime(row.prep_minutes, Number(event.target.value))
+                                }
+                              />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className={styles.formGrid}>
+                  <label className={styles.label}>
+                    Timeout de oferta (seg)
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={1}
+                      value={assignmentSettings.offer_timeout_seconds}
+                      onChange={(event) =>
+                        patchAssignmentField('offer_timeout_seconds', Number(event.target.value))
+                      }
+                    />
+                  </label>
+                  <label className={styles.label}>
+                    Pre-libre (seg)
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={1}
+                      value={assignmentSettings.pre_free_eta_seconds}
+                      onChange={(event) =>
+                        patchAssignmentField('pre_free_eta_seconds', Number(event.target.value))
+                      }
+                    />
+                  </label>
+                  <label className={styles.label}>
+                    GPS obsoleto (seg)
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={1}
+                      value={assignmentSettings.driver_location_staleness_seconds}
+                      onChange={(event) =>
+                        patchAssignmentField(
+                          'driver_location_staleness_seconds',
+                          Number(event.target.value),
+                        )
+                      }
+                    />
+                  </label>
+                  <label className={styles.label}>
+                    Repartidores protegidos
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={0}
+                      value={assignmentSettings.min_protected_drivers}
+                      onChange={(event) =>
+                        patchAssignmentField('min_protected_drivers', Number(event.target.value))
+                      }
+                    />
+                  </label>
+                  <label className={styles.label}>
+                    Alta demanda: máx. libres
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={0}
+                      value={assignmentSettings.high_demand_available_drivers_max}
+                      onChange={(event) =>
+                        patchAssignmentField(
+                          'high_demand_available_drivers_max',
+                          Number(event.target.value),
+                        )
+                      }
+                    />
+                  </label>
+                  <label className={styles.label}>
+                    Alta demanda: ocupación
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={assignmentSettings.high_demand_occupied_ratio}
+                      onChange={(event) =>
+                        patchAssignmentField(
+                          'high_demand_occupied_ratio',
+                          Number(event.target.value),
+                        )
+                      }
+                    />
+                  </label>
+                  <label className={styles.label}>
+                    Alta demanda: pendientes mín.
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={0}
+                      value={assignmentSettings.high_demand_pending_min}
+                      onChange={(event) =>
+                        patchAssignmentField('high_demand_pending_min', Number(event.target.value))
+                      }
+                    />
+                  </label>
+                  <label className={styles.label}>
+                    Reintento (seg)
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={1}
+                      value={assignmentSettings.assignment_retry_seconds}
+                      onChange={(event) =>
+                        patchAssignmentField('assignment_retry_seconds', Number(event.target.value))
+                      }
+                    />
+                  </label>
+                  <label className={`${styles.label} ${styles.formGridFull}`}>
+                    Timeout de asignación (seg)
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={1}
+                      value={assignmentSettings.assignment_timeout_seconds}
+                      onChange={(event) =>
+                        patchAssignmentField(
+                          'assignment_timeout_seconds',
+                          Number(event.target.value),
+                        )
+                      }
+                    />
+                  </label>
+                </div>
+
+                {canWriteProviderConfig ? (
+                  <div className={styles.assignmentActions}>
+                    <button
+                      type="button"
+                      className={styles.primaryBtn}
+                      disabled={assignmentSaving || !isAssignmentDirty}
+                      onClick={() => void handleSaveAssignment()}
+                    >
+                      {assignmentSaving ? 'Guardando…' : 'Guardar asignación'}
+                    </button>
+                  </div>
+                ) : null}
+              </fieldset>
+            )}
           </section>
 
           <section className={styles.panel} aria-labelledby="settings-hours">

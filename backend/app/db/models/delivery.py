@@ -17,7 +17,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -70,6 +70,22 @@ class DeliveryProvider(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     payment_methods: Mapped[list["DeliveryProviderPaymentMethod"]] = relationship(
         back_populates="delivery_provider",
         cascade="all, delete-orphan",
+    )
+    assignment_settings: Mapped["DeliveryProviderAssignmentSettings | None"] = relationship(
+        back_populates="delivery_provider",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    search_lead_times: Mapped[list["DeliverySearchLeadTime"]] = relationship(
+        back_populates="delivery_provider",
+        cascade="all, delete-orphan",
+    )
+    drivers: Mapped[list["DeliveryDriver"]] = relationship(
+        back_populates="delivery_provider",
+        cascade="all, delete-orphan",
+    )
+    dispatch_requests: Mapped[list["DeliveryDispatchRequest"]] = relationship(
+        back_populates="delivery_provider",
     )
 
     __table_args__ = (
@@ -399,4 +415,307 @@ class DeliveryAssignment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="status_allowed",
         ),
         Index("ix_delivery_assignments_listing", "delivery_provider_id", "status", "created_at"),
+    )
+
+
+class DeliveryDriver(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "delivery_drivers"
+
+    delivery_provider_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_providers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+    first_name: Mapped[str] = mapped_column(Text, nullable=False)
+    last_name: Mapped[str] = mapped_column(Text, nullable=False)
+    phone: Mapped[str] = mapped_column(Text, nullable=False)
+    profile_photo_path: Mapped[str] = mapped_column(Text, nullable=False)
+    ine_document_path: Mapped[str] = mapped_column(Text, nullable=False)
+    license_document_path: Mapped[str] = mapped_column(Text, nullable=False)
+    insurance_document_path: Mapped[str] = mapped_column(Text, nullable=False)
+    credit_limit_cents: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="50000"
+    )
+    credit_held_cents: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    compartment_size: Mapped[str] = mapped_column(String, nullable=False)
+    plate: Mapped[str] = mapped_column(Text, nullable=False)
+    motorcycle_brand: Mapped[str] = mapped_column(Text, nullable=False)
+    motorcycle_color: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, server_default="invited")
+    is_online: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    last_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    last_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    fcm_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    delivery_provider: Mapped["DeliveryProvider"] = relationship(back_populates="drivers")
+    dispatch_requests: Mapped[list["DeliveryDispatchRequest"]] = relationship(
+        back_populates="assigned_driver"
+    )
+    offers: Mapped[list["DeliveryDispatchOffer"]] = relationship(back_populates="driver")
+    credit_holds: Mapped[list["DeliveryCreditHold"]] = relationship(back_populates="driver")
+
+    __table_args__ = (
+        Index(
+            "uq_delivery_drivers_email_per_provider",
+            "delivery_provider_id",
+            text("lower(btrim(email))"),
+            unique=True,
+        ),
+        CheckConstraint(
+            "credit_held_cents >= 0 AND credit_held_cents <= credit_limit_cents",
+            name="credit_bounds",
+        ),
+        CheckConstraint(
+            "compartment_size IN ('normal','grande')",
+            name="compartment_size_allowed",
+        ),
+        CheckConstraint(
+            "status IN ('invited','active','blocked')",
+            name="status_allowed",
+        ),
+        Index("ix_delivery_drivers_dispatch_lookup", "delivery_provider_id", "status", "is_online"),
+    )
+
+
+class DeliveryProviderAssignmentSettings(TimestampMixin, Base):
+    __tablename__ = "delivery_provider_assignment_settings"
+
+    delivery_provider_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_providers.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    offer_timeout_seconds: Mapped[int] = mapped_column(Integer, nullable=False, server_default="45")
+    pre_free_eta_seconds: Mapped[int] = mapped_column(Integer, nullable=False, server_default="60")
+    driver_location_staleness_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="90"
+    )
+    min_protected_drivers: Mapped[int] = mapped_column(Integer, nullable=False, server_default="2")
+    high_demand_available_drivers_max: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="2"
+    )
+    high_demand_occupied_ratio: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default="0.80"
+    )
+    high_demand_pending_min: Mapped[int] = mapped_column(Integer, nullable=False, server_default="5")
+    near_destination_radius_meters: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="800"
+    )
+    max_extra_route_minutes: Mapped[int] = mapped_column(Integer, nullable=False, server_default="8")
+    max_pickup_detour_minutes: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="8"
+    )
+    max_destination_detour_minutes: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="8"
+    )
+    max_active_packages_per_driver: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="3"
+    )
+    assignment_retry_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="30"
+    )
+    assignment_timeout_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="900"
+    )
+    pre_free_speed_mps: Mapped[float] = mapped_column(Float, nullable=False, server_default="8")
+
+    delivery_provider: Mapped["DeliveryProvider"] = relationship(
+        back_populates="assignment_settings"
+    )
+
+
+class DeliverySearchLeadTime(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "delivery_search_lead_times"
+
+    delivery_provider_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_providers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    prep_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    search_ahead_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    delivery_provider: Mapped["DeliveryProvider"] = relationship(
+        back_populates="search_lead_times"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("delivery_provider_id", "prep_minutes"),
+        CheckConstraint("search_ahead_minutes >= 0", name="search_ahead_nonneg"),
+    )
+
+
+class DeliveryDispatchRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "delivery_dispatch_requests"
+
+    restaurant_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("restaurants.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    delivery_provider_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_providers.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    zone_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_provider_zones.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    customer_name: Mapped[str] = mapped_column(Text, nullable=False)
+    customer_phone: Mapped[str] = mapped_column(Text, nullable=False)
+    dropoff_lat: Mapped[float] = mapped_column(Float, nullable=False)
+    dropoff_lng: Mapped[float] = mapped_column(Float, nullable=False)
+    dropoff_address: Mapped[str] = mapped_column(Text, nullable=False)
+    dropoff_maps_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    payment_method: Mapped[str] = mapped_column(String, nullable=False)
+    collect_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    cash_denomination_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    package_size: Mapped[str] = mapped_column(String, nullable=False)
+    package_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    ready_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    search_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    quoted_fee_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    assigned_driver_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_drivers.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    tracking_token: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decision_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cycle_rejected_driver_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(PG_UUID(as_uuid=True)),
+        nullable=False,
+        server_default=text("'{}'"),
+    )
+    dispatch_group_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+    )
+
+    delivery_provider: Mapped["DeliveryProvider"] = relationship(
+        back_populates="dispatch_requests"
+    )
+    assigned_driver: Mapped["DeliveryDriver | None"] = relationship(
+        back_populates="dispatch_requests"
+    )
+    offers: Mapped[list["DeliveryDispatchOffer"]] = relationship(back_populates="request")
+    credit_hold: Mapped["DeliveryCreditHold | None"] = relationship(
+        back_populates="request",
+        uselist=False,
+    )
+
+    __table_args__ = (
+        CheckConstraint("package_count >= 1", name="package_count_min"),
+        CheckConstraint(
+            "payment_method IN ('cash','transfer','card_terminal')",
+            name="payment_method_allowed",
+        ),
+        CheckConstraint(
+            "package_size IN ('normal','grande')",
+            name="package_size_allowed",
+        ),
+        CheckConstraint(
+            "status IN ("
+            "'scheduled','searching','offered','assigned','picked_up',"
+            "'in_transit','delivered','unassigned','cancelled'"
+            ")",
+            name="status_allowed",
+        ),
+        Index("ix_delivery_dispatch_requests_provider_lookup", "delivery_provider_id", "status", "search_at"),
+        Index("ix_delivery_dispatch_requests_driver_lookup", "assigned_driver_id", "status"),
+    )
+
+
+class DeliveryDispatchOffer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "delivery_dispatch_offers"
+
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_dispatch_requests.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    driver_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_drivers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    case_applied: Mapped[str] = mapped_column(String, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    score_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    request: Mapped["DeliveryDispatchRequest"] = relationship(back_populates="offers")
+    driver: Mapped["DeliveryDriver"] = relationship(back_populates="offers")
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('offered','accepted','rejected','expired')",
+            name="status_allowed",
+        ),
+        CheckConstraint(
+            "case_applied IN ('A','B','C','D')",
+            name="case_applied_allowed",
+        ),
+        Index(
+            "uq_delivery_dispatch_offers_one_offered_per_driver",
+            "driver_id",
+            unique=True,
+            postgresql_where=text("status = 'offered'"),
+        ),
+        Index(
+            "uq_delivery_dispatch_offers_one_offered_per_request",
+            "request_id",
+            unique=True,
+            postgresql_where=text("status = 'offered'"),
+        ),
+    )
+
+
+class DeliveryCreditHold(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "delivery_credit_holds"
+
+    driver_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_drivers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_dispatch_requests.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    released_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    driver: Mapped["DeliveryDriver"] = relationship(back_populates="credit_holds")
+    request: Mapped["DeliveryDispatchRequest"] = relationship(back_populates="credit_hold")
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('held','released')",
+            name="status_allowed",
+        ),
     )

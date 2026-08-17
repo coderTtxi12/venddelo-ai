@@ -36,6 +36,7 @@ from app.modules.delivery_providers.pricing import (
     config_to_json,
     default_pricing_config,
 )
+from app.modules.delivery_dispatch.seed import seed_dispatch_defaults
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
@@ -156,6 +157,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         self.seed_default_schedules(provider.id, zone.id)
         self.seed_default_pricing_config(provider.id, zone.id)
         self.seed_default_payment_methods(provider.id)
+        seed_dispatch_defaults(self._session, provider.id)
         return DeliveryProviderDTO.model_validate(provider)
 
     def _primary_zone_id(self, provider_id: uuid.UUID) -> uuid.UUID | None:
@@ -835,6 +837,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         self._session.add(provider)
         self._session.flush()
         self.seed_default_payment_methods(provider.id)
+        seed_dispatch_defaults(self._session, provider.id)
         return provider.id
 
     def ensure_partnership_request(

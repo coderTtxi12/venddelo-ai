@@ -833,3 +833,38 @@
     transition: none;
   }
 }
+
+.assignmentTableWrap {
+  overflow-x: auto;
+}
+
+.assignmentTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.assignmentTable th,
+.assignmentTable td {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.assignmentTable th {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.assignmentTable td:last-child {
+  width: 8rem;
+}
+
+.assignmentActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.85rem;
+}

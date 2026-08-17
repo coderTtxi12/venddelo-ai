@@ -10,13 +10,19 @@ from app.db.models.marketing import MarketingAgentAccount, MarketingTask
 from app.db.models.menu_import_session import MenuImportSession
 from app.db.models.delivery import (
     DeliveryAssignment,
+    DeliveryCreditHold,
+    DeliveryDispatchOffer,
+    DeliveryDispatchRequest,
+    DeliveryDriver,
     DeliveryProvider,
+    DeliveryProviderAssignmentSettings,
     DeliveryProviderMember,
     DeliveryProviderPaymentMethod,
     DeliveryProviderPricingConfig,
     DeliveryProviderSchedule,
     DeliveryProviderTariff,
     DeliveryProviderZone,
+    DeliverySearchLeadTime,
     RestaurantDeliveryProvider,
 )
 from app.db.models.menu import (
@@ -72,6 +78,12 @@ __all__ = [
     "DeliveryProviderTariff",
     "RestaurantDeliveryProvider",
     "DeliveryAssignment",
+    "DeliveryCreditHold",
+    "DeliveryDispatchOffer",
+    "DeliveryDispatchRequest",
+    "DeliveryDriver",
+    "DeliveryProviderAssignmentSettings",
+    "DeliverySearchLeadTime",
     "AssistantConversation",
     "AssistantMessage",
     "AssistantLLMUsage",

@@ -79,6 +79,8 @@ class Settings(BaseSettings):
     translation_cache_ttl_seconds: int = 3600
     cors_origins: str = "http://localhost:3000"
     menu_public_domain: str = "mxy.mx"
+    delivery_tasks_backend: str = "stub"
+    delivery_tasks_secret: str | None = None
 
     @field_validator("database_url", "database_url_test")
     @classmethod
