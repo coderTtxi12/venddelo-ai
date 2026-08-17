@@ -435,6 +435,8 @@ class DeliveryDriver(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     first_name: Mapped[str] = mapped_column(Text, nullable=False)
     last_name: Mapped[str] = mapped_column(Text, nullable=False)
     phone: Mapped[str] = mapped_column(Text, nullable=False)
+    emergency_contact_name: Mapped[str] = mapped_column(Text, nullable=False)
+    emergency_contact_phone: Mapped[str] = mapped_column(Text, nullable=False)
     profile_photo_path: Mapped[str] = mapped_column(Text, nullable=False)
     ine_document_path: Mapped[str] = mapped_column(Text, nullable=False)
     license_document_path: Mapped[str] = mapped_column(Text, nullable=False)
@@ -447,6 +449,11 @@ class DeliveryDriver(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     plate: Mapped[str] = mapped_column(Text, nullable=False)
     motorcycle_brand: Mapped[str] = mapped_column(Text, nullable=False)
     motorcycle_color: Mapped[str] = mapped_column(Text, nullable=False)
+    registered_zone_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_provider_zones.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="invited")
     is_online: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     last_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -457,6 +464,9 @@ class DeliveryDriver(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     fcm_token: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     delivery_provider: Mapped["DeliveryProvider"] = relationship(back_populates="drivers")
+    registered_zone: Mapped["DeliveryProviderZone | None"] = relationship(
+        foreign_keys=[registered_zone_id],
+    )
     dispatch_requests: Mapped[list["DeliveryDispatchRequest"]] = relationship(
         back_populates="assigned_driver"
     )
