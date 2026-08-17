@@ -120,8 +120,11 @@ export function restaurantPublicMenuUrl(subdomain: string): string {
   return `https://${subdomain}.${MENU_PUBLIC_DOMAIN}`;
 }
 
-/** Origin used by public restaurant routes such as menu and delivery tracking. */
+/** Origin only — never `/menu/{sub}`. Tracking uses `{origin}/rastreo/{token}`. */
 export function publicMenuOrigin(subdomain: string): string {
+  if (shouldUseMenuPathRouting()) {
+    return menuAppBaseUrl();
+  }
   return restaurantPublicMenuUrl(subdomain);
 }
 

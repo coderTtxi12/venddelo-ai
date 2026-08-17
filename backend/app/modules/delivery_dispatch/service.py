@@ -495,7 +495,7 @@ class RestaurantDispatchService:
             delivery_longitude=longitude,
         )
         if not quote.available:
-            raise ValidationError(quote.reason or "No se pudo calcular el costo del envío")
+            raise ValidationError(quote.reason or "El servicio de reparto no está disponible.")
 
         now = datetime.now(UTC)
         ready_at = now + timedelta(minutes=data.prep_minutes)
