@@ -1282,3 +1282,8 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         if claimed:
             self._session.flush()
         return claimed
+
+    def claim_drivers(self, user_id: uuid.UUID, email: str) -> None:
+        from app.modules.delivery_dispatch.service import claim_drivers
+
+        claim_drivers(self._session, user_id, email)

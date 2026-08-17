@@ -22,6 +22,8 @@ import type {
   DeliveryPricingSimulateRequest,
   DeliverySearchLeadTime,
   DeliverySearchLeadTimeUpdate,
+  DeliveryDriver,
+  DeliveryDriverCreateInput,
 } from './types';
 
 function withZoneId(path: string, zoneId: string): string {
@@ -245,6 +247,18 @@ export function patchMyDeliveryProviderSearchLeadTimes(
 ) {
   return apiRequest<DeliverySearchLeadTime[]>('/delivery-providers/me/search-lead-times', {
     method: 'PATCH',
+    token,
+    body,
+  });
+}
+
+export function listMyDeliveryDrivers(token: string) {
+  return apiRequest<DeliveryDriver[]>('/delivery-providers/me/drivers', { token });
+}
+
+export function createMyDeliveryDriver(token: string, body: DeliveryDriverCreateInput) {
+  return apiRequest<DeliveryDriver>('/delivery-providers/me/drivers', {
+    method: 'POST',
     token,
     body,
   });

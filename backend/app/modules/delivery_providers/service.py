@@ -54,10 +54,10 @@ class DeliveryProviderService:
         self._storage = storage
 
     def get_me(self, user_id: uuid.UUID, email: str | None = None) -> DeliveryProviderMeResponse:
-        found = self._repo.get_for_user(user_id)
-        if found is None and email:
+        if email:
             self._repo.claim_admin_invites(user_id, email)
-            found = self._repo.get_for_user(user_id)
+            self._repo.claim_drivers(user_id, email)
+        found = self._repo.get_for_user(user_id)
         if found is None:
             return DeliveryProviderMeResponse(provider=None, member_role=None, zones=[])
         provider, member_role = found

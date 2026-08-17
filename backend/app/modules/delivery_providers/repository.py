@@ -240,3 +240,6 @@ class DeliveryProviderRepository(ABC):
 
     @abstractmethod
     def claim_admin_invites(self, user_id: uuid.UUID, email: str) -> bool: ...
+
+    @abstractmethod
+    def claim_drivers(self, user_id: uuid.UUID, email: str) -> None: ...

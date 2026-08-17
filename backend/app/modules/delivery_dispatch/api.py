@@ -1,10 +1,17 @@
-from fastapi import APIRouter, Depends
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, status
 
 from app.api.deps import get_synced_user
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
+from app.infra.storage.factory import build_storage
 from app.modules.delivery_dispatch.schemas import (
     AssignmentSettingsDTO,
     AssignmentSettingsUpdate,
+    DeliveryDriverCreate,
+    DeliveryDriverDocumentsUpdate,
+    DeliveryDriverDTO,
+    DeliveryDriverUpdate,
     SearchLeadTimeDTO,
     SearchLeadTimeUpdate,
 )
@@ -19,7 +26,58 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeliveryDispatchSe
     return DeliveryDispatchService(
         uow.session,
         SqlAlchemyDeliveryProviderRepository(uow.session),
+        build_storage(),
     )
+
+
+@router.get("/me/drivers", response_model=list[DeliveryDriverDTO])
+def list_drivers(
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryDispatchService = Depends(_service),
+) -> list[DeliveryDriverDTO]:
+    return service.list_drivers(user.id)
+
+
+@router.post(
+    "/me/drivers",
+    response_model=DeliveryDriverDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_driver(
+    data: DeliveryDriverCreate,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryDispatchService = Depends(_service),
+) -> DeliveryDriverDTO:
+    return service.create_driver(user.id, data)
+
+
+@router.get("/me/drivers/{driver_id}", response_model=DeliveryDriverDTO)
+def get_driver(
+    driver_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryDispatchService = Depends(_service),
+) -> DeliveryDriverDTO:
+    return service.get_driver(user.id, driver_id)
+
+
+@router.patch("/me/drivers/{driver_id}", response_model=DeliveryDriverDTO)
+def patch_driver(
+    driver_id: UUID,
+    data: DeliveryDriverUpdate,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryDispatchService = Depends(_service),
+) -> DeliveryDriverDTO:
+    return service.update_driver(user.id, driver_id, data)
+
+
+@router.post("/me/drivers/{driver_id}/documents", response_model=DeliveryDriverDTO)
+def upload_driver_documents(
+    driver_id: UUID,
+    data: DeliveryDriverDocumentsUpdate,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryDispatchService = Depends(_service),
+) -> DeliveryDriverDTO:
+    return service.upload_driver_documents(user.id, driver_id, data)
 
 
 @router.get("/me/assignment-settings", response_model=AssignmentSettingsDTO)

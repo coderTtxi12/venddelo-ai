@@ -248,3 +248,47 @@ export type DeliverySearchLeadTime = {
 };
 
 export type DeliverySearchLeadTimeUpdate = DeliverySearchLeadTime;
+
+export type DeliveryDriverStatus = 'invited' | 'active' | 'blocked';
+export type DeliveryDriverCompartmentSize = 'normal' | 'grande';
+
+export type DeliveryDriver = {
+  id: string;
+  user_id: string | null;
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  profile_photo_path: string;
+  ine_document_path: string;
+  license_document_path: string;
+  insurance_document_path: string;
+  credit_limit_cents: number;
+  credit_held_cents: number;
+  compartment_size: DeliveryDriverCompartmentSize;
+  plate: string;
+  motorcycle_brand: string;
+  motorcycle_color: string;
+  status: DeliveryDriverStatus;
+  is_online: boolean;
+};
+
+export type DeliveryDriverCreateInput = {
+  first_name: string;
+  last_name: string;
+  phone: string;
+  email: string;
+  compartment_size: DeliveryDriverCompartmentSize;
+  plate: string;
+  motorcycle_brand: string;
+  motorcycle_color: string;
+  credit_limit_cents?: number;
+  profile_photo_base64: string;
+  profile_photo_file_name?: string | null;
+  ine_document_base64: string;
+  ine_document_file_name?: string | null;
+  license_document_base64: string;
+  license_document_file_name?: string | null;
+  insurance_document_base64: string;
+  insurance_document_file_name?: string | null;
+};

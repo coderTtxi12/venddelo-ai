@@ -1,17 +1,19 @@
 import type { ReactNode } from 'react';
 
+export type PanelPageStyles = {
+  page: string;
+  header: string;
+  title: string;
+  subtitle: string;
+  empty?: string;
+  emptyTitle?: string;
+  emptySubtitle?: string;
+};
+
 type PanelPageShellProps = {
   title: string;
   subtitle: string;
-  styles: {
-    page: string;
-    header: string;
-    title: string;
-    subtitle: string;
-    empty?: string;
-    emptyTitle?: string;
-    emptySubtitle?: string;
-  };
+  styles: PanelPageStyles;
   action?: ReactNode;
   children?: ReactNode;
 };

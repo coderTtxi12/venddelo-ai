@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -52,3 +54,76 @@ class SearchLeadTimeDTO(BaseModel):
 class SearchLeadTimeUpdate(BaseModel):
     prep_minutes: int
     search_ahead_minutes: int = Field(ge=0)
+
+
+class DeliveryDriverDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    user_id: uuid.UUID | None
+    email: str
+    first_name: str
+    last_name: str
+    phone: str
+    profile_photo_path: str
+    ine_document_path: str
+    license_document_path: str
+    insurance_document_path: str
+    credit_limit_cents: int
+    credit_held_cents: int
+    compartment_size: str
+    plate: str
+    motorcycle_brand: str
+    motorcycle_color: str
+    status: str
+    is_online: bool
+
+
+class DeliveryDriverCreate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    first_name: str
+    last_name: str
+    phone: str
+    email: str
+    compartment_size: str
+    plate: str
+    motorcycle_brand: str
+    motorcycle_color: str
+    credit_limit_cents: int = Field(default=50000, ge=0)
+    profile_photo_base64: str
+    profile_photo_file_name: str | None = None
+    ine_document_base64: str
+    ine_document_file_name: str | None = None
+    license_document_base64: str
+    license_document_file_name: str | None = None
+    insurance_document_base64: str
+    insurance_document_file_name: str | None = None
+
+
+class DeliveryDriverUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    compartment_size: str | None = None
+    plate: str | None = None
+    motorcycle_brand: str | None = None
+    motorcycle_color: str | None = None
+    credit_limit_cents: int | None = Field(default=None, ge=0)
+    status: str | None = None
+
+
+class DeliveryDriverDocumentsUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    profile_photo_base64: str | None = None
+    profile_photo_file_name: str | None = None
+    ine_document_base64: str | None = None
+    ine_document_file_name: str | None = None
+    license_document_base64: str | None = None
+    license_document_file_name: str | None = None
+    insurance_document_base64: str | None = None
+    insurance_document_file_name: str | None = None
