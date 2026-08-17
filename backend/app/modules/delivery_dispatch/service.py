@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import base64
 import binascii
+import http.client
 import re
 import secrets
+import ssl
 import uuid
 from datetime import UTC, datetime, timedelta
-from urllib.error import URLError
-from urllib.parse import urlparse
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.parse import urljoin, urlparse
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
+from app.core.config import get_settings
 from app.core.exceptions import (
     ConflictError,
     ForbiddenError,
@@ -27,11 +28,19 @@ from app.db.models.delivery import (
     DeliveryDriver,
     DeliveryProviderAssignmentSettings,
     DeliveryProviderMember,
+    DeliveryProviderZone,
     DeliverySearchLeadTime,
     RestaurantDeliveryProvider,
 )
+from app.db.models.restaurant import Restaurant
+from app.modules.assistant.image_webp import WEBP_CONTENT_TYPE, convert_image_bytes_to_webp
 from app.modules.delivery_dispatch.geo import geodesic_meters
-from app.modules.delivery_dispatch.maps_url import parse_maps_url
+from app.modules.delivery_dispatch.maps_url import (
+    extract_maps_query_text,
+    geocode_address_text,
+    parse_maps_url,
+    should_follow_maps_redirect,
+)
 from app.modules.delivery_dispatch.schemas import (
     AssignmentSettingsDTO,
     AssignmentSettingsUpdate,
@@ -66,7 +75,6 @@ from app.modules.delivery_providers.permissions import (
 )
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
-from app.db.models.restaurant import Restaurant
 from app.modules.restaurants.schemas import RestaurantDTO
 from app.modules.users.schemas import UserDTO
 
@@ -129,16 +137,17 @@ class DeliveryDispatchService:
         require_view_drivers(member_role)
         rows = self._session.scalars(
             select(DeliveryDriver)
+            .options(selectinload(DeliveryDriver.registered_zone))
             .where(DeliveryDriver.delivery_provider_id == provider_id)
             .order_by(DeliveryDriver.created_at.desc())
         ).all()
-        return [DeliveryDriverDTO.model_validate(row) for row in rows]
+        return [self._to_driver_dto(row) for row in rows]
 
     def get_driver(self, user_id: uuid.UUID, driver_id: uuid.UUID) -> DeliveryDriverDTO:
         provider_id, member_role = self._require_provider_with_role(user_id)
         require_view_drivers(member_role)
         row = self._get_driver_or_raise(provider_id, driver_id)
-        return DeliveryDriverDTO.model_validate(row)
+        return self._to_driver_dto(row)
 
     def create_driver(self, user_id: uuid.UUID, data: DeliveryDriverCreate) -> DeliveryDriverDTO:
         provider_id, member_role = self._require_provider_with_role(user_id)
@@ -193,6 +202,8 @@ class DeliveryDispatchService:
             first_name=data.first_name.strip(),
             last_name=data.last_name.strip(),
             phone=data.phone.strip(),
+            emergency_contact_name=data.emergency_contact_name.strip(),
+            emergency_contact_phone=data.emergency_contact_phone.strip(),
             profile_photo_path=profile_photo_path,
             ine_document_path=ine_document_path,
             license_document_path=license_document_path,
@@ -200,16 +211,17 @@ class DeliveryDispatchService:
             credit_limit_cents=data.credit_limit_cents,
             credit_held_cents=0,
             compartment_size=compartment,
-            plate=data.plate.strip(),
+            plate=data.plate.strip().upper(),
             motorcycle_brand=data.motorcycle_brand.strip(),
             motorcycle_color=data.motorcycle_color.strip(),
+            registered_zone_id=self._resolve_registered_zone(provider_id, data.registered_zone_id),
             status="invited",
             is_online=False,
         )
         self._session.add(row)
         self._session.flush()
         self._session.refresh(row)
-        return DeliveryDriverDTO.model_validate(row)
+        return self._to_driver_dto(row)
 
     def update_driver(
         self,
@@ -257,24 +269,34 @@ class DeliveryDispatchService:
                     "El límite de crédito no puede ser menor que el crédito retenido"
                 )
 
+        if "registered_zone_id" in updates:
+            updates["registered_zone_id"] = self._resolve_registered_zone(
+                provider_id, updates["registered_zone_id"]
+            )
+
         text_fields = (
             "first_name",
             "last_name",
             "phone",
+            "emergency_contact_name",
+            "emergency_contact_phone",
             "plate",
             "motorcycle_brand",
             "motorcycle_color",
         )
         for field in text_fields:
             if field in updates and updates[field] is not None:
-                updates[field] = updates[field].strip()
+                value = updates[field].strip()
+                if field == "plate":
+                    value = value.upper()
+                updates[field] = value
 
         for field, value in updates.items():
             setattr(row, field, value)
 
         self._session.flush()
         self._session.refresh(row)
-        return DeliveryDriverDTO.model_validate(row)
+        return self._to_driver_dto(row)
 
     def upload_driver_documents(
         self,
@@ -317,7 +339,7 @@ class DeliveryDispatchService:
 
         self._session.flush()
         self._session.refresh(row)
-        return DeliveryDriverDTO.model_validate(row)
+        return self._to_driver_dto(row)
 
     def get_assignment_settings(self, user_id: uuid.UUID) -> AssignmentSettingsDTO:
         provider_id = self._require_provider_id(user_id)
@@ -393,25 +415,47 @@ class DeliveryDispatchService:
         if len(raw) > _MAX_DOCUMENT_BYTES:
             raise ValidationError("El archivo no puede superar 8 MB")
 
-        ext = self._extension_for_content_type(content_type, file_name)
+        if content_type == "application/pdf":
+            stored_type = "application/pdf"
+            ext = "pdf"
+        else:
+            if content_type != WEBP_CONTENT_TYPE:
+                try:
+                    raw = convert_image_bytes_to_webp(raw)
+                except ValidationError as exc:
+                    raise ValidationError("No se pudo convertir la imagen a WebP") from exc
+            stored_type = WEBP_CONTENT_TYPE
+            ext = "webp"
+            if len(raw) > _MAX_DOCUMENT_BYTES:
+                raise ValidationError("El archivo no puede superar 8 MB")
+
         safe_name = (file_name or f"{label}.{ext}").rsplit(".", 1)[0]
         path = f"delivery-drivers/{provider_id}/{uuid.uuid4()}/{safe_name}.{ext}"
-        stored = self._storage.upload(path, raw, content_type)
+        stored = self._storage.upload(path, raw, stored_type)
         return stored.path
 
-    @staticmethod
-    def _extension_for_content_type(content_type: str, file_name: str | None) -> str:
-        if content_type == "application/pdf":
-            return "pdf"
-        if content_type == "image/jpeg":
-            return "jpg"
-        if content_type == "image/png":
-            return "png"
-        if content_type == "image/webp":
-            return "webp"
-        if file_name and "." in file_name:
-            return file_name.rsplit(".", 1)[-1].lower()
-        return "bin"
+    def _resolve_registered_zone(
+        self,
+        provider_id: uuid.UUID,
+        zone_id: uuid.UUID | None,
+    ) -> uuid.UUID | None:
+        if zone_id is None:
+            return None
+        found = self._session.scalar(
+            select(DeliveryProviderZone.id).where(
+                DeliveryProviderZone.id == zone_id,
+                DeliveryProviderZone.delivery_provider_id == provider_id,
+            )
+        )
+        if found is None:
+            raise ValidationError("La zona de empresa no es válida")
+        return found
+
+    def _to_driver_dto(self, row: DeliveryDriver) -> DeliveryDriverDTO:
+        zone_name = row.registered_zone.name if row.registered_zone is not None else None
+        return DeliveryDriverDTO.model_validate(row).model_copy(
+            update={"registered_zone_name": zone_name}
+        )
 
     def _get_driver_or_raise(self, provider_id: uuid.UUID, driver_id: uuid.UUID) -> DeliveryDriver:
         row = self._session.scalar(
@@ -451,25 +495,61 @@ class DeliveryDispatchService:
 
 _PAYMENT_EDITABLE_STATUSES = frozenset({"scheduled", "searching", "offered", "unassigned"})
 _CASH_CONFIRMABLE_STATUSES = frozenset({"assigned", "picked_up", "in_transit", "delivered"})
-_SHORT_MAPS_HOSTS = frozenset({"maps.app.goo.gl", "goo.gl"})
 
 
-class _CappedRedirectHandler(HTTPRedirectHandler):
-    max_redirections = 5
+_MAPS_REDIRECT_HEADERS = {
+    "User-Agent": "MexyDispatch/1.0",
+}
+_MAPS_SSL_CONTEXT = ssl.create_default_context()
 
 
 def _follow_maps_redirects(url: str) -> str | None:
-    opener = build_opener(_CappedRedirectHandler)
-    request = Request(
-        url,
-        headers={"User-Agent": "MexyDispatch/1.0"},
-        method="GET",
-    )
-    try:
-        with opener.open(request, timeout=5) as response:
-            return str(response.geturl())
-    except (URLError, TimeoutError, ValueError, OSError):
+    """Expand goo.gl / maps.app.goo.gl links via HEAD Location headers."""
+    current = url.strip()
+    if not current:
         return None
+
+    for _ in range(5):
+        try:
+            parsed = urlparse(current)
+            if parsed.scheme not in {"http", "https"}:
+                return None
+            host = parsed.hostname
+            if not host:
+                return None
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            path = parsed.path or "/"
+            if parsed.query:
+                path = f"{path}?{parsed.query}"
+
+            if parsed.scheme == "https":
+                conn: http.client.HTTPConnection = http.client.HTTPSConnection(
+                    host,
+                    port,
+                    timeout=10,
+                    context=_MAPS_SSL_CONTEXT,
+                )
+            else:
+                conn = http.client.HTTPConnection(host, port, timeout=10)
+
+            conn.request("HEAD", path, headers=_MAPS_REDIRECT_HEADERS)
+            response = conn.getresponse()
+            response.read()
+            conn.close()
+
+            if response.status in (301, 302, 303, 307, 308):
+                location = response.getheader("Location")
+                if not location:
+                    return None
+                current = urljoin(current, location)
+                continue
+            if response.status == 200:
+                return current
+            return None
+        except (TimeoutError, OSError, ValueError, http.client.HTTPException):
+            return None
+
+    return current
 
 
 class RestaurantDispatchService:
@@ -491,14 +571,7 @@ class RestaurantDispatchService:
         provider_id = partnership.delivery_provider_id
 
         latitude, longitude = self._resolve_dropoff_coordinates(data)
-        lead_time = self._session.scalar(
-            select(DeliverySearchLeadTime).where(
-                DeliverySearchLeadTime.delivery_provider_id == provider_id,
-                DeliverySearchLeadTime.prep_minutes == data.prep_minutes,
-            )
-        )
-        if lead_time is None:
-            raise ValidationError("Ese tiempo de preparación no está configurado")
+        lead_time = self._resolve_lead_time(provider_id, data.prep_minutes)
 
         self._validate_payment(
             data.payment_method,
@@ -569,6 +642,28 @@ class RestaurantDispatchService:
             .order_by(DeliveryDispatchRequest.created_at.desc())
         ).all()
         return [DispatchRequestDTO.model_validate(row) for row in rows]
+
+    def resolve_maps_url(self, url: str) -> tuple[float, float, str | None]:
+        trimmed = url.strip()
+        if not trimmed:
+            raise ValidationError("El enlace de Google Maps es obligatorio")
+
+        coordinates = parse_maps_url(trimmed)
+        resolved_url: str | None = None
+        if coordinates is None and should_follow_maps_redirect(trimmed):
+            resolved_url = _follow_maps_redirects(trimmed)
+            if resolved_url:
+                coordinates = parse_maps_url(resolved_url)
+
+        if coordinates is None:
+            api_key = get_settings().google_maps_api_key
+            query_text = extract_maps_query_text(resolved_url or trimmed)
+            if api_key and query_text:
+                coordinates = geocode_address_text(query_text, api_key)
+
+        if coordinates is None:
+            raise ValidationError("No se pudo leer la ubicación del enlace")
+        return coordinates[0], coordinates[1], resolved_url
 
     def list_lead_times(
         self,
@@ -731,6 +826,32 @@ class RestaurantDispatchService:
             raise NotFoundError("Solicitud de delivery no encontrada")
         return row
 
+    def _resolve_lead_time(
+        self,
+        provider_id: uuid.UUID,
+        prep_minutes: int,
+    ) -> DeliverySearchLeadTime:
+        if prep_minutes >= 60:
+            raise ValidationError("El tiempo debe ser menor a 60 minutos")
+
+        exact = self._session.scalar(
+            select(DeliverySearchLeadTime).where(
+                DeliverySearchLeadTime.delivery_provider_id == provider_id,
+                DeliverySearchLeadTime.prep_minutes == prep_minutes,
+            )
+        )
+        if exact is not None:
+            return exact
+
+        rows = self._session.scalars(
+            select(DeliverySearchLeadTime)
+            .where(DeliverySearchLeadTime.delivery_provider_id == provider_id)
+            .order_by(DeliverySearchLeadTime.prep_minutes.asc())
+        ).all()
+        if not rows:
+            raise ValidationError("Ese tiempo de preparación no está configurado")
+        return min(rows, key=lambda row: abs(row.prep_minutes - prep_minutes))
+
     def _resolve_dropoff_coordinates(
         self,
         data: DispatchRequestCreate,
@@ -740,15 +861,8 @@ class RestaurantDispatchService:
         if not data.dropoff_maps_url:
             raise ValidationError("La ubicación de entrega es obligatoria")
 
-        coordinates = parse_maps_url(data.dropoff_maps_url)
-        if coordinates is None:
-            host = urlparse(data.dropoff_maps_url).hostname
-            if host in _SHORT_MAPS_HOSTS:
-                resolved = _follow_maps_redirects(data.dropoff_maps_url)
-                coordinates = parse_maps_url(resolved) if resolved else None
-        if coordinates is None:
-            raise ValidationError("No se pudo leer la ubicación del enlace")
-        return coordinates
+        latitude, longitude, _ = self.resolve_maps_url(data.dropoff_maps_url)
+        return latitude, longitude
 
     @staticmethod
     def _validate_payment(
