@@ -13,6 +13,12 @@ import { attachMapProjectionHelper } from '@/lib/mapProjectionHelper';
 import type { GeoJsonPolygon } from '@/lib/onboarding/types';
 import styles from './ServiceZoneMapDrawer.module.css';
 
+export type ReferenceZoneOverlay = {
+  id: string;
+  name: string;
+  polygon: GeoJsonPolygon;
+};
+
 type ServiceZoneMapDrawerProps = {
   polygon: GeoJsonPolygon | null;
   onPolygonChange: (polygon: GeoJsonPolygon | null) => void;
@@ -24,6 +30,8 @@ type ServiceZoneMapDrawerProps = {
     latitude: number;
     longitude: number;
   }) => void;
+  referenceZones?: ReferenceZoneOverlay[];
+  embeddedInScrollable?: boolean;
 };
 
 type MapTool = 'draw' | 'pan';
@@ -40,6 +48,19 @@ const POLYGON_STYLE = {
   strokeWeight: 2,
   editable: true,
   draggable: false,
+  zIndex: 3,
+};
+
+const REFERENCE_POLYGON_STYLE = {
+  fillColor: '#2563EB',
+  fillOpacity: 0.16,
+  strokeColor: '#1D4ED8',
+  strokeWeight: 2,
+  strokeOpacity: 0.9,
+  editable: false,
+  draggable: false,
+  clickable: false,
+  zIndex: 1,
 };
 
 const DRAFT_POLYGON_STYLE = {
@@ -93,7 +114,11 @@ function exitDocumentFullscreen(): Promise<void> {
   return Promise.resolve();
 }
 
-function applyMapInteractionMode(map: google.maps.Map, mode: 'navigate' | 'draw') {
+function applyMapInteractionMode(
+  map: google.maps.Map,
+  mode: 'navigate' | 'draw',
+  cooperativeScroll = false,
+) {
   if (mode === 'draw') {
     map.setOptions({
       draggable: false,
@@ -108,10 +133,39 @@ function applyMapInteractionMode(map: google.maps.Map, mode: 'navigate' | 'draw'
   map.setOptions({
     draggable: true,
     gestureHandling: 'greedy',
-    scrollwheel: true,
+    scrollwheel: !cooperativeScroll,
     disableDoubleClickZoom: false,
     draggableCursor: undefined,
   });
+}
+
+function geoJsonToLatLngRing(polygon: GeoJsonPolygon): google.maps.LatLngLiteral[] {
+  const source = polygon.coordinates?.[0] ?? [];
+  return source
+    .filter((_, index, arr) => {
+      if (index !== arr.length - 1) return true;
+      const first = arr[0];
+      const last = arr[index];
+      return first[0] !== last[0] || first[1] !== last[1];
+    })
+    .map(([lng, lat]) => ({ lat, lng }));
+}
+
+function ringCentroid(ring: google.maps.LatLngLiteral[]): google.maps.LatLngLiteral | null {
+  if (ring.length === 0) return null;
+  const sum = ring.reduce(
+    (acc, point) => ({ lat: acc.lat + point.lat, lng: acc.lng + point.lng }),
+    { lat: 0, lng: 0 },
+  );
+  return { lat: sum.lat / ring.length, lng: sum.lng / ring.length };
+}
+
+function createReferenceLabel(name: string): HTMLElement {
+  const el = document.createElement('div');
+  el.className = styles.referenceLabel;
+  el.textContent = name;
+  el.setAttribute('aria-hidden', 'true');
+  return el;
 }
 
 function pathToGeoJson(path: google.maps.MVCArray<google.maps.LatLng>): GeoJsonPolygon {
@@ -200,13 +254,19 @@ export function ServiceZoneMapDrawer({
   centerLat,
   centerLng,
   onSearchPlaceChange,
+  referenceZones = [],
+  embeddedInScrollable = false,
 }: ServiceZoneMapDrawerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapFrameRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const projectionHelperRef = useRef<ReturnType<typeof attachMapProjectionHelper> | null>(null);
   const polygonRef = useRef<google.maps.Polygon | null>(null);
+  const referenceOverlaysRef = useRef<google.maps.Polygon[]>([]);
+  const referenceLabelsRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const anchorMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const embeddedInScrollableRef = useRef(embeddedInScrollable);
+  embeddedInScrollableRef.current = embeddedInScrollable;
   const draftMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const draftMidpointsRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const advancedMarkerClassRef = useRef<typeof google.maps.marker.AdvancedMarkerElement | null>(
@@ -221,6 +281,7 @@ export function ServiceZoneMapDrawer({
   const isDrawingRef = useRef(false);
   const mapToolRef = useRef<MapTool>('draw');
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const didFitReferenceBoundsRef = useRef(false);
 
   const onPolygonChangeRef = useRef(onPolygonChange);
   onPolygonChangeRef.current = onPolygonChange;
@@ -255,6 +316,15 @@ export function ServiceZoneMapDrawer({
     draftPreviewPolygonRef.current = null;
     rubberBandRef.current?.setMap(null);
     rubberBandRef.current = null;
+  }, []);
+
+  const clearReferenceOverlays = useCallback(() => {
+    referenceOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+    referenceOverlaysRef.current = [];
+    referenceLabelsRef.current.forEach((marker) => {
+      marker.map = null;
+    });
+    referenceLabelsRef.current = [];
   }, []);
 
   const detachDrawingListeners = useCallback(() => {
@@ -461,7 +531,7 @@ export function ServiceZoneMapDrawer({
       }
 
       detachDrawingListeners();
-      applyMapInteractionMode(map, 'navigate');
+      applyMapInteractionMode(map, 'navigate', embeddedInScrollableRef.current);
     },
     [attachDrawingListeners, detachDrawingListeners],
   );
@@ -479,7 +549,7 @@ export function ServiceZoneMapDrawer({
     setMapTool('draw');
     pointerStartRef.current = null;
     if (map) {
-      applyMapInteractionMode(map, 'navigate');
+      applyMapInteractionMode(map, 'navigate', embeddedInScrollableRef.current);
     }
   }, [clearDraftVisuals, detachDrawingListeners]);
 
@@ -766,6 +836,74 @@ export function ServiceZoneMapDrawer({
   }, [centerLat, centerLng, panToCenter, ready]);
 
   useEffect(() => {
+    const map = mapInstanceRef.current;
+    const AdvancedMarkerElement = advancedMarkerClassRef.current;
+    if (!ready || !map) return;
+
+    clearReferenceOverlays();
+
+    const bounds = new google.maps.LatLngBounds();
+    let hasAny = false;
+
+    for (const zone of referenceZones) {
+      const ring = geoJsonToLatLngRing(zone.polygon);
+      if (ring.length < 3) continue;
+
+      const overlay = new google.maps.Polygon({
+        paths: ring,
+        map,
+        ...REFERENCE_POLYGON_STYLE,
+      });
+      referenceOverlaysRef.current.push(overlay);
+      ring.forEach((point) => bounds.extend(point));
+      hasAny = true;
+
+      const centroid = ringCentroid(ring);
+      if (centroid && AdvancedMarkerElement) {
+        referenceLabelsRef.current.push(
+          new AdvancedMarkerElement({
+            map,
+            position: centroid,
+            gmpClickable: false,
+            zIndex: 2,
+            content: createReferenceLabel(zone.name),
+          }),
+        );
+      }
+    }
+
+    if (
+      hasAny &&
+      !hasPolygonRef.current &&
+      !isDrawingRef.current &&
+      centerLat == null &&
+      !didFitReferenceBoundsRef.current
+    ) {
+      map.fitBounds(bounds);
+      didFitReferenceBoundsRef.current = true;
+    }
+  }, [centerLat, clearReferenceOverlays, ready, referenceZones]);
+
+  useEffect(() => {
+    if (!embeddedInScrollable || !ready) return;
+    const frame = mapFrameRef.current;
+    if (!frame) return;
+
+    const onWheel = (event: WheelEvent) => {
+      if (isMapFrameFullscreen(frame) || isMapExpanded) return;
+      const root = frame.closest('[data-scroll-root]');
+      if (!(root instanceof HTMLElement)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      root.scrollTop += event.deltaY;
+      root.scrollLeft += event.deltaX;
+    };
+
+    frame.addEventListener('wheel', onWheel, { passive: false, capture: true });
+    return () => frame.removeEventListener('wheel', onWheel, { capture: true });
+  }, [embeddedInScrollable, isMapExpanded, ready]);
+
+  useEffect(() => {
     let cancelled = false;
     const initialPolygon = polygon;
     const initialCenterLat = centerLat;
@@ -793,6 +931,7 @@ export function ServiceZoneMapDrawer({
           streetViewControl: false,
           fullscreenControl: false,
           gestureHandling: 'greedy',
+          scrollwheel: !embeddedInScrollableRef.current,
         });
         mapInstanceRef.current = map;
         projectionHelperRef.current = attachMapProjectionHelper(map);
@@ -803,14 +942,7 @@ export function ServiceZoneMapDrawer({
         }
 
         if (initialPolygon?.coordinates?.[0]?.length) {
-          const ring = initialPolygon.coordinates[0]
-            .filter((_, index, arr) => {
-              if (index !== arr.length - 1) return true;
-              const first = arr[0];
-              const last = arr[index];
-              return first[0] !== last[0] || first[1] !== last[1];
-            })
-            .map(([lng, lat]) => ({ lat, lng }));
+          const ring = geoJsonToLatLngRing(initialPolygon);
 
           if (ring.length >= 3) {
             mountPolygon(map, ring);
@@ -835,6 +967,12 @@ export function ServiceZoneMapDrawer({
       clearDraftVisuals();
       clearPathListeners();
       polygonRef.current?.setMap(null);
+      referenceOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+      referenceOverlaysRef.current = [];
+      referenceLabelsRef.current.forEach((marker) => {
+        marker.map = null;
+      });
+      referenceLabelsRef.current = [];
       if (anchorMarkerRef.current) anchorMarkerRef.current.map = null;
       projectionHelperRef.current?.detach();
       projectionHelperRef.current = null;
@@ -869,7 +1007,7 @@ export function ServiceZoneMapDrawer({
   })();
 
   return (
-    <div className={styles.wrap}>
+    <div className={`${styles.wrap} ${embeddedInScrollable ? styles.wrapCompact : ''}`.trim()}>
       <section className={styles.stepCard} aria-labelledby="zone-search-heading">
         <div className={styles.stepHeader}>
           <span className={styles.stepBadge}>1</span>
@@ -989,7 +1127,9 @@ export function ServiceZoneMapDrawer({
                       if (!isDrawing) {
                         mapToolRef.current = 'pan';
                         setMapTool('pan');
-                        if (map) applyMapInteractionMode(map, 'navigate');
+                        if (map) {
+                          applyMapInteractionMode(map, 'navigate', embeddedInScrollableRef.current);
+                        }
                         return;
                       }
                       applyDrawingTool('pan');
