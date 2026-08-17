@@ -32,27 +32,98 @@
 .modalBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 60;
-  padding: 1rem;
+  background: rgba(15, 23, 42, 0.55);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1.25rem, env(safe-area-inset-bottom));
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 transparent;
+}
+
+.modalBackdrop::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modalBackdrop::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 999px;
 }
 
 .modal {
-  width: 100%;
-  max-width: 720px;
-  max-height: min(92vh, 900px);
-  overflow: auto;
+  width: min(720px, 100%);
+  margin: 0 auto;
+  overflow: visible;
   background: var(--color-surface);
   border-radius: 14px;
   border: 1px solid var(--color-border);
   box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
-  padding: 1.25rem 1.35rem;
+  padding: 1.25rem 1.35rem 0;
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+}
+
+.modal:focus {
+  outline: none;
+}
+
+.modal:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.modalHeader {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  overflow: visible;
+}
+
+.mapSlot {
+  min-width: 0;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.legendSwatch {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legendSwatchExisting {
+  background: color-mix(in srgb, var(--color-primary) 28%, transparent);
+  border: 2px solid var(--color-primary);
+}
+
+.legendSwatchNew {
+  background: color-mix(in srgb, #9ca3af 45%, transparent);
+  border: 2px solid #1f2937;
 }
 
 .modalTitle {
@@ -74,7 +145,14 @@
   justify-content: flex-end;
   gap: 0.5rem;
   flex-wrap: wrap;
-  margin-top: 0.25rem;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 0 -1.35rem 0;
+  padding: 0.85rem 1.35rem 1.25rem;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 14px 14px;
 }
 
 .modalActions .primaryBtn {
