@@ -200,3 +200,23 @@ def test_high_demand_returns_no_offers():
     assert result.high_demand is True
     assert result.offers == ()
     assert result.case is None
+
+
+def test_rejected_driver_is_not_offered():
+    request = _request(rejected=("near",))
+    near = _driver("near", last_lat=19.4330, last_lng=-99.1335)
+    far = _driver("far", last_lat=19.4400, last_lng=-99.1400)
+    result = choose_assignments(_context(request, (near, far)))
+
+    assert result.case == "A"
+    assert result.offers[0].driver_id == "far"
+
+
+def test_silent_driver_is_not_offered_this_cycle():
+    request = _request(silent=("near",))
+    near = _driver("near", last_lat=19.4330, last_lng=-99.1335)
+    far = _driver("far", last_lat=19.4400, last_lng=-99.1400)
+    result = choose_assignments(_context(request, (near, far)))
+
+    assert result.case == "A"
+    assert result.offers[0].driver_id == "far"

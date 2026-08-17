@@ -153,6 +153,7 @@ def _assign_or_retry(
     settings_row = session.get(
         DeliveryProviderAssignmentSettings,
         request.delivery_provider_id,
+        with_for_update=True,
     )
     if settings_row is None:
         _enqueue_retry(session, request, now)

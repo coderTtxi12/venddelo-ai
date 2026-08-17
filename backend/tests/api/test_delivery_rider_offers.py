@@ -1,16 +1,24 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from sqlalchemy import select, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
 from app.api.deps import get_auth
 from app.core.security import AuthenticatedUser, AuthPort
-from app.db.models.delivery import DeliveryCreditHold, DeliveryDispatchOffer, DeliveryDriver
+from app.db.models.delivery import (
+    DeliveryCreditHold,
+    DeliveryDispatchOffer,
+    DeliveryDispatchRequest,
+    DeliveryDriver,
+    DeliveryProviderAssignmentSettings,
+)
 from app.main import app
 from tests.api.test_api_v1 import AUTH, OWNER
 from tests.api.test_delivery_drivers import TINY_PNG
@@ -79,14 +87,19 @@ def _clean_rider_offer_tables(engine):
     _as_owner()
 
 
-def _driver_payload() -> dict:
+def _driver_payload(
+    *,
+    email: str = RIDER_EMAIL,
+    phone: str = "+525511112233",
+    plate: str = "ABC123",
+) -> dict:
     return {
         "first_name": "Juan",
         "last_name": "Pérez",
-        "phone": "+525511112233",
-        "email": RIDER_EMAIL,
+        "phone": phone,
+        "email": email,
         "compartment_size": "normal",
-        "plate": "ABC123",
+        "plate": plate,
         "motorcycle_brand": "Italika",
         "motorcycle_color": "Rojo",
         "profile_photo_base64": TINY_PNG,
@@ -167,6 +180,71 @@ def _create_and_offer(client, engine, restaurant_id: str) -> tuple[str, str]:
     body = offers.json()
     assert len(body) == 1
     return request_id, body[0]["id"]
+
+
+def _setup_ready_fleet(
+    client,
+    engine,
+    *,
+    driver_count: int,
+    min_protected_drivers: int,
+    high_demand_available_drivers_max: int,
+    subdomain: str,
+) -> tuple[str, list[uuid.UUID]]:
+    _create_mexy_provider(client)
+    _as_mexy()
+    settings = client.patch(
+        "/api/v1/delivery-providers/me/assignment-settings",
+        json={
+            "high_demand_available_drivers_max": high_demand_available_drivers_max,
+            "min_protected_drivers": min_protected_drivers,
+        },
+        headers=AUTH,
+    )
+    assert settings.status_code == 200, settings.text
+    driver_ids: list[uuid.UUID] = []
+    for index in range(driver_count):
+        created = client.post(
+            "/api/v1/delivery-providers/me/drivers",
+            json=_driver_payload(
+                email=f"repartidor{index}@empresa.com",
+                phone=f"+5255111122{index:02d}",
+                plate=f"ABC{index:03d}",
+            ),
+            headers=AUTH,
+        )
+        assert created.status_code == 201, created.text
+        driver_ids.append(uuid.UUID(created.json()["id"]))
+
+    _as_owner()
+    restaurant_id = _create_restaurant(client, subdomain=subdomain)
+    _activate_partnership(client, engine, restaurant_id)
+
+    now = datetime.now(UTC)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        for driver_id in driver_ids:
+            driver = session.get(DeliveryDriver, driver_id)
+            assert driver is not None
+            driver.status = "active"
+            driver.is_online = True
+            driver.last_lat = COVERED_LAT
+            driver.last_lng = COVERED_LNG
+            driver.location_updated_at = now
+        session.commit()
+    return restaurant_id, driver_ids
+
+
+def _create_dispatch_request(client, restaurant_id: str) -> uuid.UUID:
+    _as_owner()
+    created = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(),
+        headers=AUTH,
+    )
+    assert created.status_code == 201, created.text
+    return uuid.UUID(created.json()["id"])
 
 
 @requires_db
@@ -252,3 +330,161 @@ def test_internal_tasks_unauthorized_when_secret_mismatches(client):
             headers={**AUTH, "X-Delivery-Tasks-Secret": "wrong"},
         )
     assert response.status_code == 401
+
+
+@requires_db
+def test_expire_offer_marks_silent_and_offers_next(client, engine):
+    from app.modules.delivery_dispatch.tasks import handle_task
+
+    restaurant_id, _driver_ids = _setup_ready_fleet(
+        client,
+        engine,
+        driver_count=2,
+        min_protected_drivers=0,
+        high_demand_available_drivers_max=0,
+        subdomain="expire-cycle",
+    )
+    request_id = _create_dispatch_request(client, restaurant_id)
+    now = datetime.now(UTC)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    with factory() as session:
+        handle_task(session, {"kind": "search", "request_id": str(request_id)}, now=now)
+        session.commit()
+        offer = session.scalar(
+            select(DeliveryDispatchOffer).where(
+                DeliveryDispatchOffer.request_id == request_id,
+                DeliveryDispatchOffer.status == "offered",
+            )
+        )
+        assert offer is not None
+        first_driver_id = offer.driver_id
+        offer_id = offer.id
+
+    with factory() as session:
+        handle_task(
+            session,
+            {
+                "kind": "expire_offer",
+                "request_id": str(request_id),
+                "offer_id": str(offer_id),
+            },
+            now=now,
+        )
+        session.commit()
+        expired = session.get(DeliveryDispatchOffer, offer_id)
+        request = session.get(DeliveryDispatchRequest, request_id)
+        nxt = session.scalar(
+            select(DeliveryDispatchOffer).where(
+                DeliveryDispatchOffer.request_id == request_id,
+                DeliveryDispatchOffer.status == "offered",
+            )
+        )
+        assert expired is not None
+        assert expired.status == "expired"
+        assert request is not None
+        assert first_driver_id in (request.cycle_silent_driver_ids or [])
+        assert nxt is not None
+        assert nxt.driver_id != first_driver_id
+        assert request.status == "offered"
+
+
+@requires_db
+def test_reject_offer_marks_rejected_and_offers_next(client, engine):
+    from app.modules.delivery_dispatch.tasks import handle_task, reject_offer_and_search
+
+    restaurant_id, _driver_ids = _setup_ready_fleet(
+        client,
+        engine,
+        driver_count=2,
+        min_protected_drivers=0,
+        high_demand_available_drivers_max=0,
+        subdomain="reject-cycle",
+    )
+    request_id = _create_dispatch_request(client, restaurant_id)
+    now = datetime.now(UTC)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    with factory() as session:
+        handle_task(session, {"kind": "search", "request_id": str(request_id)}, now=now)
+        session.commit()
+        offer = session.scalar(
+            select(DeliveryDispatchOffer).where(
+                DeliveryDispatchOffer.request_id == request_id,
+                DeliveryDispatchOffer.status == "offered",
+            )
+        )
+        assert offer is not None
+        first_driver_id = offer.driver_id
+        offer_id = offer.id
+
+    with factory() as session:
+        offer = session.get(DeliveryDispatchOffer, offer_id)
+        request = session.get(DeliveryDispatchRequest, request_id)
+        assert offer is not None
+        assert request is not None
+        reject_offer_and_search(session, offer, request, now)
+        session.commit()
+        rejected = session.get(DeliveryDispatchOffer, offer_id)
+        request = session.get(DeliveryDispatchRequest, request_id)
+        nxt = session.scalar(
+            select(DeliveryDispatchOffer).where(
+                DeliveryDispatchOffer.request_id == request_id,
+                DeliveryDispatchOffer.status == "offered",
+            )
+        )
+        assert rejected is not None
+        assert rejected.status == "rejected"
+        assert request is not None
+        assert first_driver_id in (request.cycle_rejected_driver_ids or [])
+        assert nxt is not None
+        assert nxt.driver_id != first_driver_id
+        assert request.status == "offered"
+
+
+@requires_db
+def test_search_holds_provider_settings_lock(client, engine):
+    from app.modules.delivery_dispatch.tasks import handle_task
+
+    restaurant_id, _driver_ids = _setup_ready_fleet(
+        client,
+        engine,
+        driver_count=3,
+        min_protected_drivers=2,
+        high_demand_available_drivers_max=0,
+        subdomain="case-b-lock",
+    )
+    request_a = _create_dispatch_request(client, restaurant_id)
+    request_b = _create_dispatch_request(client, restaurant_id)
+    now = datetime.now(UTC)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    session_a = factory()
+    session_b = factory()
+    try:
+        handle_task(session_a, {"kind": "search", "request_id": str(request_a)}, now=now)
+        locked_request = session_a.get(DeliveryDispatchRequest, request_a)
+        assert locked_request is not None
+        provider_id = locked_request.delivery_provider_id
+
+        session_b.execute(text("SET LOCAL lock_timeout = '1s'"))
+        with pytest.raises(OperationalError, match="lock timeout"):
+            session_b.scalar(
+                select(DeliveryProviderAssignmentSettings)
+                .where(
+                    DeliveryProviderAssignmentSettings.delivery_provider_id == provider_id
+                )
+                .with_for_update()
+            )
+        session_b.rollback()
+
+        session_a.commit()
+        handle_task(session_b, {"kind": "search", "request_id": str(request_b)}, now=now)
+        session_b.commit()
+
+        offers = session_b.scalars(
+            select(DeliveryDispatchOffer).where(DeliveryDispatchOffer.status == "offered")
+        ).all()
+        assert len(offers) == 1
+    finally:
+        session_a.close()
+        session_b.close()
