@@ -205,13 +205,16 @@ def upgrade() -> None:
     )
 
     connection = op.get_bind()
-    # Zoneless providers with no pricing/schedules/partnerships (e.g. 0023 mexy-reparto
-    # stub) are allowed — we never invent a polygon. Fail only when child rows exist
-    # that could not receive zone_id because no zone exists.
+    from app.modules.delivery_providers.multi_zone_backfill import cleanup_zoneless_provider_rows
+
+    # 0023 mexy-reparto stub has no polygon. Drop orphan pricing/schedules and
+    # duplicate Mexy partnerships so SET NOT NULL can succeed. Do not invent a zone.
+    cleanup_zoneless_provider_rows(connection)
+
     missing_zone = connection.execute(
         text(
             """
-            SELECT 1
+            SELECT p.slug
             FROM delivery_providers p
             WHERE NOT EXISTS (
                 SELECT 1
@@ -235,12 +238,12 @@ def upgrade() -> None:
                     WHERE r.delivery_provider_id = p.id
                 )
             )
-            LIMIT 1
             """
         )
-    ).first()
-    if missing_zone is not None:
-        raise RuntimeError("delivery provider missing zone")
+    ).fetchall()
+    if missing_zone:
+        slugs = ", ".join(row[0] for row in missing_zone)
+        raise RuntimeError(f"delivery provider missing zone: {slugs}")
 
     null_pricing = connection.execute(
         text(
