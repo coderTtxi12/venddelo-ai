@@ -67,6 +67,8 @@ class DeliveryDriverDTO(BaseModel):
     first_name: str
     last_name: str
     phone: str
+    emergency_contact_name: str
+    emergency_contact_phone: str
     profile_photo_path: str
     ine_document_path: str
     license_document_path: str
@@ -77,6 +79,8 @@ class DeliveryDriverDTO(BaseModel):
     plate: str
     motorcycle_brand: str
     motorcycle_color: str
+    registered_zone_id: uuid.UUID | None = None
+    registered_zone_name: str | None = None
     status: str
     is_online: bool
 
@@ -87,11 +91,14 @@ class DeliveryDriverCreate(BaseModel):
     first_name: str
     last_name: str
     phone: str
+    emergency_contact_name: str
+    emergency_contact_phone: str
     email: str
     compartment_size: str
     plate: str
     motorcycle_brand: str
     motorcycle_color: str
+    registered_zone_id: uuid.UUID | None = None
     credit_limit_cents: int = Field(default=50000, ge=0)
     profile_photo_base64: str
     profile_photo_file_name: str | None = None
@@ -109,11 +116,14 @@ class DeliveryDriverUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     phone: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
     email: str | None = None
     compartment_size: str | None = None
     plate: str | None = None
     motorcycle_brand: str | None = None
     motorcycle_color: str | None = None
+    registered_zone_id: uuid.UUID | None = None
     credit_limit_cents: int | None = Field(default=None, ge=0)
     status: str | None = None
 
@@ -149,8 +159,14 @@ class DispatchRequestCreate(BaseModel):
     cash_denomination_cents: int | None = Field(default=None, ge=0)
     package_size: PackageSize
     package_count: int = Field(ge=1)
-    prep_minutes: int = Field(ge=1)
+    prep_minutes: int = Field(ge=1, lt=60)
     notes: str | None = Field(default=None, max_length=500)
+
+
+class MapsUrlResolveDTO(BaseModel):
+    latitude: float
+    longitude: float
+    resolved_url: str | None = None
 
 
 class DispatchPaymentUpdate(BaseModel):
