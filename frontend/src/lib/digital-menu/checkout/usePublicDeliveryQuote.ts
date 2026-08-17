@@ -27,10 +27,11 @@ export function usePublicDeliveryQuote({
     }
 
     let cancelled = false;
-    const timer = window.setTimeout(() => {
-      setLoading(true);
-      setError(null);
+    setQuote(null);
+    setLoading(true);
+    setError(null);
 
+    const timer = window.setTimeout(() => {
       void quotePublicDelivery(subdomain, { latitude, longitude })
         .then((result) => {
           if (cancelled) return;

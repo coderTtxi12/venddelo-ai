@@ -29,6 +29,30 @@ declare global {
       location?: google.maps.LatLng;
       fetchFields(options: { fields: string[] }): Promise<void>;
     }
+
+    interface AutocompleteOptions {
+      componentRestrictions?: { country?: string | string[] };
+      fields?: string[];
+    }
+
+    interface PlaceGeometry {
+      location?: google.maps.LatLng;
+    }
+
+    interface AutocompletePlace {
+      formatted_address?: string;
+      geometry?: PlaceGeometry;
+      place_id?: string;
+    }
+
+    class Autocomplete {
+      constructor(inputField: HTMLInputElement, opts?: AutocompleteOptions);
+      getPlace(): AutocompletePlace;
+      addListener(
+        eventName: 'place_changed',
+        handler: () => void,
+      ): google.maps.MapsEventListener;
+    }
   }
 
   namespace google.maps.marker {
@@ -103,6 +127,7 @@ declare global {
         noInputIcon?: boolean;
       }) => google.maps.places.PlaceAutocompleteElement;
       Place: new (options: { id: string }) => google.maps.places.Place;
+      Autocomplete: typeof google.maps.places.Autocomplete;
     }>;
     function importLibrary(name: 'geocoding'): Promise<{
       Geocoder: new () => {

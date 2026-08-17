@@ -69,6 +69,12 @@ export type PublicDispatchTracking = {
   eta_seconds: number | null;
 };
 
+export type MapsUrlResolve = {
+  latitude: number;
+  longitude: number;
+  resolved_url: string | null;
+};
+
 function restaurantQuery(restaurantId: string): string {
   return new URLSearchParams({ restaurant_id: restaurantId }).toString();
 }
@@ -83,6 +89,14 @@ export function listDispatchRequests(token: string, restaurantId: string) {
 export function listDispatchLeadTimes(token: string, restaurantId: string) {
   return apiRequest<DispatchLeadTime[]>(
     `/restaurants/me/dispatch-lead-times?${restaurantQuery(restaurantId)}`,
+    { token },
+  );
+}
+
+export function resolveDispatchMapsUrl(token: string, restaurantId: string, url: string) {
+  const params = new URLSearchParams({ restaurant_id: restaurantId, url });
+  return apiRequest<MapsUrlResolve>(
+    `/restaurants/me/resolve-maps-url?${params.toString()}`,
     { token },
   );
 }
