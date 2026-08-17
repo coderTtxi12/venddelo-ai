@@ -857,17 +857,29 @@ class RiderDispatchService:
 
         offer.status = "accepted"
         offer.responded_at = now
-        request.status = "assigned"
-        request.assigned_driver_id = locked_driver.id
-        if request.payment_method == "cash":
-            hold = DeliveryCreditHold(
-                driver_id=locked_driver.id,
-                request_id=request.id,
-                amount_cents=request.collect_cents,
-                status="held",
+        group_rows = [request]
+        if request.dispatch_group_id is not None:
+            group_rows = list(
+                self._session.scalars(
+                    select(DeliveryDispatchRequest)
+                    .where(DeliveryDispatchRequest.dispatch_group_id == request.dispatch_group_id)
+                    .with_for_update()
+                ).all()
             )
-            self._session.add(hold)
-            locked_driver.credit_held_cents += request.collect_cents
+            if request not in group_rows:
+                group_rows.append(request)
+        for row in group_rows:
+            row.status = "assigned"
+            row.assigned_driver_id = locked_driver.id
+            if row.payment_method == "cash":
+                hold = DeliveryCreditHold(
+                    driver_id=locked_driver.id,
+                    request_id=row.id,
+                    amount_cents=row.collect_cents,
+                    status="held",
+                )
+                self._session.add(hold)
+                locked_driver.credit_held_cents += row.collect_cents
         self._session.flush()
         self._session.refresh(offer)
         return RiderOfferDTO.model_validate(offer)

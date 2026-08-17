@@ -305,6 +305,37 @@ def test_case_c_groups_nearby_dropoffs_onto_one_driver():
     assert all(offer.group_id == result.group_id for offer in result.offers)
 
 
+def test_case_c_without_free_rider_falls_through_to_d():
+    current = _request("req-1", dropoff_lat=19.4326, dropoff_lng=-99.1332)
+    sibling = _request("req-2", dropoff_lat=19.4340, dropoff_lng=-99.1332)
+    nearby_m = geodesic_meters(19.4326, -99.1332, 19.4340, -99.1332)
+    assert nearby_m <= 800
+
+    on_route = _driver(
+        "on-route",
+        last_lat=19.4330,
+        last_lng=-99.1335,
+        active_request_status="picked_up",
+        active_package_count=1,
+        active_dropoff_lat=19.4340,
+        active_dropoff_lng=-99.1332,
+    )
+    result = choose_assignments(
+        _context(
+            current,
+            (on_route,),
+            due_siblings=(current, sibling),
+            settings=_settings(high_demand_available_drivers_max=2),
+        )
+    )
+
+    assert result.high_demand is True
+    assert result.case == "D"
+    assert len(result.offers) == 1
+    assert result.offers[0].driver_id == "on-route"
+    assert result.offers[0].request_id == "req-1"
+
+
 def test_case_d_discards_driver_over_detour_threshold():
     request = _request("req-1", dropoff_lat=19.4326, dropoff_lng=-99.1332)
     near_dropoff_lat, near_dropoff_lng = 19.4340, -99.1332

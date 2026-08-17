@@ -100,6 +100,8 @@ def run_search(session: Session, request_id: uuid.UUID, now: datetime) -> None:
         return
     if _live_offer(session, request.id, now) is not None:
         return
+    if _live_group_offer(session, request, now) is not None:
+        return
     settings_row = session.get(
         DeliveryProviderAssignmentSettings,
         request.delivery_provider_id,
@@ -135,6 +137,7 @@ def handle_expire_offer(session: Session, offer_id: uuid.UUID, now: datetime) ->
         *(request.cycle_silent_driver_ids or []),
         offer.driver_id,
     ]
+    _clear_dispatch_group(session, request)
     _assign_or_retry(session, request, now)
 
 
@@ -151,6 +154,7 @@ def reject_offer_and_search(
         *(request.cycle_rejected_driver_ids or []),
         offer.driver_id,
     ]
+    _clear_dispatch_group(session, request)
     _assign_or_retry(session, request, now)
 
 
@@ -458,6 +462,40 @@ def _live_offer(
             DeliveryDispatchOffer.expires_at > now,
         )
     )
+
+
+def _live_group_offer(
+    session: Session,
+    request: DeliveryDispatchRequest,
+    now: datetime,
+) -> DeliveryDispatchOffer | None:
+    if request.dispatch_group_id is None:
+        return None
+    return session.scalar(
+        select(DeliveryDispatchOffer)
+        .join(
+            DeliveryDispatchRequest,
+            DeliveryDispatchOffer.request_id == DeliveryDispatchRequest.id,
+        )
+        .where(
+            DeliveryDispatchRequest.dispatch_group_id == request.dispatch_group_id,
+            DeliveryDispatchOffer.status == "offered",
+            DeliveryDispatchOffer.expires_at > now,
+        )
+    )
+
+
+def _clear_dispatch_group(session: Session, request: DeliveryDispatchRequest) -> None:
+    group_id = request.dispatch_group_id
+    if group_id is None:
+        return
+    members = session.scalars(
+        select(DeliveryDispatchRequest)
+        .where(DeliveryDispatchRequest.dispatch_group_id == group_id)
+        .with_for_update()
+    ).all()
+    for member in members:
+        member.dispatch_group_id = None
 
 
 def _driver_busy(

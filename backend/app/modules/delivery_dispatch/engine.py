@@ -122,7 +122,9 @@ def choose_assignments(context: EngineContext) -> EngineResult:
 
     group = _nearby_dropoff_group(context, due)
     if len(group) >= 2:
-        return _assign_case_c(context, group)
+        result = _assign_case_c(context, group)
+        if result.offers:
+            return result
 
     offers = _assign_case_d(context)
     if offers:
@@ -207,7 +209,7 @@ def _assign_case_c(context: EngineContext, group: tuple[EngineRequest, ...]) -> 
     group_id = str(uuid4())
     driver = _nearest_free_for_group(context, group)
     if driver is None:
-        return EngineResult(case="C", offers=(), high_demand=True, group_id=group_id)
+        return EngineResult(case="C", offers=(), high_demand=True, group_id=None)
     offers = tuple(
         EngineOffer(
             request_id=request.id,
