@@ -556,10 +556,14 @@ export default function SettingsPage() {
     setAssignmentSuccess(null);
 
     try {
-      const [updatedSettings, updatedLeadTimes] = await Promise.all([
-        patchMyDeliveryProviderAssignmentSettings(accessToken, assignmentSettings),
-        patchMyDeliveryProviderSearchLeadTimes(accessToken, leadTimes),
-      ]);
+      const updatedSettings = await patchMyDeliveryProviderAssignmentSettings(
+        accessToken,
+        assignmentSettings,
+      );
+      const updatedLeadTimes = await patchMyDeliveryProviderSearchLeadTimes(
+        accessToken,
+        leadTimes,
+      );
       const { pre_free_speed_mps: _ignored, ...editable } = updatedSettings;
       setAssignmentSettings(editable);
       setInitialAssignmentSettings(editable);
@@ -572,6 +576,19 @@ export default function SettingsPage() {
         setAssignmentError(err.message);
       } else {
         setAssignmentError('No se pudo guardar la configuración de asignación.');
+      }
+      try {
+        const [settings, rows] = await Promise.all([
+          getMyDeliveryProviderAssignmentSettings(accessToken),
+          getMyDeliveryProviderSearchLeadTimes(accessToken),
+        ]);
+        const { pre_free_speed_mps: _ignored, ...editable } = settings;
+        setAssignmentSettings(editable);
+        setInitialAssignmentSettings(editable);
+        setLeadTimes(rows);
+        setInitialLeadTimes(rows);
+      } catch (reloadErr) {
+        console.error(reloadErr);
       }
     } finally {
       setAssignmentSaving(false);

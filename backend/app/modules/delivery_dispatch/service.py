@@ -38,7 +38,7 @@ class DeliveryDispatchService:
         provider_id, member_role = self._require_provider_with_role(user_id)
         require_write_provider_config(member_role)
         row = self._get_or_raise_settings(provider_id)
-        for field, value in data.model_dump().items():
+        for field, value in data.model_dump(exclude_unset=True).items():
             setattr(row, field, value)
         self._session.flush()
         self._session.refresh(row)

@@ -626,6 +626,10 @@ class DeliveryDispatchRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="payment_method_allowed",
         ),
         CheckConstraint(
+            "payment_method <> 'cash' OR cash_denomination_cents IS NOT NULL",
+            name="cash_denomination_required",
+        ),
+        CheckConstraint(
             "package_size IN ('normal','grande')",
             name="package_size_allowed",
         ),

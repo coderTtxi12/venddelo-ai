@@ -318,6 +318,10 @@ def upgrade() -> None:
             name=op.f("ck_delivery_dispatch_requests_payment_method_allowed"),
         ),
         sa.CheckConstraint(
+            "payment_method <> 'cash' OR cash_denomination_cents IS NOT NULL",
+            name=op.f("ck_delivery_dispatch_requests_cash_denomination_required"),
+        ),
+        sa.CheckConstraint(
             "package_size IN ('normal','grande')",
             name=op.f("ck_delivery_dispatch_requests_package_size_allowed"),
         ),

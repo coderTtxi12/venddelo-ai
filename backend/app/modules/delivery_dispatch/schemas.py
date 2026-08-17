@@ -24,20 +24,22 @@ class AssignmentSettingsDTO(BaseModel):
 
 
 class AssignmentSettingsUpdate(BaseModel):
-    offer_timeout_seconds: int = Field(ge=1)
-    pre_free_eta_seconds: int = Field(ge=1)
-    driver_location_staleness_seconds: int = Field(ge=1)
-    min_protected_drivers: int = Field(ge=0)
-    high_demand_available_drivers_max: int = Field(ge=0)
-    high_demand_occupied_ratio: float = Field(ge=0, le=1)
-    high_demand_pending_min: int = Field(ge=0)
-    near_destination_radius_meters: int = Field(ge=0)
-    max_extra_route_minutes: int = Field(ge=0)
-    max_pickup_detour_minutes: int = Field(ge=0)
-    max_destination_detour_minutes: int = Field(ge=0)
-    max_active_packages_per_driver: int = Field(ge=1)
-    assignment_retry_seconds: int = Field(ge=1)
-    assignment_timeout_seconds: int = Field(ge=1)
+    model_config = ConfigDict(extra="ignore")
+
+    offer_timeout_seconds: int | None = Field(default=None, ge=1)
+    pre_free_eta_seconds: int | None = Field(default=None, ge=1)
+    driver_location_staleness_seconds: int | None = Field(default=None, ge=1)
+    min_protected_drivers: int | None = Field(default=None, ge=0)
+    high_demand_available_drivers_max: int | None = Field(default=None, ge=0)
+    high_demand_occupied_ratio: float | None = Field(default=None, ge=0, le=1)
+    high_demand_pending_min: int | None = Field(default=None, ge=0)
+    near_destination_radius_meters: int | None = Field(default=None, ge=0)
+    max_extra_route_minutes: int | None = Field(default=None, ge=0)
+    max_pickup_detour_minutes: int | None = Field(default=None, ge=0)
+    max_destination_detour_minutes: int | None = Field(default=None, ge=0)
+    max_active_packages_per_driver: int | None = Field(default=None, ge=1)
+    assignment_retry_seconds: int | None = Field(default=None, ge=1)
+    assignment_timeout_seconds: int | None = Field(default=None, ge=1)
 
 
 class SearchLeadTimeDTO(BaseModel):

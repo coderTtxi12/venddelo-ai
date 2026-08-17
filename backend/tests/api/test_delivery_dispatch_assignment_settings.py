@@ -138,8 +138,11 @@ def test_owner_can_patch_offer_timeout(client):
 
     updated = client.patch(
         "/api/v1/delivery-providers/me/assignment-settings",
-        json=_default_assignment_patch_payload(),
+        json={"offer_timeout_seconds": 60},
         headers=AUTH,
     )
     assert updated.status_code == 200, updated.text
-    assert updated.json()["offer_timeout_seconds"] == 60
+    body = updated.json()
+    assert body["offer_timeout_seconds"] == 60
+    assert body["pre_free_eta_seconds"] == 60
+    assert body["assignment_timeout_seconds"] == 900
