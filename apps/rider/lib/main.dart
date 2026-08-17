@@ -11,6 +11,8 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/not_registered_screen.dart';
 import 'screens/offer_screen.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,10 +37,7 @@ class MexyRiderApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Mexy Rider',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B5E20)),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light,
       home: AppConfig.isConfigured
           ? const AuthGate()
           : const _MissingConfigScreen(),
@@ -51,13 +50,18 @@ class _MissingConfigScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
+    return Scaffold(
+      body: SafeArea(
         child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'Falta configuración. Copia .env.example a .env y corre la app con --dart-define-from-file=.env',
-            textAlign: TextAlign.center,
+          padding: const EdgeInsets.all(AppTheme.screenPadding),
+          child: Center(
+            child: Text(
+              'Falta configuración. Copia .env.example a .env y corre la app con --dart-define-from-file=.env',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
           ),
         ),
       ),
@@ -147,7 +151,19 @@ class _AuthGateState extends State<AuthGate> {
       builder: (context, _) {
         if (controller.loading) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            body: Center(
+              child: Padding(
+                padding: EdgeInsets.all(AppTheme.screenPadding),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Cargando tu perfil…'),
+                  ],
+                ),
+              ),
+            ),
           );
         }
         if (controller.notRegistered) {
