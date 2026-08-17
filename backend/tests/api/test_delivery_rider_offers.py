@@ -99,6 +99,8 @@ def _driver_payload(
         "first_name": "Juan",
         "last_name": "Pérez",
         "phone": phone,
+        "emergency_contact_name": "María Pérez",
+        "emergency_contact_phone": "+525598765432",
         "email": email,
         "compartment_size": "normal",
         "plate": plate,
