@@ -109,6 +109,13 @@
   color: var(--color-text-muted, #64748b);
 }
 
+.companyHint {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-secondary, #475569);
+}
+
 @media (max-width: 900px) {
   .bar {
     padding: 0.65rem 1rem;

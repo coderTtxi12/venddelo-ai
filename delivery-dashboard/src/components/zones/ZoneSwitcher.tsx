@@ -1,7 +1,7 @@
 'use client';
 
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import styles from './ZoneSwitcher.module.css';
@@ -12,8 +12,21 @@ type ZoneSwitcherProps = {
 
 export default function ZoneSwitcher({ onAddZone }: ZoneSwitcherProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { canWriteProviderConfig } = useDeliveryProviderAccess();
   const { loading, zones, selectedZoneId, setSelectedZoneId } = useDeliveryZone();
+
+  if (pathname === '/repartidores' || pathname === '/asignacion') {
+    return (
+      <div className={styles.bar}>
+        <p className={styles.companyHint}>
+          {pathname === '/repartidores'
+            ? 'Los repartidores cubren todas las zonas de la empresa.'
+            : 'La asignación aplica por empresa, no por zona.'}
+        </p>
+      </div>
+    );
+  }
 
   const handleAddZone = () => {
     if (onAddZone) {
