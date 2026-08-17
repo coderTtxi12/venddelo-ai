@@ -259,6 +259,8 @@ export type DeliveryDriver = {
   first_name: string;
   last_name: string;
   phone: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
   profile_photo_path: string;
   ine_document_path: string;
   license_document_path: string;
@@ -269,6 +271,8 @@ export type DeliveryDriver = {
   plate: string;
   motorcycle_brand: string;
   motorcycle_color: string;
+  registered_zone_id: string | null;
+  registered_zone_name: string | null;
   status: DeliveryDriverStatus;
   is_online: boolean;
 };
@@ -277,11 +281,14 @@ export type DeliveryDriverCreateInput = {
   first_name: string;
   last_name: string;
   phone: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
   email: string;
   compartment_size: DeliveryDriverCompartmentSize;
   plate: string;
   motorcycle_brand: string;
   motorcycle_color: string;
+  registered_zone_id?: string | null;
   credit_limit_cents?: number;
   profile_photo_base64: string;
   profile_photo_file_name?: string | null;
@@ -297,11 +304,14 @@ export type DeliveryDriverUpdateInput = {
   first_name?: string;
   last_name?: string;
   phone?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
   email?: string;
   compartment_size?: DeliveryDriverCompartmentSize;
   plate?: string;
   motorcycle_brand?: string;
   motorcycle_color?: string;
+  registered_zone_id?: string | null;
   credit_limit_cents?: number;
   status?: DeliveryDriverStatus;
 };
