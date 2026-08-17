@@ -15,6 +15,7 @@ from app.modules.delivery_dispatch.schemas import (
     DispatchPaymentUpdate,
     DispatchRequestCreate,
     DispatchRequestDTO,
+    MapsUrlResolveDTO,
     SearchLeadTimeDTO,
 )
 from app.modules.delivery_dispatch.service import RestaurantDispatchService
@@ -262,6 +263,23 @@ def list_dispatch_lead_times(
     service: RestaurantDispatchService = Depends(_dispatch_service),
 ) -> list[SearchLeadTimeDTO]:
     return service.list_lead_times(restaurant)
+
+
+@router.get(
+    "/me/resolve-maps-url",
+    response_model=MapsUrlResolveDTO,
+)
+def resolve_dispatch_maps_url(
+    url: str = Query(min_length=1, max_length=2000),
+    restaurant: RestaurantDTO = Depends(_owned_me_restaurant),
+    service: RestaurantDispatchService = Depends(_dispatch_service),
+) -> MapsUrlResolveDTO:
+    latitude, longitude, resolved_url = service.resolve_maps_url(url)
+    return MapsUrlResolveDTO(
+        latitude=latitude,
+        longitude=longitude,
+        resolved_url=resolved_url,
+    )
 
 
 @router.patch(
