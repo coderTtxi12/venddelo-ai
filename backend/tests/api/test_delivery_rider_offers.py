@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -81,9 +81,11 @@ def _clean_rider_offer_tables(engine):
             )
         )
     yield
+    from app.modules.delivery_dispatch.notify import set_offer_notifier
     from app.modules.delivery_dispatch.tasks import stub_bus
 
     stub_bus.clear()
+    set_offer_notifier(None)
     _as_owner()
 
 
@@ -235,12 +237,12 @@ def _setup_ready_fleet(
     return restaurant_id, driver_ids
 
 
-def _create_dispatch_request(client, restaurant_id: str) -> uuid.UUID:
+def _create_dispatch_request(client, restaurant_id: str, **payload_overrides) -> uuid.UUID:
     _as_owner()
     created = client.post(
         "/api/v1/restaurants/me/dispatch-requests",
         params={"restaurant_id": restaurant_id},
-        json=_dispatch_payload(),
+        json=_dispatch_payload(**payload_overrides),
         headers=AUTH,
     )
     assert created.status_code == 201, created.text
@@ -488,3 +490,83 @@ def test_search_holds_provider_settings_lock(client, engine):
     finally:
         session_a.close()
         session_b.close()
+
+
+@requires_db
+def test_search_timeout_marks_request_unassigned(client, engine):
+    from app.modules.delivery_dispatch.tasks import handle_task, stub_bus
+
+    restaurant_id, _driver_id = _setup_ready_rider(client, engine)
+    request_id = _create_dispatch_request(client, restaurant_id)
+    now = datetime.now(UTC)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    stub_bus.clear()
+
+    with factory() as session:
+        request = session.get(DeliveryDispatchRequest, request_id)
+        assert request is not None
+        request.search_at = now - timedelta(seconds=900)
+        request.status = "searching"
+        session.commit()
+
+    with factory() as session:
+        handle_task(session, {"kind": "search", "request_id": str(request_id)}, now=now)
+        session.commit()
+        request = session.get(DeliveryDispatchRequest, request_id)
+        offer = session.scalar(
+            select(DeliveryDispatchOffer).where(DeliveryDispatchOffer.request_id == request_id)
+        )
+        assert request is not None
+        assert request.status == "unassigned"
+        assert offer is None
+        assert not any(job.kind == "retry" for job in stub_bus.jobs)
+
+
+@requires_db
+def test_case_c_persists_dispatch_group_id_and_notifies(client, engine):
+    from app.modules.delivery_dispatch.notify import set_offer_notifier
+    from app.modules.delivery_dispatch.tasks import handle_task
+
+    restaurant_id, driver_ids = _setup_ready_fleet(
+        client,
+        engine,
+        driver_count=1,
+        min_protected_drivers=0,
+        high_demand_available_drivers_max=2,
+        subdomain="case-c-group",
+    )
+    request_a = _create_dispatch_request(client, restaurant_id)
+    request_b = _create_dispatch_request(
+        client,
+        restaurant_id,
+        dropoff_lat=COVERED_LAT + 0.001,
+        dropoff_lng=COVERED_LNG,
+    )
+    now = datetime.now(UTC)
+    seen: list[str] = []
+    set_offer_notifier(lambda driver, offer: seen.append(str(offer.id)))
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        driver = session.get(DeliveryDriver, driver_ids[0])
+        assert driver is not None
+        driver.fcm_token = "test-fcm-token"
+        session.commit()
+
+    with factory() as session:
+        handle_task(session, {"kind": "search", "request_id": str(request_a)}, now=now)
+        session.commit()
+        row_a = session.get(DeliveryDispatchRequest, request_a)
+        row_b = session.get(DeliveryDispatchRequest, request_b)
+        offer = session.scalar(
+            select(DeliveryDispatchOffer).where(
+                DeliveryDispatchOffer.request_id == request_a,
+                DeliveryDispatchOffer.status == "offered",
+            )
+        )
+        assert row_a is not None and row_b is not None
+        assert offer is not None
+        assert offer.case_applied == "C"
+        assert offer.driver_id == driver_ids[0]
+        assert row_a.dispatch_group_id is not None
+        assert row_a.dispatch_group_id == row_b.dispatch_group_id
+        assert seen == [str(offer.id)]

@@ -9,6 +9,7 @@ from app.modules.delivery_dispatch.engine import (
     EngineSettings,
     choose_assignments,
 )
+from app.modules.delivery_dispatch.geo import geodesic_meters
 
 NOW = datetime(2026, 8, 17, 12, 0, tzinfo=timezone.utc)
 RESTAURANT_LAT = 19.4326
@@ -39,11 +40,15 @@ def _request(
     silent: tuple[str, ...] = (),
     restaurant_lat: float = RESTAURANT_LAT,
     restaurant_lng: float = RESTAURANT_LNG,
+    dropoff_lat: float | None = None,
+    dropoff_lng: float | None = None,
 ) -> EngineRequest:
     return EngineRequest(
         id=request_id,
         restaurant_lat=restaurant_lat,
         restaurant_lng=restaurant_lng,
+        dropoff_lat=restaurant_lat if dropoff_lat is None else dropoff_lat,
+        dropoff_lng=restaurant_lng if dropoff_lng is None else dropoff_lng,
         package_size=package_size,
         package_count=package_count,
         payment_method=payment_method,
@@ -67,7 +72,13 @@ def _driver(
     active_request_status: str | None = None,
     active_package_count: int = 0,
     has_open_offer: bool = False,
+    active_dropoff_lat: float | None = None,
+    active_dropoff_lng: float | None = None,
+    occupied_job_count: int | None = None,
 ) -> EngineDriver:
+    occupied = occupied_job_count
+    if occupied is None:
+        occupied = 1 if active_request_status in {"assigned", "picked_up", "in_transit"} else 0
     return EngineDriver(
         id=driver_id,
         status=status,
@@ -81,6 +92,9 @@ def _driver(
         active_request_status=active_request_status,
         active_package_count=active_package_count,
         has_open_offer=has_open_offer,
+        active_dropoff_lat=active_dropoff_lat,
+        active_dropoff_lng=active_dropoff_lng,
+        occupied_job_count=occupied,
     )
 
 
@@ -220,3 +234,150 @@ def test_silent_driver_is_not_offered_this_cycle():
 
     assert result.case == "A"
     assert result.offers[0].driver_id == "far"
+
+
+def test_pre_free_in_transit_within_eta_counts_as_free_for_a():
+    dropoff_lat, dropoff_lng = 19.4330, -99.1335
+    request = _request()
+    almost_done = _driver(
+        "almost-done",
+        last_lat=dropoff_lat,
+        last_lng=dropoff_lng,
+        active_request_status="in_transit",
+        active_package_count=1,
+        active_dropoff_lat=dropoff_lat,
+        active_dropoff_lng=dropoff_lng,
+    )
+    eta_seconds = geodesic_meters(
+        dropoff_lat, dropoff_lng, dropoff_lat, dropoff_lng
+    ) / 8
+    assert eta_seconds <= 60
+
+    result = choose_assignments(_context(request, (almost_done,)))
+
+    assert result.case == "A"
+    assert result.offers[0].driver_id == "almost-done"
+    assert result.offers[0].request_id == "req-1"
+
+
+def test_stale_gps_excluded_even_if_in_transit():
+    dropoff_lat, dropoff_lng = 19.4330, -99.1335
+    request = _request()
+    stale_pre_free = _driver(
+        "stale-pre-free",
+        last_lat=dropoff_lat,
+        last_lng=dropoff_lng,
+        location_updated_at=NOW - timedelta(seconds=91),
+        active_request_status="in_transit",
+        active_package_count=1,
+        active_dropoff_lat=dropoff_lat,
+        active_dropoff_lng=dropoff_lng,
+    )
+    fresh = _driver("fresh", last_lat=19.4400, last_lng=-99.1400)
+    result = choose_assignments(_context(request, (stale_pre_free, fresh)))
+
+    assert result.case == "A"
+    assert result.offers[0].driver_id == "fresh"
+
+
+def test_case_c_groups_nearby_dropoffs_onto_one_driver():
+    current = _request("req-1", dropoff_lat=19.4326, dropoff_lng=-99.1332)
+    sibling = _request("req-2", dropoff_lat=19.4340, dropoff_lng=-99.1332)
+    nearby_m = geodesic_meters(19.4326, -99.1332, 19.4340, -99.1332)
+    assert nearby_m <= 800
+
+    driver = _driver("only", last_lat=19.4330, last_lng=-99.1335)
+    result = choose_assignments(
+        _context(
+            current,
+            (driver,),
+            due_siblings=(current, sibling),
+            settings=_settings(high_demand_available_drivers_max=2),
+        )
+    )
+
+    assert result.high_demand is True
+    assert result.case == "C"
+    assert len(result.offers) == 2
+    assert {offer.driver_id for offer in result.offers} == {"only"}
+    assert {offer.request_id for offer in result.offers} == {"req-1", "req-2"}
+    assert result.group_id is not None
+    assert all(offer.group_id == result.group_id for offer in result.offers)
+
+
+def test_case_d_discards_driver_over_detour_threshold():
+    request = _request("req-1", dropoff_lat=19.4326, dropoff_lng=-99.1332)
+    near_dropoff_lat, near_dropoff_lng = 19.4340, -99.1332
+    ok_driver = _driver(
+        "ok-on-route",
+        last_lat=19.4330,
+        last_lng=-99.1335,
+        active_request_status="picked_up",
+        active_package_count=1,
+        active_dropoff_lat=near_dropoff_lat,
+        active_dropoff_lng=near_dropoff_lng,
+    )
+    far_driver = _driver(
+        "far-on-route",
+        last_lat=19.50,
+        last_lng=-99.20,
+        active_request_status="in_transit",
+        active_package_count=1,
+        active_dropoff_lat=19.50,
+        active_dropoff_lng=-99.20,
+    )
+    pickup_minutes = (
+        geodesic_meters(19.50, -99.20, RESTAURANT_LAT, RESTAURANT_LNG) / 8 / 60
+    )
+    assert pickup_minutes > 8
+
+    result = choose_assignments(
+        _context(
+            request,
+            (far_driver, ok_driver),
+            settings=_settings(high_demand_available_drivers_max=2),
+        )
+    )
+
+    assert result.high_demand is True
+    assert result.case == "D"
+    assert len(result.offers) == 1
+    assert result.offers[0].driver_id == "ok-on-route"
+    assert result.offers[0].request_id == "req-1"
+
+
+def test_assignment_times_out_at_search_at_plus_timeout():
+    from app.modules.delivery_dispatch.engine import assignment_timed_out
+
+    search_at = NOW
+    assert assignment_timed_out(NOW + timedelta(seconds=899), search_at, 900) is False
+    assert assignment_timed_out(NOW + timedelta(seconds=900), search_at, 900) is True
+
+
+def test_notify_offer_skips_without_fcm_token():
+    from types import SimpleNamespace
+
+    from app.modules.delivery_dispatch.notify import notify_offer, set_offer_notifier
+
+    seen: list[object] = []
+    set_offer_notifier(lambda driver, offer: seen.append(offer))
+    try:
+        notify_offer(SimpleNamespace(fcm_token=None), SimpleNamespace(id="offer-1"))
+        notify_offer(SimpleNamespace(fcm_token=""), SimpleNamespace(id="offer-2"))
+        assert seen == []
+    finally:
+        set_offer_notifier(None)
+
+
+def test_notify_offer_records_when_token_present():
+    from types import SimpleNamespace
+
+    from app.modules.delivery_dispatch.notify import notify_offer, set_offer_notifier
+
+    seen: list[str] = []
+    set_offer_notifier(lambda driver, offer: seen.append(offer.id))
+    try:
+        notify_offer(SimpleNamespace(fcm_token="token-abc"), SimpleNamespace(id="offer-1"))
+        assert seen == ["offer-1"]
+    finally:
+        set_offer_notifier(None)

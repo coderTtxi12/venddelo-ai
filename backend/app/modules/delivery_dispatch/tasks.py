@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -21,8 +22,11 @@ from app.modules.delivery_dispatch.engine import (
     EngineDriver,
     EngineRequest,
     EngineSettings,
+    assignment_timed_out,
     choose_assignments,
 )
+from app.modules.delivery_dispatch.geo import geodesic_meters
+from app.modules.delivery_dispatch.notify import notify_offer
 
 _SEARCHABLE = frozenset({"scheduled", "searching", "offered"})
 _OCCUPIED = frozenset({"assigned", "picked_up", "in_transit"})
@@ -96,6 +100,16 @@ def run_search(session: Session, request_id: uuid.UUID, now: datetime) -> None:
         return
     if _live_offer(session, request.id, now) is not None:
         return
+    settings_row = session.get(
+        DeliveryProviderAssignmentSettings,
+        request.delivery_provider_id,
+    )
+    timeout_seconds = (
+        settings_row.assignment_timeout_seconds if settings_row is not None else 900
+    )
+    if assignment_timed_out(now, _as_utc(request.search_at), timeout_seconds):
+        request.status = "unassigned"
+        return
     _assign_or_retry(session, request, now)
 
 
@@ -158,6 +172,11 @@ def _assign_or_retry(
     if settings_row is None:
         _enqueue_retry(session, request, now)
         return
+    if assignment_timed_out(
+        now, _as_utc(request.search_at), settings_row.assignment_timeout_seconds
+    ):
+        request.status = "unassigned"
+        return
 
     extra_excluded: set[str] = set()
     drivers = list(_load_drivers(session, request.delivery_provider_id))
@@ -183,7 +202,9 @@ def _assign_or_retry(
         driver = session.scalar(
             select(DeliveryDriver).where(DeliveryDriver.id == driver_id).with_for_update()
         )
-        if driver is None or _driver_busy(session, driver.id, now):
+        if driver is None or _driver_busy(
+            session, driver, now, case=chosen.case, settings_row=settings_row
+        ):
             extra_excluded.add(chosen.driver_id)
             continue
 
@@ -194,16 +215,24 @@ def _assign_or_retry(
             status="offered",
             case_applied=chosen.case,
             expires_at=expires_at,
-            score_json={"case": chosen.case},
+            score_json={"case": chosen.case, "group_id": result.group_id},
         )
         session.add(offer)
         session.flush()
         request.status = "offered"
+        if result.case == "C" and result.group_id:
+            group_uuid = uuid.UUID(result.group_id)
+            for item in result.offers:
+                grouped = session.get(DeliveryDispatchRequest, uuid.UUID(item.request_id))
+                if grouped is not None:
+                    grouped.dispatch_group_id = group_uuid
         request.decision_json = {
             "case": result.case,
             "high_demand": result.high_demand,
             "driver_id": str(driver.id),
+            "group_id": result.group_id,
         }
+        notify_offer(driver, offer)
         enqueue(
             "expire_offer",
             expires_at,
@@ -274,12 +303,12 @@ def _build_context(
             DeliveryDispatchRequest.status.in_(tuple(_OCCUPIED)),
         )
     ).all()
-    active_status: dict[uuid.UUID, str] = {}
+    occupied_by_driver: dict[uuid.UUID, list[DeliveryDispatchRequest]] = defaultdict(list)
     active_packages: dict[uuid.UUID, int] = {}
     for row in occupied_rows:
         if row.assigned_driver_id is None:
             continue
-        active_status[row.assigned_driver_id] = row.status
+        occupied_by_driver[row.assigned_driver_id].append(row)
         active_packages[row.assigned_driver_id] = (
             active_packages.get(row.assigned_driver_id, 0) + row.package_count
         )
@@ -312,21 +341,11 @@ def _build_context(
         )
 
     engine_drivers = tuple(
-        EngineDriver(
-            id=str(driver.id),
-            status=driver.status,
-            is_online=driver.is_online,
-            last_lat=driver.last_lat,
-            last_lng=driver.last_lng,
-            location_updated_at=_as_utc(driver.location_updated_at)
-            if driver.location_updated_at
-            else None,
-            credit_limit_cents=driver.credit_limit_cents,
-            credit_held_cents=driver.credit_held_cents,
-            compartment_size=driver.compartment_size,
-            active_request_status=active_status.get(driver.id),
-            active_package_count=active_packages.get(driver.id, 0),
-            has_open_offer=driver.id in open_offer_ids,
+        _to_engine_driver(
+            driver,
+            occupied_by_driver.get(driver.id, []),
+            active_packages.get(driver.id, 0),
+            driver.id in open_offer_ids,
         )
         for driver in drivers
     )
@@ -358,8 +377,46 @@ def _to_engine_request(
         package_count=request.package_count,
         payment_method=request.payment_method,
         collect_cents=request.collect_cents,
+        dropoff_lat=request.dropoff_lat,
+        dropoff_lng=request.dropoff_lng,
+        status=request.status,
         cycle_rejected_driver_ids=rejected,
         cycle_silent_driver_ids=silent,
+    )
+
+
+def _to_engine_driver(
+    driver: DeliveryDriver,
+    occupied_jobs: list[DeliveryDispatchRequest],
+    active_package_count: int,
+    has_open_offer: bool,
+) -> EngineDriver:
+    active = None
+    if len(occupied_jobs) == 1:
+        active = occupied_jobs[0]
+    elif occupied_jobs:
+        active = next(
+            (job for job in occupied_jobs if job.status == "in_transit"),
+            occupied_jobs[0],
+        )
+    return EngineDriver(
+        id=str(driver.id),
+        status=driver.status,
+        is_online=driver.is_online,
+        last_lat=driver.last_lat,
+        last_lng=driver.last_lng,
+        location_updated_at=_as_utc(driver.location_updated_at)
+        if driver.location_updated_at
+        else None,
+        credit_limit_cents=driver.credit_limit_cents,
+        credit_held_cents=driver.credit_held_cents,
+        compartment_size=driver.compartment_size,
+        active_request_status=active.status if active is not None else None,
+        active_package_count=active_package_count,
+        has_open_offer=has_open_offer,
+        active_dropoff_lat=active.dropoff_lat if active is not None else None,
+        active_dropoff_lng=active.dropoff_lng if active is not None else None,
+        occupied_job_count=len(occupied_jobs),
     )
 
 
@@ -371,6 +428,13 @@ def _engine_settings(row: DeliveryProviderAssignmentSettings) -> EngineSettings:
         high_demand_occupied_ratio=row.high_demand_occupied_ratio,
         high_demand_pending_min=row.high_demand_pending_min,
         max_active_packages_per_driver=row.max_active_packages_per_driver,
+        pre_free_eta_seconds=row.pre_free_eta_seconds,
+        pre_free_speed_mps=row.pre_free_speed_mps,
+        near_destination_radius_meters=row.near_destination_radius_meters,
+        max_extra_route_minutes=row.max_extra_route_minutes,
+        max_pickup_detour_minutes=row.max_pickup_detour_minutes,
+        max_destination_detour_minutes=row.max_destination_detour_minutes,
+        assignment_timeout_seconds=row.assignment_timeout_seconds,
     )
 
 
@@ -396,23 +460,55 @@ def _live_offer(
     )
 
 
-def _driver_busy(session: Session, driver_id: uuid.UUID, now: datetime) -> bool:
+def _driver_busy(
+    session: Session,
+    driver: DeliveryDriver,
+    now: datetime,
+    *,
+    case: str,
+    settings_row: DeliveryProviderAssignmentSettings,
+) -> bool:
     open_offer = session.scalar(
         select(DeliveryDispatchOffer.id).where(
-            DeliveryDispatchOffer.driver_id == driver_id,
+            DeliveryDispatchOffer.driver_id == driver.id,
             DeliveryDispatchOffer.status == "offered",
             DeliveryDispatchOffer.expires_at > now,
         )
     )
     if open_offer is not None:
         return True
-    occupied = session.scalar(
-        select(DeliveryDispatchRequest.id).where(
-            DeliveryDispatchRequest.assigned_driver_id == driver_id,
-            DeliveryDispatchRequest.status.in_(tuple(_OCCUPIED)),
-        )
+    occupied_rows = list(
+        session.scalars(
+            select(DeliveryDispatchRequest).where(
+                DeliveryDispatchRequest.assigned_driver_id == driver.id,
+                DeliveryDispatchRequest.status.in_(tuple(_OCCUPIED)),
+            )
+        ).all()
     )
-    return occupied is not None
+    if not occupied_rows:
+        return False
+    if case == "D":
+        return False
+    return not _occupied_is_pre_free(driver, occupied_rows, settings_row)
+
+
+def _occupied_is_pre_free(
+    driver: DeliveryDriver,
+    occupied_rows: list[DeliveryDispatchRequest],
+    settings_row: DeliveryProviderAssignmentSettings,
+) -> bool:
+    if len(occupied_rows) != 1:
+        return False
+    job = occupied_rows[0]
+    if job.status != "in_transit":
+        return False
+    if driver.last_lat is None or driver.last_lng is None:
+        return False
+    eta_seconds = (
+        geodesic_meters(driver.last_lat, driver.last_lng, job.dropoff_lat, job.dropoff_lng)
+        / settings_row.pre_free_speed_mps
+    )
+    return eta_seconds <= settings_row.pre_free_eta_seconds
 
 
 def _as_utc(value: datetime) -> datetime:
