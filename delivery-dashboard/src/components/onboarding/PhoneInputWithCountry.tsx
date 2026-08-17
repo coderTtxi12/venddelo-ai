@@ -19,6 +19,8 @@ type PhoneInputWithCountryProps = {
   autoFocus?: boolean;
   showSameAsOwner?: boolean;
   onUseSameAsOwner?: () => void;
+  compact?: boolean;
+  inputId?: string;
 };
 
 export function PhoneInputWithCountry({
@@ -31,6 +33,8 @@ export function PhoneInputWithCountry({
   autoFocus = false,
   showSameAsOwner = false,
   onUseSameAsOwner,
+  compact = false,
+  inputId,
 }: PhoneInputWithCountryProps) {
   const listId = useId();
   const [open, setOpen] = useState(false);
@@ -56,7 +60,7 @@ export function PhoneInputWithCountry({
   };
 
   return (
-    <div className={styles.wrap}>
+    <div className={`${styles.wrap} ${compact ? styles.wrapCompact : ''}`.trim()}>
       <div className={styles.row} ref={wrapRef}>
         <div className={styles.countrySelect}>
           <button
@@ -100,6 +104,7 @@ export function PhoneInputWithCountry({
         </div>
 
         <input
+          id={inputId}
           type="tel"
           inputMode="numeric"
           autoComplete="tel-national"
