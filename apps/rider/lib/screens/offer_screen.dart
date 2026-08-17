@@ -66,12 +66,31 @@ class _OfferScreenState extends State<OfferScreen> {
                 style: Theme.of(context).textTheme.displaySmall,
               ),
               const SizedBox(height: 24),
-              Text(
-                widget.offer.restaurantName,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(widget.offer.dropoffAddress),
+              if (widget.offer.stops.length > 1)
+                ...widget.offer.stops.map(
+                  (stop) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          stop.restaurantName,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(stop.dropoffAddress),
+                      ],
+                    ),
+                  ),
+                )
+              else ...[
+                Text(
+                  widget.offer.restaurantName,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(widget.offer.dropoffAddress),
+              ],
               const SizedBox(height: 8),
               Text('Cobrar: \$$collect · ${_paymentLabel(widget.offer.paymentMethod)}'),
               Text('Paquetes: ${widget.offer.packageCount}'),

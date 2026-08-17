@@ -50,6 +50,23 @@ class RiderProfile {
   }
 }
 
+class RiderOfferStop {
+  const RiderOfferStop({
+    required this.restaurantName,
+    required this.dropoffAddress,
+  });
+
+  final String restaurantName;
+  final String dropoffAddress;
+
+  factory RiderOfferStop.fromJson(Map<String, dynamic> json) {
+    return RiderOfferStop(
+      restaurantName: json['restaurant_name'] as String,
+      dropoffAddress: json['dropoff_address'] as String,
+    );
+  }
+}
+
 class RiderOffer {
   const RiderOffer({
     required this.id,
@@ -61,6 +78,7 @@ class RiderOffer {
     required this.collectCents,
     required this.paymentMethod,
     required this.packageCount,
+    this.stops = const [],
   });
 
   final String id;
@@ -72,8 +90,10 @@ class RiderOffer {
   final int collectCents;
   final String paymentMethod;
   final int packageCount;
+  final List<RiderOfferStop> stops;
 
   factory RiderOffer.fromJson(Map<String, dynamic> json) {
+    final rawStops = json['stops'] as List<dynamic>? ?? const [];
     return RiderOffer(
       id: json['id'] as String,
       requestId: json['request_id'] as String,
@@ -84,6 +104,9 @@ class RiderOffer {
       collectCents: json['collect_cents'] as int,
       paymentMethod: json['payment_method'] as String,
       packageCount: json['package_count'] as int,
+      stops: rawStops
+          .map((item) => RiderOfferStop.fromJson(item as Map<String, dynamic>))
+          .toList(),
     );
   }
 }

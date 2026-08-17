@@ -301,3 +301,52 @@ def test_patch_blocked_forces_offline(client, engine):
     assert patched.status_code == 200, patched.text
     assert patched.json()["status"] == "blocked"
     assert patched.json()["is_online"] is False
+
+
+@requires_db
+def test_claim_skips_blocked_driver(client, engine):
+    provider_id = _create_provider(client)
+
+    created = client.post(
+        "/api/v1/delivery-providers/me/drivers",
+        json=_driver_create_payload("repartidor@empresa.com"),
+        headers=AUTH,
+    )
+    assert created.status_code == 201, created.text
+    driver_id = created.json()["id"]
+
+    patched = client.patch(
+        f"/api/v1/delivery-providers/me/drivers/{driver_id}",
+        json={"status": "blocked"},
+        headers=AUTH,
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["status"] == "blocked"
+
+    app.dependency_overrides[get_auth] = lambda: FakeAuth(
+        user_id=RIDER,
+        email="repartidor@empresa.com",
+    )
+    try:
+        me = client.get("/api/v1/rider/me", headers=AUTH)
+        assert me.status_code == 403
+        provider_me = client.get("/api/v1/delivery-providers/me", headers=AUTH)
+        assert provider_me.status_code == 200, provider_me.text
+        assert provider_me.json()["provider"] is None
+        assert provider_me.json()["member_role"] is None
+    finally:
+        app.dependency_overrides[get_auth] = lambda: FakeAuth()
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        driver = session.get(DeliveryDriver, uuid.UUID(driver_id))
+        assert driver is not None
+        assert driver.status == "blocked"
+        assert driver.user_id is None
+        member = session.scalar(
+            select(DeliveryProviderMember).where(
+                DeliveryProviderMember.delivery_provider_id == provider_id,
+                DeliveryProviderMember.user_id == RIDER,
+            )
+        )
+        assert member is None

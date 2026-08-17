@@ -973,3 +973,201 @@ def test_resume_former_group_members_skips_cancelled_and_live_group(client, engi
         assert row_b is not None
         assert row_b.status == "unassigned"
         assert row_b.dispatch_group_id is None
+
+
+@requires_db
+def test_expire_after_cancel_keeps_request_cancelled(client, engine):
+    from app.modules.delivery_dispatch.tasks import handle_task
+
+    restaurant_id, _driver_id = _setup_ready_rider(client, engine)
+    request_id, offer_id = _create_and_offer(client, engine, restaurant_id)
+    request_uuid = uuid.UUID(request_id)
+    offer_uuid = uuid.UUID(offer_id)
+    now = datetime.now(UTC)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    with factory() as session:
+        offer = session.get(DeliveryDispatchOffer, offer_uuid)
+        assert offer is not None
+        offer.expires_at = now - timedelta(seconds=1)
+        session.commit()
+
+    _as_owner()
+    cancelled = client.post(
+        f"/api/v1/restaurants/me/dispatch-requests/{request_id}/cancel",
+        params={"restaurant_id": restaurant_id},
+        headers=AUTH,
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["status"] == "cancelled"
+
+    with factory() as session:
+        offer = session.get(DeliveryDispatchOffer, offer_uuid)
+        assert offer is not None
+        assert offer.status == "expired"
+
+    with factory() as session:
+        handle_task(
+            session,
+            {
+                "kind": "expire_offer",
+                "request_id": request_id,
+                "offer_id": offer_id,
+            },
+            now=now,
+        )
+        session.commit()
+        request = session.get(DeliveryDispatchRequest, request_uuid)
+        offer = session.get(DeliveryDispatchOffer, offer_uuid)
+        assert request is not None
+        assert request.status == "cancelled"
+        assert offer is not None
+        assert offer.status == "expired"
+
+
+@requires_db
+def test_case_b_one_search_protects_min_drivers(client, engine):
+    from app.modules.delivery_dispatch.tasks import handle_task
+
+    restaurant_id, _driver_ids = _setup_ready_fleet(
+        client,
+        engine,
+        driver_count=3,
+        min_protected_drivers=2,
+        high_demand_available_drivers_max=0,
+        subdomain="case-b-protect",
+    )
+    request_a = _create_dispatch_request(client, restaurant_id)
+    request_b = _create_dispatch_request(client, restaurant_id)
+    now = datetime.now(UTC)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    with factory() as session:
+        handle_task(session, {"kind": "search", "request_id": str(request_a)}, now=now)
+        session.commit()
+        offers = list(
+            session.scalars(
+                select(DeliveryDispatchOffer).where(DeliveryDispatchOffer.status == "offered")
+            ).all()
+        )
+        row_a = session.get(DeliveryDispatchRequest, request_a)
+        row_b = session.get(DeliveryDispatchRequest, request_b)
+        assert len(offers) == 1
+        assert row_a is not None and row_b is not None
+        offered_ids = {offer.request_id for offer in offers}
+        assert offered_ids == {request_a}
+        assert row_a.status == "offered"
+        assert row_b.status != "offered"
+
+
+@requires_db
+def test_case_b_persists_sibling_offers_from_engine(client, engine):
+    from app.modules.delivery_dispatch.tasks import handle_task
+
+    restaurant_id, _driver_ids = _setup_ready_fleet(
+        client,
+        engine,
+        driver_count=4,
+        min_protected_drivers=2,
+        high_demand_available_drivers_max=0,
+        subdomain="case-b-siblings",
+    )
+    request_a = _create_dispatch_request(client, restaurant_id)
+    request_b = _create_dispatch_request(client, restaurant_id)
+    now = datetime.now(UTC)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    with factory() as session:
+        handle_task(session, {"kind": "search", "request_id": str(request_a)}, now=now)
+        session.commit()
+        offers = list(
+            session.scalars(
+                select(DeliveryDispatchOffer).where(DeliveryDispatchOffer.status == "offered")
+            ).all()
+        )
+        row_a = session.get(DeliveryDispatchRequest, request_a)
+        row_b = session.get(DeliveryDispatchRequest, request_b)
+        assert len(offers) == 2
+        assert {offer.request_id for offer in offers} == {request_a, request_b}
+        assert {offer.case_applied for offer in offers} == {"B"}
+        assert len({offer.driver_id for offer in offers}) == 2
+        assert row_a is not None and row_b is not None
+        assert row_a.status == "offered"
+        assert row_b.status == "offered"
+
+
+@requires_db
+def test_release_hold_locks_driver_row(client, engine):
+    restaurant_id, driver_id = _setup_ready_rider(client, engine)
+    request_id, offer_id = _create_and_offer(client, engine, restaurant_id)
+
+    _as_rider()
+    accepted = client.post(
+        f"/api/v1/rider/me/offers/{offer_id}/accept",
+        headers=AUTH,
+    )
+    assert accepted.status_code == 200, accepted.text
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    session_a = factory()
+    session_b = factory()
+    try:
+        locked = session_a.scalar(
+            select(DeliveryDriver)
+            .where(DeliveryDriver.id == uuid.UUID(driver_id))
+            .with_for_update()
+        )
+        assert locked is not None
+
+        from app.modules.delivery_dispatch.service import RestaurantDispatchService
+
+        session_b.execute(text("SET LOCAL lock_timeout = '1s'"))
+        service = RestaurantDispatchService(session_b, provider_repo=None)
+        row = session_b.get(DeliveryDispatchRequest, uuid.UUID(request_id))
+        assert row is not None
+        with pytest.raises(OperationalError, match="lock timeout"):
+            service._release_hold(row, released_by_user_id=None, now=datetime.now(UTC))
+        session_b.rollback()
+    finally:
+        session_a.rollback()
+        session_a.close()
+        session_b.close()
+
+
+@requires_db
+def test_case_c_offer_lists_grouped_stops(client, engine):
+    from app.modules.delivery_dispatch.tasks import handle_task
+
+    restaurant_id, _driver_ids = _setup_ready_fleet(
+        client,
+        engine,
+        driver_count=1,
+        min_protected_drivers=0,
+        high_demand_available_drivers_max=2,
+        subdomain="case-c-stops",
+    )
+    request_a = _create_dispatch_request(client, restaurant_id)
+    request_b = _create_dispatch_request(
+        client,
+        restaurant_id,
+        dropoff_lat=COVERED_LAT + 0.001,
+        dropoff_lng=COVERED_LNG,
+        dropoff_address="Roma Norte, CDMX",
+    )
+    now = datetime.now(UTC)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        handle_task(session, {"kind": "search", "request_id": str(request_a)}, now=now)
+        session.commit()
+
+    app.dependency_overrides[get_auth] = lambda: _Auth(RIDER, "repartidor0@empresa.com")
+    claimed = client.get("/api/v1/rider/me", headers=AUTH)
+    assert claimed.status_code == 200, claimed.text
+    offers = client.get("/api/v1/rider/me/offers", headers=AUTH)
+    assert offers.status_code == 200, offers.text
+    body = offers.json()
+    assert len(body) == 1
+    stops = body[0]["stops"]
+    addresses = {stop["dropoff_address"] for stop in stops}
+    assert addresses == {"Centro Histórico, CDMX", "Roma Norte, CDMX"}
+    assert all(stop["restaurant_name"] == "Dispatch Bistro" for stop in stops)

@@ -20,6 +20,7 @@ from app.db.models.restaurant import Restaurant
 from app.modules.delivery_dispatch.engine import (
     EngineContext,
     EngineDriver,
+    EngineOffer,
     EngineRequest,
     EngineSettings,
     assignment_timed_out,
@@ -132,6 +133,8 @@ def handle_expire_offer(session: Session, offer_id: uuid.UUID, now: datetime) ->
         return
     offer.status = "expired"
     offer.responded_at = now
+    if request.status not in {"offered", "searching"}:
+        return
     request.status = "searching"
     request.cycle_silent_driver_ids = [
         *(request.cycle_silent_driver_ids or []),
@@ -166,6 +169,27 @@ def reject_offer_and_search(
     _resume_former_group_members(session, former_members, skip_id=request.id, now=now)
 
 
+def close_offered_offers(
+    session: Session,
+    request: DeliveryDispatchRequest,
+    now: datetime,
+) -> list[DeliveryDispatchOffer]:
+    offers = list(
+        session.scalars(
+            select(DeliveryDispatchOffer)
+            .where(
+                DeliveryDispatchOffer.request_id == request.id,
+                DeliveryDispatchOffer.status == "offered",
+            )
+            .with_for_update()
+        ).all()
+    )
+    for offer in offers:
+        offer.status = "expired"
+        offer.responded_at = now
+    return offers
+
+
 def release_group_on_cancel(
     session: Session,
     request: DeliveryDispatchRequest,
@@ -175,12 +199,9 @@ def release_group_on_cancel(
     if group_id is None:
         return
     was_offered_primary = request.status == "offered"
-    live_offer = _live_offer(session, request.id, now) if was_offered_primary else None
     request.dispatch_group_id = None
-    if not was_offered_primary or live_offer is None:
+    if not was_offered_primary:
         return
-    live_offer.status = "expired"
-    live_offer.responded_at = now
     remaining = list(
         session.scalars(
             select(DeliveryDispatchRequest)
@@ -232,6 +253,49 @@ def _assign_or_retry(
             extra_excluded=extra_excluded,
         )
         result = choose_assignments(context)
+        if not result.offers:
+            _enqueue_retry(session, request, now)
+            return
+
+        expires_at = now + timedelta(seconds=settings_row.offer_timeout_seconds)
+        if result.case == "B":
+            prepared: list[tuple[EngineOffer, DeliveryDriver]] = []
+            busy = False
+            for item in result.offers:
+                driver = session.scalar(
+                    select(DeliveryDriver)
+                    .where(DeliveryDriver.id == uuid.UUID(item.driver_id))
+                    .with_for_update()
+                )
+                if driver is None or _driver_busy(
+                    session, driver, now, case=item.case, settings_row=settings_row
+                ):
+                    extra_excluded.add(item.driver_id)
+                    busy = True
+                    break
+                prepared.append((item, driver))
+            if busy:
+                continue
+            persisted_current = False
+            for item, driver in prepared:
+                target = _lock_offer_target(session, request, uuid.UUID(item.request_id), now)
+                if target is None:
+                    continue
+                _persist_dispatch_offer(
+                    session,
+                    target,
+                    driver,
+                    case=item.case,
+                    high_demand=result.high_demand,
+                    group_id=result.group_id,
+                    expires_at=expires_at,
+                )
+                if target.id == request.id:
+                    persisted_current = True
+            if not persisted_current:
+                _enqueue_retry(session, request, now)
+            return
+
         chosen = next(
             (item for item in result.offers if item.request_id == str(request.id)),
             None,
@@ -250,18 +314,15 @@ def _assign_or_retry(
             extra_excluded.add(chosen.driver_id)
             continue
 
-        expires_at = now + timedelta(seconds=settings_row.offer_timeout_seconds)
-        offer = DeliveryDispatchOffer(
-            request_id=request.id,
-            driver_id=driver.id,
-            status="offered",
-            case_applied=chosen.case,
+        _persist_dispatch_offer(
+            session,
+            request,
+            driver,
+            case=chosen.case,
+            high_demand=result.high_demand,
+            group_id=result.group_id,
             expires_at=expires_at,
-            score_json={"case": chosen.case, "group_id": result.group_id},
         )
-        session.add(offer)
-        session.flush()
-        request.status = "offered"
         if result.case == "C" and result.group_id:
             group_uuid = uuid.UUID(result.group_id)
             for item in result.offers:
@@ -275,25 +336,74 @@ def _assign_or_retry(
                 ):
                     continue
                 grouped.dispatch_group_id = group_uuid
-        request.decision_json = {
-            "case": result.case,
-            "high_demand": result.high_demand,
-            "driver_id": str(driver.id),
-            "group_id": result.group_id,
-        }
-        notify_offer(driver, offer)
-        enqueue(
-            "expire_offer",
-            expires_at,
-            {
-                "kind": "expire_offer",
-                "request_id": str(request.id),
-                "offer_id": str(offer.id),
-            },
-        )
         return
 
     _enqueue_retry(session, request, now)
+
+
+def _lock_offer_target(
+    session: Session,
+    current: DeliveryDispatchRequest,
+    target_id: uuid.UUID,
+    now: datetime,
+) -> DeliveryDispatchRequest | None:
+    if target_id == current.id:
+        if _live_offer(session, current.id, now) is not None:
+            return None
+        return current
+    target = session.scalar(
+        select(DeliveryDispatchRequest)
+        .where(
+            DeliveryDispatchRequest.id == target_id,
+            DeliveryDispatchRequest.status.in_(tuple(_SEARCHABLE)),
+        )
+        .with_for_update(skip_locked=True)
+    )
+    if target is None:
+        return None
+    if _live_offer(session, target.id, now) is not None:
+        return None
+    return target
+
+
+def _persist_dispatch_offer(
+    session: Session,
+    request: DeliveryDispatchRequest,
+    driver: DeliveryDriver,
+    *,
+    case: str,
+    high_demand: bool,
+    group_id: str | None,
+    expires_at: datetime,
+) -> DeliveryDispatchOffer:
+    offer = DeliveryDispatchOffer(
+        request_id=request.id,
+        driver_id=driver.id,
+        status="offered",
+        case_applied=case,
+        expires_at=expires_at,
+        score_json={"case": case, "group_id": group_id},
+    )
+    session.add(offer)
+    session.flush()
+    request.status = "offered"
+    request.decision_json = {
+        "case": case,
+        "high_demand": high_demand,
+        "driver_id": str(driver.id),
+        "group_id": group_id,
+    }
+    notify_offer(driver, offer)
+    enqueue(
+        "expire_offer",
+        expires_at,
+        {
+            "kind": "expire_offer",
+            "request_id": str(request.id),
+            "offer_id": str(offer.id),
+        },
+    )
+    return offer
 
 
 def _enqueue_retry(
@@ -366,7 +476,6 @@ def _build_context(
         session.scalars(
             select(DeliveryDispatchOffer.driver_id).where(
                 DeliveryDispatchOffer.status == "offered",
-                DeliveryDispatchOffer.expires_at > now,
             )
         ).all()
     )
@@ -501,11 +610,11 @@ def _live_offer(
     request_id: uuid.UUID,
     now: datetime,
 ) -> DeliveryDispatchOffer | None:
+    del now
     return session.scalar(
         select(DeliveryDispatchOffer).where(
             DeliveryDispatchOffer.request_id == request_id,
             DeliveryDispatchOffer.status == "offered",
-            DeliveryDispatchOffer.expires_at > now,
         )
     )
 
@@ -515,6 +624,7 @@ def _live_group_offer(
     request: DeliveryDispatchRequest,
     now: datetime,
 ) -> DeliveryDispatchOffer | None:
+    del now
     if request.dispatch_group_id is None:
         return None
     return session.scalar(
@@ -526,7 +636,6 @@ def _live_group_offer(
         .where(
             DeliveryDispatchRequest.dispatch_group_id == request.dispatch_group_id,
             DeliveryDispatchOffer.status == "offered",
-            DeliveryDispatchOffer.expires_at > now,
         )
     )
 
@@ -599,11 +708,11 @@ def _driver_busy(
     case: str,
     settings_row: DeliveryProviderAssignmentSettings,
 ) -> bool:
+    del now
     open_offer = session.scalar(
         select(DeliveryDispatchOffer.id).where(
             DeliveryDispatchOffer.driver_id == driver.id,
             DeliveryDispatchOffer.status == "offered",
-            DeliveryDispatchOffer.expires_at > now,
         )
     )
     if open_offer is not None:

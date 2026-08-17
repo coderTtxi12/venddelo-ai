@@ -54,4 +54,35 @@ void main() {
     expect(accept.onPressed, isNull);
     expect(reject.onPressed, isNull);
   });
+
+  testWidgets('OfferScreen lists grouped stops', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OfferScreen(
+          offer: RiderOffer(
+            id: 'o1',
+            requestId: 'r1',
+            status: 'offered',
+            expiresAt: DateTime.now().toUtc().add(const Duration(seconds: 45)),
+            restaurantName: 'Tacos',
+            dropoffAddress: 'Calle 1',
+            collectCents: 15000,
+            paymentMethod: 'cash',
+            packageCount: 2,
+            stops: const [
+              RiderOfferStop(restaurantName: 'Tacos', dropoffAddress: 'Calle 1'),
+              RiderOfferStop(restaurantName: 'Sushi', dropoffAddress: 'Calle 2'),
+            ],
+          ),
+          onAccept: () {},
+          onReject: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('Tacos'), findsOneWidget);
+    expect(find.text('Calle 1'), findsOneWidget);
+    expect(find.text('Sushi'), findsOneWidget);
+    expect(find.text('Calle 2'), findsOneWidget);
+  });
 }

@@ -45,6 +45,7 @@ from app.modules.delivery_dispatch.schemas import (
     PublicDispatchTrackingDTO,
     RiderAssignmentDTO,
     RiderOfferDTO,
+    RiderOfferStopDTO,
     RiderProfileDTO,
     SearchLeadTimeDTO,
     SearchLeadTimeUpdate,
@@ -53,6 +54,7 @@ from app.modules.delivery_dispatch.schemas import (
 )
 from app.modules.delivery_dispatch.search_at import compute_search_at
 from app.modules.delivery_dispatch.tasks import (
+    close_offered_offers,
     enqueue,
     reject_offer_and_search,
     release_group_on_cancel,
@@ -88,6 +90,8 @@ def claim_drivers(session: Session, user_id: uuid.UUID, email: str) -> None:
         return
 
     for driver in drivers:
+        if driver.status == "blocked":
+            continue
         driver.user_id = user_id
         driver.status = "active"
         existing = session.scalar(
@@ -618,6 +622,7 @@ class RestaurantDispatchService:
         if row.status in {"delivered", "cancelled"}:
             raise ValidationError("La solicitud ya no se puede cancelar")
         now = datetime.now(UTC)
+        close_offered_offers(self._session, row, now)
         release_group_on_cancel(self._session, row, now)
         row.status = "cancelled"
         row.cancelled_at = now
@@ -778,13 +783,20 @@ class RestaurantDispatchService:
         hold: DeliveryCreditHold | None = row.credit_hold
         if hold is None or hold.status != "held":
             return
+        locked_driver = None
+        if row.assigned_driver_id is not None:
+            locked_driver = self._session.scalar(
+                select(DeliveryDriver)
+                .where(DeliveryDriver.id == row.assigned_driver_id)
+                .with_for_update()
+            )
         hold.status = "released"
         hold.released_at = now
         hold.released_by_user_id = released_by_user_id
-        if row.assigned_driver is not None:
-            row.assigned_driver.credit_held_cents = max(
+        if locked_driver is not None:
+            locked_driver.credit_held_cents = max(
                 0,
-                row.assigned_driver.credit_held_cents - hold.amount_cents,
+                locked_driver.credit_held_cents - hold.amount_cents,
             )
 
 
@@ -1013,15 +1025,39 @@ class RiderDispatchService:
         if request is None:
             raise NotFoundError("Solicitud de delivery no encontrada")
         restaurant = self._session.get(Restaurant, request.restaurant_id)
+        restaurant_name = restaurant.name if restaurant is not None else ""
+        members = [request]
+        if request.dispatch_group_id is not None:
+            grouped = list(
+                self._session.scalars(
+                    select(DeliveryDispatchRequest).where(
+                        DeliveryDispatchRequest.dispatch_group_id == request.dispatch_group_id
+                    )
+                ).all()
+            )
+            others = [row for row in grouped if row.id != request.id]
+            members = [request, *others]
+        stops = []
+        for member in members:
+            member_restaurant = self._session.get(Restaurant, member.restaurant_id)
+            stops.append(
+                RiderOfferStopDTO(
+                    restaurant_name=(
+                        member_restaurant.name if member_restaurant is not None else ""
+                    ),
+                    dropoff_address=member.dropoff_address,
+                )
+            )
         return RiderOfferDTO(
             id=offer.id,
             request_id=offer.request_id,
             status=offer.status,
             case_applied=offer.case_applied,
             expires_at=offer.expires_at,
-            restaurant_name=restaurant.name if restaurant is not None else "",
+            restaurant_name=restaurant_name,
             dropoff_address=request.dropoff_address,
             collect_cents=request.collect_cents,
             payment_method=request.payment_method,
             package_count=request.package_count,
+            stops=stops,
         )

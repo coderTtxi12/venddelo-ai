@@ -233,6 +233,11 @@ class RiderFcmTokenUpdate(BaseModel):
     fcm_token: str = Field(min_length=1)
 
 
+class RiderOfferStopDTO(BaseModel):
+    restaurant_name: str
+    dropoff_address: str
+
+
 class RiderOfferDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -246,6 +251,7 @@ class RiderOfferDTO(BaseModel):
     collect_cents: int
     payment_method: str
     package_count: int
+    stops: list[RiderOfferStopDTO] = Field(default_factory=list)
 
 
 class DeliveryTaskPayload(BaseModel):
