@@ -1,4 +1,4 @@
-"""Convert uploaded raster images to WebP for assistant import inbox."""
+"""Convert uploaded raster images to WebP before storage."""
 
 from __future__ import annotations
 
