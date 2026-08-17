@@ -14,6 +14,23 @@
   color: var(--color-danger, #dc2626);
 }
 
+.success {
+  border: 1px solid color-mix(in srgb, #16a34a 35%, var(--color-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, #22c55e 8%, var(--color-surface));
+  padding: 0.85rem 1rem;
+  color: #15803d;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.drawerHint {
+  margin: 0 0 1rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
 .emptyTitle {
   font-size: 1rem;
   font-weight: 700;
@@ -61,10 +78,20 @@
   text-align: left;
   cursor: pointer;
   color: inherit;
+  transition: background 0.2s ease;
 }
 
 .cardMainButton:disabled {
   cursor: default;
+}
+
+.cardMainButton:not(:disabled):hover {
+  background: color-mix(in srgb, var(--color-primary) 4%, transparent);
+}
+
+.cardMainButton:not(:disabled):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .cardAside {
@@ -113,13 +140,44 @@
   color: var(--color-text-secondary);
 }
 
-.details {
+.brief {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem 0.85rem;
-  margin-top: 0.45rem;
-  font-size: 0.82rem;
+  align-items: center;
+  gap: 0.35rem 0.55rem;
+  margin-top: 0.55rem;
+}
+
+.briefPlate {
+  display: inline-flex;
+  align-items: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.5rem;
+  border-radius: 7px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.briefItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  font-size: 0.78rem;
+  font-weight: 500;
   color: var(--color-text-secondary);
+}
+
+.briefColorDot {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 18%, transparent);
+  flex-shrink: 0;
 }
 
 .chips {
@@ -169,20 +227,78 @@
   border: 1px solid var(--color-border);
   border-radius: 14px;
   background: var(--color-surface);
-  padding: 1.25rem;
+  overflow: hidden;
+}
+
+.formSectionOpen {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+}
+
+.formToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  min-height: 44px;
+  transition: background 0.2s ease;
+}
+
+.formToggle:hover {
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+}
+
+.formToggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.formToggleMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
 }
 
 .formTitle {
-  margin: 0 0 0.35rem;
+  margin: 0;
   font-size: 1.05rem;
   font-weight: 700;
   color: var(--color-text);
 }
 
+.formSummary {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.formChevron {
+  display: inline-flex;
+  color: var(--color-text-secondary);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.formChevronExpanded {
+  transform: rotate(180deg);
+}
+
+.formPanel {
+  border-top: 1px solid var(--color-border);
+  padding: 0 1.25rem 1.25rem;
+}
+
 .formSubtitle {
-  margin: 0 0 1rem;
+  margin: 1rem 0;
   font-size: 0.86rem;
   color: var(--color-text-secondary);
+  line-height: 1.45;
 }
 
 .formGrid {
@@ -199,6 +315,36 @@
 
 .fieldFull {
   grid-column: 1 / -1;
+}
+
+.emergencySection {
+  margin-top: 1.15rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.emergencySectionHeader {
+  margin-bottom: 0.85rem;
+}
+
+.emergencySectionTitle {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.emergencySectionHint {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.emergencySectionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
 }
 
 .label {
@@ -218,8 +364,177 @@
   color: var(--color-text);
 }
 
-.fileInput {
+.input:focus,
+.select:focus,
+.colorPicker:focus-visible,
+.uploadButton:focus-visible,
+.colorSwatch:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.plateInput {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+.colorGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.colorSwatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.28rem 0.65rem;
+  min-height: 36px;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.colorSwatch:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+}
+
+.colorSwatchSelected {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.colorSwatchPlain {
+  padding-inline: 0.75rem;
+}
+
+.colorDot {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 18%, transparent);
+  flex-shrink: 0;
+}
+
+.customColorRow {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.customColorLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.colorPicker {
+  width: 2.4rem;
+  height: 2.1rem;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.customColorValue {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.uploadRow {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.uploadPreview,
+.uploadPlaceholder {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-background);
+  flex-shrink: 0;
+}
+
+.uploadPreview {
+  object-fit: cover;
+}
+
+.uploadPdfBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #dc2626 30%, var(--color-border));
+  background: color-mix(in srgb, #ef4444 10%, var(--color-surface));
+  color: #b91c1c;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.uploadButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px dashed color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
+  border-radius: 10px;
+  padding: 0.5rem 0.85rem;
+  min-height: 40px;
+  background: var(--color-surface);
+  color: var(--color-primary);
   font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.uploadButton:hover {
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  border-color: var(--color-primary);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.fileHint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #64748b);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .colorSwatch,
+  .uploadButton,
+  .editButton,
+  .submitButton,
+  .cancelButton,
+  .cardMainButton,
+  .formToggle,
+  .formChevron {
+    transition: none;
+  }
 }
 
 .actions {
@@ -294,6 +609,10 @@
   }
 
   .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .emergencySectionGrid {
     grid-template-columns: 1fr;
   }
 }
