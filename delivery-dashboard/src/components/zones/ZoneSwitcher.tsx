@@ -67,8 +67,8 @@ export default function ZoneSwitcher({ onAddZone }: ZoneSwitcherProps) {
             </button>
           );
         })}
-        {canWriteProviderConfig ? (
-          <button type="button" className={styles.addBtn} onClick={handleAddZone}>
+        {onAddZone && canWriteProviderConfig ? (
+          <button type="button" className={styles.addBtn} onClick={onAddZone}>
             <AddOutlinedIcon sx={{ fontSize: 16 }} aria-hidden />
             Agregar zona
           </button>
