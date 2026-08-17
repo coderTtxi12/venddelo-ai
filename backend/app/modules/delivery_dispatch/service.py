@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import binascii
-import math
 import re
 import secrets
 import uuid
@@ -23,6 +22,7 @@ from app.core.exceptions import (
 from app.core.storage import StoragePort
 from app.db.models.delivery import (
     DeliveryCreditHold,
+    DeliveryDispatchOffer,
     DeliveryDispatchRequest,
     DeliveryDriver,
     DeliveryProviderAssignmentSettings,
@@ -30,6 +30,7 @@ from app.db.models.delivery import (
     DeliverySearchLeadTime,
     RestaurantDeliveryProvider,
 )
+from app.modules.delivery_dispatch.geo import geodesic_meters
 from app.modules.delivery_dispatch.maps_url import parse_maps_url
 from app.modules.delivery_dispatch.schemas import (
     AssignmentSettingsDTO,
@@ -42,12 +43,15 @@ from app.modules.delivery_dispatch.schemas import (
     DispatchRequestCreate,
     DispatchRequestDTO,
     PublicDispatchTrackingDTO,
+    RiderOfferDTO,
+    RiderProfileDTO,
     SearchLeadTimeDTO,
     SearchLeadTimeUpdate,
     TrackingDropoffDTO,
     TrackingRiderDTO,
 )
 from app.modules.delivery_dispatch.search_at import compute_search_at
+from app.modules.delivery_dispatch.tasks import enqueue, reject_offer_and_search, reset_cycle_driver_ids
 from app.modules.delivery_providers.permissions import (
     require_view_drivers,
     require_write_provider_config,
@@ -55,6 +59,7 @@ from app.modules.delivery_providers.permissions import (
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
 from app.modules.restaurants.schemas import RestaurantDTO
+from app.modules.users.schemas import UserDTO
 
 _ALLOWED_DOCUMENT_TYPES = frozenset({"image/jpeg", "image/png", "image/webp", "application/pdf"})
 _MAX_DOCUMENT_BYTES = 8 * 1024 * 1024
@@ -530,9 +535,15 @@ class RestaurantDispatchService:
             decision_json=None,
             cancelled_at=None,
             cycle_rejected_driver_ids=[],
+            cycle_silent_driver_ids=[],
         )
         self._session.add(row)
         self._session.flush()
+        enqueue(
+            "search",
+            search_at,
+            {"kind": "search", "request_id": str(row.id)},
+        )
         self._session.refresh(row)
         return DispatchRequestDTO.model_validate(row)
 
@@ -617,6 +628,8 @@ class RestaurantDispatchService:
         row.status = "searching"
         row.search_at = now
         row.next_attempt_at = now
+        reset_cycle_driver_ids(row)
+        enqueue("search", now, {"kind": "search", "request_id": str(row.id)})
         return self._flush_request(row)
 
     def confirm_rider_cash(
@@ -654,7 +667,7 @@ class RestaurantDispatchService:
                 and row.assigned_driver.last_lng is not None
             ):
                 eta_seconds = round(
-                    self._distance_meters(
+                    geodesic_meters(
                         row.assigned_driver.last_lat,
                         row.assigned_driver.last_lng,
                         row.dropoff_lat,
@@ -766,15 +779,136 @@ class RestaurantDispatchService:
                 row.assigned_driver.credit_held_cents - hold.amount_cents,
             )
 
-    @staticmethod
-    def _distance_meters(
-        lat1: float,
-        lng1: float,
-        lat2: float,
-        lng2: float,
-    ) -> float:
-        phi1, phi2 = math.radians(lat1), math.radians(lat2)
-        d_phi = math.radians(lat2 - lat1)
-        d_lambda = math.radians(lng2 - lng1)
-        a = math.sin(d_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
-        return 6_371_000 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+class RiderDispatchService:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_me(self, user: UserDTO) -> RiderProfileDTO:
+        claim_drivers(self._session, user.id, user.email or "")
+        driver = self._driver_for_user(user.id)
+        if driver is None:
+            raise ForbiddenError(
+                "Tu correo no está dado de alta. Pide a Mexy que te registre."
+            )
+        return RiderProfileDTO.model_validate(driver)
+
+    def set_online(self, user: UserDTO, is_online: bool) -> RiderProfileDTO:
+        driver = self._require_driver(user)
+        driver.is_online = is_online
+        self._session.flush()
+        self._session.refresh(driver)
+        return RiderProfileDTO.model_validate(driver)
+
+    def update_location(
+        self,
+        user: UserDTO,
+        latitude: float,
+        longitude: float,
+    ) -> RiderProfileDTO:
+        driver = self._require_driver(user)
+        driver.last_lat = latitude
+        driver.last_lng = longitude
+        driver.location_updated_at = datetime.now(UTC)
+        self._session.flush()
+        self._session.refresh(driver)
+        return RiderProfileDTO.model_validate(driver)
+
+    def list_offers(self, user: UserDTO) -> list[RiderOfferDTO]:
+        driver = self._require_driver(user)
+        now = datetime.now(UTC)
+        rows = self._session.scalars(
+            select(DeliveryDispatchOffer)
+            .where(
+                DeliveryDispatchOffer.driver_id == driver.id,
+                DeliveryDispatchOffer.status == "offered",
+                DeliveryDispatchOffer.expires_at > now,
+            )
+            .order_by(DeliveryDispatchOffer.expires_at.asc())
+        ).all()
+        return [RiderOfferDTO.model_validate(row) for row in rows]
+
+    def accept_offer(self, user: UserDTO, offer_id: uuid.UUID) -> RiderOfferDTO:
+        driver = self._require_driver(user)
+        now = datetime.now(UTC)
+        offer = self._session.scalar(
+            select(DeliveryDispatchOffer)
+            .where(
+                DeliveryDispatchOffer.id == offer_id,
+                DeliveryDispatchOffer.driver_id == driver.id,
+            )
+            .with_for_update()
+        )
+        if offer is None or offer.status != "offered" or offer.expires_at <= now:
+            raise ConflictError("La oferta ya no está disponible")
+
+        request = self._session.scalar(
+            select(DeliveryDispatchRequest)
+            .where(DeliveryDispatchRequest.id == offer.request_id)
+            .with_for_update()
+        )
+        if request is None or request.status != "offered":
+            raise ConflictError("La oferta ya no está disponible")
+
+        locked_driver = self._session.scalar(
+            select(DeliveryDriver).where(DeliveryDriver.id == driver.id).with_for_update()
+        )
+        assert locked_driver is not None
+
+        offer.status = "accepted"
+        offer.responded_at = now
+        request.status = "assigned"
+        request.assigned_driver_id = locked_driver.id
+        if request.payment_method == "cash":
+            hold = DeliveryCreditHold(
+                driver_id=locked_driver.id,
+                request_id=request.id,
+                amount_cents=request.collect_cents,
+                status="held",
+            )
+            self._session.add(hold)
+            locked_driver.credit_held_cents += request.collect_cents
+        self._session.flush()
+        self._session.refresh(offer)
+        return RiderOfferDTO.model_validate(offer)
+
+    def reject_offer(self, user: UserDTO, offer_id: uuid.UUID) -> RiderOfferDTO:
+        driver = self._require_driver(user)
+        now = datetime.now(UTC)
+        offer = self._session.scalar(
+            select(DeliveryDispatchOffer)
+            .where(
+                DeliveryDispatchOffer.id == offer_id,
+                DeliveryDispatchOffer.driver_id == driver.id,
+            )
+            .with_for_update()
+        )
+        if offer is None or offer.status != "offered":
+            raise ConflictError("La oferta ya no está disponible")
+        request = self._session.scalar(
+            select(DeliveryDispatchRequest)
+            .where(DeliveryDispatchRequest.id == offer.request_id)
+            .with_for_update()
+        )
+        if request is None:
+            raise ConflictError("La oferta ya no está disponible")
+        reject_offer_and_search(self._session, offer, request, now)
+        self._session.flush()
+        self._session.refresh(offer)
+        return RiderOfferDTO.model_validate(offer)
+
+    def _require_driver(self, user: UserDTO) -> DeliveryDriver:
+        claim_drivers(self._session, user.id, user.email or "")
+        driver = self._driver_for_user(user.id)
+        if driver is None:
+            raise ForbiddenError(
+                "Tu correo no está dado de alta. Pide a Mexy que te registre."
+            )
+        return driver
+
+    def _driver_for_user(self, user_id: uuid.UUID) -> DeliveryDriver | None:
+        return self._session.scalar(
+            select(DeliveryDriver)
+            .where(DeliveryDriver.user_id == user_id)
+            .order_by(DeliveryDriver.created_at.desc())
+        )

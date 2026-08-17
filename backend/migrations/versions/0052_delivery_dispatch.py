@@ -298,6 +298,12 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("'{}'"),
         ),
+        sa.Column(
+            "cycle_silent_driver_ids",
+            postgresql.ARRAY(sa.UUID()),
+            nullable=False,
+            server_default=sa.text("'{}'"),
+        ),
         sa.Column("dispatch_group_id", sa.UUID(), nullable=True),
         sa.Column("id", sa.UUID(), server_default=sa.text("gen_random_uuid()"), nullable=False),
         sa.Column(

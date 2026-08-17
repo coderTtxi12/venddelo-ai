@@ -204,3 +204,34 @@ class PublicDispatchTrackingDTO(BaseModel):
     dropoff: TrackingDropoffDTO
     rider: TrackingRiderDTO | None = None
     eta_seconds: int | None = None
+
+
+class RiderProfileDTO(DeliveryDriverDTO):
+    last_lat: float | None = None
+    last_lng: float | None = None
+    location_updated_at: datetime | None = None
+
+
+class RiderOnlineUpdate(BaseModel):
+    is_online: bool
+
+
+class RiderLocationUpdate(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
+class RiderOfferDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    request_id: uuid.UUID
+    status: str
+    case_applied: str
+    expires_at: datetime
+
+
+class DeliveryTaskPayload(BaseModel):
+    kind: Literal["search", "expire_offer", "retry"]
+    request_id: uuid.UUID
+    offer_id: uuid.UUID | None = None

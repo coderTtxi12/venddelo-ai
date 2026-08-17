@@ -601,6 +601,13 @@ class DeliveryDispatchRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ARRAY(PG_UUID(as_uuid=True)),
         nullable=False,
         server_default=text("'{}'"),
+        default=list,
+    )
+    cycle_silent_driver_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(PG_UUID(as_uuid=True)),
+        nullable=False,
+        server_default=text("'{}'"),
+        default=list,
     )
     dispatch_group_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
