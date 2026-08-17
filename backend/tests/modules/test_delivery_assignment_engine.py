@@ -42,6 +42,7 @@ def _request(
     restaurant_lng: float = RESTAURANT_LNG,
     dropoff_lat: float | None = None,
     dropoff_lng: float | None = None,
+    dispatch_group_id: str | None = None,
 ) -> EngineRequest:
     return EngineRequest(
         id=request_id,
@@ -55,6 +56,7 @@ def _request(
         collect_cents=collect_cents,
         cycle_rejected_driver_ids=rejected,
         cycle_silent_driver_ids=silent,
+        dispatch_group_id=dispatch_group_id,
     )
 
 
@@ -334,6 +336,40 @@ def test_case_c_without_free_rider_falls_through_to_d():
     assert len(result.offers) == 1
     assert result.offers[0].driver_id == "on-route"
     assert result.offers[0].request_id == "req-1"
+
+
+def test_case_c_skips_siblings_already_in_live_group():
+    live_group = "live-group-1"
+    current = _request("req-3", dropoff_lat=19.4326, dropoff_lng=-99.1332)
+    grouped_a = _request(
+        "req-1",
+        dropoff_lat=19.4330,
+        dropoff_lng=-99.1332,
+        dispatch_group_id=live_group,
+    )
+    grouped_b = _request(
+        "req-2",
+        dropoff_lat=19.4340,
+        dropoff_lng=-99.1332,
+        dispatch_group_id=live_group,
+    )
+    nearby_m = geodesic_meters(19.4326, -99.1332, 19.4340, -99.1332)
+    assert nearby_m <= 800
+
+    driver = _driver("only", last_lat=19.4330, last_lng=-99.1335)
+    result = choose_assignments(
+        _context(
+            current,
+            (driver,),
+            due_siblings=(current, grouped_a, grouped_b),
+            settings=_settings(high_demand_available_drivers_max=2),
+        )
+    )
+
+    offered_ids = {offer.request_id for offer in result.offers}
+    assert "req-1" not in offered_ids
+    assert "req-2" not in offered_ids
+    assert result.case != "C"
 
 
 def test_case_d_discards_driver_over_detour_threshold():

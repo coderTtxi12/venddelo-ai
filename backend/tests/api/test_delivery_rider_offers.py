@@ -730,3 +730,105 @@ def test_case_c_expire_clears_dispatch_group(client, engine):
         assert row_a is not None and row_b is not None
         assert row_a.dispatch_group_id is None
         assert row_b.dispatch_group_id is None
+
+
+@requires_db
+def test_case_c_third_search_does_not_steal_live_group(client, engine):
+    from app.modules.delivery_dispatch.tasks import handle_task
+
+    restaurant_id, _driver_ids = _setup_ready_fleet(
+        client,
+        engine,
+        driver_count=2,
+        min_protected_drivers=0,
+        high_demand_available_drivers_max=2,
+        subdomain="case-c-no-steal",
+    )
+    request_a = _create_dispatch_request(client, restaurant_id)
+    request_b = _create_dispatch_request(
+        client,
+        restaurant_id,
+        dropoff_lat=COVERED_LAT + 0.001,
+        dropoff_lng=COVERED_LNG,
+    )
+    now = datetime.now(UTC)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        handle_task(session, {"kind": "search", "request_id": str(request_a)}, now=now)
+        session.commit()
+        row_a = session.get(DeliveryDispatchRequest, request_a)
+        row_b = session.get(DeliveryDispatchRequest, request_b)
+        assert row_a is not None and row_b is not None
+        original_group = row_a.dispatch_group_id
+        assert original_group is not None
+        assert row_b.dispatch_group_id == original_group
+
+    request_c = _create_dispatch_request(
+        client,
+        restaurant_id,
+        dropoff_lat=COVERED_LAT + 0.002,
+        dropoff_lng=COVERED_LNG,
+    )
+    later = datetime.now(UTC)
+    with factory() as session:
+        handle_task(session, {"kind": "search", "request_id": str(request_c)}, now=later)
+        session.commit()
+        row_a = session.get(DeliveryDispatchRequest, request_a)
+        row_b = session.get(DeliveryDispatchRequest, request_b)
+        row_c = session.get(DeliveryDispatchRequest, request_c)
+        assert row_a is not None and row_b is not None and row_c is not None
+        assert row_a.dispatch_group_id == original_group
+        assert row_b.dispatch_group_id == original_group
+        assert row_c.dispatch_group_id != original_group
+
+
+@requires_db
+def test_case_c_expire_resumes_sibling_search(client, engine):
+    from app.modules.delivery_dispatch.tasks import handle_task, stub_bus
+
+    restaurant_id, _driver_ids = _setup_ready_fleet(
+        client,
+        engine,
+        driver_count=1,
+        min_protected_drivers=0,
+        high_demand_available_drivers_max=2,
+        subdomain="case-c-expire-resume",
+    )
+    request_a = _create_dispatch_request(client, restaurant_id)
+    request_b = _create_dispatch_request(
+        client,
+        restaurant_id,
+        dropoff_lat=COVERED_LAT + 0.001,
+        dropoff_lng=COVERED_LNG,
+    )
+    now = datetime.now(UTC)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        handle_task(session, {"kind": "search", "request_id": str(request_a)}, now=now)
+        session.commit()
+        offer = session.scalar(
+            select(DeliveryDispatchOffer).where(
+                DeliveryDispatchOffer.request_id == request_a,
+                DeliveryDispatchOffer.status == "offered",
+            )
+        )
+        assert offer is not None
+        offer_id = offer.id
+        stub_bus.clear()
+        handle_task(
+            session,
+            {
+                "kind": "expire_offer",
+                "request_id": str(request_a),
+                "offer_id": str(offer_id),
+            },
+            now=now,
+        )
+        session.commit()
+        row_b = session.get(DeliveryDispatchRequest, request_b)
+        assert row_b is not None
+        assert row_b.dispatch_group_id is None
+        sibling_jobs = [
+            job for job in stub_bus.jobs if job.payload.get("request_id") == str(request_b)
+        ]
+        assert sibling_jobs or row_b.status in {"offered", "unassigned"}

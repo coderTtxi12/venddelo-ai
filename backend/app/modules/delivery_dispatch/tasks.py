@@ -137,8 +137,9 @@ def handle_expire_offer(session: Session, offer_id: uuid.UUID, now: datetime) ->
         *(request.cycle_silent_driver_ids or []),
         offer.driver_id,
     ]
-    _clear_dispatch_group(session, request)
+    former_members = _clear_dispatch_group(session, request)
     _assign_or_retry(session, request, now)
+    _resume_former_group_members(session, former_members, skip_id=request.id, now=now)
 
 
 def reject_offer_and_search(
@@ -154,8 +155,9 @@ def reject_offer_and_search(
         *(request.cycle_rejected_driver_ids or []),
         offer.driver_id,
     ]
-    _clear_dispatch_group(session, request)
+    former_members = _clear_dispatch_group(session, request)
     _assign_or_retry(session, request, now)
+    _resume_former_group_members(session, former_members, skip_id=request.id, now=now)
 
 
 def reset_cycle_driver_ids(request: DeliveryDispatchRequest) -> None:
@@ -228,8 +230,15 @@ def _assign_or_retry(
             group_uuid = uuid.UUID(result.group_id)
             for item in result.offers:
                 grouped = session.get(DeliveryDispatchRequest, uuid.UUID(item.request_id))
-                if grouped is not None:
-                    grouped.dispatch_group_id = group_uuid
+                if grouped is None:
+                    continue
+                if (
+                    grouped.dispatch_group_id is not None
+                    and grouped.dispatch_group_id != group_uuid
+                    and _live_group_offer(session, grouped, now) is not None
+                ):
+                    continue
+                grouped.dispatch_group_id = group_uuid
         request.decision_json = {
             "case": result.case,
             "high_demand": result.high_demand,
@@ -386,6 +395,7 @@ def _to_engine_request(
         status=request.status,
         cycle_rejected_driver_ids=rejected,
         cycle_silent_driver_ids=silent,
+        dispatch_group_id=str(request.dispatch_group_id) if request.dispatch_group_id else None,
     )
 
 
@@ -485,17 +495,49 @@ def _live_group_offer(
     )
 
 
-def _clear_dispatch_group(session: Session, request: DeliveryDispatchRequest) -> None:
+def _clear_dispatch_group(
+    session: Session, request: DeliveryDispatchRequest
+) -> list[DeliveryDispatchRequest]:
     group_id = request.dispatch_group_id
     if group_id is None:
-        return
-    members = session.scalars(
-        select(DeliveryDispatchRequest)
-        .where(DeliveryDispatchRequest.dispatch_group_id == group_id)
-        .with_for_update()
-    ).all()
+        return []
+    members = list(
+        session.scalars(
+            select(DeliveryDispatchRequest)
+            .where(DeliveryDispatchRequest.dispatch_group_id == group_id)
+            .with_for_update()
+        ).all()
+    )
     for member in members:
         member.dispatch_group_id = None
+    return members
+
+
+def _resume_former_group_members(
+    session: Session,
+    members: list[DeliveryDispatchRequest],
+    *,
+    skip_id: uuid.UUID,
+    now: datetime,
+) -> None:
+    for member in members:
+        if member.id == skip_id:
+            continue
+        settings_row = session.get(
+            DeliveryProviderAssignmentSettings,
+            member.delivery_provider_id,
+        )
+        timeout_seconds = (
+            settings_row.assignment_timeout_seconds if settings_row is not None else 900
+        )
+        if assignment_timed_out(now, _as_utc(member.search_at), timeout_seconds):
+            member.status = "unassigned"
+            continue
+        enqueue(
+            "search",
+            now,
+            {"kind": "search", "request_id": str(member.id)},
+        )
 
 
 def _driver_busy(

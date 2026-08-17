@@ -49,6 +49,7 @@ class EngineRequest:
     status: str = "searching"
     cycle_rejected_driver_ids: tuple[str, ...] = ()
     cycle_silent_driver_ids: tuple[str, ...] = ()
+    dispatch_group_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -194,6 +195,7 @@ def _nearby_dropoff_group(
         request
         for request in due
         if request.status in _GROUPABLE_STATUSES
+        and _is_groupable_sibling(current, request)
         and geodesic_meters(
             current.dropoff_lat,
             current.dropoff_lng,
@@ -203,6 +205,14 @@ def _nearby_dropoff_group(
         <= radius
     ]
     return tuple(group)
+
+
+def _is_groupable_sibling(current: EngineRequest, request: EngineRequest) -> bool:
+    if request.id == current.id:
+        return True
+    if request.dispatch_group_id is None:
+        return True
+    return request.dispatch_group_id == current.dispatch_group_id
 
 
 def _assign_case_c(context: EngineContext, group: tuple[EngineRequest, ...]) -> EngineResult:
