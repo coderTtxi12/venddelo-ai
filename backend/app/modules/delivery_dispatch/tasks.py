@@ -138,6 +138,9 @@ def handle_expire_offer(session: Session, offer_id: uuid.UUID, now: datetime) ->
         offer.driver_id,
     ]
     former_members = _clear_dispatch_group(session, request)
+    _timeout_unresumable_former_members(
+        session, former_members, skip_id=request.id, now=now
+    )
     _assign_or_retry(session, request, now)
     _resume_former_group_members(session, former_members, skip_id=request.id, now=now)
 
@@ -156,8 +159,41 @@ def reject_offer_and_search(
         offer.driver_id,
     ]
     former_members = _clear_dispatch_group(session, request)
+    _timeout_unresumable_former_members(
+        session, former_members, skip_id=request.id, now=now
+    )
     _assign_or_retry(session, request, now)
     _resume_former_group_members(session, former_members, skip_id=request.id, now=now)
+
+
+def release_group_on_cancel(
+    session: Session,
+    request: DeliveryDispatchRequest,
+    now: datetime,
+) -> None:
+    group_id = request.dispatch_group_id
+    if group_id is None:
+        return
+    was_offered_primary = request.status == "offered"
+    live_offer = _live_offer(session, request.id, now) if was_offered_primary else None
+    request.dispatch_group_id = None
+    if not was_offered_primary or live_offer is None:
+        return
+    live_offer.status = "expired"
+    live_offer.responded_at = now
+    remaining = list(
+        session.scalars(
+            select(DeliveryDispatchRequest)
+            .where(DeliveryDispatchRequest.dispatch_group_id == group_id)
+            .with_for_update()
+        ).all()
+    )
+    for member in remaining:
+        member.dispatch_group_id = None
+    _timeout_unresumable_former_members(
+        session, remaining, skip_id=request.id, now=now
+    )
+    _resume_former_group_members(session, remaining, skip_id=request.id, now=now)
 
 
 def reset_cycle_driver_ids(request: DeliveryDispatchRequest) -> None:
@@ -513,7 +549,7 @@ def _clear_dispatch_group(
     return members
 
 
-def _resume_former_group_members(
+def _timeout_unresumable_former_members(
     session: Session,
     members: list[DeliveryDispatchRequest],
     *,
@@ -521,7 +557,7 @@ def _resume_former_group_members(
     now: datetime,
 ) -> None:
     for member in members:
-        if member.id == skip_id:
+        if member.id == skip_id or member.status != "searching":
             continue
         settings_row = session.get(
             DeliveryProviderAssignmentSettings,
@@ -532,6 +568,21 @@ def _resume_former_group_members(
         )
         if assignment_timed_out(now, _as_utc(member.search_at), timeout_seconds):
             member.status = "unassigned"
+
+
+def _resume_former_group_members(
+    session: Session,
+    members: list[DeliveryDispatchRequest],
+    *,
+    skip_id: uuid.UUID,
+    now: datetime,
+) -> None:
+    for member in members:
+        if member.id == skip_id:
+            continue
+        if member.status != "searching":
+            continue
+        if _live_group_offer(session, member, now) is not None:
             continue
         enqueue(
             "search",

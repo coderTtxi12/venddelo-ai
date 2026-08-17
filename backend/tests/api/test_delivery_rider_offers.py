@@ -832,3 +832,144 @@ def test_case_c_expire_resumes_sibling_search(client, engine):
             job for job in stub_bus.jobs if job.payload.get("request_id") == str(request_b)
         ]
         assert sibling_jobs or row_b.status in {"offered", "unassigned"}
+
+
+@requires_db
+def test_case_c_cancel_sibling_then_accept_keeps_cancelled(client, engine):
+    from app.modules.delivery_dispatch.tasks import handle_task
+
+    restaurant_id, driver_ids = _setup_ready_fleet(
+        client,
+        engine,
+        driver_count=1,
+        min_protected_drivers=0,
+        high_demand_available_drivers_max=2,
+        subdomain="case-c-cancel-sibling",
+    )
+    request_a = _create_dispatch_request(client, restaurant_id)
+    request_b = _create_dispatch_request(
+        client,
+        restaurant_id,
+        dropoff_lat=COVERED_LAT + 0.001,
+        dropoff_lng=COVERED_LNG,
+    )
+    now = datetime.now(UTC)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        handle_task(session, {"kind": "search", "request_id": str(request_a)}, now=now)
+        session.commit()
+        offer = session.scalar(
+            select(DeliveryDispatchOffer).where(
+                DeliveryDispatchOffer.request_id == request_a,
+                DeliveryDispatchOffer.status == "offered",
+            )
+        )
+        assert offer is not None
+        offer_id = offer.id
+        row_a = session.get(DeliveryDispatchRequest, request_a)
+        row_b = session.get(DeliveryDispatchRequest, request_b)
+        assert row_a is not None and row_b is not None
+        assert row_a.dispatch_group_id is not None
+        assert row_a.dispatch_group_id == row_b.dispatch_group_id
+
+    _as_owner()
+    cancelled = client.post(
+        f"/api/v1/restaurants/me/dispatch-requests/{request_b}/cancel",
+        params={"restaurant_id": restaurant_id},
+        headers=AUTH,
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["status"] == "cancelled"
+
+    app.dependency_overrides[get_auth] = lambda: _Auth(RIDER, "repartidor0@empresa.com")
+    claimed = client.get("/api/v1/rider/me", headers=AUTH)
+    assert claimed.status_code == 200, claimed.text
+    accepted = client.post(f"/api/v1/rider/me/offers/{offer_id}/accept", headers=AUTH)
+    assert accepted.status_code == 200, accepted.text
+
+    with factory() as session:
+        row_a = session.get(DeliveryDispatchRequest, request_a)
+        row_b = session.get(DeliveryDispatchRequest, request_b)
+        assert row_a is not None and row_b is not None
+        assert row_a.status == "assigned"
+        assert row_a.assigned_driver_id == driver_ids[0]
+        assert row_b.status == "cancelled"
+        assert row_b.assigned_driver_id is None
+        assert row_b.dispatch_group_id is None
+
+
+@requires_db
+def test_resume_former_group_members_skips_cancelled_and_live_group(client, engine):
+    from app.modules.delivery_dispatch.tasks import (
+        _resume_former_group_members,
+        handle_task,
+        stub_bus,
+    )
+
+    restaurant_id, _driver_ids = _setup_ready_fleet(
+        client,
+        engine,
+        driver_count=2,
+        min_protected_drivers=0,
+        high_demand_available_drivers_max=2,
+        subdomain="case-c-resume-skip",
+    )
+    request_a = _create_dispatch_request(client, restaurant_id)
+    request_b = _create_dispatch_request(
+        client,
+        restaurant_id,
+        dropoff_lat=COVERED_LAT + 0.001,
+        dropoff_lng=COVERED_LNG,
+    )
+    now = datetime.now(UTC)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        handle_task(session, {"kind": "search", "request_id": str(request_a)}, now=now)
+        session.commit()
+        row_a = session.get(DeliveryDispatchRequest, request_a)
+        row_b = session.get(DeliveryDispatchRequest, request_b)
+        assert row_a is not None and row_b is not None
+        assert row_a.dispatch_group_id == row_b.dispatch_group_id
+        assert row_a.dispatch_group_id is not None
+
+        stub_bus.clear()
+        _resume_former_group_members(session, [row_a, row_b], skip_id=row_a.id, now=now)
+        assert not any(
+            job.payload.get("request_id") == str(request_b) for job in stub_bus.jobs
+        )
+
+        row_b.status = "cancelled"
+        row_b.search_at = now - timedelta(hours=2)
+        stub_bus.clear()
+        _resume_former_group_members(session, [row_a, row_b], skip_id=row_a.id, now=now)
+        session.flush()
+        assert row_b.status == "cancelled"
+        assert not any(
+            job.payload.get("request_id") == str(request_b) for job in stub_bus.jobs
+        )
+
+        offer = session.scalar(
+            select(DeliveryDispatchOffer).where(
+                DeliveryDispatchOffer.request_id == request_a,
+                DeliveryDispatchOffer.status == "offered",
+            )
+        )
+        assert offer is not None
+        row_b.status = "searching"
+        row_b.search_at = now - timedelta(hours=2)
+        session.flush()
+        stub_bus.clear()
+        handle_task(
+            session,
+            {
+                "kind": "expire_offer",
+                "request_id": str(request_a),
+                "offer_id": str(offer.id),
+            },
+            now=now,
+        )
+        session.commit()
+        row_b = session.get(DeliveryDispatchRequest, request_b)
+        assert row_b is not None
+        assert row_b.status == "unassigned"
+        assert row_b.dispatch_group_id is None

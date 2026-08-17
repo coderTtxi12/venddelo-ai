@@ -51,7 +51,12 @@ from app.modules.delivery_dispatch.schemas import (
     TrackingRiderDTO,
 )
 from app.modules.delivery_dispatch.search_at import compute_search_at
-from app.modules.delivery_dispatch.tasks import enqueue, reject_offer_and_search, reset_cycle_driver_ids
+from app.modules.delivery_dispatch.tasks import (
+    enqueue,
+    reject_offer_and_search,
+    release_group_on_cancel,
+    reset_cycle_driver_ids,
+)
 from app.modules.delivery_providers.permissions import (
     require_view_drivers,
     require_write_provider_config,
@@ -611,6 +616,7 @@ class RestaurantDispatchService:
         if row.status in {"delivered", "cancelled"}:
             raise ValidationError("La solicitud ya no se puede cancelar")
         now = datetime.now(UTC)
+        release_group_on_cancel(self._session, row, now)
         row.status = "cancelled"
         row.cancelled_at = now
         self._release_hold(row, released_by_user_id=None, now=now)
@@ -869,6 +875,8 @@ class RiderDispatchService:
             if request not in group_rows:
                 group_rows.append(request)
         for row in group_rows:
+            if row.status not in {"searching", "offered"}:
+                continue
             row.status = "assigned"
             row.assigned_driver_id = locked_driver.id
             if row.payment_method == "cash":
