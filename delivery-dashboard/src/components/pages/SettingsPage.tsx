@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
+import ChevronRightOutlinedIcon from '@mui/icons-material/ChevronRightOutlined';
 import MailOutlineOutlinedIcon from '@mui/icons-material/MailOutlineOutlined';
+import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import WorkOutlineOutlinedIcon from '@mui/icons-material/WorkOutlineOutlined';
@@ -795,17 +797,30 @@ export default function SettingsPage() {
             <h2 id="settings-zone" className={styles.panelTitle}>
               Zona de reparto
             </h2>
-            <p className={styles.panelHint}>
-              El nombre y el polígono de cobertura se configuran en Cerco geográfico.
-            </p>
-            <div className={`${styles.readonlyField} ${styles.formGridFull}`}>
-              <span className={styles.readonlyLabel}>Zona seleccionada</span>
-              <span className={styles.readonlyValue}>
-                {form.serviceZoneName || 'Sin zona'}
+            <Link
+              href="/cerco-geografico"
+              className={styles.zoneRow}
+              aria-label={
+                form.serviceZoneName
+                  ? `Abrir Cerco geográfico. Zona actual: ${form.serviceZoneName}`
+                  : 'Abrir Cerco geográfico para configurar una zona'
+              }
+            >
+              <span className={styles.zoneRowIcon} aria-hidden>
+                <MapOutlinedIcon sx={{ fontSize: 20 }} />
               </span>
-            </div>
-            <Link href="/cerco-geografico" className={styles.secondaryBtn}>
-              Ir a Cerco geográfico
+              <span className={styles.zoneRowCopy}>
+                <span className={styles.zoneRowName}>
+                  {form.serviceZoneName || 'Sin zona'}
+                </span>
+                <span className={styles.zoneRowHint}>
+                  Nombre y polígono se editan en Cerco geográfico
+                </span>
+              </span>
+              <span className={styles.zoneRowAction}>
+                Abrir
+                <ChevronRightOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
+              </span>
             </Link>
           </section>
           </fieldset>
