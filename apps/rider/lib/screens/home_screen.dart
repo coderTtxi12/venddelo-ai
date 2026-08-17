@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../rider_controller.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
+import '../widgets/rider_widgets.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.controller, required this.onSignOut});
@@ -13,8 +16,9 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final profile = controller.profile;
     final name = profile == null
-        ? 'Rider'
+        ? 'Repartidor'
         : '${profile.firstName} ${profile.lastName}'.trim();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(name),
@@ -29,46 +33,47 @@ class HomeScreen extends StatelessWidget {
         listenable: controller,
         builder: (context, _) {
           final jobs = _splitJobs(controller.profile?.assignments ?? const []);
+          final isOnline = controller.profile?.isOnline ?? false;
+
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppTheme.screenPadding),
             children: [
-              SwitchListTile(
-                title: const Text('En línea'),
-                value: controller.profile?.isOnline ?? false,
-                onChanged: controller.onlineBusy
-                    ? null
-                    : (value) => controller.setOnline(value),
+              RiderOnlineToggle(
+                isOnline: isOnline,
+                enabled: !controller.onlineBusy,
+                onChanged: controller.setOnline,
               ),
-              if (controller.showIosKillWarning)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Text(
-                    'Si cierras la app deslizándola hacia arriba, el GPS se detiene y no recibirás ofertas hasta que la abras de nuevo.',
-                  ),
+              const SizedBox(height: 16),
+              if (controller.showIosKillWarning) ...[
+                const RiderInfoBanner(
+                  message:
+                      'Si cierras la app deslizándola hacia arriba, el GPS se detiene y no recibirás ofertas hasta que la abras de nuevo.',
                 ),
-              if (controller.errorMessage != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    controller.errorMessage!,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
-                ),
+                const SizedBox(height: 16),
+              ],
+              if (controller.errorMessage != null) ...[
+                RiderErrorBanner(message: controller.errorMessage!),
+                const SizedBox(height: 16),
+              ],
               if (controller.needsLocationSettings)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed: controller.openLocationSettings,
-                      child: const Text('Abrir ajustes'),
-                    ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: controller.openLocationSettings,
+                    child: const Text('Abrir ajustes de ubicación'),
                   ),
                 ),
               if (jobs.current == null)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('Sin envío activo. Ponte en línea para recibir ofertas.'),
+                RiderStatusCard(
+                  title: isOnline ? 'Esperando ofertas' : 'Estás fuera de línea',
+                  subtitle: isOnline
+                      ? 'Te avisaremos cuando llegue una nueva entrega.'
+                      : 'Activa el interruptor de arriba para empezar a recibir ofertas.',
+                  leading: Icon(
+                    isOnline ? Icons.radar_rounded : Icons.pause_circle_outline_rounded,
+                    size: 32,
+                    color: isOnline ? AppColors.online : AppColors.textMuted,
+                  ),
                 )
               else
                 _JobCard(
@@ -80,8 +85,30 @@ class HomeScreen extends StatelessWidget {
                 ),
               for (final queued in jobs.queued)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Text('Luego: recoger en ${queued.restaurantName}'),
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.schedule_rounded,
+                            color: AppColors.textMuted,
+                            size: 28,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Text(
+                              'Luego: recoger en ${queued.restaurantName}',
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
             ],
           );
@@ -118,32 +145,55 @@ class _JobCard extends StatelessWidget {
   final RiderAssignment assignment;
   final ValueChanged<String> onAction;
 
+  String _stepLabel(String status) {
+    return switch (status) {
+      'assigned' => 'Paso 1 · Recoger pedido',
+      'picked_up' => 'Paso 2 · Ir a entregar',
+      'in_transit' => 'Paso 3 · Confirmar entrega',
+      _ => 'Envío activo',
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final action = switch (assignment.status) {
-      'assigned' => ('picked-up', 'Recogí'),
-      'picked_up' => ('in-transit', 'En camino'),
-      'in_transit' => ('delivered', 'Entregué'),
+      'assigned' => ('picked-up', 'Ya recogí el pedido'),
+      'picked_up' => ('in-transit', 'Ya voy en camino'),
+      'in_transit' => ('delivered', 'Ya entregué'),
       _ => null,
     };
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              assignment.restaurantName,
-              style: Theme.of(context).textTheme.titleMedium,
+              _stepLabel(assignment.status),
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.w700,
+                  ),
             ),
-            const SizedBox(height: 8),
-            Text(assignment.dropoffAddress),
-            const SizedBox(height: 16),
-            if (action != null)
-              FilledButton(
+            const SizedBox(height: 12),
+            Text(
+              assignment.restaurantName,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              assignment.dropoffAddress,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            if (action != null) ...[
+              const SizedBox(height: 20),
+              RiderPrimaryButton(
+                label: action.$2,
+                color: AppColors.accentBright,
                 onPressed: () => onAction(action.$1),
-                child: Text(action.$2),
               ),
+            ],
           ],
         ),
       ),
