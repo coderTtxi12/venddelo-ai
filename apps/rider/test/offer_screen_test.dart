@@ -47,7 +47,9 @@ void main() {
       ),
     );
 
-    final accept = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Aceptar'));
+    final accept = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Aceptar oferta'),
+    );
     final reject = tester.widget<OutlinedButton>(
       find.widgetWithText(OutlinedButton, 'Rechazar'),
     );
