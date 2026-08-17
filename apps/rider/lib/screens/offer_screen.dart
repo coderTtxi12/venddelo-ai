@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../countdown.dart';
 import '../models.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
+import '../widgets/rider_widgets.dart';
 
 class OfferScreen extends StatefulWidget {
   const OfferScreen({
@@ -44,75 +47,161 @@ class _OfferScreenState extends State<OfferScreen> {
     super.dispose();
   }
 
+  Color _countdownColor(int remaining) {
+    if (remaining == 0) {
+      return AppColors.danger;
+    }
+    if (remaining <= 10) {
+      return AppColors.warningBright;
+    }
+    return AppColors.accent;
+  }
+
   @override
   Widget build(BuildContext context) {
     final remaining = remainingSecondsFromExpiresAt(widget.offer.expiresAt);
     final collect = (widget.offer.collectCents / 100).toStringAsFixed(2);
+    final countdownColor = _countdownColor(remaining);
+
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+        child: RiderScreenPadding(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
                 'Nueva oferta',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                remaining == 0 ? 'Expirada' : '$remaining s',
-                style: Theme.of(context).textTheme.displaySmall,
-              ),
-              const SizedBox(height: 24),
-              if (widget.offer.stops.length > 1)
-                ...widget.offer.stops.map(
-                  (stop) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          stop.restaurantName,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(stop.dropoffAddress),
-                      ],
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
                     ),
-                  ),
-                )
-              else ...[
-                Text(
-                  widget.offer.restaurantName,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(widget.offer.dropoffAddress),
-              ],
-              const SizedBox(height: 8),
-              Text('Cobrar: \$$collect · ${_paymentLabel(widget.offer.paymentMethod)}'),
-              Text('Paquetes: ${widget.offer.packageCount}'),
-              if (widget.errorMessage != null && widget.errorMessage!.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    widget.errorMessage!,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
-                ),
-              ],
-              const Spacer(),
-              FilledButton(
-                onPressed: remaining == 0 || widget.busy ? null : widget.onAccept,
-                child: const Text('Aceptar'),
               ),
               const SizedBox(height: 12),
-              OutlinedButton(
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: countdownColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+                  border: Border.all(
+                    color: countdownColor.withValues(alpha: 0.35),
+                    width: 2,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      remaining == 0 ? 'Expirada' : '$remaining',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                            color: countdownColor,
+                            fontSize: remaining == 0 ? 40 : 64,
+                          ),
+                    ),
+                    if (remaining > 0)
+                      Text(
+                        'segundos',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: countdownColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (widget.offer.stops.length > 1)
+                        ...widget.offer.stops.map(
+                          (stop) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(18),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      stop.restaurantName,
+                                      style: Theme.of(context).textTheme.titleLarge,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      stop.dropoffAddress,
+                                      style: Theme.of(context).textTheme.bodyLarge,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(18),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.offer.restaurantName,
+                                  style: Theme.of(context).textTheme.headlineSmall,
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  widget.offer.dropoffAddress,
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            children: [
+                              RiderMetaRow(
+                                label: 'Cobrar',
+                                value: '\$$collect',
+                              ),
+                              RiderMetaRow(
+                                label: 'Pago',
+                                value: _paymentLabel(widget.offer.paymentMethod),
+                              ),
+                              RiderMetaRow(
+                                label: 'Paquetes',
+                                value: '${widget.offer.packageCount}',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (widget.errorMessage != null &&
+                          widget.errorMessage!.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        RiderErrorBanner(message: widget.errorMessage!),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              RiderPrimaryButton(
+                label: 'Aceptar oferta',
+                color: AppColors.successBright,
+                onPressed: remaining == 0 || widget.busy ? null : widget.onAccept,
+              ),
+              const SizedBox(height: 12),
+              RiderSecondaryButton(
+                label: 'Rechazar',
                 onPressed: widget.busy ? null : widget.onReject,
-                child: const Text('Rechazar'),
               ),
             ],
           ),
