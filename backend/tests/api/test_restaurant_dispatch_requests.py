@@ -152,9 +152,9 @@ def test_create_dispatch_persists_quote_and_immediate_search(client, engine):
 
 
 @requires_db
-def test_create_rejects_unconfigured_prep_time(client, engine):
+def test_create_accepts_custom_prep_time_below_sixty(client, engine):
     _create_mexy_provider(client)
-    restaurant_id = _create_restaurant(client, subdomain="dispatch-bad-prep")
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-custom-prep")
     _activate_partnership(client, engine, restaurant_id)
 
     response = client.post(
@@ -164,8 +164,23 @@ def test_create_rejects_unconfigured_prep_time(client, engine):
         headers=AUTH,
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"]["message"] == "Ese tiempo de preparación no está configurado"
+    assert response.status_code == 201, response.text
+
+
+@requires_db
+def test_create_rejects_prep_time_sixty_or_more(client, engine):
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-bad-prep")
+    _activate_partnership(client, engine, restaurant_id)
+
+    response = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(prep_minutes=60),
+        headers=AUTH,
+    )
+
+    assert response.status_code == 422
 
 
 @requires_db
