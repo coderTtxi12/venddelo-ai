@@ -9,6 +9,7 @@ import HandshakeOutlinedIcon from '@mui/icons-material/HandshakeOutlined';
 import TwoWheelerOutlinedIcon from '@mui/icons-material/TwoWheelerOutlined';
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
+import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import { MOBILE_DRAWER_MAX_WIDTH, useMobileSidebar } from '@/contexts/MobileSidebarContext';
@@ -24,6 +25,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Restaurantes', path: '/partnerships', icon: <HandshakeOutlinedIcon fontSize="small" /> },
   { label: 'Repartidores', path: '/repartidores', icon: <TwoWheelerOutlinedIcon fontSize="small" /> },
+  { label: 'Asignación', path: '/asignacion', icon: <AssignmentOutlinedIcon fontSize="small" /> },
   { label: 'Tarifas', path: '/tariffs', icon: <LocalShippingOutlinedIcon fontSize="small" /> },
   { label: 'Horarios', path: '/horarios', icon: <AccessTimeOutlinedIcon fontSize="small" /> },
   { label: 'Cerco geográfico', path: '/cerco-geografico', icon: <MapOutlinedIcon fontSize="small" /> },
