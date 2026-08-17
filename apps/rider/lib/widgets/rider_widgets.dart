@@ -1,0 +1,283 @@
+import 'package:flutter/material.dart';
+
+import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
+
+class RiderScreenPadding extends StatelessWidget {
+  const RiderScreenPadding({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(AppTheme.screenPadding),
+      child: child,
+    );
+  }
+}
+
+class RiderPrimaryButton extends StatelessWidget {
+  const RiderPrimaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.color,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: color == null
+            ? null
+            : FilledButton.styleFrom(
+                backgroundColor: color,
+                disabledBackgroundColor: color?.withValues(alpha: 0.45),
+              ),
+        child: Text(label),
+      ),
+    );
+  }
+}
+
+class RiderSecondaryButton extends StatelessWidget {
+  const RiderSecondaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        child: Text(label),
+      ),
+    );
+  }
+}
+
+class RiderErrorBanner extends StatelessWidget {
+  const RiderErrorBanner({super.key, required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.danger.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+          border: Border.all(
+            color: AppColors.danger.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Text(
+          message,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: AppColors.danger,
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+      ),
+    );
+  }
+}
+
+class RiderInfoBanner extends StatelessWidget {
+  const RiderInfoBanner({super.key, required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+        border: Border.all(
+          color: AppColors.warning.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Text(
+        message,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: AppColors.warningBright,
+              fontWeight: FontWeight.w600,
+            ),
+      ),
+    );
+  }
+}
+
+class RiderOnlineToggle extends StatelessWidget {
+  const RiderOnlineToggle({
+    super.key,
+    required this.isOnline,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final bool isOnline;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = isOnline ? AppColors.online : AppColors.offline;
+    final statusLabel = isOnline ? 'EN LÍNEA' : 'FUERA DE LÍNEA';
+
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+      child: InkWell(
+        onTap: enabled ? () => onChanged(!isOnline) : null,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+            border: Border.all(
+              color: statusColor.withValues(alpha: 0.45),
+              width: 2,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: statusColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      statusLabel,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: statusColor,
+                            letterSpacing: 0.6,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isOnline
+                          ? 'Recibirás ofertas de entrega'
+                          : 'Activa para empezar a recibir ofertas',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: isOnline,
+                onChanged: enabled ? onChanged : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class RiderStatusCard extends StatelessWidget {
+  const RiderStatusCard({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    this.leading,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (leading != null) ...[
+              leading!,
+              const SizedBox(width: 16),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 6),
+                  Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class RiderMetaRow extends StatelessWidget {
+  const RiderMetaRow({super.key, required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textMuted,
+                  ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
