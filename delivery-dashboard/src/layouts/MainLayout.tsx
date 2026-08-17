@@ -14,7 +14,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         <div className={styles.main}>
           <TopBar />
           <ZoneSwitcher />
-          <div className={styles.content}>{children}</div>
+          <div className={styles.content} data-scroll-lock>
+            {children}
+          </div>
         </div>
       </div>
     </MobileSidebarProvider>
