@@ -35,6 +35,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/login') ||
     pathname.startsWith('/auth/callback') ||
     pathname.startsWith('/menu/') ||
+    pathname.startsWith('/rastreo') ||
     isMenuPublicHost(host);
 
   if (!user && !isPublic) {

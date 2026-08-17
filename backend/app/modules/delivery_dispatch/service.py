@@ -2,15 +2,35 @@ from __future__ import annotations
 
 import base64
 import binascii
+import math
 import re
+import secrets
 import uuid
+from datetime import UTC, datetime, timedelta
+from urllib.error import URLError
+from urllib.parse import urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ConflictError, NotFoundError, ValidationError
+from app.core.exceptions import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ValidationError,
+)
 from app.core.storage import StoragePort
-from app.db.models.delivery import DeliveryDriver, DeliveryProviderMember
+from app.db.models.delivery import (
+    DeliveryCreditHold,
+    DeliveryDispatchRequest,
+    DeliveryDriver,
+    DeliveryProviderAssignmentSettings,
+    DeliveryProviderMember,
+    DeliverySearchLeadTime,
+    RestaurantDeliveryProvider,
+)
+from app.modules.delivery_dispatch.maps_url import parse_maps_url
 from app.modules.delivery_dispatch.schemas import (
     AssignmentSettingsDTO,
     AssignmentSettingsUpdate,
@@ -18,22 +38,25 @@ from app.modules.delivery_dispatch.schemas import (
     DeliveryDriverDocumentsUpdate,
     DeliveryDriverDTO,
     DeliveryDriverUpdate,
+    DispatchPaymentUpdate,
+    DispatchRequestCreate,
+    DispatchRequestDTO,
+    PublicDispatchTrackingDTO,
     SearchLeadTimeDTO,
     SearchLeadTimeUpdate,
+    TrackingDropoffDTO,
+    TrackingRiderDTO,
 )
+from app.modules.delivery_dispatch.search_at import compute_search_at
 from app.modules.delivery_providers.permissions import (
     require_view_drivers,
     require_write_provider_config,
 )
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
-from app.db.models.delivery import (
-    DeliveryProviderAssignmentSettings,
-    DeliverySearchLeadTime,
-)
+from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
+from app.modules.restaurants.schemas import RestaurantDTO
 
-_ALLOWED_DOCUMENT_TYPES = frozenset(
-    {"image/jpeg", "image/png", "image/webp", "application/pdf"}
-)
+_ALLOWED_DOCUMENT_TYPES = frozenset({"image/jpeg", "image/png", "image/webp", "application/pdf"})
 _MAX_DOCUMENT_BYTES = 8 * 1024 * 1024
 _DATA_URL_RE = re.compile(r"^data:([^;]+);base64,(.+)$", re.DOTALL)
 
@@ -101,9 +124,7 @@ class DeliveryDispatchService:
         row = self._get_driver_or_raise(provider_id, driver_id)
         return DeliveryDriverDTO.model_validate(row)
 
-    def create_driver(
-        self, user_id: uuid.UUID, data: DeliveryDriverCreate
-    ) -> DeliveryDriverDTO:
+    def create_driver(self, user_id: uuid.UUID, data: DeliveryDriverCreate) -> DeliveryDriverDTO:
         provider_id, member_role = self._require_provider_with_role(user_id)
         require_write_provider_config(member_role)
 
@@ -220,7 +241,15 @@ class DeliveryDispatchService:
                     "El límite de crédito no puede ser menor que el crédito retenido"
                 )
 
-        for field in ("first_name", "last_name", "phone", "plate", "motorcycle_brand", "motorcycle_color"):
+        text_fields = (
+            "first_name",
+            "last_name",
+            "phone",
+            "plate",
+            "motorcycle_brand",
+            "motorcycle_color",
+        )
+        for field in text_fields:
             if field in updates and updates[field] is not None:
                 updates[field] = updates[field].strip()
 
@@ -368,9 +397,7 @@ class DeliveryDispatchService:
             return file_name.rsplit(".", 1)[-1].lower()
         return "bin"
 
-    def _get_driver_or_raise(
-        self, provider_id: uuid.UUID, driver_id: uuid.UUID
-    ) -> DeliveryDriver:
+    def _get_driver_or_raise(self, provider_id: uuid.UUID, driver_id: uuid.UUID) -> DeliveryDriver:
         row = self._session.scalar(
             select(DeliveryDriver).where(
                 DeliveryDriver.id == driver_id,
@@ -388,18 +415,14 @@ class DeliveryDispatchService:
         provider, _role = found
         return provider.id
 
-    def _require_provider_with_role(
-        self, user_id: uuid.UUID
-    ) -> tuple[uuid.UUID, str]:
+    def _require_provider_with_role(self, user_id: uuid.UUID) -> tuple[uuid.UUID, str]:
         found = self._provider_repo.get_for_user(user_id)
         if found is None:
             raise NotFoundError("No tienes un proveedor de delivery registrado")
         provider, member_role = found
         return provider.id, member_role
 
-    def _get_or_raise_settings(
-        self, provider_id: uuid.UUID
-    ) -> DeliveryProviderAssignmentSettings:
+    def _get_or_raise_settings(self, provider_id: uuid.UUID) -> DeliveryProviderAssignmentSettings:
         row = self._session.scalar(
             select(DeliveryProviderAssignmentSettings).where(
                 DeliveryProviderAssignmentSettings.delivery_provider_id == provider_id
@@ -408,3 +431,350 @@ class DeliveryDispatchService:
         if row is None:
             raise NotFoundError("Configuración de asignación no encontrada")
         return row
+
+
+_PAYMENT_EDITABLE_STATUSES = frozenset({"scheduled", "searching", "offered", "unassigned"})
+_CASH_CONFIRMABLE_STATUSES = frozenset({"assigned", "picked_up", "in_transit", "delivered"})
+_SHORT_MAPS_HOSTS = frozenset({"maps.app.goo.gl", "goo.gl"})
+
+
+class _CappedRedirectHandler(HTTPRedirectHandler):
+    max_redirections = 5
+
+
+def _follow_maps_redirects(url: str) -> str | None:
+    opener = build_opener(_CappedRedirectHandler)
+    request = Request(
+        url,
+        headers={"User-Agent": "MexyDispatch/1.0"},
+        method="GET",
+    )
+    try:
+        with opener.open(request, timeout=5) as response:
+            return str(response.geturl())
+    except (URLError, TimeoutError, ValueError, OSError):
+        return None
+
+
+class RestaurantDispatchService:
+    def __init__(
+        self,
+        session: Session,
+        provider_repo: DeliveryProviderRepository,
+    ) -> None:
+        self._session = session
+        self._provider_repo = provider_repo
+        self._quotes = PublicDeliveryQuoteService(provider_repo)
+
+    def create(
+        self,
+        restaurant: RestaurantDTO,
+        data: DispatchRequestCreate,
+    ) -> DispatchRequestDTO:
+        partnership = self._active_partnership(restaurant.id)
+        provider_id = partnership.delivery_provider_id
+
+        latitude, longitude = self._resolve_dropoff_coordinates(data)
+        lead_time = self._session.scalar(
+            select(DeliverySearchLeadTime).where(
+                DeliverySearchLeadTime.delivery_provider_id == provider_id,
+                DeliverySearchLeadTime.prep_minutes == data.prep_minutes,
+            )
+        )
+        if lead_time is None:
+            raise ValidationError("Ese tiempo de preparación no está configurado")
+
+        self._validate_payment(
+            data.payment_method,
+            data.collect_cents,
+            data.cash_denomination_cents,
+        )
+        quote = self._quotes.quote_delivery(
+            restaurant,
+            delivery_latitude=latitude,
+            delivery_longitude=longitude,
+        )
+        if not quote.available:
+            raise ValidationError(quote.reason or "No se pudo calcular el costo del envío")
+
+        now = datetime.now(UTC)
+        ready_at = now + timedelta(minutes=data.prep_minutes)
+        search_at = compute_search_at(
+            now,
+            ready_at,
+            lead_time.search_ahead_minutes,
+        )
+        row = DeliveryDispatchRequest(
+            restaurant_id=restaurant.id,
+            delivery_provider_id=provider_id,
+            zone_id=partnership.zone_id,
+            customer_name=data.customer_name.strip(),
+            customer_phone=data.customer_phone.strip(),
+            dropoff_lat=latitude,
+            dropoff_lng=longitude,
+            dropoff_address=data.dropoff_address.strip(),
+            dropoff_maps_url=data.dropoff_maps_url,
+            payment_method=data.payment_method,
+            collect_cents=data.collect_cents,
+            cash_denomination_cents=data.cash_denomination_cents,
+            package_size=data.package_size,
+            package_count=data.package_count,
+            ready_at=ready_at,
+            search_at=search_at,
+            next_attempt_at=search_at,
+            quoted_fee_cents=quote.delivery_fee_cents,
+            status="searching" if search_at <= now else "scheduled",
+            assigned_driver_id=None,
+            tracking_token=secrets.token_hex(24),
+            notes=data.notes.strip() if data.notes else None,
+            decision_json=None,
+            cancelled_at=None,
+            cycle_rejected_driver_ids=[],
+        )
+        self._session.add(row)
+        self._session.flush()
+        self._session.refresh(row)
+        return DispatchRequestDTO.model_validate(row)
+
+    def list(
+        self,
+        restaurant: RestaurantDTO,
+    ) -> list[DispatchRequestDTO]:
+        self._active_partnership(restaurant.id)
+        rows = self._session.scalars(
+            select(DeliveryDispatchRequest)
+            .where(DeliveryDispatchRequest.restaurant_id == restaurant.id)
+            .order_by(DeliveryDispatchRequest.created_at.desc())
+        ).all()
+        return [DispatchRequestDTO.model_validate(row) for row in rows]
+
+    def list_lead_times(
+        self,
+        restaurant: RestaurantDTO,
+    ) -> list[SearchLeadTimeDTO]:
+        partnership = self._active_partnership(restaurant.id)
+        rows = self._session.scalars(
+            select(DeliverySearchLeadTime)
+            .where(DeliverySearchLeadTime.delivery_provider_id == partnership.delivery_provider_id)
+            .order_by(DeliverySearchLeadTime.prep_minutes.asc())
+        ).all()
+        return [SearchLeadTimeDTO.model_validate(row) for row in rows]
+
+    def update_payment(
+        self,
+        restaurant: RestaurantDTO,
+        request_id: uuid.UUID,
+        data: DispatchPaymentUpdate,
+    ) -> DispatchRequestDTO:
+        row = self._request(restaurant.id, request_id)
+        if row.assigned_driver_id is not None:
+            raise ConflictError("Ya hay un repartidor asignado")
+        if row.status not in _PAYMENT_EDITABLE_STATUSES:
+            raise ValidationError("El pago ya no se puede editar")
+
+        updates = data.model_dump(exclude_unset=True)
+        payment_method = updates.get("payment_method", row.payment_method)
+        collect_cents = updates.get("collect_cents", row.collect_cents)
+        cash_denomination_cents = updates.get(
+            "cash_denomination_cents",
+            row.cash_denomination_cents,
+        )
+        if payment_method != "cash" and "cash_denomination_cents" not in updates:
+            cash_denomination_cents = None
+        self._validate_payment(
+            payment_method,
+            collect_cents,
+            cash_denomination_cents,
+        )
+        row.payment_method = payment_method
+        row.collect_cents = collect_cents
+        row.cash_denomination_cents = cash_denomination_cents
+        return self._flush_request(row)
+
+    def cancel(
+        self,
+        restaurant: RestaurantDTO,
+        request_id: uuid.UUID,
+    ) -> DispatchRequestDTO:
+        row = self._request(restaurant.id, request_id)
+        if row.status in {"delivered", "cancelled"}:
+            raise ValidationError("La solicitud ya no se puede cancelar")
+        now = datetime.now(UTC)
+        row.status = "cancelled"
+        row.cancelled_at = now
+        self._release_hold(row, released_by_user_id=None, now=now)
+        return self._flush_request(row)
+
+    def retry(
+        self,
+        restaurant: RestaurantDTO,
+        request_id: uuid.UUID,
+    ) -> DispatchRequestDTO:
+        row = self._request(restaurant.id, request_id)
+        if row.status != "unassigned":
+            raise ValidationError("Solo puedes reintentar solicitudes sin asignar")
+        now = datetime.now(UTC)
+        row.status = "searching"
+        row.search_at = now
+        row.next_attempt_at = now
+        return self._flush_request(row)
+
+    def confirm_rider_cash(
+        self,
+        restaurant: RestaurantDTO,
+        request_id: uuid.UUID,
+        user_id: uuid.UUID,
+    ) -> DispatchRequestDTO:
+        row = self._request(restaurant.id, request_id)
+        if row.status not in _CASH_CONFIRMABLE_STATUSES:
+            raise ValidationError("El efectivo todavía no se puede confirmar")
+        hold = row.credit_hold
+        if hold is None or hold.status != "held":
+            raise ValidationError("No hay efectivo retenido para esta solicitud")
+        self._release_hold(
+            row,
+            released_by_user_id=user_id,
+            now=datetime.now(UTC),
+        )
+        return self._flush_request(row)
+
+    def public_tracking(self, token: str) -> PublicDispatchTrackingDTO:
+        row = self._session.scalar(
+            select(DeliveryDispatchRequest).where(DeliveryDispatchRequest.tracking_token == token)
+        )
+        if row is None:
+            raise NotFoundError("Solicitud de delivery no encontrada")
+
+        rider = None
+        eta_seconds = None
+        if row.assigned_driver is not None:
+            rider = TrackingRiderDTO(first_name=row.assigned_driver.first_name)
+            if (
+                row.assigned_driver.last_lat is not None
+                and row.assigned_driver.last_lng is not None
+            ):
+                eta_seconds = round(
+                    self._distance_meters(
+                        row.assigned_driver.last_lat,
+                        row.assigned_driver.last_lng,
+                        row.dropoff_lat,
+                        row.dropoff_lng,
+                    )
+                    / 8
+                )
+
+        return PublicDispatchTrackingDTO(
+            status=row.status,
+            dropoff=TrackingDropoffDTO(
+                latitude=row.dropoff_lat,
+                longitude=row.dropoff_lng,
+                address=row.dropoff_address,
+            ),
+            rider=rider,
+            eta_seconds=eta_seconds,
+        )
+
+    def _active_partnership(
+        self,
+        restaurant_id: uuid.UUID,
+    ) -> RestaurantDeliveryProvider:
+        partnership = self._provider_repo.get_mexy_partnership_for_restaurant(restaurant_id)
+        if partnership is None or partnership.status != "active":
+            raise ForbiddenError("No tienes un repartidor activo")
+        row = self._session.scalar(
+            select(RestaurantDeliveryProvider).where(
+                RestaurantDeliveryProvider.id == partnership.id
+            )
+        )
+        if row is None:
+            raise ForbiddenError("No tienes un repartidor activo")
+        return row
+
+    def _request(
+        self,
+        restaurant_id: uuid.UUID,
+        request_id: uuid.UUID,
+    ) -> DeliveryDispatchRequest:
+        row = self._session.scalar(
+            select(DeliveryDispatchRequest).where(
+                DeliveryDispatchRequest.id == request_id,
+                DeliveryDispatchRequest.restaurant_id == restaurant_id,
+            )
+        )
+        if row is None:
+            raise NotFoundError("Solicitud de delivery no encontrada")
+        return row
+
+    def _resolve_dropoff_coordinates(
+        self,
+        data: DispatchRequestCreate,
+    ) -> tuple[float, float]:
+        if data.dropoff_lat is not None and data.dropoff_lng is not None:
+            return data.dropoff_lat, data.dropoff_lng
+        if not data.dropoff_maps_url:
+            raise ValidationError("La ubicación de entrega es obligatoria")
+
+        coordinates = parse_maps_url(data.dropoff_maps_url)
+        if coordinates is None:
+            host = urlparse(data.dropoff_maps_url).hostname
+            if host in _SHORT_MAPS_HOSTS:
+                resolved = _follow_maps_redirects(data.dropoff_maps_url)
+                coordinates = parse_maps_url(resolved) if resolved else None
+        if coordinates is None:
+            raise ValidationError("No se pudo leer la ubicación del enlace")
+        return coordinates
+
+    @staticmethod
+    def _validate_payment(
+        payment_method: str,
+        collect_cents: int,
+        cash_denomination_cents: int | None,
+    ) -> None:
+        if payment_method == "cash" and cash_denomination_cents is None:
+            raise ValidationError("Indica con qué billete o moneda pagará el cliente")
+        if (
+            payment_method == "cash"
+            and cash_denomination_cents is not None
+            and cash_denomination_cents < collect_cents
+        ):
+            raise ValidationError("La denominación debe cubrir el monto a cobrar")
+
+    def _flush_request(
+        self,
+        row: DeliveryDispatchRequest,
+    ) -> DispatchRequestDTO:
+        self._session.flush()
+        self._session.refresh(row)
+        return DispatchRequestDTO.model_validate(row)
+
+    def _release_hold(
+        self,
+        row: DeliveryDispatchRequest,
+        *,
+        released_by_user_id: uuid.UUID | None,
+        now: datetime,
+    ) -> None:
+        hold: DeliveryCreditHold | None = row.credit_hold
+        if hold is None or hold.status != "held":
+            return
+        hold.status = "released"
+        hold.released_at = now
+        hold.released_by_user_id = released_by_user_id
+        if row.assigned_driver is not None:
+            row.assigned_driver.credit_held_cents = max(
+                0,
+                row.assigned_driver.credit_held_cents - hold.amount_cents,
+            )
+
+    @staticmethod
+    def _distance_meters(
+        lat1: float,
+        lng1: float,
+        lat2: float,
+        lng2: float,
+    ) -> float:
+        phi1, phi2 = math.radians(lat1), math.radians(lat2)
+        d_phi = math.radians(lat2 - lat1)
+        d_lambda = math.radians(lng2 - lng1)
+        a = math.sin(d_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
+        return 6_371_000 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))

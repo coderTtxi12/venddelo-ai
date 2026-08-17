@@ -12,6 +12,14 @@ function maybeRewriteMenuSubdomain(request: NextRequest): NextResponse | null {
     return null;
   }
 
+  if (pathname.startsWith('/rastreo/')) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set('x-restaurant-subdomain', subdomain);
+    return NextResponse.rewrite(new URL(pathname, request.url), {
+      request: { headers: requestHeaders },
+    });
+  }
+
   const rewritePath =
     pathname === '/' ? `/menu/${subdomain}` : `/menu/${subdomain}${pathname}`;
 

@@ -8,18 +8,19 @@ from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.infra.cache.menu_cache import MenuCacheService
 from app.infra.cache.translated_menu import TranslatedMenuService
 from app.infra.redis.factory import build_cache
+from app.modules.delivery_dispatch.schemas import PublicDispatchTrackingDTO
+from app.modules.delivery_dispatch.service import RestaurantDispatchService
+from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
+from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
 from app.modules.menu.schemas import FullMenuDTO
 from app.modules.menu.service import MenuService
 from app.modules.orders.schemas import OrderDTO, PublicOrderInput
 from app.modules.orders.service import OrderService
 from app.modules.promotions.effective import resolve_timezone
 from app.modules.promotions.pricing import CartLineInput, price_cart
-from app.modules.promotions.schemas import PromotionDTO
 from app.modules.promotions.service import PromotionService
-from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
-from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
-from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
 from app.modules.public.checkout_payments import enabled_public_payment_methods
+from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
 from app.modules.public.schemas import (
     CartQuoteDTO,
     CartQuoteInput,
@@ -34,7 +35,10 @@ from app.modules.public.schemas import (
     PublicRestaurantSocialLinksDTO,
 )
 from app.modules.restaurants.schemas import ScheduleDTO
-from app.modules.restaurants.social_links import build_public_social_links, normalize_live_menu_social_placement
+from app.modules.restaurants.social_links import (
+    build_public_social_links,
+    normalize_live_menu_social_placement,
+)
 from app.modules.translations.service import TranslationService
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -64,7 +68,9 @@ def _promotion_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> Promotio
     return PromotionService(uow.promotions)
 
 
-def _partnership_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeliveryPartnershipService:
+def _partnership_service(
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> DeliveryPartnershipService:
     return DeliveryPartnershipService(
         SqlAlchemyDeliveryProviderRepository(uow.session),
         restaurant_repo=uow.restaurants,
@@ -75,6 +81,15 @@ def _public_delivery_quote_service(
     uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> PublicDeliveryQuoteService:
     return PublicDeliveryQuoteService(SqlAlchemyDeliveryProviderRepository(uow.session))
+
+
+def _restaurant_dispatch_service(
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> RestaurantDispatchService:
+    return RestaurantDispatchService(
+        uow.session,
+        SqlAlchemyDeliveryProviderRepository(uow.session),
+    )
 
 
 def _order_service(
@@ -134,7 +149,9 @@ def _to_public_restaurant_dto(restaurant) -> PublicRestaurantDTO:
         digital_menu_limited_time_category_name=restaurant.digital_menu_limited_time_category_name,
         whatsapp_phone=restaurant.whatsapp_phone,
         social_links=social_links,
-        social_placement=normalize_live_menu_social_placement(restaurant.live_menu_social_placement),
+        social_placement=normalize_live_menu_social_placement(
+            restaurant.live_menu_social_placement
+        ),
         original_language=restaurant.original_language,
         timezone=restaurant.timezone,
         server_now=now,
@@ -252,6 +269,17 @@ def quote_public_delivery(
         partnership_status=quote.partnership_status,
         weather_mode=quote.weather_mode,
     )
+
+
+@router.get(
+    "/dispatch-tracking/{token}",
+    response_model=PublicDispatchTrackingDTO,
+)
+def get_public_dispatch_tracking(
+    token: str,
+    service: RestaurantDispatchService = Depends(_restaurant_dispatch_service),
+) -> PublicDispatchTrackingDTO:
+    return service.public_tracking(token)
 
 
 @router.post("/restaurants/{subdomain}/cart/quote", response_model=CartQuoteDTO)

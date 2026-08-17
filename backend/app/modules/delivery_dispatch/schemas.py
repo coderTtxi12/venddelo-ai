@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -127,3 +129,78 @@ class DeliveryDriverDocumentsUpdate(BaseModel):
     license_document_file_name: str | None = None
     insurance_document_base64: str | None = None
     insurance_document_file_name: str | None = None
+
+
+PaymentMethod = Literal["cash", "transfer", "card_terminal"]
+PackageSize = Literal["normal", "grande"]
+
+
+class DispatchRequestCreate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    customer_name: str = Field(min_length=1, max_length=200)
+    customer_phone: str = Field(min_length=1, max_length=30)
+    dropoff_lat: float | None = Field(default=None, ge=-90, le=90)
+    dropoff_lng: float | None = Field(default=None, ge=-180, le=180)
+    dropoff_address: str = Field(min_length=1, max_length=500)
+    dropoff_maps_url: str | None = Field(default=None, max_length=2000)
+    payment_method: PaymentMethod
+    collect_cents: int = Field(ge=0)
+    cash_denomination_cents: int | None = Field(default=None, ge=0)
+    package_size: PackageSize
+    package_count: int = Field(ge=1)
+    prep_minutes: int = Field(ge=1)
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class DispatchPaymentUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    payment_method: PaymentMethod | None = None
+    collect_cents: int | None = Field(default=None, ge=0)
+    cash_denomination_cents: int | None = Field(default=None, ge=0)
+
+
+class DispatchRequestDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    customer_name: str
+    customer_phone: str
+    dropoff_lat: float
+    dropoff_lng: float
+    dropoff_address: str
+    dropoff_maps_url: str | None
+    payment_method: str
+    collect_cents: int
+    cash_denomination_cents: int | None
+    package_size: str
+    package_count: int
+    ready_at: datetime
+    search_at: datetime
+    next_attempt_at: datetime
+    quoted_fee_cents: int
+    status: str
+    assigned_driver_id: uuid.UUID | None
+    tracking_token: str
+    notes: str | None
+    cancelled_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TrackingDropoffDTO(BaseModel):
+    latitude: float
+    longitude: float
+    address: str
+
+
+class TrackingRiderDTO(BaseModel):
+    first_name: str
+
+
+class PublicDispatchTrackingDTO(BaseModel):
+    status: str
+    dropoff: TrackingDropoffDTO
+    rider: TrackingRiderDTO | None = None
+    eta_seconds: int | None = None

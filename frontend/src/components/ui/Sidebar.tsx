@@ -11,6 +11,7 @@ import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
+import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
 import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import { useAssistantChat } from '@/contexts/AssistantChatContext';
@@ -19,6 +20,9 @@ import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
 import { prefetchKitchenOrders } from '@/lib/orders/kitchenOrdersCache';
+import { getRestaurant } from '@/lib/api/restaurants';
+import { isActiveDeliveryPartnership } from '@/lib/fetchActiveDeliveryProviderConfig';
+import { syncRestaurantDeliveryPartnership } from '@/lib/syncDeliveryPartnership';
 import RestaurantSwitcher from '@/components/ui/RestaurantSwitcher';
 import styles from './Sidebar.module.css';
 
@@ -33,6 +37,7 @@ const navItems: NavItem[] = [
   { label: 'Productos', path: '/products', icon: <Inventory2OutlinedIcon fontSize="small" /> },
   { label: 'Menú Digital', path: '/digital-menu', icon: <QrCode2OutlinedIcon fontSize="small" /> },
   { label: 'Horario', path: '/hours', icon: <AccessTimeOutlinedIcon fontSize="small" /> },
+  { label: 'Delivery', path: '/delivery', icon: <LocalShippingOutlinedIcon fontSize="small" /> },
   { label: 'Analíticas', path: '/analytics', icon: <BarChartOutlinedIcon fontSize="small" /> },
   { label: 'Marketing', path: '/marketing', icon: <CampaignOutlinedIcon fontSize="small" /> },
   { label: 'Configuración', path: '/settings', icon: <SettingsOutlinedIcon fontSize="small" /> },
@@ -59,10 +64,14 @@ export default function Sidebar() {
   const { isOpen: isChatOpen, openChat, closeChat } = useAssistantChat();
   const { isMobileDrawer, isDrawerOpen, closeDrawer } = useMobileSidebar();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showDelivery, setShowDelivery] = useState(false);
   const wasChatOpenRef = useRef(false);
 
   useEffect(() => {
-    setIsCollapsed(shouldSidebarStartCollapsed(window.innerWidth));
+    const frame = window.requestAnimationFrame(() => {
+      setIsCollapsed(shouldSidebarStartCollapsed(window.innerWidth));
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
@@ -79,6 +88,36 @@ export default function Sidebar() {
   useEffect(() => {
     if (isMobileDrawer && isChatOpen) closeDrawer();
   }, [isMobileDrawer, isChatOpen, closeDrawer]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!accessToken || !selectedRestaurantId) {
+      void Promise.resolve().then(() => {
+        if (!cancelled) setShowDelivery(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      try {
+        const restaurant = await getRestaurant(accessToken, selectedRestaurantId);
+        const partnership = await syncRestaurantDeliveryPartnership(
+          accessToken,
+          selectedRestaurantId,
+          restaurant.delivery_enabled,
+        );
+        if (!cancelled) setShowDelivery(isActiveDeliveryPartnership(partnership));
+      } catch {
+        if (!cancelled) setShowDelivery(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, selectedRestaurantId]);
 
   const showCollapsed = !isMobileDrawer && isCollapsed;
   const showLabels = isMobileDrawer || !isCollapsed;
@@ -164,7 +203,7 @@ export default function Sidebar() {
         )}
 
         <nav className={styles.nav}>
-          {navItems.map((item) => {
+          {navItems.filter((item) => item.path !== '/delivery' || showDelivery).map((item) => {
             const active = isNavActive(pathname, item.path);
             const badgeCount =
               item.path === '/orders' && pendingOrdersCount > 0 ? pendingOrdersCount : null;

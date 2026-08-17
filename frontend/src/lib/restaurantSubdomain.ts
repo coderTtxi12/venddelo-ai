@@ -120,6 +120,11 @@ export function restaurantPublicMenuUrl(subdomain: string): string {
   return `https://${subdomain}.${MENU_PUBLIC_DOMAIN}`;
 }
 
+/** Origin used by public restaurant routes such as menu and delivery tracking. */
+export function publicMenuOrigin(subdomain: string): string {
+  return restaurantPublicMenuUrl(subdomain);
+}
+
 export function subdomainAvailabilityMessage(result: {
   available: boolean;
   valid: boolean;

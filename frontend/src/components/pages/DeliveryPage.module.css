@@ -1,0 +1,283 @@
+.page {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.header p,
+.sectionHeading p,
+.request p,
+.request span,
+.empty,
+.loading {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.card,
+.success {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+}
+
+.sectionHeading {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.sectionHeading > svg {
+  color: var(--color-primary);
+}
+
+.sectionHeading h2,
+.success h2,
+.request h3 {
+  margin: 0 0 0.25rem;
+  color: var(--color-text);
+}
+
+.sectionHeading h2,
+.success h2 {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.form {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--color-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.form input,
+.form select,
+.form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  padding: 0.55rem 0.75rem;
+  color: var(--color-text);
+  font: inherit;
+}
+
+.form textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.form input:focus,
+.form select:focus,
+.form textarea:focus,
+.actions button:focus-visible,
+.trackingLink button:focus-visible,
+.primaryButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+  border-color: var(--color-primary);
+}
+
+.locationSelected,
+.weightNotice {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
+.weightNotice {
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.primaryButton {
+  justify-self: start;
+  border: 0;
+  border-radius: 12px;
+  background: var(--color-primary);
+  padding: 0.65rem 1.1rem;
+  min-height: 44px;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.error {
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fef2f2;
+  padding: 0.75rem 0.9rem;
+  color: #b91c1c;
+}
+
+.success {
+  flex-direction: row;
+  align-items: flex-start;
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
+.success > svg {
+  color: #047857;
+}
+
+.success p {
+  margin: 0 0 0.65rem;
+  color: var(--color-text-secondary);
+}
+
+.trackingLink {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 42rem;
+}
+
+.trackingLink a {
+  overflow: hidden;
+  color: var(--color-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trackingLink button,
+.actions button {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  padding: 0.45rem 0.75rem;
+  min-height: 40px;
+  color: var(--color-text);
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.trackingLink button:hover,
+.actions button:hover {
+  border-color: color-mix(in srgb, var(--color-text) 18%, var(--color-border));
+  background: var(--color-bg);
+}
+
+.list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.request {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.requestMain {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.request h3 {
+  font-size: 0.95rem;
+}
+
+.request p {
+  margin-bottom: 0.3rem;
+}
+
+.request span {
+  font-size: 0.8rem;
+}
+
+.statusIcon {
+  display: grid;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.loading {
+  padding: 2rem;
+}
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .request {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButton,
+  .trackingLink button,
+  .actions button {
+    transition: none;
+  }
+}

@@ -8,32 +8,39 @@ from app.api.deps import (
     pagination_params,
     require_owned_restaurant,
 )
-from app.core.exceptions import ValidationError
+from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
+from app.modules.delivery_dispatch.schemas import (
+    DispatchPaymentUpdate,
+    DispatchRequestCreate,
+    DispatchRequestDTO,
+    SearchLeadTimeDTO,
+)
+from app.modules.delivery_dispatch.service import RestaurantDispatchService
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
 from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
-from app.modules.restaurants.schemas import (
-    PaymentMethodCreate,
-    PaymentMethodDTO,
-    RestaurantAdminInviteCreate,
-    RestaurantAdminInviteDTO,
-    RestaurantCreate,
-    RestaurantDTO,
-    RestaurantAccessListResponse,
-    RestaurantMeResponse,
-    RestaurantMemberDTO,
-    RestaurantSelectRequest,
-    RestaurantUpdate,
-    ScheduleCreate,
-    ScheduleDTO,
-    SubdomainAvailabilityDTO,
-)
 from app.modules.delivery_providers.schemas import (
     DeliveryProviderPaymentMethodDTO,
     DeliveryProviderScheduleDTO,
     MexyCoverageResponse,
     RestaurantDeliveryPartnershipResponse,
+)
+from app.modules.restaurants.schemas import (
+    PaymentMethodCreate,
+    PaymentMethodDTO,
+    RestaurantAccessListResponse,
+    RestaurantAdminInviteCreate,
+    RestaurantAdminInviteDTO,
+    RestaurantCreate,
+    RestaurantDTO,
+    RestaurantMemberDTO,
+    RestaurantMeResponse,
+    RestaurantSelectRequest,
+    RestaurantUpdate,
+    ScheduleCreate,
+    ScheduleDTO,
+    SubdomainAvailabilityDTO,
 )
 from app.modules.restaurants.service import RestaurantService
 from app.modules.users.schemas import UserDTO
@@ -45,11 +52,39 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> RestaurantService:
     return RestaurantService(uow.restaurants)
 
 
-def _partnership_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeliveryPartnershipService:
+def _partnership_service(
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> DeliveryPartnershipService:
     return DeliveryPartnershipService(
         SqlAlchemyDeliveryProviderRepository(uow.session),
         restaurant_repo=uow.restaurants,
     )
+
+
+def _dispatch_service(
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> RestaurantDispatchService:
+    return RestaurantDispatchService(
+        uow.session,
+        SqlAlchemyDeliveryProviderRepository(uow.session),
+    )
+
+
+def _owned_me_restaurant(
+    restaurant_id: UUID | None = Query(default=None),
+    user: UserDTO = Depends(get_synced_user),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> RestaurantDTO:
+    result = RestaurantService(uow.restaurants).get_me(
+        user.id,
+        user.email,
+        restaurant_id=restaurant_id,
+    )
+    if result.restaurant is None:
+        raise NotFoundError("Restaurant not found")
+    if result.member_role not in {"owner", "admin"}:
+        raise ForbiddenError("You do not have access to this restaurant")
+    return result.restaurant
 
 
 def _maybe_request_mexy_delivery(
@@ -192,6 +227,91 @@ def remove_my_restaurant_admin_member(
     service: RestaurantService = Depends(_service),
 ) -> None:
     service.remove_admin_member(user.id, member_id)
+
+
+@router.post(
+    "/me/dispatch-requests",
+    response_model=DispatchRequestDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_dispatch_request(
+    data: DispatchRequestCreate,
+    restaurant: RestaurantDTO = Depends(_owned_me_restaurant),
+    service: RestaurantDispatchService = Depends(_dispatch_service),
+) -> DispatchRequestDTO:
+    return service.create(restaurant, data)
+
+
+@router.get(
+    "/me/dispatch-requests",
+    response_model=list[DispatchRequestDTO],
+)
+def list_dispatch_requests(
+    restaurant: RestaurantDTO = Depends(_owned_me_restaurant),
+    service: RestaurantDispatchService = Depends(_dispatch_service),
+) -> list[DispatchRequestDTO]:
+    return service.list(restaurant)
+
+
+@router.get(
+    "/me/dispatch-lead-times",
+    response_model=list[SearchLeadTimeDTO],
+)
+def list_dispatch_lead_times(
+    restaurant: RestaurantDTO = Depends(_owned_me_restaurant),
+    service: RestaurantDispatchService = Depends(_dispatch_service),
+) -> list[SearchLeadTimeDTO]:
+    return service.list_lead_times(restaurant)
+
+
+@router.patch(
+    "/me/dispatch-requests/{request_id}",
+    response_model=DispatchRequestDTO,
+)
+def patch_dispatch_request_payment(
+    request_id: UUID,
+    data: DispatchPaymentUpdate,
+    restaurant: RestaurantDTO = Depends(_owned_me_restaurant),
+    service: RestaurantDispatchService = Depends(_dispatch_service),
+) -> DispatchRequestDTO:
+    return service.update_payment(restaurant, request_id, data)
+
+
+@router.post(
+    "/me/dispatch-requests/{request_id}/cancel",
+    response_model=DispatchRequestDTO,
+)
+def cancel_dispatch_request(
+    request_id: UUID,
+    restaurant: RestaurantDTO = Depends(_owned_me_restaurant),
+    service: RestaurantDispatchService = Depends(_dispatch_service),
+) -> DispatchRequestDTO:
+    return service.cancel(restaurant, request_id)
+
+
+@router.post(
+    "/me/dispatch-requests/{request_id}/retry",
+    response_model=DispatchRequestDTO,
+)
+def retry_dispatch_request(
+    request_id: UUID,
+    restaurant: RestaurantDTO = Depends(_owned_me_restaurant),
+    service: RestaurantDispatchService = Depends(_dispatch_service),
+) -> DispatchRequestDTO:
+    return service.retry(restaurant, request_id)
+
+
+@router.post(
+    "/me/dispatch-requests/{request_id}/confirm-rider-cash",
+    response_model=DispatchRequestDTO,
+)
+def confirm_dispatch_rider_cash(
+    request_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    restaurant: RestaurantDTO = Depends(_owned_me_restaurant),
+    service: RestaurantDispatchService = Depends(_dispatch_service),
+) -> DispatchRequestDTO:
+    return service.confirm_rider_cash(restaurant, request_id, user.id)
 
 
 @router.get("/{restaurant_id}", response_model=RestaurantDTO)
