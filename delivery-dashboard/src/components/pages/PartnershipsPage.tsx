@@ -138,22 +138,31 @@ export default function PartnershipsPage() {
     }
   }
 
-  const pendingCount = requests.length;
-  const activeCount = activePartnerships.length;
+  const pendingInView = useMemo(
+    () => (filterZoneId ? requests.filter((item) => item.zone.id === filterZoneId) : requests),
+    [filterZoneId, requests],
+  );
+  const activeInView = useMemo(
+    () =>
+      filterZoneId
+        ? activePartnerships.filter((item) => item.zone.id === filterZoneId)
+        : activePartnerships,
+    [activePartnerships, filterZoneId],
+  );
+  const pendingCount = pendingInView.length;
+  const activeCount = activeInView.length;
 
-  const tabItems = tab === 'pending' ? requests : activePartnerships;
-
-  const filteredItems = useMemo(() => {
-    if (!filterZoneId) return tabItems;
-    return tabItems.filter((item) => item.zone.id === filterZoneId);
-  }, [filterZoneId, tabItems]);
+  const tabItems = tab === 'pending' ? pendingInView : activeInView;
 
   const groupedItems = useMemo(
-    () => (filterZoneId ? null : groupItemsByZone(filteredItems, zones)),
-    [filterZoneId, filteredItems, zones],
+    () => (filterZoneId ? null : groupItemsByZone(tabItems, zones)),
+    [filterZoneId, tabItems, zones],
   );
 
-  const zoneFilterEmpty = filterZoneId !== null && tabItems.length > 0 && filteredItems.length === 0;
+  const zoneFilterEmpty =
+    filterZoneId !== null &&
+    (tab === 'pending' ? requests : activePartnerships).length > 0 &&
+    tabItems.length === 0;
 
   const cardProps = {
     zones,
@@ -202,7 +211,7 @@ export default function PartnershipsPage() {
     if (filterZoneId) {
       return (
         <div className={styles.list}>
-          {filteredItems.map((item) =>
+          {tabItems.map((item) =>
             tab === 'pending' ? renderPendingCard(item) : renderActiveCard(item),
           )}
         </div>
