@@ -1,3 +1,4 @@
+import base64
 import uuid
 
 import pytest
@@ -19,6 +20,9 @@ TINY_PNG = (
     "data:image/png;base64,"
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 )
+TINY_PDF = "data:application/pdf;base64," + base64.b64encode(
+    b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
+).decode("ascii")
 
 
 class FakeAuth(AuthPort):
@@ -60,6 +64,12 @@ def _create_provider(client) -> uuid.UUID:
     return uuid.UUID(resp.json()["id"])
 
 
+def _main_zone_id(client) -> str:
+    resp = client.get("/api/v1/delivery-providers/me/zones", headers=AUTH)
+    assert resp.status_code == 200, resp.text
+    return resp.json()[0]["id"]
+
+
 def _invite_and_claim_operator(client, provider_id: uuid.UUID) -> None:
     created = client.post(
         "/api/v1/delivery-providers/me/admin-invites",
@@ -86,6 +96,8 @@ def _driver_create_payload(email: str = "rider@empresa.com") -> dict:
         "first_name": "Juan",
         "last_name": "Pérez",
         "phone": "+525511112233",
+        "emergency_contact_name": "María Pérez",
+        "emergency_contact_phone": "+525598765432",
         "email": email,
         "compartment_size": "normal",
         "plate": "ABC123",
@@ -119,6 +131,74 @@ def test_owner_can_create_driver(client):
     assert body["credit_held_cents"] == 0
     assert body["email"] == "rider@empresa.com"
     assert body["is_online"] is False
+    assert body["profile_photo_path"].endswith(".webp")
+    assert body["ine_document_path"].endswith(".webp")
+    assert body["license_document_path"].endswith(".webp")
+    assert body["insurance_document_path"].endswith(".webp")
+    assert body["plate"] == "ABC123"
+    assert body["emergency_contact_name"] == "María Pérez"
+    assert body["emergency_contact_phone"] == "+525598765432"
+    assert body["registered_zone_id"] is None
+    assert body["registered_zone_name"] is None
+
+
+@requires_db
+def test_create_driver_stores_informational_zone_and_uppercases_plate(client):
+    _create_provider(client)
+    zone_id = _main_zone_id(client)
+
+    payload = _driver_create_payload("zona-rider@empresa.com")
+    payload["plate"] = "ab-12cd"
+    payload["registered_zone_id"] = zone_id
+
+    response = client.post(
+        "/api/v1/delivery-providers/me/drivers",
+        json=payload,
+        headers=AUTH,
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["plate"] == "AB-12CD"
+    assert body["registered_zone_id"] == zone_id
+    assert body["registered_zone_name"] == "Cobertura principal"
+
+
+@requires_db
+def test_create_driver_rejects_foreign_registered_zone(client):
+    _create_provider(client)
+    payload = _driver_create_payload("bad-zone@empresa.com")
+    payload["registered_zone_id"] = str(uuid.uuid4())
+
+    response = client.post(
+        "/api/v1/delivery-providers/me/drivers",
+        json=payload,
+        headers=AUTH,
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["message"] == "La zona de empresa no es válida"
+
+
+@requires_db
+def test_pdf_driver_documents_keep_pdf_extension(client):
+    _create_provider(client)
+
+    payload = _driver_create_payload("pdf-rider@empresa.com")
+    payload["ine_document_base64"] = TINY_PDF
+    payload["ine_document_file_name"] = "ine.pdf"
+    payload["license_document_base64"] = TINY_PDF
+    payload["license_document_file_name"] = "licencia.pdf"
+
+    response = client.post(
+        "/api/v1/delivery-providers/me/drivers",
+        json=payload,
+        headers=AUTH,
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["profile_photo_path"].endswith(".webp")
+    assert body["ine_document_path"].endswith(".pdf")
+    assert body["license_document_path"].endswith(".pdf")
+    assert body["insurance_document_path"].endswith(".webp")
 
 
 @requires_db
