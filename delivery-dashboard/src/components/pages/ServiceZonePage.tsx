@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import { ServiceZoneMapDrawer } from '@/components/onboarding/ServiceZoneMapDrawer';
@@ -49,11 +49,22 @@ export default function ServiceZonePage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createForm, setCreateForm] = useState<ZoneFormState>(() => createEmptyZoneForm());
   const [creating, setCreating] = useState(false);
+  const createDialogRef = useRef<HTMLDivElement>(null);
 
   const isDirty = useMemo(() => zoneFieldsDirty(form, initialForm), [form, initialForm]);
   const restaurantCount = selectedZone?.restaurant_count ?? 0;
   const deleteBlocked = restaurantCount > 0;
   const canDeleteZone = canWriteProviderConfig && zones.length > 1;
+  const referenceZones = useMemo(
+    () =>
+      zones.flatMap((zone) => {
+        if (!zone.polygon) return [];
+        const ring = zone.polygon.coordinates[0];
+        if (!ring || ring.length < 4) return [];
+        return [{ id: zone.id, name: zone.name, polygon: zone.polygon }];
+      }),
+    [zones],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -199,6 +210,40 @@ export default function ServiceZonePage() {
     setCreateDialogOpen(true);
   };
 
+  useEffect(() => {
+    if (!createDialogOpen) return;
+
+    const previousBody = document.body.style.overflow;
+    const previousHtml = document.documentElement.style.overflow;
+    const locked = Array.from(document.querySelectorAll<HTMLElement>('[data-scroll-lock]')).map(
+      (node) => ({ node, overflow: node.style.overflow }),
+    );
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    locked.forEach(({ node }) => {
+      node.style.overflow = 'hidden';
+    });
+
+    createDialogRef.current?.querySelector('input')?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || creating) return;
+      event.preventDefault();
+      setCreateDialogOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousBody;
+      document.documentElement.style.overflow = previousHtml;
+      locked.forEach(({ node, overflow }) => {
+        node.style.overflow = overflow;
+      });
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [createDialogOpen, creating]);
+
   return (
     <>
       <PanelPageShell
@@ -322,54 +367,76 @@ export default function ServiceZonePage() {
       {createDialogOpen ? (
         <div
           className={createStyles.modalBackdrop}
+          data-scroll-root
           role="presentation"
           onClick={(event) => {
             if (event.target === event.currentTarget && !creating) setCreateDialogOpen(false);
           }}
         >
           <div
+            ref={createDialogRef}
             className={createStyles.modal}
             role="dialog"
             aria-modal="true"
             aria-labelledby="create-zone-title"
+            tabIndex={-1}
           >
-            <h2 id="create-zone-title" className={createStyles.modalTitle}>
-              Nueva zona de reparto
-            </h2>
-            <p className={createStyles.modalHint}>
-              Asigna un nombre y dibuja el polígono de cobertura para la nueva zona.
-            </p>
+            <div className={createStyles.modalHeader}>
+              <h2 id="create-zone-title" className={createStyles.modalTitle}>
+                Nueva zona de reparto
+              </h2>
+              <p className={createStyles.modalHint}>
+                Asigna un nombre y dibuja el polígono de cobertura para la nueva zona. Las zonas
+                actuales aparecen en azul solo como referencia.
+              </p>
+              {referenceZones.length > 0 ? (
+                <div className={createStyles.legend} aria-label="Leyenda del mapa">
+                  <span className={createStyles.legendItem}>
+                    <span className={`${createStyles.legendSwatch} ${createStyles.legendSwatchExisting}`} />
+                    Zonas actuales (solo consulta)
+                  </span>
+                  <span className={createStyles.legendItem}>
+                    <span className={`${createStyles.legendSwatch} ${createStyles.legendSwatchNew}`} />
+                    Nueva zona
+                  </span>
+                </div>
+              ) : null}
+            </div>
 
-            <label className={styles.label}>
-              Nombre de la zona
-              <input
-                className={styles.input}
-                value={createForm.serviceZoneName}
-                placeholder="Cobertura norte"
-                onChange={(e) =>
-                  setCreateForm((prev) => ({ ...prev, serviceZoneName: e.target.value }))
-                }
-              />
-            </label>
+            <div className={createStyles.modalBody}>
+              <label className={styles.label}>
+                Nombre de la zona
+                <input
+                  className={styles.input}
+                  value={createForm.serviceZoneName}
+                  placeholder="Cobertura norte"
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({ ...prev, serviceZoneName: e.target.value }))
+                  }
+                />
+              </label>
 
-            <div className={styles.mapWrap}>
-              <ServiceZoneMapDrawer
-                polygon={createForm.serviceZonePolygon}
-                searchAddress={createForm.serviceZoneSearchAddress}
-                centerLat={createForm.serviceZoneCenterLat}
-                centerLng={createForm.serviceZoneCenterLng}
-                onSearchPlaceChange={(place) =>
-                  setCreateForm((prev) => ({
-                    ...prev,
-                    serviceZoneSearchAddress: place.address,
-                    serviceZoneCenterLat: place.latitude,
-                    serviceZoneCenterLng: place.longitude,
-                  }))
-                }
-                onPolygonChange={(polygon) =>
-                  setCreateForm((prev) => ({ ...prev, serviceZonePolygon: polygon }))
-                }
-              />
+              <div className={createStyles.mapSlot}>
+                <ServiceZoneMapDrawer
+                  polygon={createForm.serviceZonePolygon}
+                  searchAddress={createForm.serviceZoneSearchAddress}
+                  centerLat={createForm.serviceZoneCenterLat}
+                  centerLng={createForm.serviceZoneCenterLng}
+                  referenceZones={referenceZones}
+                  embeddedInScrollable
+                  onSearchPlaceChange={(place) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      serviceZoneSearchAddress: place.address,
+                      serviceZoneCenterLat: place.latitude,
+                      serviceZoneCenterLng: place.longitude,
+                    }))
+                  }
+                  onPolygonChange={(polygon) =>
+                    setCreateForm((prev) => ({ ...prev, serviceZonePolygon: polygon }))
+                  }
+                />
+              </div>
             </div>
 
             <div className={createStyles.modalActions}>
