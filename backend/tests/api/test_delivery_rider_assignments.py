@@ -81,8 +81,22 @@ def test_get_me_includes_active_assignments_after_accept(client, engine):
     assignment = assignments[0]
     assert assignment["id"] == request_id
     assert assignment["status"] == "assigned"
+    assert assignment["short_id"]
+    assert len(assignment["short_id"]) == 5
     assert assignment["restaurant_name"] == "Dispatch Bistro"
     assert assignment["dropoff_address"] == "Centro Histórico, CDMX"
+    assert "restaurant_address" in assignment
+    assert assignment["dropoff_lat"] is not None
+    assert assignment["dropoff_lng"] is not None
+    assert assignment["payment_method"] == "cash"
+    assert assignment["collect_cents"] == 25000
+    assert assignment["cash_denomination_cents"] == 50000
+    assert assignment["package_count"] == 1
+    assert assignment["package_size"] == "normal"
+    assert isinstance(assignment["quoted_fee_cents"], int)
+    assert "notes" in assignment
+    assert assignment.get("customer_name") in (None, "")
+    assert assignment.get("customer_phone") in (None, "")
 
 
 @requires_db
@@ -119,6 +133,14 @@ def test_assignment_status_flow_picked_up_in_transit_delivered(client, engine):
     )
     assert picked_up.status_code == 200, picked_up.text
     assert picked_up.json()["status"] == "picked_up"
+    assert picked_up.json()["customer_name"] == "María López"
+    assert picked_up.json()["customer_phone"] == "+525512345678"
+
+    me_picked = client.get("/api/v1/rider/me", headers=AUTH)
+    assert me_picked.status_code == 200, me_picked.text
+    picked_assignment = me_picked.json()["assignments"][0]
+    assert picked_assignment["customer_name"] == "María López"
+    assert picked_assignment["customer_phone"] == "+525512345678"
 
     in_transit = client.post(
         f"/api/v1/rider/me/assignments/{request_id}/in-transit",
