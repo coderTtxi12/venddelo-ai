@@ -8,6 +8,7 @@ from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.infra.cache.menu_cache import MenuCacheService
 from app.infra.cache.translated_menu import TranslatedMenuService
 from app.infra.redis.factory import build_cache
+from app.infra.storage.factory import build_storage
 from app.modules.delivery_dispatch.schemas import PublicDispatchTrackingDTO
 from app.modules.delivery_dispatch.service import RestaurantDispatchService
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
@@ -89,6 +90,7 @@ def _restaurant_dispatch_service(
     return RestaurantDispatchService(
         uow.session,
         SqlAlchemyDeliveryProviderRepository(uow.session),
+        build_storage(),
     )
 
 

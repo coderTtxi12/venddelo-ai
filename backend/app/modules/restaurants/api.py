@@ -11,6 +11,7 @@ from app.api.deps import (
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
+from app.infra.storage.factory import build_storage
 from app.modules.delivery_dispatch.schemas import (
     DispatchPaymentUpdate,
     DispatchRequestCreate,
@@ -68,6 +69,7 @@ def _dispatch_service(
     return RestaurantDispatchService(
         uow.session,
         SqlAlchemyDeliveryProviderRepository(uow.session),
+        build_storage(),
     )
 
 
