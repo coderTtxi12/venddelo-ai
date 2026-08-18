@@ -280,6 +280,8 @@ class RiderAssignmentDTO(BaseModel):
     notes: str | None = None
     customer_name: str | None = None
     customer_phone: str | None = None
+    case_applied: str | None = None
+    dispatch_group_id: uuid.UUID | None = None
 
 
 class RiderProfileDTO(DeliveryDriverDTO):
