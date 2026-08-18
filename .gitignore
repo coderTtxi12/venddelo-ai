@@ -72,7 +72,9 @@ docker-compose.override.yml
 .superpowers/
 scripts/apply-commits-copy-paste.sh
 
-# Misc
-*.pem
-*.log
-coverage/
+# Firebase / FCM client and service-account secrets
+google-services.json
+GoogleService-Info.plist
+*firebase-adminsdk*.json
+**/.secrets/
+backend/.secrets/firebase-adminsdk.json
