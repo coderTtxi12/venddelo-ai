@@ -1,0 +1,135 @@
+.map {
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-border) 25%, var(--color-surface));
+}
+
+.fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 360px;
+  border: 1px dashed var(--color-border);
+  border-radius: 14px;
+  color: var(--color-text-secondary);
+  font-size: 0.88rem;
+}
+
+.driverPin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.45rem 0.2rem 0.2rem;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: 2px solid #16a34a;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+.driverPinOffline {
+  border-color: #94a3b8;
+  opacity: 0.75;
+}
+
+.driverPinStale {
+  border-color: #f59e0b;
+}
+
+.driverPinFocused {
+  border-color: #2563eb;
+  border-width: 3px;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, #2563eb 28%, transparent),
+    0 2px 10px rgba(15, 23, 42, 0.18);
+  transform: scale(1.08);
+}
+
+.driverDot {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  flex-shrink: 0;
+}
+
+.driverLabel {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--color-text);
+}
+
+.dropoffPin {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  background: #f97316;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.2);
+}
+
+.restaurantPin {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 3px;
+  background: #7c3aed;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.2);
+}
+
+.zoneLabel {
+  pointer-events: none;
+  max-width: 11rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #1e3a8a 88%, #ffffff);
+  color: #ffffff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.28);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zoneLabelSelected {
+  background: #1d4ed8;
+}
+
+.requestLabel {
+  pointer-events: none;
+  padding: 0.12rem 0.42rem;
+  border-radius: 6px;
+  background: #1d4ed8;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.28);
+  font-variant-numeric: tabular-nums;
+}
+
+.dropoffPinFocused,
+.restaurantPinFocused {
+  width: 0.92rem;
+  height: 0.92rem;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #ea580c 35%, transparent);
+}
+
+.requestLabelFocused {
+  background: #9a3412;
+  box-shadow: 0 0 0 2px #fff, 0 1px 6px rgba(15, 23, 42, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .driverPinFocused {
+    transform: none;
+  }
+}
