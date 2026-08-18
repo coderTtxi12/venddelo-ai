@@ -26,6 +26,7 @@ import type {
   DeliveryDriverCreateInput,
   DeliveryDriverDocumentsUpdateInput,
   DeliveryDriverUpdateInput,
+  DispatchMonitorSnapshot,
 } from './types';
 
 function withZoneId(path: string, zoneId: string): string {
@@ -291,5 +292,31 @@ export function uploadMyDeliveryDriverDocuments(
     method: 'POST',
     token,
     body,
+  });
+}
+
+export function getMyDispatchMonitor(token: string, zoneId?: string | null) {
+  const path = zoneId
+    ? `/delivery-providers/me/dispatch-monitor?zone_id=${encodeURIComponent(zoneId)}`
+    : '/delivery-providers/me/dispatch-monitor';
+  return apiRequest<DispatchMonitorSnapshot>(path, { token });
+}
+
+export function createMyManualDispatchOffer(
+  token: string,
+  requestId: string,
+  driverId: string,
+) {
+  return apiRequest<{
+    id: string;
+    request_id: string;
+    driver_id: string;
+    case_applied: string;
+    expires_at: string;
+    tracking_token: string;
+  }>(`/delivery-providers/me/dispatch-requests/${requestId}/manual-offer`, {
+    method: 'POST',
+    token,
+    body: { driver_id: driverId },
   });
 }

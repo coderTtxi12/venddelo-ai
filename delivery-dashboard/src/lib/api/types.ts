@@ -326,3 +326,149 @@ export type DeliveryDriverDocumentsUpdateInput = {
   insurance_document_base64?: string;
   insurance_document_file_name?: string | null;
 };
+
+export type DispatchMonitorMetrics = {
+  drivers_online: number;
+  drivers_offline: number;
+  drivers_location_stale: number;
+  requests_pending: number;
+  requests_due_search: number;
+  requests_in_progress: number;
+  offers_open: number;
+  credit_holds_active: number;
+  drivers_credit_blocked: number;
+  high_demand: boolean;
+  requests_unassigned: number;
+  high_demand_few_free?: boolean;
+  high_demand_high_occupancy?: boolean;
+  high_demand_large_queue?: boolean;
+  high_demand_free_count?: number;
+  high_demand_occupied_ratio?: number;
+  assignment_timeout_seconds?: number;
+  offer_timeout_seconds?: number;
+  assignment_retry_seconds?: number;
+  max_active_packages_per_driver?: number;
+  tasks_backend?: string;
+};
+
+export type DispatchMonitorDriver = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  is_online: boolean;
+  status: string;
+  plate: string;
+  motorcycle_color: string;
+  compartment_size: string;
+  profile_photo_path: string;
+  last_lat: number | null;
+  last_lng: number | null;
+  location_updated_at: string | null;
+  location_stale: boolean;
+  location_age_seconds?: number | null;
+  credit_limit_cents: number;
+  credit_held_cents: number;
+  credit_available_cents: number;
+  credit_blocked: boolean;
+  active_request_id: string | null;
+  active_request_status: string | null;
+  open_offer_id: string | null;
+  is_pre_free?: boolean;
+  pre_free_eta_seconds?: number | null;
+  occupied_job_count?: number;
+  active_package_count?: number;
+};
+
+export type DispatchMonitorSearchBlocker = {
+  code: string;
+  count: number;
+};
+
+export type DispatchMonitorRequest = {
+  id: string;
+  short_id: string;
+  status: string;
+  customer_name: string;
+  customer_phone?: string;
+  restaurant_name: string;
+  restaurant_lat: number | null;
+  restaurant_lng: number | null;
+  dropoff_lat: number;
+  dropoff_lng: number;
+  dropoff_address: string;
+  payment_method: string;
+  collect_cents: number;
+  cash_denomination_cents?: number | null;
+  search_at: string;
+  ready_at: string;
+  next_attempt_at: string;
+  assignment_timeout_at?: string;
+  is_due_search: boolean;
+  assigned_driver_id: string | null;
+  assigned_driver_name: string | null;
+  last_assigned_driver_name?: string | null;
+  dispatch_group_id: string | null;
+  zone_name: string | null;
+  package_size: string;
+  package_count?: number;
+  quoted_fee_cents?: number;
+  notes?: string | null;
+  last_case?: string | null;
+  last_decision?: Record<string, unknown> | null;
+  eligible_driver_count?: number;
+  search_blockers?: DispatchMonitorSearchBlocker[];
+  cycle_rejected_count?: number;
+  cycle_silent_count?: number;
+};
+
+export type DispatchMonitorOffer = {
+  id: string;
+  request_id: string;
+  short_id: string;
+  driver_id: string;
+  driver_name: string;
+  status: string;
+  case_applied: string;
+  expires_at: string;
+  customer_name: string;
+  restaurant_name: string;
+  dropoff_address?: string | null;
+  score_json?: Record<string, unknown> | null;
+};
+
+export type DispatchMonitorCreditHold = {
+  id: string;
+  driver_id: string;
+  driver_name: string;
+  request_id: string;
+  short_id: string;
+  amount_cents: number;
+  status: string;
+  customer_name: string;
+  restaurant_name: string;
+};
+
+export type DispatchMonitorRoute = {
+  request_id: string;
+  short_id: string;
+  driver_id: string;
+  driver_name: string;
+  status: string;
+  origin_lat: number;
+  origin_lng: number;
+  origin_label: string;
+  destination_lat: number;
+  destination_lng: number;
+  destination_label: string;
+};
+
+export type DispatchMonitorSnapshot = {
+  generated_at: string;
+  metrics: DispatchMonitorMetrics;
+  drivers: DispatchMonitorDriver[];
+  requests: DispatchMonitorRequest[];
+  offers: DispatchMonitorOffer[];
+  credit_holds: DispatchMonitorCreditHold[];
+  routes: DispatchMonitorRoute[];
+};
