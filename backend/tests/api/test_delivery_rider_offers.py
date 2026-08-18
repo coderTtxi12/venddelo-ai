@@ -1196,3 +1196,4 @@ def test_case_c_offer_lists_grouped_stops(client, engine):
     addresses = {stop["dropoff_address"] for stop in stops}
     assert addresses == {"Centro Histórico, CDMX", "Roma Norte, CDMX"}
     assert all(stop["restaurant_name"] == "Dispatch Bistro" for stop in stops)
+    assert body[0]["package_count"] == 2
