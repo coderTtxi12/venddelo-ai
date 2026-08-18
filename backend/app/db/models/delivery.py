@@ -604,6 +604,7 @@ class DeliveryDispatchRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=True,
     )
     tracking_token: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    short_id: Mapped[str] = mapped_column(String(8), nullable=False, unique=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     decision_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -690,7 +691,7 @@ class DeliveryDispatchOffer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="status_allowed",
         ),
         CheckConstraint(
-            "case_applied IN ('A','B','C','D')",
+            "case_applied IN ('A','B','C','D','M')",
             name="case_applied_allowed",
         ),
         Index(
