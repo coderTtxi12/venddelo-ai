@@ -19,6 +19,7 @@ class RiderAssignment {
     this.notes,
     this.customerName,
     this.customerPhone,
+    this.caseApplied,
   });
 
   final String id;
@@ -40,6 +41,7 @@ class RiderAssignment {
   final String? notes;
   final String? customerName;
   final String? customerPhone;
+  final String? caseApplied;
 
   factory RiderAssignment.fromJson(Map<String, dynamic> json) {
     return RiderAssignment(
@@ -62,6 +64,7 @@ class RiderAssignment {
       notes: json['notes'] as String?,
       customerName: json['customer_name'] as String?,
       customerPhone: json['customer_phone'] as String?,
+      caseApplied: json['case_applied'] as String?,
     );
   }
 }
