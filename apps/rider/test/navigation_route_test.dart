@@ -135,6 +135,7 @@ void main() {
     expect(jobs.current?.status, 'assigned');
     expect(jobs.queued.map((item) => item.id), ['a1']);
     expect(jobStepLabel(jobs.current!.status), 'Recoge el pedido');
+    expect(queuedJobLabel(jobs.queued.first), 'Luego: entregar');
   });
 
   test('splitRiderJobs finishes the in-transit delivery before the next pickup', () {
@@ -155,5 +156,121 @@ void main() {
 
     expect(jobs.current?.id, 'a1');
     expect(jobs.queued.map((item) => item.id), ['a2']);
+  });
+
+  test('splitRiderJobs inserts a case D pickup before an in-transit delivery', () {
+    const delivering = RiderAssignment(
+      id: 'a1',
+      status: 'in_transit',
+      restaurantName: 'Tacos',
+      dropoffAddress: 'Calle 1',
+      dropoffLat: 19.44,
+      dropoffLng: -99.14,
+      caseApplied: 'A',
+    );
+    const detour = RiderAssignment(
+      id: 'a2',
+      status: 'assigned',
+      restaurantName: 'Sushi',
+      dropoffAddress: 'Calle 2',
+      restaurantLat: 19.435,
+      restaurantLng: -99.135,
+      caseApplied: 'D',
+    );
+
+    final jobs = splitRiderJobs([delivering, detour]);
+
+    expect(jobs.current?.id, 'a2');
+    expect(jobs.current?.status, 'assigned');
+    expect(jobs.queued.map((item) => item.id), ['a1']);
+  });
+
+  test('splitRiderJobs picks up the nearest restaurant first', () {
+    const far = RiderAssignment(
+      id: 'far',
+      status: 'assigned',
+      restaurantName: 'Far',
+      dropoffAddress: 'Calle Far',
+      restaurantLat: 19.50,
+      restaurantLng: -99.20,
+      caseApplied: 'C',
+    );
+    const near = RiderAssignment(
+      id: 'near',
+      status: 'assigned',
+      restaurantName: 'Near',
+      dropoffAddress: 'Calle Near',
+      restaurantLat: 19.431,
+      restaurantLng: -99.131,
+      caseApplied: 'C',
+    );
+
+    final jobs = splitRiderJobs(
+      [far, near],
+      riderLat: 19.43,
+      riderLng: -99.13,
+    );
+
+    expect(jobs.current?.id, 'near');
+    expect(jobs.queued.map((item) => item.id), ['far']);
+  });
+
+  test('splitRiderJobs delivers the nearest dropoff first after pickups', () {
+    const far = RiderAssignment(
+      id: 'far',
+      status: 'picked_up',
+      restaurantName: 'Tacos',
+      dropoffAddress: 'Far',
+      dropoffLat: 19.50,
+      dropoffLng: -99.20,
+      caseApplied: 'C',
+    );
+    const near = RiderAssignment(
+      id: 'near',
+      status: 'picked_up',
+      restaurantName: 'Tacos',
+      dropoffAddress: 'Near',
+      dropoffLat: 19.432,
+      dropoffLng: -99.132,
+      caseApplied: 'C',
+    );
+
+    final jobs = splitRiderJobs(
+      [far, near],
+      riderLat: 19.43,
+      riderLng: -99.13,
+    );
+
+    expect(jobs.current?.id, 'near');
+    expect(jobs.queued.map((item) => item.id), ['far']);
+  });
+
+  test('stackedJobPins shows remaining restaurants and dropoffs', () {
+    const pickup = RiderAssignment(
+      id: 'a2',
+      status: 'assigned',
+      restaurantName: 'Sushi',
+      dropoffAddress: 'Calle 2',
+      restaurantLat: 19.43,
+      restaurantLng: -99.13,
+      caseApplied: 'D',
+    );
+    const delivering = RiderAssignment(
+      id: 'a1',
+      status: 'in_transit',
+      restaurantName: 'Tacos',
+      dropoffAddress: 'Calle 1',
+      dropoffLat: 19.44,
+      dropoffLng: -99.14,
+      caseApplied: 'A',
+    );
+
+    final pins = stackedJobPins(splitRiderJobs([delivering, pickup]));
+
+    expect(pins, hasLength(2));
+    expect(pins.first.kind, 'restaurant');
+    expect(pins.first.current, isTrue);
+    expect(pins.last.kind, 'dropoff');
+    expect(pins.last.current, isFalse);
   });
 }
