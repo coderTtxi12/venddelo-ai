@@ -5,3 +5,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+# Firebase Admin SDK — never commit service accounts
+.secrets/
+.secrets/firebase-adminsdk.json
+*firebase-adminsdk*.json

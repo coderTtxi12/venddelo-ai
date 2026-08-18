@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     menu_public_domain: str = "mxy.mx"
     delivery_tasks_backend: str = "stub"
     delivery_tasks_secret: str | None = None
+    firebase_credentials_path: str | None = None
+    firebase_credentials_json: str | None = None
 
     @field_validator("database_url", "database_url_test")
     @classmethod
