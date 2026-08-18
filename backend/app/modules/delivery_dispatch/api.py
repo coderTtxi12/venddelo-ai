@@ -12,6 +12,8 @@ from app.modules.delivery_dispatch.schemas import (
     DeliveryDriverDocumentsUpdate,
     DeliveryDriverDTO,
     DeliveryDriverUpdate,
+    ManualOfferCreate,
+    ManualOfferDTO,
     SearchLeadTimeDTO,
     SearchLeadTimeUpdate,
 )
@@ -95,6 +97,20 @@ def patch_assignment_settings(
     service: DeliveryDispatchService = Depends(_service),
 ) -> AssignmentSettingsDTO:
     return service.update_assignment_settings(user.id, data)
+
+
+@router.post(
+    "/me/dispatch-requests/{request_id}/manual-offer",
+    response_model=ManualOfferDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_manual_offer(
+    request_id: UUID,
+    data: ManualOfferCreate,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryDispatchService = Depends(_service),
+) -> ManualOfferDTO:
+    return service.create_manual_offer(user.id, request_id, data)
 
 
 @router.get("/me/search-lead-times", response_model=list[SearchLeadTimeDTO])
