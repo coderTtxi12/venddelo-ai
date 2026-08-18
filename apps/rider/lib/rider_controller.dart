@@ -10,22 +10,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'api.dart';
 import 'config.dart';
+import 'friendly_error.dart';
 import 'location_auth.dart';
-import 'location_permission.dart';
 import 'location_task.dart';
 import 'models.dart';
+import 'offer_push.dart';
+import 'rider_permissions.dart';
 
 class RiderController extends ChangeNotifier {
-  RiderController({
-    RiderApi? api,
-    Future<bool> Function()? openAppSettingsImpl,
-  }) : _api =
-           api ??
-           RiderApi(
-             tokenProvider: () =>
-                 Supabase.instance.client.auth.currentSession?.accessToken,
-           ),
-       _openAppSettings = openAppSettingsImpl ?? Geolocator.openAppSettings;
+  RiderController({RiderApi? api, Future<bool> Function()? openAppSettingsImpl})
+    : _api =
+          api ??
+          RiderApi(
+            tokenProvider: () =>
+                Supabase.instance.client.auth.currentSession?.accessToken,
+          ),
+      _openAppSettings = openAppSettingsImpl ?? Geolocator.openAppSettings;
 
   final RiderApi _api;
   final Future<bool> Function() _openAppSettings;
@@ -38,11 +38,17 @@ class RiderController extends ChangeNotifier {
   bool onlineBusy = false;
   bool offerBusy = false;
   bool needsLocationSettings = false;
+  Position? currentPosition;
 
   Timer? _offerPoll;
+  Timer? _mePoll;
   StreamSubscription<RemoteMessage>? _fcmForeground;
+  StreamSubscription<RemoteMessage>? _fcmOpened;
+  StreamSubscription<String>? _fcmTokenRefresh;
   StreamSubscription<AuthState>? _authSub;
+  StreamSubscription<Position>? _positionSub;
   bool _listeningTaskData = false;
+  String? _alarmedOfferId;
 
   Future<void> bootstrap() async {
     loading = true;
@@ -54,6 +60,7 @@ class RiderController extends ChangeNotifier {
     try {
       await refreshMe();
       await _setupFcm();
+      await startLiveLocation();
       if (profile?.isOnline == true) {
         await _startOnlineServices();
       }
@@ -63,10 +70,15 @@ class RiderController extends ChangeNotifier {
         profile = null;
       } else {
         errorMessage = error.message;
+        await startLiveLocation();
       }
     } catch (error) {
-      errorMessage = error.toString();
+      errorMessage = friendlyErrorMessage(error);
+      await startLiveLocation();
     } finally {
+      if (!notRegistered) {
+        _startMePoll();
+      }
       loading = false;
       notifyListeners();
     }
@@ -77,16 +89,42 @@ class RiderController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _startMePoll() {
+    _mePoll?.cancel();
+    _mePoll = Timer.periodic(const Duration(seconds: 8), (_) {
+      unawaited(_refreshMeQuietly());
+    });
+  }
+
+  Future<void> _refreshMeQuietly() async {
+    try {
+      profile = await _api.getMe();
+      final recovered = errorMessage != null;
+      errorMessage = null;
+      notifyListeners();
+      if (recovered) {
+        unawaited(_setupFcm());
+        if (profile?.isOnline == true) {
+          unawaited(_startOnlineServices());
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> syncNotifications() async {
+    await _setupFcm();
+  }
+
   Future<void> refreshOffers() async {
     if (profile?.isOnline != true) {
-      offer = null;
+      _applyOffer(null);
       notifyListeners();
       return;
     }
     await _persistSessionToLocationTask();
     try {
       final offers = await _api.listOffers();
-      offer = offers.isEmpty ? null : offers.first;
+      _applyOffer(offers.isEmpty ? null : offers.first);
       notifyListeners();
     } on ApiException catch (error) {
       errorMessage = error.message;
@@ -103,24 +141,63 @@ class RiderController extends ChangeNotifier {
     notifyListeners();
     try {
       if (isOnline) {
-        await _ensureLocationPermissions();
-        await _requestNotificationPermission();
+        try {
+          await ensureLocationPermissionsForOnline();
+          await ensureNotificationPermissionsForOnline();
+        } on LocationPermissionException catch (error) {
+          needsLocationSettings = true;
+          throw ApiException(400, error.message);
+        }
         profile = await _api.setOnline(true);
+        await startLiveLocation();
+        await _setupFcm();
         await _startOnlineServices();
       } else {
         await _stopOnlineServices();
         profile = await _api.setOnline(false);
-        offer = null;
+        _applyOffer(null);
         needsLocationSettings = false;
       }
     } on ApiException catch (error) {
       errorMessage = error.message;
     } catch (error) {
-      errorMessage = error.toString();
+      errorMessage = friendlyErrorMessage(error);
     } finally {
       onlineBusy = false;
       notifyListeners();
     }
+  }
+
+  Future<void> startLiveLocation() async {
+    if (_positionSub != null) {
+      return;
+    }
+    final permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return;
+    }
+    try {
+      currentPosition = await Geolocator.getLastKnownPosition();
+      currentPosition ??= await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+      notifyListeners();
+    } catch (_) {}
+
+    _positionSub =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 6,
+          ),
+        ).listen((position) {
+          currentPosition = position;
+          notifyListeners();
+        });
   }
 
   Future<void> openLocationSettings() async {
@@ -137,7 +214,7 @@ class RiderController extends ChangeNotifier {
     notifyListeners();
     try {
       await _api.acceptOffer(current.id);
-      offer = null;
+      _applyOffer(null);
       await refreshMe();
     } on ApiException catch (error) {
       errorMessage = error.message;
@@ -158,7 +235,7 @@ class RiderController extends ChangeNotifier {
     notifyListeners();
     try {
       await _api.rejectOffer(current.id);
-      offer = null;
+      _applyOffer(null);
     } on ApiException catch (error) {
       errorMessage = error.message;
     } finally {
@@ -188,58 +265,83 @@ class RiderController extends ChangeNotifier {
     await refreshOffers();
   }
 
+  void _applyOffer(RiderOffer? next) {
+    offer = next;
+    _syncOfferAlarm(next?.id);
+  }
+
+  void _syncOfferAlarm(String? nextOfferId) {
+    if (shouldStopOfferAlarm(
+      nextOfferId: nextOfferId,
+      alarmedOfferId: _alarmedOfferId,
+    )) {
+      unawaited(stopOfferAlarm());
+      _alarmedOfferId = null;
+    }
+    if (shouldStartOfferAlarm(
+      nextOfferId: nextOfferId,
+      alarmedOfferId: _alarmedOfferId,
+    )) {
+      _alarmedOfferId = nextOfferId;
+      unawaited(startOfferAlarm(offerId: nextOfferId));
+    }
+  }
+
   Future<void> _stopOnlineServices() async {
     _offerPoll?.cancel();
     _offerPoll = null;
     await stopLocationForegroundTask();
   }
 
-  Future<void> _ensureLocationPermissions() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      needsLocationSettings = false;
-      throw const ApiException(400, 'Activa el GPS para ponerte en línea.');
-    }
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.whileInUse) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (!canGoOnlineWithPermission(permission)) {
-      needsLocationSettings = shouldOfferLocationSettings(permission);
-      throw const ApiException(400, alwaysLocationRequiredMessage);
-    }
-    needsLocationSettings = false;
-  }
-
-  Future<void> _requestNotificationPermission() async {
-    final status = await FlutterForegroundTask.checkNotificationPermission();
-    if (status != NotificationPermission.granted) {
-      await FlutterForegroundTask.requestNotificationPermission();
-    }
-  }
-
   Future<void> _setupFcm() async {
     if (Firebase.apps.isEmpty) {
+      debugPrint('FCM skipped: Firebase not initialized');
       return;
     }
     try {
       final messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission();
-      final token = await messaging.getToken();
-      if (token != null) {
-        await _api.putFcmToken(token);
+      final settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      final authorized =
+          settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+      if (!authorized) {
+        debugPrint('FCM skipped: permission ${settings.authorizationStatus}');
+        return;
       }
+      final token = await messaging.getToken();
+      if (token == null) {
+        debugPrint('FCM skipped: getToken returned null');
+        return;
+      }
+      await _api.putFcmToken(token);
+      debugPrint('FCM token saved (${token.length} chars)');
       await _fcmForeground?.cancel();
-      _fcmForeground = FirebaseMessaging.onMessage.listen((_) {
+      _fcmForeground = FirebaseMessaging.onMessage.listen((message) {
+        final offerId = offerIdFromPushData(message.data);
+        if (offerId != null) {
+          _syncOfferAlarm(offerId);
+        }
         unawaited(refreshOffers());
       });
-      FirebaseMessaging.onMessageOpenedApp.listen((_) {
+      await _fcmTokenRefresh?.cancel();
+      _fcmTokenRefresh = messaging.onTokenRefresh.listen((refreshToken) {
+        unawaited(_api.putFcmToken(refreshToken));
+      });
+      await _fcmOpened?.cancel();
+      _fcmOpened = FirebaseMessaging.onMessageOpenedApp.listen((_) {
         unawaited(refreshOffers());
       });
-    } catch (_) {}
+      final initial = await messaging.getInitialMessage();
+      if (initial != null) {
+        unawaited(refreshOffers());
+      }
+    } catch (error, stackTrace) {
+      debugPrint('FCM setup failed: $error\n$stackTrace');
+    }
   }
 
   void _listenTaskData() {
@@ -251,9 +353,7 @@ class RiderController extends ChangeNotifier {
   }
 
   void _listenAuth() {
-    _authSub ??= Supabase.instance.client.auth.onAuthStateChange.listen((
-      data,
-    ) {
+    _authSub ??= Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final session = data.session;
       if (session != null) {
         unawaited(_persistSessionToLocationTask(session));
@@ -273,7 +373,7 @@ class RiderController extends ChangeNotifier {
       return;
     }
     await saveLocationTaskCredentials(
-      apiBaseUrl: AppConfig.apiBaseUrl,
+      apiBaseUrl: _api.resolvedApiBaseUrl,
       accessToken: current.accessToken,
       refreshToken: current.refreshToken ?? '',
       supabaseUrl: AppConfig.supabaseUrl,
@@ -283,7 +383,7 @@ class RiderController extends ChangeNotifier {
 
   Future<void> _forceOfflineAfterAuthFailure() async {
     errorMessage = locationAuthFailedMessage;
-    offer = null;
+    _applyOffer(null);
     await _stopOnlineServices();
     try {
       profile = await _api.setOnline(false);
@@ -296,8 +396,13 @@ class RiderController extends ChangeNotifier {
   @override
   void dispose() {
     _offerPoll?.cancel();
+    _mePoll?.cancel();
+    unawaited(stopOfferAlarm());
     unawaited(_fcmForeground?.cancel());
+    unawaited(_fcmOpened?.cancel());
+    unawaited(_fcmTokenRefresh?.cancel());
     unawaited(_authSub?.cancel());
+    unawaited(_positionSub?.cancel());
     if (_listeningTaskData) {
       FlutterForegroundTask.removeTaskDataCallback(_onTaskData);
       _listeningTaskData = false;

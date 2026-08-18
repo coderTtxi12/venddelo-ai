@@ -1,21 +1,26 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
+import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'auth.dart';
+import 'auth_gate.dart';
 import 'config.dart';
-import 'location_task.dart';
-import 'rider_controller.dart';
-import 'screens/home_screen.dart';
-import 'screens/login_screen.dart';
-import 'screens/not_registered_screen.dart';
-import 'screens/offer_screen.dart';
+import 'firebase_options.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _configureGoogleMapsAndroid();
   FlutterForegroundTask.initCommunicationPort();
   if (AppConfig.isConfigured) {
     await Supabase.initialize(
@@ -23,10 +28,27 @@ Future<void> main() async {
       publishableKey: AppConfig.supabaseAnonKey,
     );
     try {
-      await Firebase.initializeApp();
-    } catch (_) {}
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      debugPrint('Firebase initialized for FCM');
+    } catch (error, stackTrace) {
+      debugPrint('Firebase init skipped: $error\n$stackTrace');
+    }
   }
   runApp(const MexyRiderApp());
+}
+
+void _configureGoogleMapsAndroid() {
+  if (kIsWeb) {
+    return;
+  }
+  final mapsImplementation = GoogleMapsFlutterPlatform.instance;
+  if (mapsImplementation is GoogleMapsFlutterAndroid) {
+    // Stack overlays (sheet, chips) need Hybrid Composition on Xiaomi/Impeller.
+    mapsImplementation.useAndroidViewSurface = true;
+  }
 }
 
 class MexyRiderApp extends StatelessWidget {
@@ -65,121 +87,6 @@ class _MissingConfigScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
-
-  @override
-  State<AuthGate> createState() => _AuthGateState();
-}
-
-class _AuthGateState extends State<AuthGate> {
-  RiderController? _controller;
-  String? _loginError;
-  bool _signingIn = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final session = Supabase.instance.client.auth.currentSession;
-    if (session != null) {
-      _attachController();
-    }
-    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      if (!mounted) {
-        return;
-      }
-      if (data.session == null) {
-        _controller?.dispose();
-        setState(() => _controller = null);
-      } else if (_controller == null) {
-        _attachController();
-      }
-    });
-  }
-
-  void _attachController() {
-    final controller = RiderController();
-    _controller = controller;
-    controller.bootstrap();
-    setState(() {});
-  }
-
-  Future<void> _onGoogleSignIn() async {
-    setState(() {
-      _signingIn = true;
-      _loginError = null;
-    });
-    try {
-      await signInWithGoogle();
-    } catch (error) {
-      if (mounted) {
-        setState(() => _loginError = error.toString());
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _signingIn = false);
-      }
-    }
-  }
-
-  Future<void> _onSignOut() async {
-    await stopLocationForegroundTask();
-    await signOut();
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = _controller;
-    if (controller == null) {
-      return LoginScreen(
-        onGoogleSignIn: _signingIn ? null : _onGoogleSignIn,
-        error: _loginError,
-      );
-    }
-    return ListenableBuilder(
-      listenable: controller,
-      builder: (context, _) {
-        if (controller.loading) {
-          return const Scaffold(
-            body: Center(
-              child: Padding(
-                padding: EdgeInsets.all(AppTheme.screenPadding),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Cargando tu perfil…'),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
-        if (controller.notRegistered) {
-          return NotRegisteredScreen(onSignOut: _onSignOut);
-        }
-        if (controller.offer != null) {
-          return OfferScreen(
-            offer: controller.offer!,
-            errorMessage: controller.errorMessage,
-            busy: controller.offerBusy,
-            onAccept: controller.acceptOffer,
-            onReject: controller.rejectOffer,
-          );
-        }
-        return HomeScreen(controller: controller, onSignOut: _onSignOut);
-      },
     );
   }
 }

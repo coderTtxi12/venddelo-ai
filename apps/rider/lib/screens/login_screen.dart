@@ -4,10 +4,16 @@ import '../theme/app_colors.dart';
 import '../widgets/rider_widgets.dart';
 
 class LoginScreen extends StatelessWidget {
-  const LoginScreen({super.key, required this.onGoogleSignIn, this.error});
+  const LoginScreen({
+    super.key,
+    required this.onGoogleSignIn,
+    this.error,
+    this.loading = false,
+  });
 
   final VoidCallback? onGoogleSignIn;
   final String? error;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -18,21 +24,12 @@ class LoginScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(),
-              Container(
-                width: 72,
-                height: 72,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(
-                  Icons.two_wheeler_rounded,
-                  color: Colors.white,
-                  size: 36,
-                ),
+              const Icon(
+                Icons.two_wheeler_rounded,
+                color: AppColors.primary,
+                size: 56,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               Text(
                 'Mexy Rider',
                 textAlign: TextAlign.center,
@@ -40,7 +37,7 @@ class LoginScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Entra con el mismo correo que Mexy dio de alta.',
+                'Entra con el mismo correo con el que Mexy te dio de alta.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: AppColors.textSecondary,
@@ -52,8 +49,8 @@ class LoginScreen extends StatelessWidget {
                 const SizedBox(height: 16),
               ],
               RiderPrimaryButton(
-                label: 'Continuar con Google',
-                onPressed: onGoogleSignIn,
+                label: loading ? 'Entrando…' : 'Continuar con Google',
+                onPressed: loading ? null : onGoogleSignIn,
               ),
             ],
           ),
