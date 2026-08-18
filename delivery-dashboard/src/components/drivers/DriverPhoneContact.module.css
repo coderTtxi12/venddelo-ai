@@ -1,0 +1,83 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  margin-top: 0.15rem;
+}
+
+.numberLink {
+  min-width: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #128c7e;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.numberLink:hover {
+  color: #0f766e;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.actionWhatsApp,
+.actionPhone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.actionWhatsApp {
+  color: #128c7e;
+  border-color: color-mix(in srgb, #25d366 28%, var(--color-border));
+  background: color-mix(in srgb, #25d366 10%, var(--color-surface));
+}
+
+.actionWhatsApp:hover {
+  color: #0f766e;
+  border-color: color-mix(in srgb, #25d366 45%, var(--color-border));
+  background: color-mix(in srgb, #25d366 16%, var(--color-surface));
+}
+
+.actionPhone:hover {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+}
+
+.actionWhatsApp:focus-visible,
+.actionPhone:focus-visible,
+.numberLink:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.compact .numberLink {
+  font-size: 0.72rem;
+}
+
+.compact .actionWhatsApp,
+.compact .actionPhone {
+  width: 1.5rem;
+  height: 1.5rem;
+}
