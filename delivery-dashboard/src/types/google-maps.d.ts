@@ -125,9 +125,12 @@ declare global {
       strokeColor?: string;
       strokeWeight?: number;
       strokeOpacity?: number;
+      geodesic?: boolean;
+      clickable?: boolean;
+      zIndex?: number;
       map?: Map | null;
       icons?: Array<{
-        icon: { path: string; strokeOpacity?: number; scale?: number };
+        icon: { path: string; strokeOpacity?: number; strokeColor?: string; scale?: number };
         offset?: string;
         repeat?: string;
       }>;
@@ -149,6 +152,44 @@ declare global {
       constructor(opts?: PolygonOptions);
       getPath(): MVCArray<LatLng>;
       setMap(map: Map | null): void;
+    }
+
+    enum TravelMode {
+      DRIVING = 'DRIVING',
+      WALKING = 'WALKING',
+      BICYCLING = 'BICYCLING',
+      TRANSIT = 'TRANSIT',
+      TWO_WHEELER = 'TWO_WHEELER',
+    }
+
+    type DirectionsStatus =
+      | 'OK'
+      | 'NOT_FOUND'
+      | 'ZERO_RESULTS'
+      | 'MAX_WAYPOINTS_EXCEEDED'
+      | 'INVALID_REQUEST'
+      | 'OVER_QUERY_LIMIT'
+      | 'REQUEST_DENIED'
+      | 'UNKNOWN_ERROR';
+
+    interface DirectionsRequest {
+      origin: LatLngLiteral | LatLng | string;
+      destination: LatLngLiteral | LatLng | string;
+      travelMode: TravelMode | string;
+      provideRouteAlternatives?: boolean;
+    }
+
+    interface DirectionsResult {
+      routes: Array<{
+        overview_path: LatLng[];
+      }>;
+    }
+
+    class DirectionsService {
+      route(
+        request: DirectionsRequest,
+        callback?: (result: DirectionsResult | null, status: DirectionsStatus) => void,
+      ): Promise<DirectionsResult>;
     }
 
     class Polyline {
@@ -191,6 +232,8 @@ declare global {
       Map: typeof google.maps.Map;
       LatLng: typeof google.maps.LatLng;
       LatLngBounds: typeof google.maps.LatLngBounds;
+      DirectionsService: typeof google.maps.DirectionsService;
+      TravelMode: typeof google.maps.TravelMode;
       Polygon: typeof google.maps.Polygon;
       Polyline: typeof google.maps.Polyline;
       Point: typeof google.maps.Point;
