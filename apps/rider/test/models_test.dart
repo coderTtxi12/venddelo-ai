@@ -17,6 +17,7 @@ void main() {
       'package_count': 2,
       'package_size': 'grande',
       'notes': 'Tocar el timbre',
+      'case_applied': 'C',
     });
 
     expect(assignment.paymentMethod, 'cash');
@@ -28,9 +29,14 @@ void main() {
     expect(assignment.notes, 'Tocar el timbre');
     expect(assignment.customerName, isNull);
     expect(assignment.customerPhone, isNull);
+    expect(assignment.caseApplied, 'C');
     expect(paymentLabel(assignment.paymentMethod), 'Efectivo');
     expect(packageSizeLabel(assignment.packageSize), 'Grande');
     expect(packageCountLabel(assignment.packageCount), '2 paquetes');
+  });
+
+  test('paymentLabel maps mixed grouped offers', () {
+    expect(paymentLabel('mixed'), 'Mixto');
   });
 
   test('RiderProfile.fromJson exposes available credit', () {
