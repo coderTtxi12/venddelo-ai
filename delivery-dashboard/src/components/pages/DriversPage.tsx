@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
+import { DriverAvatar } from '@/components/drivers/DriverAvatar';
+import { DriverMetaTags } from '@/components/drivers/DriverMetaTags';
+import { DriverPhoneContact } from '@/components/drivers/DriverPhoneContact';
 import { FormSelect } from '@/components/ui/FormSelect';
 import { PanelPageShell, type PanelPageStyles } from '@/components/pages/PanelPageShell';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
@@ -31,7 +34,7 @@ import {
 import { prepareImageForUpload } from '@/lib/image/convertToWebp';
 import { DEFAULT_COUNTRY_ISO, findCountryByIso, formatE164 } from '@/lib/phone/countryDialCodes';
 import { parseE164Phone } from '@/lib/phone/parseE164';
-import { centsToPesosInput, formatMoney, pesosInputToCents } from '@/lib/pricing/tariffUtils';
+import { centsToPesosInput, pesosInputToCents } from '@/lib/pricing/tariffUtils';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import panelStyles from './PartnershipsPage.module.css';
 import styles from './DriversPage.module.css';
@@ -199,10 +202,6 @@ function statusLabel(status: DeliveryDriver['status']): string {
   return 'Invitado';
 }
 
-function compartmentLabel(size: DeliveryDriver['compartment_size']): string {
-  return size === 'grande' ? 'Grande' : 'Normal';
-}
-
 function createFormSummary(form: DriverFormState): string {
   const name = [form.first_name, form.last_name].filter(Boolean).join(' ').trim();
   if (name) return `Borrador: ${name}`;
@@ -364,35 +363,17 @@ function MotorcycleColorField({
   );
 }
 
-function DriverAvatar({ driver }: { driver: DeliveryDriver }) {
-  const photoUrl = storagePublicUrl(driver.profile_photo_path);
-  const initials = `${driver.first_name.charAt(0)}${driver.last_name.charAt(0)}`.toUpperCase();
-
-  if (photoUrl) {
-    return <img src={photoUrl} alt="" className={styles.photo} />;
-  }
-
-  return <span className={styles.photoFallback}>{initials}</span>;
-}
-
 function DriverBrief({ driver }: { driver: DeliveryDriver }) {
   const availableCents = driver.credit_limit_cents - driver.credit_held_cents;
-  const colorHex = motorcycleColorHex(driver.motorcycle_color);
 
   return (
-    <div className={styles.brief}>
-      <span className={styles.briefPlate}>{driver.plate}</span>
-      <span className={styles.briefItem}>
-        <span
-          className={styles.briefColorDot}
-          style={{ background: colorHex }}
-          aria-hidden
-        />
-        {driver.motorcycle_color}
-      </span>
-      <span className={styles.briefItem}>{formatMoney(availableCents)}</span>
-      <span className={styles.briefItem}>{compartmentLabel(driver.compartment_size)}</span>
-    </div>
+    <DriverMetaTags
+      plate={driver.plate}
+      motorcycleColor={driver.motorcycle_color}
+      compartmentSize={driver.compartment_size}
+      creditAvailableCents={availableCents}
+      className={styles.driverBriefMeta}
+    />
   );
 }
 
@@ -1048,7 +1029,11 @@ export default function DriversPage() {
                   }}
                   disabled={!canWriteProviderConfig}
                 >
-                  <DriverAvatar driver={driver} />
+                  <DriverAvatar
+                    firstName={driver.first_name}
+                    lastName={driver.last_name}
+                    profilePhotoPath={driver.profile_photo_path}
+                  />
                   <div className={styles.main}>
                     <h3 className={styles.name}>
                       {driver.first_name} {driver.last_name}
@@ -1062,8 +1047,16 @@ export default function DriversPage() {
                     <span className={statusChipClass(driver.status)}>{statusLabel(driver.status)}</span>
                     {driver.is_online ? (
                       <span className={`${styles.chip} ${styles.chipOnline}`}>En línea</span>
-                    ) : null}
+                    ) : (
+                      <span className={`${styles.chip} ${styles.chipOffline}`}>Offline</span>
+                    )}
                   </div>
+                  <DriverPhoneContact
+                    phone={driver.phone}
+                    compact
+                    stopPropagation
+                    className={styles.asidePhone}
+                  />
                   {canWriteProviderConfig ? (
                     <button
                       type="button"
