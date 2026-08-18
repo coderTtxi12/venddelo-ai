@@ -60,7 +60,10 @@ declare global {
       map?: google.maps.Map | null;
       position?: google.maps.LatLngLiteral | google.maps.LatLng;
       gmpDraggable?: boolean;
+      gmpClickable?: boolean;
       title?: string;
+      content?: HTMLElement;
+      zIndex?: number;
     }
 
     class AdvancedMarkerElement {
@@ -82,6 +85,10 @@ declare global {
       lng(): number;
     }
 
+    class LatLngBounds {
+      extend(point: LatLngLiteral | LatLng): void;
+    }
+
     interface MapOptions {
       center?: LatLngLiteral | LatLng;
       zoom?: number;
@@ -98,7 +105,53 @@ declare global {
       setCenter(center: LatLngLiteral | LatLng): void;
       setZoom(zoom: number): void;
       panTo(center: LatLngLiteral | LatLng): void;
+      fitBounds(bounds: LatLngBounds, padding?: number): void;
       addListener(eventName: 'click', handler: (event: MapMouseEvent) => void): MapsEventListener;
+    }
+
+    enum TravelMode {
+      DRIVING = 'DRIVING',
+      WALKING = 'WALKING',
+      BICYCLING = 'BICYCLING',
+      TRANSIT = 'TRANSIT',
+      TWO_WHEELER = 'TWO_WHEELER',
+    }
+
+    interface DirectionsRequest {
+      origin: LatLngLiteral | LatLng | string;
+      destination: LatLngLiteral | LatLng | string;
+      travelMode: TravelMode | string;
+    }
+
+    interface DirectionsResult {
+      routes: Array<{
+        overview_path: LatLng[];
+      }>;
+    }
+
+    class DirectionsService {
+      route(request: DirectionsRequest): Promise<DirectionsResult>;
+    }
+
+    interface PolylineOptions {
+      path?: LatLngLiteral[];
+      strokeColor?: string;
+      strokeWeight?: number;
+      strokeOpacity?: number;
+      geodesic?: boolean;
+      clickable?: boolean;
+      zIndex?: number;
+      map?: Map | null;
+      icons?: Array<{
+        icon: { path: string; strokeOpacity?: number; strokeColor?: string; scale?: number };
+        offset?: string;
+        repeat?: string;
+      }>;
+    }
+
+    class Polyline {
+      constructor(opts?: PolylineOptions);
+      setMap(map: Map | null): void;
     }
 
     interface MapMouseEvent {
@@ -143,7 +196,11 @@ declare global {
     maps: {
       importLibrary: typeof google.maps.importLibrary;
       LatLng: typeof google.maps.LatLng;
+      LatLngBounds: typeof google.maps.LatLngBounds;
       Map: typeof google.maps.Map;
+      Polyline: typeof google.maps.Polyline;
+      DirectionsService: typeof google.maps.DirectionsService;
+      TravelMode: typeof google.maps.TravelMode;
       marker: typeof google.maps.marker;
       places: typeof google.maps.places;
     };

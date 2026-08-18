@@ -58,6 +58,14 @@ export async function loadGoogleMapsPlaces(): Promise<void> {
   await window.google!.maps.importLibrary('places');
 }
 
+export async function loadGoogleMaps(): Promise<void> {
+  await ensureGoogleMapsScript();
+  await Promise.all([
+    window.google!.maps.importLibrary('maps'),
+    window.google!.maps.importLibrary('marker'),
+  ]);
+}
+
 export async function loadGoogleMapsEditor(): Promise<void> {
   await ensureGoogleMapsScript();
   await Promise.all([
