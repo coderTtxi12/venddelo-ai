@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.orm import sessionmaker
 
-from app.db.models.delivery import DeliveryDispatchRequest
+from app.db.models.delivery import DeliveryDispatchRequest, DeliveryDriver
 from tests.api.test_api_v1 import AUTH, OWNER
 from tests.api.test_delivery_partnerships import (
     COVERED_LAT,
@@ -139,6 +139,10 @@ def test_create_dispatch_persists_quote_and_immediate_search(client, engine):
     assert len(body["tracking_token"]) >= 48
     assert body["quoted_fee_cents"] > 0
     assert body["search_at"] is not None
+    assert body["short_id"]
+    assert len(body["short_id"]) == 5
+    assert body["short_id"].isupper()
+    assert body["rider"] is None
 
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     with factory() as session:
@@ -276,7 +280,207 @@ def test_cancel_and_public_tracking_hide_private_fields(client, engine):
 
     tracking = client.get(f"/api/v1/public/dispatch-tracking/{created['tracking_token']}")
     assert tracking.status_code == 200
-    assert tracking.json()["status"] == "cancelled"
-    assert tracking.json()["dropoff"]["address"] == "Centro Histórico, CDMX"
-    assert "customer_phone" not in tracking.json()
-    assert "tracking_token" not in tracking.json()
+    body = tracking.json()
+    assert body["status"] == "cancelled"
+    assert body["dropoff"]["address"] == "Centro Histórico, CDMX"
+    assert body["short_id"] == created["short_id"]
+    assert body["rider"] is None
+    assert body["package_count"] == 1
+    assert body["payment_method"] == "cash"
+    assert body["collect_cents"] == 25000
+    assert body["cash_denomination_cents"] == 50000
+    assert body["pickup"]["name"] == "Dispatch Bistro"
+    assert body["pickup"]["latitude"] == COVERED_LAT
+    assert body["pickup"]["longitude"] == COVERED_LNG
+    assert body["restaurant_name"] == "Dispatch Bistro"
+    assert body["customer_name"] == "María López"
+    assert "customer_phone" not in body
+    assert "tracking_token" not in body
+    assert "plate" not in body
+
+
+@requires_db
+def test_cancel_rejected_when_rider_already_assigned(client, engine):
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-no-cancel-assigned")
+    _activate_partnership(client, engine, restaurant_id)
+    created = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(),
+        headers=AUTH,
+    )
+    assert created.status_code == 201, created.text
+    request_id = uuid.UUID(created.json()["id"])
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        row = session.get(DeliveryDispatchRequest, request_id)
+        assert row is not None
+        row.status = "assigned"
+        session.commit()
+
+    cancelled = client.post(
+        f"/api/v1/restaurants/me/dispatch-requests/{request_id}/cancel",
+        params={"restaurant_id": restaurant_id},
+        headers=AUTH,
+    )
+    assert cancelled.status_code == 400
+    assert "repartidor asignado" in cancelled.json()["error"]["message"].lower()
+
+
+@requires_db
+def test_list_includes_assigned_rider_public_fields(client, engine):
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-list-rider")
+    _activate_partnership(client, engine, restaurant_id)
+    created = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(),
+        headers=AUTH,
+    )
+    assert created.status_code == 201, created.text
+    request_id = uuid.UUID(created.json()["id"])
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        row = session.get(DeliveryDispatchRequest, request_id)
+        assert row is not None
+        driver = DeliveryDriver(
+            delivery_provider_id=row.delivery_provider_id,
+            email="juan.rider@example.com",
+            first_name="Juan",
+            last_name="Pérez",
+            phone="+525511112233",
+            emergency_contact_name="María Pérez",
+            emergency_contact_phone="+525598765432",
+            profile_photo_path="drivers/photo.webp",
+            ine_document_path="drivers/ine.webp",
+            license_document_path="drivers/licencia.webp",
+            insurance_document_path="drivers/seguro.webp",
+            compartment_size="normal",
+            plate="ABC123",
+            motorcycle_brand="Italika",
+            motorcycle_color="Rojo",
+            status="active",
+        )
+        session.add(driver)
+        session.flush()
+        row.assigned_driver_id = driver.id
+        row.status = "assigned"
+        session.commit()
+
+    listed = client.get(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        headers=AUTH,
+    )
+    assert listed.status_code == 200, listed.text
+    body = next(item for item in listed.json() if item["id"] == str(request_id))
+    rider = body["rider"]
+    assert rider is not None
+    assert rider["first_name"] == "Juan"
+    assert rider["plate_suffix"] == "123"
+    assert rider["vehicle_type"] == "moto"
+    assert rider["motorcycle_brand"] == "Italika"
+    assert rider["motorcycle_color"] == "Rojo"
+    assert rider["phone"] == "+525511112233"
+    assert "last_name" not in rider
+    assert "plate" not in rider or rider.get("plate") is None
+    assert "emergency_contact_phone" not in rider
+
+
+@requires_db
+def test_public_tracking_omits_collect_for_transfer(client, engine):
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-transfer-track")
+    _activate_partnership(client, engine, restaurant_id)
+    created = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(
+            payment_method="transfer",
+            collect_cents=0,
+            cash_denomination_cents=None,
+        ),
+        headers=AUTH,
+    )
+    assert created.status_code == 201, created.text
+
+    tracking = client.get(f"/api/v1/public/dispatch-tracking/{created.json()['tracking_token']}")
+    assert tracking.status_code == 200
+    body = tracking.json()
+    assert body["payment_method"] == "transfer"
+    assert body["collect_cents"] is None
+    assert body["cash_denomination_cents"] is None
+    assert body["package_count"] == 1
+    assert body["rider"] is None
+    assert body["restaurant_name"] == "Dispatch Bistro"
+    assert body["customer_name"] == "María López"
+
+
+@requires_db
+def test_public_tracking_keeps_names_when_delivered(client, engine):
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-delivered-track")
+    _activate_partnership(client, engine, restaurant_id)
+    created = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(),
+        headers=AUTH,
+    )
+    assert created.status_code == 201, created.text
+    request_id = uuid.UUID(created.json()["id"])
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        row = session.get(DeliveryDispatchRequest, request_id)
+        assert row is not None
+        row.status = "delivered"
+        session.commit()
+
+    tracking = client.get(f"/api/v1/public/dispatch-tracking/{created.json()['tracking_token']}")
+    assert tracking.status_code == 200
+    body = tracking.json()
+    assert body["status"] == "delivered"
+    assert body["restaurant_name"] == "Dispatch Bistro"
+    assert body["customer_name"] == "María López"
+    assert body["dropoff"]["address"] == "Centro Histórico, CDMX"
+    assert "customer_phone" not in body
+
+
+@requires_db
+def test_public_tracking_ws_sends_snapshot(client, engine):
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-ws-track")
+    _activate_partnership(client, engine, restaurant_id)
+    created = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(),
+        headers=AUTH,
+    )
+    assert created.status_code == 201, created.text
+    token = created.json()["tracking_token"]
+
+    with client.websocket_connect(f"/api/v1/ws/public/dispatch-tracking/{token}") as websocket:
+        payload = websocket.receive_json()
+
+    assert payload["type"] == "tracking.updated"
+    assert payload["tracking"]["short_id"] == created.json()["short_id"]
+    assert payload["tracking"]["pickup"]["name"] == "Dispatch Bistro"
+    assert payload["tracking"]["restaurant_name"] == "Dispatch Bistro"
+    assert payload["tracking"]["customer_name"] == "María López"
+    assert "customer_phone" not in payload["tracking"]
+    assert "tracking_token" not in payload["tracking"]
+
+
+def test_public_plate_suffix_uses_last_three_alnum():
+    from app.modules.delivery_dispatch.tracking_view import public_plate_suffix
+
+    assert public_plate_suffix("ABC123") == "123"
+    assert public_plate_suffix("ab-12-3") == "123"
+    assert public_plate_suffix("12") == "12"
+    assert public_plate_suffix("   ") == ""
