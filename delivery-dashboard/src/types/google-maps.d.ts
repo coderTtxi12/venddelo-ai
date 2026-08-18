@@ -138,7 +138,8 @@ declare global {
 
     class Map {
       constructor(el: HTMLElement, opts?: MapOptions);
-      fitBounds(bounds: LatLngBounds): void;
+      setCenter(center: LatLngLiteral | LatLng): void;
+      fitBounds(bounds: LatLngBounds, padding?: number): void;
       panTo(center: LatLngLiteral | LatLng): void;
       setZoom(zoom: number): void;
       setOptions(options: MapOptions): void;
