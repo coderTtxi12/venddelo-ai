@@ -1,7 +1,13 @@
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'api.dart';
 import 'config.dart';
+import 'friendly_error.dart';
+import 'models.dart';
+
+const String riderNotRegisteredMessage =
+    'Tu correo no está dado de alta. Mexy debe registrarte en el panel de repartidores con el mismo correo de Google.';
 
 Future<void> signInWithGoogle() async {
   final googleSignIn = GoogleSignIn(
@@ -26,6 +32,29 @@ Future<void> signInWithGoogle() async {
     idToken: idToken,
     accessToken: googleAuth.accessToken,
   );
+  try {
+    await ensureRegisteredRider();
+  } on AuthException {
+    await signOut();
+    rethrow;
+  }
+}
+
+/// Only drivers pre-registered in the delivery dashboard may use the app.
+Future<void> ensureRegisteredRider() async {
+  final api = RiderApi(
+    tokenProvider: () => Supabase.instance.client.auth.currentSession?.accessToken,
+  );
+  try {
+    await api.getMe();
+  } on ApiException catch (error) {
+    if (error.statusCode == 403) {
+      throw AuthException(riderNotRegisteredMessage);
+    }
+    throw AuthException(error.message);
+  } catch (error) {
+    throw AuthException(friendlyErrorMessage(error));
+  }
 }
 
 Future<void> signOut() async {
