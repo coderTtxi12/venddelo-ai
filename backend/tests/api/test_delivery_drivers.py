@@ -295,6 +295,22 @@ def test_claim_driver_on_get_me(client, engine):
 
 
 @requires_db
+def test_unregistered_user_cannot_access_rider_me(client):
+    _create_provider(client)
+
+    app.dependency_overrides[get_auth] = lambda: FakeAuth(
+        user_id=RIDER,
+        email="noexiste@empresa.com",
+    )
+    try:
+        me = client.get("/api/v1/rider/me", headers=AUTH)
+        assert me.status_code == 403, me.text
+        assert "dado de alta" in me.json()["error"]["message"]
+    finally:
+        app.dependency_overrides[get_auth] = lambda: FakeAuth()
+
+
+@requires_db
 def test_patch_cannot_change_credit_held_cents(client, engine):
     _create_provider(client)
 
