@@ -1,8 +1,8 @@
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import re
 
 from app.api.v1.router import api_v1_router
 from app.core.config import get_settings
@@ -12,7 +12,9 @@ from app.core.request_context import RequestIdMiddleware
 from app.infra.llm.factory import build_llm_provider
 from app.infra.llm.tracing import flush_langsmith_traces, log_tracing_status
 from app.infra.realtime.digital_menu_hub import get_digital_menu_realtime_hub
+from app.infra.realtime.dispatch_hub import get_dispatch_realtime_hub
 from app.infra.realtime.order_hub import get_order_realtime_hub
+from app.infra.realtime.tracking_hub import get_tracking_realtime_hub
 from app.middleware.rate_limit import RateLimitMiddleware
 
 
@@ -37,10 +39,20 @@ def create_app() -> FastAPI:
         loop = asyncio.get_running_loop()
         get_order_realtime_hub().bind_loop(loop)
         get_digital_menu_realtime_hub().bind_loop(loop)
+        get_dispatch_realtime_hub().bind_loop(loop)
+        get_tracking_realtime_hub().bind_loop(loop)
+        from app.modules.delivery_dispatch.fcm import init_firebase
+
+        init_firebase(
+            credentials_path=settings.firebase_credentials_path,
+            credentials_json=settings.firebase_credentials_json,
+        )
         yield
         flush_langsmith_traces()
         await get_order_realtime_hub().shutdown()
         await get_digital_menu_realtime_hub().shutdown()
+        await get_dispatch_realtime_hub().shutdown()
+        await get_tracking_realtime_hub().shutdown()
 
     app = FastAPI(title="Vendelo AI API", version=settings.app_version, lifespan=lifespan)
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
