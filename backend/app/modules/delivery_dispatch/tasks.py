@@ -27,6 +27,7 @@ from app.modules.delivery_dispatch.engine import (
     choose_assignments,
 )
 from app.modules.delivery_dispatch.geo import geodesic_meters
+from app.modules.delivery_dispatch.monitor_notify import notify_request_realtime
 from app.modules.delivery_dispatch.notify import notify_offer
 
 _SEARCHABLE = frozenset({"scheduled", "searching", "offered"})
@@ -112,8 +113,10 @@ def run_search(session: Session, request_id: uuid.UUID, now: datetime) -> None:
     )
     if assignment_timed_out(now, _as_utc(request.search_at), timeout_seconds):
         request.status = "unassigned"
+        notify_request_realtime(session, request)
         return
     _assign_or_retry(session, request, now)
+    notify_request_realtime(session, request)
 
 
 def handle_expire_offer(session: Session, offer_id: uuid.UUID, now: datetime) -> None:
@@ -133,7 +136,18 @@ def handle_expire_offer(session: Session, offer_id: uuid.UUID, now: datetime) ->
         return
     offer.status = "expired"
     offer.responded_at = now
+    restore_status = None
+    if offer.case_applied == "M" and isinstance(offer.score_json, dict):
+        restore_status = offer.score_json.get("restore_status")
+    if request.status in _OCCUPIED:
+        notify_request_realtime(session, request)
+        return
+    if restore_status == "unassigned":
+        request.status = "unassigned"
+        notify_request_realtime(session, request)
+        return
     if request.status not in {"offered", "searching"}:
+        notify_request_realtime(session, request)
         return
     request.status = "searching"
     request.cycle_silent_driver_ids = [
@@ -146,6 +160,7 @@ def handle_expire_offer(session: Session, offer_id: uuid.UUID, now: datetime) ->
     )
     _assign_or_retry(session, request, now)
     _resume_former_group_members(session, former_members, skip_id=request.id, now=now)
+    notify_request_realtime(session, request)
 
 
 def reject_offer_and_search(
@@ -156,6 +171,14 @@ def reject_offer_and_search(
 ) -> None:
     offer.status = "rejected"
     offer.responded_at = now
+    if request.status in _OCCUPIED:
+        return
+    restore_status = None
+    if offer.case_applied == "M" and isinstance(offer.score_json, dict):
+        restore_status = offer.score_json.get("restore_status")
+    if restore_status == "unassigned":
+        request.status = "unassigned"
+        return
     request.status = "searching"
     request.cycle_rejected_driver_ids = [
         *(request.cycle_rejected_driver_ids or []),
@@ -375,23 +398,30 @@ def _persist_dispatch_offer(
     high_demand: bool,
     group_id: str | None,
     expires_at: datetime,
+    keep_request_status: bool = False,
+    extra_score: dict | None = None,
 ) -> DeliveryDispatchOffer:
+    score_json: dict = {"case": case, "group_id": group_id}
+    if extra_score:
+        score_json.update(extra_score)
     offer = DeliveryDispatchOffer(
         request_id=request.id,
         driver_id=driver.id,
         status="offered",
         case_applied=case,
         expires_at=expires_at,
-        score_json={"case": case, "group_id": group_id},
+        score_json=score_json,
     )
     session.add(offer)
     session.flush()
-    request.status = "offered"
+    if not keep_request_status:
+        request.status = "offered"
     request.decision_json = {
         "case": case,
         "high_demand": high_demand,
         "driver_id": str(driver.id),
         "group_id": group_id,
+        **(extra_score or {}),
     }
     notify_offer(driver, offer)
     enqueue(
@@ -404,6 +434,9 @@ def _persist_dispatch_offer(
         },
     )
     return offer
+
+
+persist_dispatch_offer = _persist_dispatch_offer
 
 
 def _enqueue_retry(
