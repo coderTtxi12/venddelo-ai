@@ -97,6 +97,17 @@ class EngineResult:
     group_id: str | None = None
 
 
+@dataclass(frozen=True)
+class HighDemandBreakdown:
+    high_demand: bool
+    few_free: bool
+    high_occupancy: bool
+    large_queue: bool
+    free_count: int
+    occupied_ratio: float
+    pending_count: int
+
+
 def assignment_timed_out(now: datetime, search_at: datetime, timeout_seconds: int) -> bool:
     return now >= search_at + timedelta(seconds=timeout_seconds)
 
@@ -143,11 +154,10 @@ def _due_requests(context: EngineContext) -> tuple[EngineRequest, ...]:
     return tuple(seen)
 
 
-def _is_high_demand(context: EngineContext) -> bool:
+def high_demand_breakdown(context: EngineContext) -> HighDemandBreakdown:
     settings = context.settings
     free = [driver for driver in context.drivers if _is_free(context, context.request, driver)]
-    if len(free) <= settings.high_demand_available_drivers_max:
-        return True
+    few_free = len(free) <= settings.high_demand_available_drivers_max
 
     online_fresh = [driver for driver in context.drivers if _is_online_fresh(context, driver)]
     occupied = [
@@ -155,10 +165,75 @@ def _is_high_demand(context: EngineContext) -> bool:
         for driver in online_fresh
         if driver.active_request_status in _OCCUPIED_STATUSES and not _is_pre_free(context, driver)
     ]
-    if online_fresh and (len(occupied) / len(online_fresh)) >= settings.high_demand_occupied_ratio:
-        return True
+    occupied_ratio = (len(occupied) / len(online_fresh)) if online_fresh else 0.0
+    high_occupancy = (
+        bool(online_fresh) and occupied_ratio >= settings.high_demand_occupied_ratio
+    )
+    large_queue = context.pending_count >= settings.high_demand_pending_min
+    return HighDemandBreakdown(
+        high_demand=few_free or high_occupancy or large_queue,
+        few_free=few_free,
+        high_occupancy=high_occupancy,
+        large_queue=large_queue,
+        free_count=len(free),
+        occupied_ratio=occupied_ratio,
+        pending_count=context.pending_count,
+    )
 
-    return context.pending_count >= settings.high_demand_pending_min
+
+def _is_high_demand(context: EngineContext) -> bool:
+    return high_demand_breakdown(context).high_demand
+
+
+def eligibility_blockers(
+    context: EngineContext,
+    request: EngineRequest,
+    driver: EngineDriver,
+) -> tuple[str, ...]:
+    reasons: list[str] = []
+    if driver.status != "active":
+        reasons.append("invited" if driver.status == "invited" else "blocked")
+    if not driver.is_online:
+        reasons.append("offline")
+    elif not _is_online_fresh(context, driver):
+        reasons.append("gps")
+    if driver.has_open_offer:
+        reasons.append("offer")
+    if driver.id in request.cycle_rejected_driver_ids:
+        reasons.append("rejected")
+    if driver.id in request.cycle_silent_driver_ids:
+        reasons.append("silent")
+    if request.package_size == "grande" and driver.compartment_size != "grande":
+        reasons.append("compartment")
+    if (
+        driver.active_package_count + request.package_count
+        > context.settings.max_active_packages_per_driver
+    ):
+        reasons.append("packages")
+    if request.payment_method == "cash":
+        available = driver.credit_limit_cents - driver.credit_held_cents
+        if available < request.collect_cents:
+            reasons.append("credit")
+    return tuple(reasons)
+
+
+def pre_free_eta_seconds(context: EngineContext, driver: EngineDriver) -> int | None:
+    if not _is_pre_free(context, driver):
+        return None
+    if (
+        driver.last_lat is None
+        or driver.last_lng is None
+        or driver.active_dropoff_lat is None
+        or driver.active_dropoff_lng is None
+    ):
+        return None
+    distance = geodesic_meters(
+        driver.last_lat,
+        driver.last_lng,
+        driver.active_dropoff_lat,
+        driver.active_dropoff_lng,
+    )
+    return int(distance / context.settings.pre_free_speed_mps)
 
 
 def _assign_case_b(
