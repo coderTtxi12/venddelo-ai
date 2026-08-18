@@ -17,13 +17,65 @@
   box-shadow: 0 20px 50px rgb(15 23 42 / 8%);
 }
 
-.brand {
+.brandRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   padding: 1.1rem 1.5rem;
   border-bottom: 1px solid var(--color-border);
+}
+
+.brand {
   color: var(--color-primary);
   font-size: 0.95rem;
   font-weight: 800;
   letter-spacing: 0.02em;
+}
+
+.liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  padding: 0.28rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.liveBadgeOn {
+  color: #1d4ed8;
+  background: color-mix(in srgb, #2563eb 12%, var(--color-surface));
+}
+
+.liveDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.liveBadgeOn .liveDot {
+  animation: livePulse 1.6s ease-out infinite;
+}
+
+@keyframes livePulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(1.55);
+    opacity: 0.35;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .status {
@@ -52,6 +104,145 @@
   text-transform: uppercase;
 }
 
+.statusDelivered .icon {
+  background: color-mix(in srgb, #047857 14%, var(--color-surface));
+  color: #047857;
+}
+
+.parties {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem;
+  margin: 0 1.5rem 1.35rem;
+  padding: 0;
+}
+
+.party {
+  display: grid;
+  gap: 0.28rem;
+  min-width: 0;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg);
+}
+
+.party dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.party dd {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0 1.5rem 1.5rem;
+  padding: 0;
+}
+
+.timelineItem {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 0.85rem;
+  position: relative;
+  padding-bottom: 1.15rem;
+}
+
+.timelineItem:last-child {
+  padding-bottom: 0;
+}
+
+.timelineItem:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 18px;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border);
+}
+
+.timelineItem.step_complete:not(:last-child)::before,
+.timelineItem.step_current:not(:last-child)::before {
+  background: var(--color-primary);
+}
+
+.timelineItem.step_failed:not(:last-child)::before {
+  background: #fecaca;
+}
+
+.timelineMarker {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  box-sizing: border-box;
+}
+
+.step_complete .timelineMarker {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.step_current .timelineMarker {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 16%, transparent);
+}
+
+.step_failed .timelineMarker {
+  border-color: #b91c1c;
+  background: #b91c1c;
+}
+
+.timelineCopy {
+  min-width: 0;
+}
+
+.timelineLabel {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  line-height: 1.3;
+}
+
+.timelineHint {
+  margin: 0.2rem 0 0;
+  font-size: 0.86rem;
+  color: var(--color-text-muted, var(--color-text-secondary));
+  line-height: 1.4;
+}
+
+.step_complete .timelineLabel,
+.step_current .timelineLabel {
+  color: var(--color-text);
+}
+
+.step_current .timelineHint {
+  color: var(--color-text-secondary);
+}
+
+.step_failed .timelineLabel {
+  color: #b91c1c;
+}
+
 .icon {
   display: grid;
   flex: 0 0 52px;
@@ -63,27 +254,222 @@
   color: var(--color-primary);
 }
 
-.rider {
-  display: flex;
-  gap: 0.45rem;
+.riderCard {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.9rem 0.9rem;
   align-items: center;
-  margin: 0 1.5rem 1.35rem;
-  border-radius: 10px;
+  margin: 0 1.5rem 1rem;
+  border-radius: 14px;
   background: var(--color-bg);
-  padding: 0.75rem 0.9rem;
+  padding: 0.9rem 1rem;
+}
+
+.riderPhoto,
+.riderPhotoFallback {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.riderPhoto {
+  object-fit: cover;
+  background: color-mix(in srgb, var(--color-border) 40%, var(--color-surface));
+}
+
+.riderPhotoFallback {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+  color: var(--color-primary);
+  font-size: 1.45rem;
+  font-weight: 800;
+}
+
+.riderBody {
+  min-width: 0;
+}
+
+.riderName {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.riderVehicle,
+.riderPlate,
+.riderEta {
+  margin: 0.28rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.riderColor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.colorDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 35%);
+}
+
+.riderPlate {
+  color: var(--color-text);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+.riderActions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.55rem;
+}
+
+.riderAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  font-size: 0.92rem;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.riderActionIcon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.riderActionCall {
+  color: #1d4ed8;
+  background: color-mix(in srgb, #2563eb 12%, var(--color-surface));
+  border-color: color-mix(in srgb, #2563eb 28%, var(--color-border));
+}
+
+.riderActionCall:hover {
+  background: color-mix(in srgb, #2563eb 18%, var(--color-surface));
+  border-color: color-mix(in srgb, #2563eb 42%, var(--color-border));
+}
+
+.riderActionWhatsApp {
+  color: #0f766e;
+  background: color-mix(in srgb, #25d366 14%, var(--color-surface));
+  border-color: color-mix(in srgb, #25d366 32%, var(--color-border));
+}
+
+.riderActionWhatsApp:hover {
+  background: color-mix(in srgb, #25d366 22%, var(--color-surface));
+  border-color: color-mix(in srgb, #25d366 48%, var(--color-border));
+}
+
+.riderAction:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.details {
+  margin: 0 1.5rem 1.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.detailsToggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0;
+  border: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 0.95rem 1rem;
+  font: inherit;
+  font-size: 0.98rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.detailsToggle:hover {
+  background: var(--color-bg);
+}
+
+.detailsToggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.detailsHeading {
+  margin: 0;
+  padding: 0.95rem 1rem;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.detailsChevron {
+  display: grid;
+  place-items: center;
+  color: var(--color-text-secondary);
+  transition: transform 0.2s ease;
+}
+
+.detailsChevronOpen {
+  transform: rotate(180deg);
+}
+
+.detailsPanel {
+  display: grid;
+  gap: 0.7rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg);
+  padding: 0.95rem 1rem 1.05rem;
+}
+
+.detailsPanel[hidden] {
+  display: none;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+  font-size: 0.95rem;
+}
+
+.detailRow span {
   color: var(--color-text-secondary);
 }
 
-.mapWrap {
-  height: 330px;
-  border-block: 1px solid var(--color-border);
-  background: var(--color-bg);
-}
-
-.mapWrap iframe {
-  width: 100%;
-  height: 100%;
-  border: 0;
+.detailRow strong {
+  color: var(--color-text);
+  font-weight: 700;
+  text-align: right;
 }
 
 .address {
@@ -126,8 +512,18 @@
   color: var(--color-text);
 }
 
-.error p {
-  margin: 0;
+@media (prefers-reduced-motion: reduce) {
+  .step_current .timelineMarker {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+  }
+
+  .detailsChevron {
+    transition: none;
+  }
+
+  .liveBadgeOn .liveDot {
+    animation: none;
+  }
 }
 
 @media (max-width: 520px) {
@@ -147,16 +543,22 @@
     padding-inline: 1.1rem;
   }
 
-  .brand,
+  .brandRow,
   .address {
     padding-inline: 1.1rem;
   }
 
-  .rider {
+  .timeline {
     margin-inline: 1.1rem;
   }
 
-  .mapWrap {
-    height: 300px;
+  .parties {
+    grid-template-columns: 1fr;
+    margin-inline: 1.1rem;
+  }
+
+  .riderCard,
+  .details {
+    margin-inline: 1.1rem;
   }
 }
