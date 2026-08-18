@@ -15,6 +15,7 @@ String paymentLabel(String method) {
     'cash' => 'Efectivo',
     'transfer' => 'Transferencia',
     'card_terminal' => 'Terminal',
+    'mixed' => 'Mixto',
     _ => method,
   };
 }
