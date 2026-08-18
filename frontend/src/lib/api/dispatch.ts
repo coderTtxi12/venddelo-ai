@@ -11,6 +11,18 @@ export type DispatchStatus =
   | 'unassigned'
   | 'cancelled';
 
+export type DispatchAssignedRider = {
+  first_name: string;
+  photo_url: string | null;
+  plate_suffix: string;
+  vehicle_type: string;
+  motorcycle_brand: string;
+  motorcycle_color: string;
+  latitude: number | null;
+  longitude: number | null;
+  phone: string;
+};
+
 export type DispatchRequest = {
   id: string;
   customer_name: string;
@@ -31,10 +43,12 @@ export type DispatchRequest = {
   status: DispatchStatus;
   assigned_driver_id: string | null;
   tracking_token: string;
+  short_id: string;
   notes: string | null;
   cancelled_at: string | null;
   created_at: string;
   updated_at: string;
+  rider?: DispatchAssignedRider | null;
 };
 
 export type DispatchLeadTime = {
@@ -60,13 +74,35 @@ export type DispatchCreateInput = {
 
 export type PublicDispatchTracking = {
   status: DispatchStatus;
+  short_id: string;
+  restaurant_name: string | null;
+  customer_name: string;
+  pickup: {
+    latitude: number;
+    longitude: number;
+    name: string;
+  } | null;
   dropoff: {
     latitude: number;
     longitude: number;
     address: string;
   };
-  rider: { first_name: string } | null;
+  rider: {
+    first_name: string;
+    photo_url: string | null;
+    plate_suffix: string;
+    vehicle_type: string;
+    motorcycle_brand: string;
+    motorcycle_color: string;
+    latitude: number | null;
+    longitude: number | null;
+    phone: string;
+  } | null;
   eta_seconds: number | null;
+  package_count: number;
+  payment_method: 'cash' | 'transfer' | 'card_terminal';
+  collect_cents: number | null;
+  cash_denomination_cents: number | null;
 };
 
 export type MapsUrlResolve = {
@@ -74,6 +110,12 @@ export type MapsUrlResolve = {
   longitude: number;
   resolved_url: string | null;
 };
+
+export function formatDispatchShortId(shortId: string | null | undefined): string {
+  const value = (shortId ?? '').trim().toUpperCase();
+  if (!value) return '';
+  return value.startsWith('#') ? value : `#${value}`;
+}
 
 function restaurantQuery(restaurantId: string): string {
   return new URLSearchParams({ restaurant_id: restaurantId }).toString();
