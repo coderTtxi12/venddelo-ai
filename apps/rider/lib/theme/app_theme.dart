@@ -3,19 +3,19 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 abstract final class AppTheme {
-  static const double buttonHeight = 56;
-  static const double buttonHeightSecondary = 52;
+  static const double buttonHeight = 60;
+  static const double buttonHeightSecondary = 56;
   static const double minTouchTarget = 48;
-  static const double screenPadding = 20;
-  static const double cardRadius = 16;
-  static const double buttonRadius = 14;
+  static const double screenPadding = 24;
+  static const double cardRadius = 20;
+  static const double buttonRadius = 16;
 
   static ThemeData get light {
     const colorScheme = ColorScheme(
       brightness: Brightness.light,
-      primary: AppColors.primary,
+      primary: AppColors.cta,
       onPrimary: Colors.white,
-      secondary: AppColors.accent,
+      secondary: AppColors.ctaBright,
       onSecondary: Colors.white,
       error: AppColors.danger,
       onError: Colors.white,
@@ -39,7 +39,8 @@ abstract final class AppTheme {
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
         titleTextStyle: base.textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
+          fontSize: 22,
           color: AppColors.textPrimary,
         ),
       ),
@@ -49,7 +50,7 @@ abstract final class AppTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(cardRadius),
-          side: const BorderSide(color: AppColors.border),
+          side: const BorderSide(color: AppColors.border, width: 1),
         ),
       ),
       dividerTheme: const DividerThemeData(
@@ -59,28 +60,33 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          backgroundColor: AppColors.cta,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: AppColors.border,
+          disabledForegroundColor: AppColors.textMuted,
           minimumSize: const Size.fromHeight(buttonHeight),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           textStyle: const TextStyle(
-            fontSize: 18,
+            fontSize: 19,
             fontWeight: FontWeight.w700,
-            letterSpacing: 0.2,
+            letterSpacing: 0.1,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(buttonRadius),
           ),
+          elevation: 0,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(buttonHeightSecondary),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          foregroundColor: AppColors.textSecondary,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          foregroundColor: AppColors.textPrimary,
           textStyle: const TextStyle(
-            fontSize: 17,
+            fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
-          side: const BorderSide(color: AppColors.border, width: 1.5),
+          side: const BorderSide(color: AppColors.border, width: 1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(buttonRadius),
           ),
@@ -90,7 +96,7 @@ abstract final class AppTheme {
         style: TextButton.styleFrom(
           minimumSize: const Size(minTouchTarget, minTouchTarget),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          foregroundColor: AppColors.accent,
+          foregroundColor: AppColors.textPrimary,
           textStyle: const TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w600,
@@ -113,7 +119,7 @@ abstract final class AppTheme {
         trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: AppColors.accent,
+        color: AppColors.cta,
       ),
     );
   }

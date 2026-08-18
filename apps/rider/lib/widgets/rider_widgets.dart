@@ -84,9 +84,7 @@ class RiderErrorBanner extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.danger.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
-          border: Border.all(
-            color: AppColors.danger.withValues(alpha: 0.35),
-          ),
+          border: Border.all(color: AppColors.danger.withValues(alpha: 0.22)),
         ),
         child: Text(
           message,
@@ -111,16 +109,14 @@ class RiderInfoBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: AppColors.warning.withValues(alpha: 0.1),
+        color: AppColors.cta.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
-        border: Border.all(
-          color: AppColors.warning.withValues(alpha: 0.35),
-        ),
+        border: Border.all(color: AppColors.cta.withValues(alpha: 0.22)),
       ),
       child: Text(
         message,
         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: AppColors.warningBright,
+              color: AppColors.cta,
               fontWeight: FontWeight.w600,
             ),
       ),
@@ -155,16 +151,13 @@ class RiderOnlineToggle extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-            border: Border.all(
-              color: statusColor.withValues(alpha: 0.45),
-              width: 2,
-            ),
+            border: Border.all(color: AppColors.border),
           ),
           child: Row(
             children: [
               Container(
-                width: 14,
-                height: 14,
+                width: 12,
+                height: 12,
                 decoration: BoxDecoration(
                   color: statusColor,
                   shape: BoxShape.circle,
@@ -178,8 +171,8 @@ class RiderOnlineToggle extends StatelessWidget {
                     Text(
                       statusLabel,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: statusColor,
-                            letterSpacing: 0.6,
+                            color: AppColors.textPrimary,
+                            letterSpacing: 0.4,
                           ),
                     ),
                     const SizedBox(height: 4),
