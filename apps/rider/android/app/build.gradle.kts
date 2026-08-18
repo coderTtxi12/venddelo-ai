@@ -2,7 +2,24 @@ plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services")
 }
+
+fun loadRiderEnv(file: java.io.File): Map<String, String> {
+    if (!file.exists()) {
+        return emptyMap()
+    }
+    return file.readLines()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") && it.contains("=") }
+        .associate { line ->
+            val idx = line.indexOf("=")
+            line.substring(0, idx).trim() to line.substring(idx + 1).trim().trim('"')
+        }
+}
+
+val riderEnv = loadRiderEnv(rootProject.file("../.env"))
+val googleMapsApiKey = riderEnv["GOOGLE_MAPS_API_KEY"].orEmpty()
 
 android {
     namespace = "com.mexy.mexy_rider"
@@ -23,6 +40,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
     }
 
     buildTypes {
@@ -42,4 +60,18 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+// Physical phones use API_BASE_URL=localhost. Re-apply USB reverse after every
+// install because `adb reverse` is cleared when the cable or flutter run reconnects.
+afterEvaluate {
+    val adb = java.io.File(android.sdkDirectory, "platform-tools/adb")
+    tasks.matching { it.name.startsWith("install") }.configureEach {
+        doLast {
+            exec {
+                commandLine(adb.absolutePath, "reverse", "tcp:8080", "tcp:8080")
+                isIgnoreExitValue = true
+            }
+        }
+    }
 }
