@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.modules.analytics.api import router as analytics_router
 from app.modules.assistant.api import router as assistant_router
 from app.modules.delivery_dispatch.api import router as delivery_dispatch_router
+from app.modules.delivery_dispatch.ws import router as delivery_dispatch_ws_router
 from app.modules.delivery_dispatch.rider_api import (
     internal_router as delivery_internal_router,
 )
@@ -24,6 +25,7 @@ api_v1_router.include_router(health_router)
 api_v1_router.include_router(users_router)
 api_v1_router.include_router(delivery_providers_router)
 api_v1_router.include_router(delivery_dispatch_router)
+api_v1_router.include_router(delivery_dispatch_ws_router)
 api_v1_router.include_router(rider_router)
 api_v1_router.include_router(delivery_internal_router)
 api_v1_router.include_router(restaurants_router)
