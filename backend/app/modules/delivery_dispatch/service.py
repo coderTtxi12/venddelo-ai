@@ -36,6 +36,7 @@ from app.db.models.restaurant import Restaurant
 from app.infra.storage.factory import build_storage
 from app.modules.assistant.image_webp import WEBP_CONTENT_TYPE, convert_image_bytes_to_webp
 from app.modules.delivery_dispatch.geo import geodesic_meters
+from app.modules.delivery_dispatch.rider_route import group_offer_totals, order_offer_stops
 from app.modules.delivery_dispatch.maps_url import (
     extract_maps_query_text,
     geocode_address_text,
@@ -1226,7 +1227,8 @@ class RiderDispatchService:
         self._session.flush()
         self._session.refresh(request)
         notify_request_realtime(self._session, request)
-        return self._to_assignment_dto(request)
+        cases = self._accepted_cases([request])
+        return self._to_assignment_dto(request, case_applied=cases.get(request.id))
 
     def _swap_assigned_driver(
         self,
@@ -1314,14 +1316,59 @@ class RiderDispatchService:
                 DeliveryDispatchRequest.status.in_(_ACTIVE_ASSIGNMENT_STATUSES),
             )
         ).all()
-        assignments = [self._to_assignment_dto(request, restaurant) for request, restaurant in rows]
+        cases = self._accepted_cases([request for request, _ in rows])
+        assignments = [
+            self._to_assignment_dto(
+                request,
+                restaurant,
+                case_applied=cases.get(request.id),
+            )
+            for request, restaurant in rows
+        ]
         assignments.sort(key=lambda item: _ASSIGNMENT_STATUS_ORDER.get(item.status, 99))
         return assignments
+
+    def _accepted_cases(
+        self, requests: list[DeliveryDispatchRequest]
+    ) -> dict[uuid.UUID, str]:
+        if not requests:
+            return {}
+        request_ids = [request.id for request in requests]
+        offers = self._session.scalars(
+            select(DeliveryDispatchOffer).where(
+                DeliveryDispatchOffer.request_id.in_(request_ids),
+                DeliveryDispatchOffer.status == "accepted",
+            )
+        ).all()
+        latest: dict[uuid.UUID, DeliveryDispatchOffer] = {}
+        for offer in offers:
+            current = latest.get(offer.request_id)
+            offer_at = offer.responded_at or offer.created_at
+            current_at = (
+                current.responded_at or current.created_at if current is not None else None
+            )
+            if current is None or (offer_at is not None and (current_at is None or offer_at >= current_at)):
+                latest[offer.request_id] = offer
+        cases = {request_id: offer.case_applied for request_id, offer in latest.items()}
+        group_case: dict[uuid.UUID, str] = {}
+        for request in requests:
+            case = cases.get(request.id)
+            if request.dispatch_group_id is not None and case:
+                group_case[request.dispatch_group_id] = case
+        for request in requests:
+            if request.id in cases or request.dispatch_group_id is None:
+                continue
+            inherited = group_case.get(request.dispatch_group_id)
+            if inherited is not None:
+                cases[request.id] = inherited
+        return cases
 
     def _to_assignment_dto(
         self,
         request: DeliveryDispatchRequest,
         restaurant: Restaurant | None = None,
+        *,
+        case_applied: str | None = None,
     ) -> RiderAssignmentDTO:
         if restaurant is None:
             restaurant = self._session.get(Restaurant, request.restaurant_id)
@@ -1350,6 +1397,8 @@ class RiderDispatchService:
             notes=request.notes,
             customer_name=request.customer_name if picked_up else None,
             customer_phone=request.customer_phone if picked_up else None,
+            case_applied=case_applied,
+            dispatch_group_id=request.dispatch_group_id,
         )
 
     def _to_offer_dto(self, offer: DeliveryDispatchOffer) -> RiderOfferDTO:
@@ -1371,7 +1420,10 @@ class RiderDispatchService:
             )
             others = [row for row in grouped if row.id != request.id]
             members = [request, *others]
-        stops = []
+        driver = self._session.get(DeliveryDriver, offer.driver_id)
+        start_lat = driver.last_lat if driver is not None else None
+        start_lng = driver.last_lng if driver is not None else None
+        stop_payloads: list[dict] = []
         for member in members:
             member_restaurant = self._session.get(Restaurant, member.restaurant_id)
             restaurant_lat = member_restaurant.latitude if member_restaurant is not None else None
@@ -1386,20 +1438,38 @@ class RiderDispatchService:
                         member.dropoff_lng,
                     )
                 )
-            stops.append(
-                RiderOfferStopDTO(
-                    restaurant_name=(
+            stop_payloads.append(
+                {
+                    "restaurant_name": (
                         member_restaurant.name if member_restaurant is not None else ""
                     ),
-                    dropoff_address=member.dropoff_address,
-                    short_id=member.short_id,
-                    restaurant_lat=restaurant_lat,
-                    restaurant_lng=restaurant_lng,
-                    dropoff_lat=member.dropoff_lat,
-                    dropoff_lng=member.dropoff_lng,
-                    distance_meters=distance_meters,
-                )
+                    "dropoff_address": member.dropoff_address,
+                    "short_id": member.short_id,
+                    "restaurant_lat": restaurant_lat,
+                    "restaurant_lng": restaurant_lng,
+                    "dropoff_lat": member.dropoff_lat,
+                    "dropoff_lng": member.dropoff_lng,
+                    "distance_meters": distance_meters,
+                    "package_count": member.package_count,
+                    "payment_method": member.payment_method,
+                    "collect_cents": member.collect_cents,
+                }
             )
+        stop_payloads = order_offer_stops(stop_payloads, start_lat, start_lng)
+        totals = group_offer_totals(stop_payloads)
+        stops = [
+            RiderOfferStopDTO(
+                restaurant_name=row["restaurant_name"],
+                dropoff_address=row["dropoff_address"],
+                short_id=row["short_id"],
+                restaurant_lat=row["restaurant_lat"],
+                restaurant_lng=row["restaurant_lng"],
+                dropoff_lat=row["dropoff_lat"],
+                dropoff_lng=row["dropoff_lng"],
+                distance_meters=row["distance_meters"],
+            )
+            for row in stop_payloads
+        ]
         primary = stops[0] if stops else None
         distances = [stop.distance_meters for stop in stops if stop.distance_meters is not None]
         return RiderOfferDTO(
@@ -1411,10 +1481,10 @@ class RiderDispatchService:
             expires_at=offer.expires_at,
             restaurant_name=restaurant_name,
             dropoff_address=request.dropoff_address,
-            collect_cents=request.collect_cents,
+            collect_cents=totals["collect_cents"],
             quoted_fee_cents=sum(member.quoted_fee_cents for member in members),
-            payment_method=request.payment_method,
-            package_count=request.package_count,
+            payment_method=totals["payment_method"],
+            package_count=totals["package_count"],
             restaurant_lat=primary.restaurant_lat if primary is not None else None,
             restaurant_lng=primary.restaurant_lng if primary is not None else None,
             dropoff_lat=request.dropoff_lat,
