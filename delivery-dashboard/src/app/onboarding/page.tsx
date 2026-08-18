@@ -17,7 +17,7 @@ export default function OnboardingPage() {
       const provider = response.provider;
       if (!provider) return;
       if (provider.status === 'active') {
-        router.replace('/partnerships');
+        router.replace('/monitor');
         return;
       }
       router.replace('/pending-review');
