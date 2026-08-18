@@ -13,16 +13,11 @@
 }
 
 .header p,
-.sectionHeading p,
-.request p,
-.request span,
-.empty,
 .loading {
   margin: 0;
   color: var(--color-text-secondary);
 }
 
-.card,
 .success {
   display: flex;
   flex-direction: column;
@@ -33,25 +28,105 @@
   background: var(--color-surface);
 }
 
-.sectionHeading {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
+.formSection {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  overflow: hidden;
 }
 
-.sectionHeading > svg {
+.formSectionOpen {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+}
+
+.formToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  min-height: 44px;
+  color: inherit;
+  transition: background 0.2s ease;
+}
+
+.formToggle:hover {
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+}
+
+.formToggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.formToggleMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.formToggleLead {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.formToggleIcon {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
   color: var(--color-primary);
 }
 
-.sectionHeading h2,
-.success h2,
-.request h3 {
-  margin: 0 0 0.25rem;
+.formTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--color-text);
 }
 
-.sectionHeading h2,
+.formSummary {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.formChevron {
+  display: inline-flex;
+  color: var(--color-text-secondary);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.formChevronExpanded {
+  transform: rotate(180deg);
+}
+
+.formPanel {
+  border-top: 1px solid var(--color-border);
+  padding: 0 1.25rem 1.25rem;
+}
+
+.formPanel[hidden] {
+  display: none;
+}
+
+.formSubtitle {
+  margin: 1rem 0;
+  font-size: 0.86rem;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
 .success h2 {
+  margin: 0 0 0.25rem;
+  color: var(--color-text);
   font-size: 1rem;
   font-weight: 800;
 }
@@ -116,7 +191,6 @@
 
 .input:focus,
 .textarea:focus,
-.actions button:focus-visible,
 .trackingLink button:focus-visible,
 .primaryButton:focus-visible {
   outline: 2px solid var(--color-primary);
@@ -137,36 +211,6 @@
   color: var(--color-text);
   font-size: 0.82rem;
   font-weight: 700;
-}
-
-.form input,
-.form select,
-.form textarea {
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 44px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-surface);
-  padding: 0.55rem 0.75rem;
-  color: var(--color-text);
-  font: inherit;
-}
-
-.form textarea {
-  min-height: 88px;
-  resize: vertical;
-}
-
-.form input:focus,
-.form select:focus,
-.form textarea:focus,
-.actions button:focus-visible,
-.trackingLink button:focus-visible,
-.primaryButton:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
-  border-color: var(--color-primary);
 }
 
 .locationSelected,
@@ -312,8 +356,7 @@
   white-space: nowrap;
 }
 
-.trackingLink button,
-.actions button {
+.trackingLink button {
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-surface);
@@ -325,92 +368,9 @@
   touch-action: manipulation;
 }
 
-.trackingLink button:hover,
-.actions button:hover {
+.trackingLink button:hover {
   border-color: color-mix(in srgb, var(--color-text) 18%, var(--color-border));
   background: var(--color-bg);
-}
-
-.list {
-  display: grid;
-  gap: 0.65rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.request {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: center;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-bg);
-}
-
-.requestBody {
-  min-width: 0;
-}
-
-.requestMeta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.45rem 0.75rem;
-  margin-top: 0.35rem;
-  font-size: 0.8rem;
-  color: var(--color-text-secondary);
-}
-
-.statusChip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.15rem 0.55rem;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--color-text-secondary);
-}
-
-.requestMain {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-  min-width: 0;
-}
-
-.request h3 {
-  font-size: 0.95rem;
-}
-
-.request p {
-  margin-bottom: 0.3rem;
-}
-
-.request span {
-  font-size: 0.8rem;
-}
-
-.statusIcon {
-  display: grid;
-  flex: 0 0 36px;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
-  color: var(--color-primary);
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.5rem;
 }
 
 .loading {
@@ -423,21 +383,13 @@
   .gridThree {
     grid-template-columns: 1fr;
   }
-
-  .request {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .actions {
-    justify-content: flex-start;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .primaryButton,
   .trackingLink button,
-  .actions button {
+  .formToggle,
+  .formChevron {
     transition: none;
   }
 }

@@ -3,14 +3,15 @@
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlined';
 import DoneAllOutlinedIcon from '@mui/icons-material/DoneAllOutlined';
-import ErrorOutlineOutlinedIcon from '@mui/icons-material/ErrorOutlineOutlined';
-import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
-import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
+import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DeliveryLocationValue } from '@/components/digital-menu/CheckoutDeliveryAddressPicker';
 import { DispatchDeliveryAddressPicker } from '@/components/dispatch/DispatchDeliveryAddressPicker';
+import { DispatchRecentRequests } from '@/components/dispatch/DispatchRecentRequests';
+import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
 import { FormSelect } from '@/components/ui/FormSelect';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -23,7 +24,7 @@ import {
   retryDispatchRequest,
   type DispatchCreateInput,
   type DispatchRequest,
-  type DispatchStatus,
+  formatDispatchShortId,
 } from '@/lib/api/dispatch';
 import { getPublicCheckoutConfig, type PublicDeliveryService } from '@/lib/api/public';
 import { ApiError } from '@/lib/api/types';
@@ -32,28 +33,10 @@ import { formatMoney } from '@/lib/currency';
 import { getDeliveryWeatherNotice } from '@/lib/digital-menu/checkout/deliveryWeatherNotice';
 import { usePublicDeliveryQuote } from '@/lib/digital-menu/checkout/usePublicDeliveryQuote';
 import { isActiveDeliveryPartnership } from '@/lib/fetchActiveDeliveryProviderConfig';
+import { DEFAULT_COUNTRY_ISO, findCountryByIso, formatE164 } from '@/lib/phone/countryDialCodes';
 import { publicMenuOrigin } from '@/lib/restaurantSubdomain';
 import { syncRestaurantDeliveryPartnership } from '@/lib/syncDeliveryPartnership';
 import styles from './DeliveryPage.module.css';
-
-const STATUS_LABELS: Record<DispatchStatus, string> = {
-  scheduled: 'Programado',
-  searching: 'Buscando repartidor',
-  offered: 'Oferta enviada',
-  assigned: 'Repartidor asignado',
-  picked_up: 'Pedido recogido',
-  in_transit: 'En camino',
-  delivered: 'Entregado',
-  unassigned: 'Sin repartidor',
-  cancelled: 'Cancelado',
-};
-
-const CASH_CONFIRMABLE = new Set<DispatchStatus>([
-  'assigned',
-  'picked_up',
-  'in_transit',
-  'delivered',
-]);
 
 const PREP_CUSTOM_VALUE = 'custom';
 
@@ -63,25 +46,6 @@ const EMPTY_LOCATION: DeliveryLocationValue = {
   longitude: null,
   placeId: null,
 };
-
-function statusIcon(status: DispatchStatus) {
-  if (status === 'delivered') return <DoneAllOutlinedIcon fontSize="small" />;
-  if (status === 'unassigned' || status === 'cancelled') {
-    return <ErrorOutlineOutlinedIcon fontSize="small" />;
-  }
-  if (status === 'scheduled') return <ScheduleOutlinedIcon fontSize="small" />;
-  if (status === 'searching' || status === 'offered') {
-    return <DeliveryDiningOutlinedIcon fontSize="small" />;
-  }
-  return <LocalShippingOutlinedIcon fontSize="small" />;
-}
-
-function money(cents: number): string {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-  }).format(cents / 100);
-}
 
 function parsePesosToCents(input: string): number {
   const trimmed = input.trim();
@@ -100,6 +64,12 @@ export default function DeliveryPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<DispatchRequest | null>(null);
+  const [confirm, setConfirm] = useState<{
+    kind: 'cancel' | 'cash';
+    request: DispatchRequest;
+    step: 1 | 2;
+  } | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   const [location, setLocation] = useState<DeliveryLocationValue>(EMPTY_LOCATION);
   const [mapsUrl, setMapsUrl] = useState<string | null>(null);
@@ -112,6 +82,11 @@ export default function DeliveryPage() {
   const [customPrepMinutes, setCustomPrepMinutes] = useState('');
   const [collectAmount, setCollectAmount] = useState('0');
   const [cashDenomination, setCashDenomination] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [phoneCountryIso, setPhoneCountryIso] = useState(DEFAULT_COUNTRY_ISO);
+  const [phoneLocal, setPhoneLocal] = useState('');
+  const [formExpanded, setFormExpanded] = useState(true);
+  const didInitFormCollapse = useRef(false);
 
   const courierAvailable = deliveryService?.available ?? false;
   const courierReason = deliveryService?.reason ?? null;
@@ -212,6 +187,14 @@ export default function DeliveryPage() {
   }, [accessToken, selectedRestaurantId]);
 
   useEffect(() => {
+    if (loading || didInitFormCollapse.current) return;
+    if (requests.length > 0) {
+      setFormExpanded(false);
+      didInitFormCollapse.current = true;
+    }
+  }, [loading, requests.length]);
+
+  useEffect(() => {
     if (authLoading || accessLoading) return;
     if (!accessToken || !selectedRestaurantId) return;
     const frame = window.requestAnimationFrame(() => void load());
@@ -272,6 +255,10 @@ export default function DeliveryPage() {
     Number(packageCount) >= 1 &&
     !submitting;
 
+  const formSummary = customerName.trim()
+    ? `${customerName.trim()}${phoneLocal ? ` · ${phoneLocal}` : ''}`
+    : 'Nombre, celular y dirección del cliente';
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!accessToken || !selectedRestaurantId || !canRequestRider || prepMinutes == null) return;
@@ -285,9 +272,12 @@ export default function DeliveryPage() {
     }
 
     const form = new FormData(event.currentTarget);
-    const customerName = String(form.get('customer_name') ?? '').trim();
-    const customerPhone = String(form.get('customer_phone') ?? '').trim();
-    if (!customerName || !customerPhone) {
+    const name = customerName.trim();
+    const customerPhone = formatE164(
+      findCountryByIso(phoneCountryIso).dialCode,
+      phoneLocal,
+    );
+    if (!name || phoneLocal.replace(/\D/g, '').length < 8) {
       setError('Completa el nombre y celular del cliente.');
       return;
     }
@@ -319,7 +309,7 @@ export default function DeliveryPage() {
     setError(null);
     try {
       const row = await createDispatchRequest(accessToken, selectedRestaurantId, {
-        customer_name: customerName,
+        customer_name: name,
         customer_phone: customerPhone,
         dropoff_lat: location.latitude,
         dropoff_lng: location.longitude,
@@ -344,6 +334,10 @@ export default function DeliveryPage() {
       setCollectAmount('0');
       setCashDenomination('');
       setCustomPrepMinutes('');
+      setCustomerName('');
+      setPhoneCountryIso(DEFAULT_COUNTRY_ISO);
+      setPhoneLocal('');
+      setFormExpanded(false);
       if (leadTimes[0] != null) {
         setPrepSelection(String(leadTimes[0]));
       }
@@ -361,9 +355,9 @@ export default function DeliveryPage() {
 
   async function runAction(
     request: DispatchRequest,
-    action: 'cancel' | 'retry' | 'cash',
-  ) {
-    if (!accessToken || !selectedRestaurantId) return;
+    action: 'retry' | 'cancel' | 'cash',
+  ): Promise<boolean> {
+    if (!accessToken || !selectedRestaurantId) return false;
     setError(null);
     try {
       const updated =
@@ -375,12 +369,61 @@ export default function DeliveryPage() {
       setRequests((current) =>
         current.map((item) => (item.id === updated.id ? updated : item)),
       );
+      return true;
     } catch (actionError) {
       setError(
         actionError instanceof ApiError ? actionError.message : 'No se pudo actualizar la solicitud.',
       );
+      return false;
     }
   }
+
+  async function finishConfirm() {
+    if (!confirm) return;
+    setConfirming(true);
+    try {
+      const ok = await runAction(confirm.request, confirm.kind);
+      if (ok) setConfirm(null);
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  const confirmCopy = confirm
+    ? confirm.kind === 'cancel'
+      ? confirm.step === 1
+        ? {
+            title: `¿Cancelar el envío ${formatDispatchShortId(confirm.request.short_id)}?`,
+            description:
+              'Se detendrá la búsqueda de repartidor y el cliente dejará de ver el rastreo activo.\n\nEsta acción no se puede deshacer.',
+            confirmLabel: 'Continuar',
+            cancelLabel: 'No, conservar',
+            variant: 'danger' as const,
+          }
+        : {
+            title: 'Confirma la cancelación',
+            description: `Vas a cancelar ${formatDispatchShortId(confirm.request.short_id)} de ${confirm.request.customer_name}. El pedido no se asignará a ningún rider.`,
+            confirmLabel: 'Sí, cancelar envío',
+            cancelLabel: 'Volver',
+            variant: 'danger' as const,
+          }
+      : confirm.step === 1
+        ? {
+            title: '¿El rider ya te pagó?',
+            description:
+              'Esto libera el crédito retenido al repartidor.\n\nConfírmalo solo si ya recibiste el efectivo en tu negocio.',
+            confirmLabel: 'Continuar',
+            cancelLabel: 'Todavía no',
+            variant: 'primary' as const,
+          }
+        : {
+            title: 'Confirma el pago',
+            description: `Vas a marcar que el rider ya te entregó el cobro de ${formatDispatchShortId(confirm.request.short_id)} (${formatMoney(confirm.request.collect_cents / 100, 'MXN')}).`,
+            confirmLabel: 'Sí, ya me pagó',
+            cancelLabel: 'Volver',
+            variant: 'primary' as const,
+          }
+    : null;
 
   if (loading || authLoading || accessLoading) {
     return <p className={styles.loading}>Cargando Delivery…</p>;
@@ -403,16 +446,41 @@ export default function DeliveryPage() {
         </div>
       ) : null}
 
-      <section className={styles.card} aria-labelledby="new-delivery-title">
-        <div className={styles.sectionHeading}>
-          <DeliveryDiningOutlinedIcon />
-          <div>
-            <h2 id="new-delivery-title">Solicitar delivery</h2>
-            <p>Completa los datos del cliente, cobro y paquete.</p>
-          </div>
-        </div>
+      <section
+        className={`${styles.formSection} ${formExpanded ? styles.formSectionOpen : ''}`}
+        aria-labelledby="new-delivery-title"
+      >
+        <button
+          type="button"
+          className={styles.formToggle}
+          aria-expanded={formExpanded}
+          aria-controls="new-delivery-panel"
+          onClick={() => setFormExpanded((open) => !open)}
+        >
+          <span className={styles.formToggleLead}>
+            <DeliveryDiningOutlinedIcon className={styles.formToggleIcon} aria-hidden />
+            <span className={styles.formToggleMain}>
+              <h2 id="new-delivery-title" className={styles.formTitle}>
+                Solicitar delivery
+              </h2>
+              {!formExpanded ? (
+                <span className={styles.formSummary}>{formSummary}</span>
+              ) : null}
+            </span>
+          </span>
+          <span
+            className={`${styles.formChevron} ${formExpanded ? styles.formChevronExpanded : ''}`}
+            aria-hidden
+          >
+            <ExpandMoreOutlinedIcon sx={{ fontSize: 22 }} />
+          </span>
+        </button>
 
-        <form className={styles.form} onSubmit={submit}>
+        <div id="new-delivery-panel" className={styles.formPanel} hidden={!formExpanded}>
+          <p className={styles.formSubtitle}>
+            Completa los datos del cliente, cobro y paquete.
+          </p>
+          <form className={styles.form} onSubmit={submit}>
           <div className={styles.gridTwo}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="customer-name">
@@ -424,6 +492,8 @@ export default function DeliveryPage() {
                 className={styles.input}
                 required
                 maxLength={200}
+                value={customerName}
+                onChange={(event) => setCustomerName(event.target.value)}
                 disabled={!courierAvailable}
               />
             </div>
@@ -431,14 +501,15 @@ export default function DeliveryPage() {
               <label className={styles.label} htmlFor="customer-phone">
                 Celular
               </label>
-              <input
-                id="customer-phone"
-                name="customer_phone"
-                type="tel"
-                className={styles.input}
-                required
-                maxLength={30}
+              <PhoneInputWithCountry
+                inputId="customer-phone"
+                countryIso={phoneCountryIso}
+                localNumber={phoneLocal}
+                onCountryChange={setPhoneCountryIso}
+                onLocalNumberChange={setPhoneLocal}
+                placeholder="55 1234 5678"
                 disabled={!courierAvailable}
+                flat
               />
             </div>
           </div>
@@ -652,13 +723,14 @@ export default function DeliveryPage() {
             {submitting ? 'Solicitando…' : 'Solicitar repartidor'}
           </button>
         </form>
+        </div>
       </section>
 
       {created && trackingUrl ? (
         <section className={styles.success} aria-live="polite">
           <DoneAllOutlinedIcon />
           <div>
-            <h2>Solicitud creada</h2>
+            <h2>Solicitud {formatDispatchShortId(created.short_id)} creada</h2>
             <p>
               La búsqueda inicia el{' '}
               {new Date(created.search_at).toLocaleString('es-MX', {
@@ -681,57 +753,40 @@ export default function DeliveryPage() {
         </section>
       ) : null}
 
-      <section className={styles.card} aria-labelledby="dispatch-list-title">
-        <div className={styles.sectionHeading}>
-          <LocalShippingOutlinedIcon />
-          <div>
-            <h2 id="dispatch-list-title">Solicitudes recientes</h2>
-            <p>Consulta el estado y administra tus entregas.</p>
-          </div>
-        </div>
-        <ul className={styles.list}>
-          {requests.length ? (
-            requests.map((request) => (
-              <li key={request.id}>
-                <article className={styles.request}>
-                  <div className={styles.requestMain}>
-                    <span className={styles.statusIcon}>{statusIcon(request.status)}</span>
-                    <div className={styles.requestBody}>
-                      <h3>{request.customer_name}</h3>
-                      <p>{request.dropoff_address}</p>
-                      <div className={styles.requestMeta}>
-                        <span className={styles.statusChip}>
-                          {STATUS_LABELS[request.status]}
-                        </span>
-                        <span>{money(request.quoted_fee_cents)}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className={styles.actions}>
-                    {request.status === 'unassigned' ? (
-                      <button type="button" onClick={() => void runAction(request, 'retry')}>
-                        Reintentar
-                      </button>
-                    ) : null}
-                    {!['delivered', 'cancelled'].includes(request.status) ? (
-                      <button type="button" onClick={() => void runAction(request, 'cancel')}>
-                        Cancelar
-                      </button>
-                    ) : null}
-                    {request.payment_method === 'cash' && CASH_CONFIRMABLE.has(request.status) ? (
-                      <button type="button" onClick={() => void runAction(request, 'cash')}>
-                        Rider ya me pagó
-                      </button>
-                    ) : null}
-                  </div>
-                </article>
-              </li>
-            ))
-          ) : (
-            <li className={styles.empty}>Todavía no hay solicitudes de delivery.</li>
-          )}
-        </ul>
-      </section>
+      <DispatchRecentRequests
+        requests={requests}
+        subdomain={subdomain}
+        busy={confirming}
+        onRetry={(request) => void runAction(request, 'retry')}
+        onCancel={(request) => setConfirm({ kind: 'cancel', request, step: 1 })}
+        onConfirmCash={(request) => setConfirm({ kind: 'cash', request, step: 1 })}
+      />
+      <ConfirmDialog
+        open={confirm != null && confirmCopy != null}
+        title={confirmCopy?.title ?? ''}
+        description={confirmCopy?.description ?? ''}
+        stepHint={confirm ? `Paso ${confirm.step} de 2` : undefined}
+        confirmLabel={confirmCopy?.confirmLabel}
+        cancelLabel={confirmCopy?.cancelLabel}
+        variant={confirmCopy?.variant}
+        loading={confirming}
+        onCancel={() => {
+          if (confirming) return;
+          if (confirm?.step === 2) {
+            setConfirm({ ...confirm, step: 1 });
+            return;
+          }
+          setConfirm(null);
+        }}
+        onConfirm={() => {
+          if (!confirm) return;
+          if (confirm.step === 1) {
+            setConfirm({ ...confirm, step: 2 });
+            return;
+          }
+          void finishConfirm();
+        }}
+      />
     </div>
   );
 }
