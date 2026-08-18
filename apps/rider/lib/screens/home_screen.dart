@@ -9,6 +9,7 @@ import '../formatters.dart';
 import '../maps/contact_links.dart';
 import '../maps/geo.dart';
 import '../maps/google_routes.dart';
+import '../maps/monitor_map_style.dart';
 import '../maps/nav_target.dart';
 import '../maps/open_external_maps.dart';
 import '../maps/selected_route_store.dart';
@@ -43,6 +44,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedRoute = 0;
   String? _routeQueryKey;
   DateTime? _lastRerouteAt;
+  BitmapDescriptor? _restaurantIcon;
+  BitmapDescriptor? _dropoffIcon;
 
   @override
   void initState() {
@@ -50,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
     widget.controller.addListener(_onControllerTick);
     unawaited(widget.controller.startLiveLocation());
     unawaited(_restoreSelectedRoute());
+    unawaited(_loadMapPins());
   }
 
   @override
@@ -59,9 +63,16 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  RiderAssignment? get _currentJob {
-    return _splitJobs(widget.controller.profile?.assignments ?? const []).current;
+  RiderJobSplit get _jobs {
+    final position = widget.controller.currentPosition;
+    return splitRiderJobs(
+      widget.controller.profile?.assignments ?? const [],
+      riderLat: position?.latitude,
+      riderLng: position?.longitude,
+    );
   }
+
+  RiderAssignment? get _currentJob => _jobs.current;
 
   String? get _currentRouteJobKey {
     final job = _currentJob;
@@ -83,6 +94,46 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _selectedRoute = index;
     });
+  }
+
+  Future<void> _loadMapPins() async {
+    final pixelRatio =
+        WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
+    final restaurantIcon = await buildRestaurantMapPin(pixelRatio);
+    final dropoffIcon = await buildDropoffMapPin(pixelRatio);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _restaurantIcon = restaurantIcon;
+      _dropoffIcon = dropoffIcon;
+    });
+  }
+
+  Set<Marker> _stackedMarkers(RiderJobSplit jobs) {
+    final pins = stackedJobPins(jobs);
+    return {
+      for (var index = 0; index < pins.length; index++)
+        Marker(
+          markerId: MarkerId('job-pin-$index'),
+          position: pins[index].position,
+          anchor: MonitorMapStyle.pinAnchor,
+          zIndexInt: pins[index].current ? 3 : 2,
+          infoWindow: InfoWindow(
+            title: pins[index].kind == 'restaurant' ? 'Recoger' : 'Entregar',
+            snippet: pins[index].label,
+          ),
+          icon: pins[index].kind == 'restaurant'
+              ? _restaurantIcon ??
+                    BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueViolet,
+                    )
+              : _dropoffIcon ??
+                    BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueOrange,
+                    ),
+        ),
+    };
   }
 
   void _selectRoute(int index) {
@@ -263,7 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final name = profile == null
         ? 'Repartidor'
         : '${profile.firstName} ${profile.lastName}'.trim();
-    final jobs = _splitJobs(profile?.assignments ?? const []);
+    final jobs = _jobs;
     final isOnline = profile?.isOnline ?? false;
     final position = controller.currentPosition;
     final center = position == null
@@ -273,19 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final job = jobs.current;
     final destination = job == null ? null : assignmentNavigationTarget(job);
     final selectedRoute = _selectedRouteOption;
-    final extraMarkers = <Marker>{
-      if (destination != null)
-        Marker(
-          markerId: const MarkerId('nav-destination'),
-          position: destination,
-          infoWindow: InfoWindow(
-            title: job?.status == 'assigned' ? 'Recoger' : 'Entregar',
-            snippet: job?.status == 'assigned'
-                ? job?.restaurantName
-                : job?.dropoffAddress,
-          ),
-        ),
-    };
+    final extraMarkers = _stackedMarkers(jobs);
     final polylines = <Polyline>{};
     final routes = _routes?.routes ?? const <RiderRouteOption>[];
     for (var i = 0; i < routes.length; i++) {
@@ -649,7 +688,7 @@ class _HomeBottomSheet extends StatelessWidget {
 
   final RiderController controller;
   final SheetController sheetController;
-  final _JobSplit jobs;
+  final RiderJobSplit jobs;
   final bool isOnline;
   final double peekHeight;
   final double expandedHeight;
@@ -798,7 +837,7 @@ class _HomeBottomSheet extends StatelessWidget {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Luego: ${queued.restaurantName}',
+                              queuedJobLabel(queued),
                               style: Theme.of(context).textTheme.bodyLarge,
                             ),
                           ),
@@ -844,31 +883,6 @@ class _HomeBottomSheet extends StatelessWidget {
       ),
     );
   }
-}
-
-class _JobSplit {
-  const _JobSplit({this.current, this.queued = const []});
-
-  final RiderAssignment? current;
-  final List<RiderAssignment> queued;
-}
-
-_JobSplit _splitJobs(List<RiderAssignment> assignments) {
-  final inProgress = assignments
-      .where(
-        (item) => item.status == 'picked_up' || item.status == 'in_transit',
-      )
-      .toList();
-  final assigned = assignments
-      .where((item) => item.status == 'assigned')
-      .toList();
-  if (inProgress.isNotEmpty) {
-    return _JobSplit(current: inProgress.first, queued: assigned);
-  }
-  if (assigned.isEmpty) {
-    return const _JobSplit();
-  }
-  return _JobSplit(current: assigned.first, queued: assigned.skip(1).toList());
 }
 
 double _headingDegrees(double heading) {
