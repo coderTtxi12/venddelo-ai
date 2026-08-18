@@ -11,6 +11,7 @@ import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
+import QueryStatsOutlinedIcon from '@mui/icons-material/QueryStatsOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import { MOBILE_DRAWER_MAX_WIDTH, useMobileSidebar } from '@/contexts/MobileSidebarContext';
 import styles from './Sidebar.module.css';
@@ -23,6 +24,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { label: 'Monitor', path: '/monitor', icon: <QueryStatsOutlinedIcon fontSize="small" /> },
   { label: 'Restaurantes', path: '/partnerships', icon: <HandshakeOutlinedIcon fontSize="small" /> },
   { label: 'Repartidores', path: '/repartidores', icon: <TwoWheelerOutlinedIcon fontSize="small" /> },
   { label: 'Asignación', path: '/asignacion', icon: <AssignmentOutlinedIcon fontSize="small" /> },
