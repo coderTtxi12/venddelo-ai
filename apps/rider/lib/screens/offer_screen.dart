@@ -1,225 +1,295 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:smooth_sheets/smooth_sheets.dart';
 
-import '../countdown.dart';
+import '../maps/google_routes.dart';
+import '../maps/monitor_map_style.dart';
 import '../models.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_theme.dart';
-import '../widgets/rider_widgets.dart';
+import '../widgets/offer_details_sheet.dart';
+import '../widgets/rider_live_map.dart';
 
 class OfferScreen extends StatefulWidget {
   const OfferScreen({
     super.key,
     required this.offer,
     required this.onAccept,
-    required this.onReject,
     this.errorMessage,
     this.busy = false,
+    this.showMap = true,
   });
 
   final RiderOffer offer;
   final VoidCallback onAccept;
-  final VoidCallback onReject;
   final String? errorMessage;
   final bool busy;
+  final bool showMap;
 
   @override
   State<OfferScreen> createState() => _OfferScreenState();
 }
 
 class _OfferScreenState extends State<OfferScreen> {
-  Timer? _ticker;
+  final RiderMapController _mapController = RiderMapController();
+  late OfferMapGeometry _geometry;
+  BitmapDescriptor? _restaurantIcon;
+  BitmapDescriptor? _dropoffIcon;
+  List<LatLng>? _roadPoints;
 
   @override
   void initState() {
     super.initState();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {});
-      }
-    });
+    _geometry = _geometryFor();
+    unawaited(_bootstrapMap());
   }
 
   @override
-  void dispose() {
-    _ticker?.cancel();
-    super.dispose();
+  void didUpdateWidget(covariant OfferScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.offer.id != widget.offer.id ||
+        oldWidget.offer.restaurantLat != widget.offer.restaurantLat ||
+        oldWidget.offer.dropoffLat != widget.offer.dropoffLat ||
+        oldWidget.offer.stops.length != widget.offer.stops.length) {
+      _roadPoints = null;
+      _geometry = _geometryFor();
+      unawaited(_loadRoadRoute());
+    }
   }
 
-  Color _countdownColor(int remaining) {
-    if (remaining == 0) {
-      return AppColors.danger;
+  OfferMapGeometry _geometryFor({List<LatLng>? roadPoints}) {
+    return offerMapGeometry(
+      widget.offer,
+      roadPoints: roadPoints ?? _roadPoints,
+      restaurantIcon: _restaurantIcon,
+      dropoffIcon: _dropoffIcon,
+    );
+  }
+
+  Future<void> _bootstrapMap() async {
+    final pixelRatio =
+        WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
+    final restaurantIcon = await buildRestaurantMapPin(pixelRatio);
+    final dropoffIcon = await buildDropoffMapPin(pixelRatio);
+    if (!mounted) {
+      return;
     }
-    if (remaining <= 10) {
-      return AppColors.warningBright;
+    _restaurantIcon = restaurantIcon;
+    _dropoffIcon = dropoffIcon;
+    setState(() => _geometry = _geometryFor());
+    await _loadRoadRoute();
+  }
+
+  Future<void> _loadRoadRoute() async {
+    final origin = _latLng(widget.offer.restaurantLat, widget.offer.restaurantLng);
+    final destination = _latLng(widget.offer.dropoffLat, widget.offer.dropoffLng);
+    if (origin == null || destination == null) {
+      return;
     }
-    return AppColors.accent;
+    final result = await fetchRiderRoutes(origin: origin, destination: destination);
+    if (!mounted || result == null || result.routes.isEmpty) {
+      return;
+    }
+    _roadPoints = result.routes.first.points;
+    setState(() => _geometry = _geometryFor());
   }
 
   @override
   Widget build(BuildContext context) {
-    final remaining = remainingSecondsFromExpiresAt(widget.offer.expiresAt);
-    final collect = (widget.offer.collectCents / 100).toStringAsFixed(2);
-    final countdownColor = _countdownColor(remaining);
+    final center = _geometry.fitPoints.isEmpty
+        ? kDefaultMapCenter
+        : _geometry.fitPoints.first;
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: RiderScreenPadding(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
             children: [
-              Text(
-                'Nueva oferta',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w700,
+              if (widget.showMap)
+                Positioned.fill(
+                  child: RepaintBoundary(
+                    child: RiderLiveMap(
+                      mapKey: const ValueKey('offer-google-map'),
+                      mapController: _mapController,
+                      center: center,
+                      isOnline: true,
+                      padding: const EdgeInsets.only(bottom: 280),
+                      hideNativeMarker: true,
+                      extraMarkers: _geometry.markers,
+                      polylines: _geometry.polylines,
+                      fitPoints: _geometry.fitPoints,
+                      fitOnce: true,
+                      onUserGesture: () {},
                     ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                decoration: BoxDecoration(
-                  color: countdownColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-                  border: Border.all(
-                    color: countdownColor.withValues(alpha: 0.35),
-                    width: 2,
                   ),
+                )
+              else
+                const Positioned.fill(
+                  child: ColoredBox(color: AppColors.background),
                 ),
-                child: Column(
-                  children: [
-                    Text(
-                      remaining == 0 ? 'Expirada' : '$remaining',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                            color: countdownColor,
-                            fontSize: remaining == 0 ? 40 : 64,
-                          ),
-                    ),
-                    if (remaining > 0)
-                      Text(
-                        'segundos',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: countdownColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (widget.offer.stops.length > 1)
-                        ...widget.offer.stops.map(
-                          (stop) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Card(
-                              child: Padding(
-                                padding: const EdgeInsets.all(18),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      stop.restaurantName,
-                                      style: Theme.of(context).textTheme.titleLarge,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      stop.dropoffAddress,
-                                      style: Theme.of(context).textTheme.bodyLarge,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      else
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(18),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  widget.offer.restaurantName,
-                                  style: Theme.of(context).textTheme.headlineSmall,
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  widget.offer.dropoffAddress,
-                                  style: Theme.of(context).textTheme.bodyLarge,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 16),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(18),
-                          child: Column(
-                            children: [
-                              RiderMetaRow(
-                                label: 'Cobrar',
-                                value: '\$$collect',
-                              ),
-                              RiderMetaRow(
-                                label: 'Pago',
-                                value: _paymentLabel(widget.offer.paymentMethod),
-                              ),
-                              RiderMetaRow(
-                                label: 'Paquetes',
-                                value: '${widget.offer.packageCount}',
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (widget.errorMessage != null &&
-                          widget.errorMessage!.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        RiderErrorBanner(message: widget.errorMessage!),
-                      ],
+              SheetViewport(
+                child: Sheet(
+                  initialOffset: const SheetOffset(0.5),
+                  physics: const BouncingSheetPhysics(),
+                  snapGrid: SheetSnapGrid(
+                    snaps: [
+                      SheetOffset.absolute(360),
+                      SheetOffset.absolute(constraints.maxHeight * 0.5),
+                      SheetOffset.absolute(constraints.maxHeight * 0.92),
                     ],
                   ),
+                  scrollConfiguration: const SheetScrollConfiguration(),
+                  decoration: const MaterialSheetDecoration(
+                    size: SheetSize.fit,
+                    color: AppColors.surface,
+                    elevation: 12,
+                    clipBehavior: Clip.antiAlias,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(28),
+                      ),
+                    ),
+                  ),
+                  child: SizedBox(
+                    height: constraints.maxHeight,
+                    child: OfferDetailsSheet(
+                      offer: widget.offer,
+                      errorMessage: widget.errorMessage,
+                      busy: widget.busy,
+                      onAccept: widget.onAccept,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              RiderPrimaryButton(
-                label: 'Aceptar oferta',
-                color: AppColors.successBright,
-                onPressed: remaining == 0 || widget.busy ? null : widget.onAccept,
-              ),
-              const SizedBox(height: 12),
-              RiderSecondaryButton(
-                label: 'Rechazar',
-                onPressed: widget.busy ? null : widget.onReject,
-              ),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 }
 
-String _paymentLabel(String method) {
-  switch (method) {
-    case 'cash':
-      return 'Efectivo';
-    case 'transfer':
-      return 'Transferencia';
-    case 'card_terminal':
-      return 'Terminal';
-    default:
-      return method;
+class OfferMapGeometry {
+  const OfferMapGeometry({
+    required this.markers,
+    required this.polylines,
+    required this.fitPoints,
+  });
+
+  final Set<Marker> markers;
+  final Set<Polyline> polylines;
+  final List<LatLng> fitPoints;
+}
+
+OfferMapGeometry offerMapGeometry(
+  RiderOffer offer, {
+  List<LatLng>? roadPoints,
+  BitmapDescriptor? restaurantIcon,
+  BitmapDescriptor? dropoffIcon,
+}) {
+  final stops = offer.stops.isEmpty
+      ? [
+          RiderOfferStop(
+            restaurantName: offer.restaurantName,
+            dropoffAddress: offer.dropoffAddress,
+            restaurantLat: offer.restaurantLat,
+            restaurantLng: offer.restaurantLng,
+            dropoffLat: offer.dropoffLat,
+            dropoffLng: offer.dropoffLng,
+          ),
+        ]
+      : offer.stops;
+
+  final markers = <Marker>{};
+  final polylines = <Polyline>{};
+  final fitPoints = <LatLng>[];
+
+  for (var index = 0; index < stops.length; index++) {
+    final stop = stops[index];
+    final origin = _latLng(
+      stop.restaurantLat ?? offer.restaurantLat,
+      stop.restaurantLng ?? offer.restaurantLng,
+    );
+    final destination = _latLng(
+      stop.dropoffLat ?? offer.dropoffLat,
+      stop.dropoffLng ?? offer.dropoffLng,
+    );
+    if (origin != null) {
+      fitPoints.add(origin);
+      markers.add(
+        Marker(
+          markerId: MarkerId('origin-$index'),
+          position: origin,
+          anchor: MonitorMapStyle.pinAnchor,
+          zIndex: 2,
+          infoWindow: InfoWindow(
+            title: 'Recoger',
+            snippet: stop.restaurantName,
+          ),
+          icon: restaurantIcon ??
+              BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueViolet,
+              ),
+        ),
+      );
+    }
+    if (destination != null) {
+      fitPoints.add(destination);
+      markers.add(
+        Marker(
+          markerId: MarkerId('dropoff-$index'),
+          position: destination,
+          anchor: MonitorMapStyle.pinAnchor,
+          zIndex: 2,
+          infoWindow: InfoWindow(
+            title: 'Entregar',
+            snippet: stop.dropoffAddress,
+          ),
+          icon: dropoffIcon ??
+              BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueOrange,
+              ),
+        ),
+      );
+    }
+    final path = (index == 0 && roadPoints != null && roadPoints.length > 1)
+        ? roadPoints
+        : [
+            ?origin,
+            ?destination,
+          ];
+    if (path.length > 1) {
+      polylines.add(
+        Polyline(
+          polylineId: PolylineId('route-$index'),
+          points: path,
+          color: MonitorMapStyle.pendingRoute,
+          width: MonitorMapStyle.pendingRouteWidth,
+          geodesic: path.length < 3,
+          patterns: MonitorMapStyle.pendingRoutePatterns,
+        ),
+      );
+      if (path.length > 2) {
+        fitPoints.addAll(path);
+      }
+    }
   }
+
+  return OfferMapGeometry(
+    markers: markers,
+    polylines: polylines,
+    fitPoints: fitPoints,
+  );
+}
+
+LatLng? _latLng(double? lat, double? lng) {
+  if (lat == null || lng == null) {
+    return null;
+  }
+  if (lat.abs() < 0.0001 && lng.abs() < 0.0001) {
+    return null;
+  }
+  return LatLng(lat, lng);
 }
