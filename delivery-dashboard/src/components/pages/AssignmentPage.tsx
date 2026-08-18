@@ -323,10 +323,19 @@ export default function AssignmentPage() {
                     label="Timeout de asignación"
                     hint="Tiempo máximo antes de marcar como sin asignar."
                     min={1}
-                    fullWidth
                     value={assignmentSettings.assignment_timeout_seconds}
                     onChange={(value) =>
                       patchAssignmentField('assignment_timeout_seconds', value)
+                    }
+                  />
+                  <NumberField
+                    id="max-packages"
+                    label="Máx. paquetes por repartidor"
+                    hint="Tope de paquetes activos a la vez. El motor no le ofrece más si ya llegó al límite."
+                    min={1}
+                    value={assignmentSettings.max_active_packages_per_driver}
+                    onChange={(value) =>
+                      patchAssignmentField('max_active_packages_per_driver', value)
                     }
                   />
                 </div>
