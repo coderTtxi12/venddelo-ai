@@ -106,7 +106,7 @@ export default function DeliveryPage() {
 
   const quoteEnabled =
     courierAvailable &&
-    subdomain &&
+    subdomain.length > 0 &&
     location.latitude != null &&
     location.longitude != null;
 
