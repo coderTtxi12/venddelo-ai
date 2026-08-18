@@ -186,6 +186,29 @@ def _create_and_offer(client, engine, restaurant_id: str) -> tuple[str, str]:
     return request_id, body[0]["id"]
 
 
+@requires_db
+def test_rider_offer_includes_route_fee_and_distance(client, engine):
+    restaurant_id, _driver_id = _setup_ready_rider(client, engine)
+    _request_id, offer_id = _create_and_offer(client, engine, restaurant_id)
+
+    _as_rider()
+    offers = client.get("/api/v1/rider/me/offers", headers=AUTH)
+    assert offers.status_code == 200, offers.text
+    offer = offers.json()[0]
+    assert offer["id"] == offer_id
+    assert isinstance(offer["quoted_fee_cents"], int)
+    assert offer["quoted_fee_cents"] >= 0
+    assert offer["dropoff_lat"] is not None
+    assert offer["dropoff_lng"] is not None
+    assert "restaurant_lat" in offer
+    assert "distance_meters" in offer
+    assert offer["short_id"]
+    assert len(offer["short_id"]) == 5
+    assert offer["stops"][0]["dropoff_lat"] == offer["dropoff_lat"]
+    assert offer["stops"][0]["dropoff_lng"] == offer["dropoff_lng"]
+    assert offer["stops"][0]["short_id"] == offer["short_id"]
+
+
 def _setup_ready_fleet(
     client,
     engine,
