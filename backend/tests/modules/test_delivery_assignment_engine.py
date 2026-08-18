@@ -8,6 +8,8 @@ from app.modules.delivery_dispatch.engine import (
     EngineRequest,
     EngineSettings,
     choose_assignments,
+    eligibility_blockers,
+    high_demand_breakdown,
 )
 from app.modules.delivery_dispatch.geo import geodesic_meters
 
@@ -448,3 +450,20 @@ def test_notify_offer_records_when_token_present():
         assert seen == ["offer-1"]
     finally:
         set_offer_notifier(None)
+
+
+def test_high_demand_breakdown_flags_large_queue():
+    request = _request()
+    driver = _driver("d1", last_lat=19.4330, last_lng=-99.1335)
+    breakdown = high_demand_breakdown(
+        _context(request, (driver,), settings=_settings(high_demand_available_drivers_max=5), pending_count=8)
+    )
+    assert breakdown.large_queue is True
+    assert breakdown.high_demand is True
+
+
+def test_eligibility_blockers_offline_and_gps():
+    request = _request()
+    offline = _driver("off", last_lat=19.4330, last_lng=-99.1335, is_online=False)
+    context = _context(request, (offline,))
+    assert "offline" in eligibility_blockers(context, request, offline)
