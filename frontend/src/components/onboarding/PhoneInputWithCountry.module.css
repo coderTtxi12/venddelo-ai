@@ -6,6 +6,15 @@
   max-width: 28rem;
 }
 
+.wrapFlat .countryButton,
+.wrapFlat .phoneInput {
+  box-shadow: none;
+}
+
+.wrapFlat .phoneInput:focus {
+  box-shadow: none;
+}
+
 .row {
   display: flex;
   gap: 0.75rem;
@@ -37,8 +46,14 @@
   box-shadow: var(--shadow-sm);
 }
 
-.countryButton:hover {
+.countryButton:hover:not(:disabled) {
   border-color: rgba(79, 70, 229, 0.45);
+}
+
+.countryButton:disabled,
+.phoneInput:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .countryButton:focus-visible {

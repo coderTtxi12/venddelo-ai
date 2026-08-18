@@ -1,14 +1,17 @@
 'use client';
 
+import { useEffect } from 'react';
 import styles from './ConfirmDialog.module.css';
 
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
   description: string;
+  stepHint?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   loading?: boolean;
+  variant?: 'danger' | 'primary';
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -17,12 +20,23 @@ export default function ConfirmDialog({
   open,
   title,
   description,
+  stepHint,
   confirmLabel = 'Confirmar',
   cancelLabel = 'Cancelar',
   loading = false,
+  variant = 'danger',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  useEffect(() => {
+    if (!open) return undefined;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape' && !loading) onCancel();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [loading, onCancel, open]);
+
   if (!open) return null;
 
   return (
@@ -35,6 +49,7 @@ export default function ConfirmDialog({
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-desc"
       >
+        {stepHint ? <p className={styles.stepHint}>{stepHint}</p> : null}
         <h2 id="confirm-dialog-title" className={styles.title}>
           {title}
         </h2>
@@ -52,7 +67,7 @@ export default function ConfirmDialog({
           </button>
           <button
             type="button"
-            className={styles.confirmBtn}
+            className={variant === 'primary' ? styles.confirmPrimary : styles.confirmBtn}
             onClick={onConfirm}
             disabled={loading}
           >

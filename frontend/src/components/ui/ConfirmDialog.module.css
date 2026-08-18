@@ -19,6 +19,15 @@
   padding: 1.25rem 1.35rem;
 }
 
+.stepHint {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
 .title {
   font-size: 1.05rem;
   font-weight: 700;
@@ -31,6 +40,7 @@
   color: var(--color-text-secondary);
   line-height: 1.5;
   margin: 0 0 1.25rem;
+  white-space: pre-line;
 }
 
 .actions {
@@ -74,15 +84,38 @@
   background: #991b1b;
 }
 
-.confirmBtn:disabled {
+.confirmBtn:disabled,
+.confirmPrimary:disabled {
   opacity: 0.65;
   cursor: not-allowed;
 }
 
+.confirmPrimary {
+  border: none;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 180ms ease;
+}
+
+.confirmPrimary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
 .cancelBtn:focus-visible,
-.confirmBtn:focus-visible {
-  outline: 2px solid #b91c1c;
+.confirmBtn:focus-visible,
+.confirmPrimary:focus-visible {
+  outline: 2px solid #2563eb;
   outline-offset: 2px;
+}
+
+.confirmBtn:focus-visible {
+  outline-color: #b91c1c;
 }
 
 @media (max-width: 767px) {
@@ -115,7 +148,8 @@
   }
 
   .cancelBtn,
-  .confirmBtn {
+  .confirmBtn,
+  .confirmPrimary {
     width: 100%;
     min-height: 44px;
     justify-content: center;
@@ -130,7 +164,8 @@
   }
 
   .cancelBtn,
-  .confirmBtn {
+  .confirmBtn,
+  .confirmPrimary {
     min-height: 44px;
     padding-inline: 1.15rem;
   }
@@ -138,7 +173,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cancelBtn,
-  .confirmBtn {
+  .confirmBtn,
+  .confirmPrimary {
     transition: none;
   }
 }

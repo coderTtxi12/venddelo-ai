@@ -25,6 +25,9 @@ type PhoneInputWithCountryProps = {
   onUseSameAsOwner?: () => void;
   variant?: PhoneInputVariant;
   hasError?: boolean;
+  disabled?: boolean;
+  inputId?: string;
+  flat?: boolean;
 };
 
 export function PhoneInputWithCountry({
@@ -40,6 +43,9 @@ export function PhoneInputWithCountry({
   onUseSameAsOwner,
   variant = 'dashboard',
   hasError = false,
+  disabled = false,
+  inputId,
+  flat = false,
 }: PhoneInputWithCountryProps) {
   const listId = useId();
   const [open, setOpen] = useState(false);
@@ -67,7 +73,7 @@ export function PhoneInputWithCountry({
   };
 
   return (
-    <div className={ui.wrap}>
+    <div className={`${ui.wrap}${flat && ui.wrapFlat ? ` ${ui.wrapFlat}` : ''}`}>
       <div className={ui.row} ref={wrapRef}>
         <div className={ui.countrySelect}>
           <button
@@ -76,6 +82,7 @@ export function PhoneInputWithCountry({
             aria-haspopup="listbox"
             aria-expanded={open}
             aria-controls={listId}
+            disabled={disabled}
             onClick={() => setOpen((prev) => !prev)}
           >
             <span className={ui.flag} aria-hidden>
@@ -111,6 +118,7 @@ export function PhoneInputWithCountry({
         </div>
 
         <input
+          id={inputId}
           type="tel"
           inputMode="numeric"
           autoComplete="tel-national"
@@ -118,6 +126,7 @@ export function PhoneInputWithCountry({
           value={localNumber}
           placeholder={placeholder}
           autoFocus={autoFocus}
+          disabled={disabled}
           aria-label="Número de teléfono"
           aria-invalid={hasError || undefined}
           onChange={(event) => onLocalNumberChange(digitsOnly(event.target.value))}
