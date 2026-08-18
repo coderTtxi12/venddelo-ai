@@ -166,7 +166,8 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
           _PayoutHero(
             feeLabel: formatMoneyCents(offer.quotedFeeCents),
             distanceLabel: formatDistanceMeters(offer.distanceMeters),
-            collectLabel: offer.paymentMethod == 'cash'
+            collectLabel: offer.paymentMethod == 'cash' ||
+                    (offer.paymentMethod == 'mixed' && offer.collectCents > 0)
                 ? formatMoneyCents(offer.collectCents)
                 : null,
           ),
