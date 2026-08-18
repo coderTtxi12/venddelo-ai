@@ -92,6 +92,7 @@ def test_get_me_includes_active_assignments_after_accept(client, engine):
     assert assignment["collect_cents"] == 25000
     assert assignment["cash_denomination_cents"] == 50000
     assert assignment["package_count"] == 1
+    assert assignment["case_applied"] == "A"
     assert assignment["package_size"] == "normal"
     assert isinstance(assignment["quoted_fee_cents"], int)
     assert "notes" in assignment
