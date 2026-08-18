@@ -27,7 +27,7 @@ export default function PendingReviewRoute() {
           return;
         }
         if (response.provider.status === 'active') {
-          router.replace('/partnerships');
+          router.replace('/monitor');
           return;
         }
         setProvider(response.provider);
