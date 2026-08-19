@@ -1,27 +1,22 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { DispatchRequestLogSections } from '@/components/monitor/DispatchRequestLogSections';
 import { DriverPhoneContact } from '@/components/drivers/DriverPhoneContact';
 import { RightDrawer } from '@/components/ui/RightDrawer';
 import { getAssignmentLog } from '@/lib/api/deliveryProviders';
 import type { AssignmentLog, DispatchMonitorRequest } from '@/lib/api/types';
 import {
-  ASSIGNMENT_LOG_EMPTY,
   ASSIGNMENT_LOG_ERROR,
-  ASSIGNMENT_LOG_LOADING,
   assignmentSchedulerLines,
   blockersSummary,
-  caseLabel,
   formatCoords,
   formatShortId,
-  formatTimelineTime,
   mapsSearchUrl,
   paymentLabel,
   requestCashDenominationLine,
   requestPackageLine,
   requestStatusLabel,
-  timelineEventTitle,
-  timelineEventTone,
 } from '@/lib/dispatch/monitorCopy';
 import { formatMoney } from '@/lib/pricing/tariffUtils';
 import styles from './RequestDetailDrawer.module.css';
@@ -56,16 +51,6 @@ function ExternalLink({ href, children }: { href: string; children: string }) {
       {children}
     </a>
   );
-}
-
-function assignmentEventToneClass(
-  tone: string,
-  isNow: boolean,
-): string {
-  if (isNow) return styles.toneNow;
-  if (tone === 'ok') return styles.toneOk;
-  if (tone === 'warn') return styles.toneWarn;
-  return styles.toneNeutral;
 }
 
 export function RequestDetailDrawer({
@@ -220,97 +205,17 @@ export function RequestDetailDrawer({
             </dl>
           </section>
 
-          <section className={styles.section} aria-labelledby="request-detail-asignacion">
-            <h3 id="request-detail-asignacion" className={styles.heading}>
-              Asignación
-            </h3>
-            {schedulerLines.length > 0 ? (
-              <div className={styles.scheduler}>
-                {schedulerLines.map((line) => (
-                  <span key={line}>{line}</span>
-                ))}
-              </div>
-            ) : null}
-            {logError ? (
-              <p className={styles.alert} role="alert">
-                {logError}
-              </p>
-            ) : null}
-            {logLoading && !visibleLog ? (
-              <p className={styles.empty}>{ASSIGNMENT_LOG_LOADING}</p>
-            ) : assignmentEvents.length === 0 ? (
-              logError && !visibleLog ? null : (
-                <p className={styles.empty}>{ASSIGNMENT_LOG_EMPTY}</p>
-              )
-            ) : (
-              <ol className={styles.timeline}>
-                {assignmentEvents.map((event, index) => {
-                  const isNow = highlightLast && index === assignmentEvents.length - 1;
-                  return (
-                    <li
-                      key={event.id}
-                      className={`${styles.step} ${assignmentEventToneClass(event.tone, isNow)}`}
-                    >
-                      <time className={styles.time} dateTime={event.at}>
-                        {formatTimelineTime(event.at)}
-                      </time>
-                      <span className={styles.marker} aria-hidden />
-                      <span className={styles.event}>
-                        <strong>{event.title}</strong>
-                        {event.detail ? <span>{event.detail}</span> : null}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-          </section>
-
-          <section className={styles.section} aria-labelledby="request-detail-operacion">
-            <h3 id="request-detail-operacion" className={styles.heading}>
-              Operación
-            </h3>
-            {timeline.length === 0 ? (
-              <p className={styles.empty}>Sin eventos todavía.</p>
-            ) : (
-              <ol className={styles.timeline}>
-                {timeline.map((event, index) => {
-                  const tone = timelineEventTone(event);
-                  const caseText = caseLabel(event.case_applied);
-                  const toneClass =
-                    tone === 'now'
-                      ? styles.toneNow
-                      : tone === 'warn'
-                        ? styles.toneWarn
-                        : tone === 'alert'
-                          ? styles.toneAlert
-                          : tone === 'ok'
-                            ? styles.toneOk
-                            : styles.toneNeutral;
-                  return (
-                    <li
-                      key={`${event.kind}-${event.at ?? 'na'}-${event.driver_name ?? ''}-${index}`}
-                      className={`${styles.step} ${toneClass}`}
-                    >
-                      <time className={styles.time} dateTime={event.at ?? undefined}>
-                        {formatTimelineTime(event.at)}
-                      </time>
-                      <span className={styles.marker} aria-hidden />
-                      <span className={styles.event}>
-                        <strong>{timelineEventTitle(event)}</strong>
-                        {caseText ? <span>{caseText}</span> : null}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-            {blockers ? (
-              <p className={styles.blockers}>
-                {request.eligible_driver_count ?? 0} candidatos · {blockers}
-              </p>
-            ) : null}
-          </section>
+          <DispatchRequestLogSections
+            timeline={timeline}
+            blockers={blockers}
+            eligibleCount={request.eligible_driver_count ?? 0}
+            schedulerLines={schedulerLines}
+            logError={logError}
+            logLoading={logLoading}
+            hasLog={visibleLog != null}
+            assignmentEvents={assignmentEvents}
+            highlightLast={highlightLast}
+          />
         </div>
       ) : null}
     </RightDrawer>
