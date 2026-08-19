@@ -19,6 +19,7 @@ import '../theme/app_colors.dart';
 import '../widgets/rider_live_map.dart';
 import '../widgets/rider_slide_to_confirm.dart';
 import '../widgets/rider_widgets.dart';
+import 'account_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -415,10 +416,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(width: 10),
                       _RoundIconButton(
-                        icon: Icons.logout_rounded,
-                        tooltip: 'Salir',
+                        icon: Icons.person_rounded,
+                        tooltip: 'Cuenta',
                         size: 52,
-                        onPressed: widget.onSignOut,
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => AccountScreen(
+                                controller: widget.controller,
+                                onSignOut: widget.onSignOut,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
