@@ -7,8 +7,9 @@ import { FormSelect } from '@/components/ui/FormSelect';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { useAuth } from '@/hooks/useAuth';
 import { getMyDispatchHistory, listMyDeliveryDrivers } from '@/lib/api/deliveryProviders';
+import { listActivePartnerships } from '@/lib/api/partnerships';
 import { ApiError } from '@/lib/api/types';
-import type { DeliveryDriver, DispatchHistoryItem } from '@/lib/api/types';
+import type { DeliveryDriver, DeliveryPartnershipRequest, DispatchHistoryItem } from '@/lib/api/types';
 import { historyDateRange, type HistoryPeriod } from '@/lib/dispatch/historyPeriod';
 import { formatDateTime, formatShortId, paymentLabel, requestStatusLabel } from '@/lib/dispatch/monitorCopy';
 import { formatMoney } from '@/lib/pricing/tariffUtils';
@@ -41,7 +42,9 @@ export default function HistoryPage() {
   const [appliedCustom, setAppliedCustom] = useState<{ start: string; end: string } | null>(null);
   const [status, setStatus] = useState<'' | 'delivered' | 'cancelled'>('');
   const [driverId, setDriverId] = useState('');
+  const [restaurantId, setRestaurantId] = useState('');
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
+  const [partnerships, setPartnerships] = useState<DeliveryPartnershipRequest[]>([]);
   const [items, setItems] = useState<DispatchHistoryItem[]>([]);
   const [total, setTotal] = useState(0);
   const [deliveredCount, setDeliveredCount] = useState(0);
@@ -74,6 +77,16 @@ export default function HistoryPage() {
     }
   }, [accessToken]);
 
+  const loadPartnerships = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const rows = await listActivePartnerships(accessToken);
+      setPartnerships(rows);
+    } catch {
+      setPartnerships([]);
+    }
+  }, [accessToken]);
+
   const loadPage = useCallback(
     async (offset: number, append: boolean) => {
       if (!accessToken || zonesLoading) return;
@@ -86,6 +99,7 @@ export default function HistoryPage() {
           end: range.end,
           status: status || undefined,
           driverId: driverId || null,
+          restaurantId: restaurantId || null,
           zoneId,
           limit: 50,
           offset,
@@ -106,12 +120,16 @@ export default function HistoryPage() {
         setLoadingMore(false);
       }
     },
-    [accessToken, driverId, range.end, range.start, status, zoneId, zonesLoading],
+    [accessToken, driverId, range.end, range.start, restaurantId, status, zoneId, zonesLoading],
   );
 
   useEffect(() => {
     void loadDrivers();
   }, [loadDrivers]);
+
+  useEffect(() => {
+    void loadPartnerships();
+  }, [loadPartnerships]);
 
   useEffect(() => {
     void loadPage(0, false);
@@ -124,6 +142,29 @@ export default function HistoryPage() {
     ],
     [drivers],
   );
+
+  const restaurantOptions = useMemo(() => {
+    const visible = isAllZones
+      ? partnerships
+      : partnerships.filter((row) => row.zone.id === selectedZoneId);
+    const unique = new Map<string, string>();
+    for (const row of visible) {
+      unique.set(row.restaurant.id, row.restaurant.name);
+    }
+    return [
+      { value: '', label: 'Todos' },
+      ...[...unique.entries()]
+        .sort((a, b) => a[1].localeCompare(b[1], 'es'))
+        .map(([value, label]) => ({ value, label })),
+    ];
+  }, [isAllZones, partnerships, selectedZoneId]);
+
+  useEffect(() => {
+    if (!restaurantId) return;
+    if (!restaurantOptions.some((option) => option.value === restaurantId)) {
+      setRestaurantId('');
+    }
+  }, [restaurantId, restaurantOptions]);
 
   function applyCustomRange() {
     if (!customStart || !customEnd) return;
@@ -197,6 +238,16 @@ export default function HistoryPage() {
         ) : null}
 
         <div className={styles.selects}>
+          <div className={styles.filterField}>
+            <span id="history-restaurant-label">Negocio</span>
+            <FormSelect
+              id="history-restaurant"
+              aria-labelledby="history-restaurant-label"
+              value={restaurantId}
+              options={restaurantOptions}
+              onChange={setRestaurantId}
+            />
+          </div>
           <div className={styles.filterField}>
             <span id="history-driver-label">Repartidor</span>
             <FormSelect
