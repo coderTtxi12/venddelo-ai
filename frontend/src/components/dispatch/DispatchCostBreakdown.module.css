@@ -1,0 +1,76 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+}
+
+.title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.rows {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.row dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.row dd {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-primary);
+}
+
+.total {
+  margin-top: 0.15rem;
+  padding-top: 0.55rem;
+  border-top: 1px dashed color-mix(in srgb, var(--color-text) 14%, var(--color-border));
+}
+
+.total dt,
+.total dd {
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.hint {
+  margin: 0.1rem 0 0;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
