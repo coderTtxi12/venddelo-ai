@@ -52,12 +52,22 @@ def test_searched_detail_eligible_but_no_offer() -> None:
     ) == "Había riders, pero el motor no soltó oferta (reserva de libres)."
 
 
+def test_searched_detail_eligible_high_demand_is_not_reserve() -> None:
+    assert searched_detail(
+        driver_count=4,
+        eligible_count=2,
+        blocker_counts={"offline": 2},
+        high_demand=True,
+    ) == "Había riders libres, pero no se pudo agrupar ni encadenar."
+
+
 def test_offer_copy() -> None:
     assert offered_title("Luis") == "Ofertó a Luis"
     assert offered_detail("A") == "El más cercano al restaurante"
     assert offered_detail("B") == "Varios pedidos listos · riders en paralelo"
     assert offered_detail("C") == "Alta demanda · entregas cercanas, un rider"
     assert offered_detail("D") == "Alta demanda · rider que ya iba de camino"
+    assert offered_detail("E") == "Alta demanda · rider libre más cercano al restaurante"
     assert offered_detail("M") == "Asignación manual desde el monitor"
     assert expired_title("Luis") == "Luis no respondió"
     assert rejected_title("Luis") == "Luis rechazó"
