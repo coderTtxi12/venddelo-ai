@@ -117,6 +117,10 @@ export function formatDispatchShortId(shortId: string | null | undefined): strin
   return value.startsWith('#') ? value : `#${value}`;
 }
 
+export function isDispatchHistoryStatus(status: DispatchStatus): boolean {
+  return status === 'delivered' || status === 'cancelled';
+}
+
 function restaurantQuery(restaurantId: string): string {
   return new URLSearchParams({ restaurant_id: restaurantId }).toString();
 }
