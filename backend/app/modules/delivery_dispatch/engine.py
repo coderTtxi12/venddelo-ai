@@ -132,10 +132,6 @@ def choose_assignments(context: EngineContext) -> EngineResult:
                 high_demand=False,
             )
 
-    hooked = _assign_case_c(context)
-    if hooked.offers:
-        return hooked
-
     driver = _nearest_free(context, context.request, taken=set())
     if driver is not None:
         return EngineResult(
@@ -143,6 +139,10 @@ def choose_assignments(context: EngineContext) -> EngineResult:
             offers=(EngineOffer(request_id=context.request.id, driver_id=driver.id, case="E"),),
             high_demand=True,
         )
+
+    hooked = _assign_case_c(context)
+    if hooked.offers:
+        return hooked
 
     offers = _assign_case_d(context)
     if offers:
