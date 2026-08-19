@@ -88,7 +88,7 @@ function memberSecondaryLabel(member: DeliveryProviderMember): string | null {
 
 export default function SettingsPage() {
   const { accessToken } = useAuth();
-  const { selectedZoneId, selectedZone } = useDeliveryZone();
+  const { selectedZone, effectiveZoneId } = useDeliveryZone();
   const { canManageMembers, canWriteProviderConfig, isOperator } = useDeliveryProviderAccess();
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -206,12 +206,12 @@ export default function SettingsPage() {
     let cancelled = false;
 
     async function loadSchedules() {
-      if (!accessToken || !selectedZoneId) return;
+      if (!accessToken || !effectiveZoneId) return;
       setSchedulesLoading(true);
       setScheduleError(null);
 
       try {
-        const rows = await listMyDeliveryProviderSchedules(accessToken, selectedZoneId);
+        const rows = await listMyDeliveryProviderSchedules(accessToken, effectiveZoneId);
         if (!cancelled) setSchedules(rows);
       } catch (err) {
         console.error(err);
@@ -227,7 +227,7 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, selectedZoneId]);
+  }, [accessToken, effectiveZoneId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -320,7 +320,7 @@ export default function SettingsPage() {
       setScheduleError('No hay sesión activa. Inicia sesión de nuevo.');
       return;
     }
-    if (!selectedZoneId) {
+    if (!effectiveZoneId) {
       setScheduleError('Selecciona una zona de reparto.');
       return;
     }
@@ -330,8 +330,8 @@ export default function SettingsPage() {
     setScheduleSuccess(null);
 
     try {
-      await setMyDeliveryProviderSchedules(accessToken, selectedZoneId, payload);
-      const updated = await listMyDeliveryProviderSchedules(accessToken, selectedZoneId);
+      await setMyDeliveryProviderSchedules(accessToken, effectiveZoneId, payload);
+      const updated = await listMyDeliveryProviderSchedules(accessToken, effectiveZoneId);
       setSchedules(updated);
       setScheduleSuccess('Horarios guardados correctamente.');
     } catch (err) {
