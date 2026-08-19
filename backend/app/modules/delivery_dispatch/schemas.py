@@ -46,8 +46,14 @@ class AssignmentSettingsUpdate(BaseModel):
     assignment_timeout_seconds: int | None = Field(default=None, ge=1)
 
 
+class ItineraryStopInput(BaseModel):
+    kind: Literal["restaurant", "dropoff"]
+    request_id: uuid.UUID
+
+
 class ManualOfferCreate(BaseModel):
     driver_id: uuid.UUID
+    itinerary: list[ItineraryStopInput] | None = None
 
 
 class ManualOfferDTO(BaseModel):
@@ -58,6 +64,23 @@ class ManualOfferDTO(BaseModel):
     expires_at: datetime
     tracking_token: str
     short_id: str
+
+
+class DriverItineraryStopDTO(BaseModel):
+    sequence: int
+    kind: Literal["restaurant", "dropoff"]
+    request_id: uuid.UUID
+    current: bool = False
+    title: str | None = None
+    detail: str | None = None
+    lat: float | None = None
+    lng: float | None = None
+    short_id: str | None = None
+    action: str | None = None
+
+
+class ItineraryUpdate(BaseModel):
+    stops: list[ItineraryStopInput]
 
 
 class SearchLeadTimeDTO(BaseModel):
@@ -289,6 +312,7 @@ class RiderProfileDTO(DeliveryDriverDTO):
     last_lng: float | None = None
     location_updated_at: datetime | None = None
     assignments: list[RiderAssignmentDTO] = Field(default_factory=list)
+    itinerary: list[DriverItineraryStopDTO] = Field(default_factory=list)
 
 
 class RiderOnlineUpdate(BaseModel):
@@ -400,6 +424,7 @@ class DispatchMonitorDriverDTO(BaseModel):
     pre_free_eta_seconds: int | None = None
     occupied_job_count: int = 0
     active_package_count: int = 0
+    itinerary: list[DriverItineraryStopDTO] = Field(default_factory=list)
 
 
 class DispatchMonitorRequestDTO(BaseModel):
