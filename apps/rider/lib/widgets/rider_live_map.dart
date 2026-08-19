@@ -260,7 +260,6 @@ class _RiderLiveMapState extends State<RiderLiveMap> {
         trafficEnabled: false,
         liteModeEnabled: false,
         minMaxZoomPreference: MinMaxZoomPreference(widget.minZoom, 20),
-        mapType: MapType.normal,
         gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
           Factory<EagerGestureRecognizer>(() => EagerGestureRecognizer()),
         },
