@@ -255,11 +255,118 @@
   padding: 0.85rem;
 }
 
-.panelTitle {
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
   margin: 0 0 0.65rem;
+}
+
+.panel:has(.panelToggle[aria-expanded='false']) .panelHeader {
+  margin-bottom: 0;
+}
+
+.panelToggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.1rem 0.15rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.panelToggle:hover {
+  background: color-mix(in srgb, #2563eb 6%, transparent);
+}
+
+.panelToggle:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.panelChevron,
+.panelChevronCollapsed {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+  transition: transform 180ms ease;
+}
+
+.panelChevronCollapsed {
+  transform: rotate(-90deg);
+}
+
+.panelTitle {
+  margin: 0;
   font-size: 0.86rem;
   font-weight: 800;
   color: var(--color-text);
+}
+
+.panelCount {
+  flex-shrink: 0;
+  padding: 0.04rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-size: 0.68rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+}
+
+.sortBtn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.15rem 0.28rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+}
+
+.sortBtn:hover {
+  background: color-mix(in srgb, #2563eb 6%, transparent);
+}
+
+.sortBtn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.sortDir {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.12rem;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.sortDirIdle {
+  color: #d1d5db;
+}
+
+.sortDirActive {
+  color: #2563eb;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panelChevron,
+  .panelChevronCollapsed {
+    transition: none;
+  }
 }
 
 .filterRow {
@@ -413,6 +520,59 @@
 .queueTagCash {
   border-color: color-mix(in srgb, #16a34a 28%, var(--color-border));
   color: #15803d;
+}
+
+.statQueue {
+  border-color: color-mix(in srgb, #f97316 32%, var(--color-border));
+  color: #c2410c;
+  background: color-mix(in srgb, #fdba74 18%, var(--color-surface));
+}
+
+.statActive {
+  border-color: color-mix(in srgb, #2563eb 32%, var(--color-border));
+  color: #1d4ed8;
+  background: color-mix(in srgb, #93c5fd 18%, var(--color-surface));
+}
+
+.statUnassigned {
+  border-color: color-mix(in srgb, #f59e0b 35%, var(--color-border));
+  color: #a16207;
+  background: color-mix(in srgb, #facc15 14%, var(--color-surface));
+}
+
+.gpsChip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0.08rem 0.4rem;
+  border-radius: 6px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  border: 1px solid var(--color-border);
+}
+
+.gpsFresh {
+  border-color: color-mix(in srgb, #16a34a 35%, var(--color-border));
+  color: #15803d;
+  background: color-mix(in srgb, #86efac 16%, var(--color-surface));
+}
+
+.gpsStale {
+  border-color: color-mix(in srgb, #f59e0b 40%, var(--color-border));
+  color: #a16207;
+  background: color-mix(in srgb, #facc15 16%, var(--color-surface));
+}
+
+.gpsMissing {
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+}
+
+.asidePhone {
+  margin-top: 0.1rem;
+  justify-content: flex-end;
 }
 
 .queueLast {
