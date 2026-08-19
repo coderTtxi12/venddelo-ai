@@ -156,6 +156,49 @@ def test_create_dispatch_persists_quote_and_immediate_search(client, engine):
 
 
 @requires_db
+def test_create_dispatch_publishes_restaurant_realtime_event(client, engine, monkeypatch):
+    from app.infra.realtime import restaurant_dispatch_hub as restaurant_hub_module
+
+    published: list[dict] = []
+
+    def capture_publish(restaurant_id, payload):
+        published.append({"restaurant_id": str(restaurant_id), **payload})
+
+    monkeypatch.setattr(
+        restaurant_hub_module.get_restaurant_dispatch_realtime_hub(),
+        "publish_sync",
+        capture_publish,
+    )
+
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-publish")
+    _activate_partnership(client, engine, restaurant_id)
+    response = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(),
+        headers=AUTH,
+    )
+
+    assert response.status_code == 201, response.text
+    assert published
+    assert published[0]["type"] == "dispatch.updated"
+    assert published[0]["restaurant_id"] == restaurant_id
+
+
+@requires_db
+def test_restaurant_dispatch_ws_accepts_owner(client, engine):
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-owner-ws")
+    _activate_partnership(client, engine, restaurant_id)
+
+    with client.websocket_connect(
+        f"/api/v1/ws/restaurants/{restaurant_id}/dispatch?token=valid-token"
+    ) as websocket:
+        websocket.send_text("ping")
+
+
+@requires_db
 def test_create_accepts_custom_prep_time_below_sixty(client, engine):
     _create_mexy_provider(client)
     restaurant_id = _create_restaurant(client, subdomain="dispatch-custom-prep")
