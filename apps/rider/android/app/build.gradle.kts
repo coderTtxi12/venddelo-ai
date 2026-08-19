@@ -1,3 +1,7 @@
+import java.io.File
+import org.gradle.process.ExecOperations
+import javax.inject.Inject
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -5,7 +9,7 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-fun loadRiderEnv(file: java.io.File): Map<String, String> {
+fun loadRiderEnv(file: File): Map<String, String> {
     if (!file.exists()) {
         return emptyMap()
     }
@@ -64,14 +68,24 @@ flutter {
 
 // Physical phones use API_BASE_URL=localhost. Re-apply USB reverse after every
 // install because `adb reverse` is cleared when the cable or flutter run reconnects.
-afterEvaluate {
-    val adb = java.io.File(android.sdkDirectory, "platform-tools/adb")
-    tasks.matching { it.name.startsWith("install") }.configureEach {
-        doLast {
-            exec {
-                commandLine(adb.absolutePath, "reverse", "tcp:8080", "tcp:8080")
-                isIgnoreExitValue = true
-            }
+interface InjectedExecOps {
+    @get:Inject
+    val execOps: ExecOperations
+}
+
+val injectedExecOps = project.objects.newInstance<InjectedExecOps>()
+val adbExecutable = androidComponents.sdkComponents.adb
+
+tasks.matching { it.name.startsWith("install") }.configureEach {
+    doLast {
+        injectedExecOps.execOps.exec {
+            commandLine(
+                adbExecutable.get().asFile.absolutePath,
+                "reverse",
+                "tcp:8080",
+                "tcp:8080",
+            )
+            isIgnoreExitValue = true
         }
     }
 }
