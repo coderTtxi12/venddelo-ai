@@ -318,6 +318,7 @@ export function getMyDispatchHistory(
     end: string;
     status?: 'delivered' | 'cancelled';
     driverId?: string | null;
+    restaurantId?: string | null;
     zoneId?: string | null;
     limit?: number;
     offset?: number;
@@ -328,6 +329,7 @@ export function getMyDispatchHistory(
   qs.set('end', params.end);
   if (params.status) qs.set('status', params.status);
   if (params.driverId) qs.set('driver_id', params.driverId);
+  if (params.restaurantId) qs.set('restaurant_id', params.restaurantId);
   if (params.zoneId) qs.set('zone_id', params.zoneId);
   qs.set('limit', String(params.limit ?? 50));
   qs.set('offset', String(params.offset ?? 0));
