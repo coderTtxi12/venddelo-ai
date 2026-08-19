@@ -253,6 +253,8 @@ void main() {
       dropoffAddress: 'Calle 2',
       restaurantLat: 19.43,
       restaurantLng: -99.13,
+      dropoffLat: 19.45,
+      dropoffLng: -99.15,
       caseApplied: 'D',
     );
     const delivering = RiderAssignment(
@@ -267,10 +269,161 @@ void main() {
 
     final pins = stackedJobPins(splitRiderJobs([delivering, pickup]));
 
-    expect(pins, hasLength(2));
+    expect(pins, hasLength(3));
     expect(pins.first.kind, 'restaurant');
     expect(pins.first.current, isTrue);
+    expect(pins[1].kind, 'dropoff');
+    expect(pins[1].current, isFalse);
     expect(pins.last.kind, 'dropoff');
-    expect(pins.last.current, isFalse);
+    expect(pins.last.label, contains('Entregar'));
+  });
+
+  test('riderItineraryStops adds the later dropoff after finishing current work', () {
+    const delivering = RiderAssignment(
+      id: 'a1',
+      status: 'in_transit',
+      restaurantName: 'Tacos',
+      dropoffAddress: 'Calle 1',
+      dropoffLat: 19.44,
+      dropoffLng: -99.14,
+      customerName: 'Ana',
+      caseApplied: 'A',
+    );
+    const nextPickup = RiderAssignment(
+      id: 'a2',
+      status: 'assigned',
+      restaurantName: 'Sushi',
+      dropoffAddress: 'Calle 2',
+      restaurantLat: 19.45,
+      restaurantLng: -99.15,
+      dropoffLat: 19.46,
+      dropoffLng: -99.16,
+      caseApplied: 'B',
+    );
+
+    final stops = riderItineraryStops(splitRiderJobs([delivering, nextPickup]));
+
+    expect(stops.map((item) => item.action), ['Entregar', 'Recoger', 'Entregar']);
+    expect(stops.map((item) => item.requestId), ['a1', 'a2', 'a2']);
+    expect(stops.first.title, 'Ana');
+    expect(stops[1].title, 'Sushi');
+    expect(stops.last.title, 'Calle 2');
+  });
+
+  test('persisted itinerary wins over nearest-neighbor job order', () {
+    const near = RiderAssignment(
+      id: 'near',
+      status: 'assigned',
+      restaurantName: 'Cerca',
+      dropoffAddress: 'Drop cerca',
+      restaurantLat: 19.431,
+      restaurantLng: -99.131,
+      dropoffLat: 19.432,
+      dropoffLng: -99.132,
+    );
+    const far = RiderAssignment(
+      id: 'far',
+      status: 'assigned',
+      restaurantName: 'Lejos',
+      dropoffAddress: 'Drop lejos',
+      restaurantLat: 19.50,
+      restaurantLng: -99.20,
+      dropoffLat: 19.51,
+      dropoffLng: -99.21,
+    );
+    const itinerary = [
+      PersistedItineraryStop(
+        sequence: 1,
+        kind: 'restaurant',
+        requestId: 'far',
+        title: 'Lejos',
+        action: 'Recoger',
+      ),
+      PersistedItineraryStop(
+        sequence: 2,
+        kind: 'restaurant',
+        requestId: 'near',
+        title: 'Cerca',
+        action: 'Recoger',
+      ),
+      PersistedItineraryStop(
+        sequence: 3,
+        kind: 'dropoff',
+        requestId: 'near',
+        title: 'Drop cerca',
+        action: 'Entregar',
+      ),
+      PersistedItineraryStop(
+        sequence: 4,
+        kind: 'dropoff',
+        requestId: 'far',
+        title: 'Drop lejos',
+        action: 'Entregar',
+      ),
+    ];
+
+    final jobs = splitRiderJobs(
+      [near, far],
+      riderLat: 19.43,
+      riderLng: -99.13,
+      itinerary: itinerary,
+    );
+    expect(jobs.current?.id, 'far');
+    expect(jobs.queued.map((item) => item.id), ['near']);
+
+    final stops = riderItineraryStops(jobs, itinerary: itinerary);
+    expect(stops.map((item) => '${item.kind}:${item.requestId}'), [
+      'restaurant:far',
+      'restaurant:near',
+      'dropoff:near',
+      'dropoff:far',
+    ]);
+    expect(
+      navigationTargetForJobs(
+        jobs.current,
+        itinerary: itinerary,
+        assignments: [near, far],
+      ),
+      const LatLng(19.50, -99.20),
+    );
+  });
+
+  test('app ignores itinerary that delivers before pickup', () {
+    const assigned = RiderAssignment(
+      id: 'a',
+      status: 'assigned',
+      restaurantName: 'Tacos',
+      dropoffAddress: 'Calle 1',
+      restaurantLat: 19.43,
+      restaurantLng: -99.13,
+      dropoffLat: 19.44,
+      dropoffLng: -99.14,
+    );
+    const invalid = [
+      PersistedItineraryStop(
+        sequence: 1,
+        kind: 'dropoff',
+        requestId: 'a',
+        action: 'Entregar',
+      ),
+      PersistedItineraryStop(
+        sequence: 2,
+        kind: 'restaurant',
+        requestId: 'a',
+        action: 'Recoger',
+      ),
+    ];
+
+    expect(pickupBeforeDropoff(invalid), isFalse);
+    final jobs = splitRiderJobs([assigned], itinerary: invalid);
+    expect(jobs.current?.status, 'assigned');
+    expect(
+      navigationTargetForJobs(
+        jobs.current,
+        itinerary: invalid,
+        assignments: [assigned],
+      ),
+      const LatLng(19.43, -99.13),
+    );
   });
 }
