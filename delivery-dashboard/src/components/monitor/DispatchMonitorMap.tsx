@@ -8,8 +8,9 @@ import {
   itineraryLegs,
   pickupBeforeDropoff,
 } from '@/lib/dispatch/driverItinerary';
+import { liveBusinessesFromRequests } from '@/lib/dispatch/liveBusinesses';
 import { fetchRoadRoute } from '@/lib/dispatch/fetchRoadRoute';
-import { formatShortId } from '@/lib/dispatch/monitorCopy';
+import { formatShortId, requestStatusLabel } from '@/lib/dispatch/monitorCopy';
 import { ALL_ZONES_ID, zoneColorForId, type ZoneColor } from '@/lib/dispatch/zoneColors';
 import { motorcycleColorHex } from '@/lib/drivers/motorcycleColors';
 import { getGoogleMapsMapId, loadGoogleMaps } from '@/lib/loadGoogleMaps';
@@ -21,6 +22,7 @@ type DispatchMonitorMapProps = {
   selectedZoneId: string | null;
   focusedRequestId?: string | null;
   focusedDriverId?: string | null;
+  focusedRestaurantId?: string | null;
   onReorderItinerary?: (
     driverId: string,
     stops: Array<{ kind: 'restaurant' | 'dropoff'; request_id: string }>,
@@ -55,84 +57,89 @@ function zonePolygonStyle(color: ZoneColor, emphasized: boolean) {
 
 const PENDING_REQUEST_STATUSES = new Set(['scheduled', 'searching', 'offered', 'unassigned']);
 
-function coloredPolylineStyle(
-  color: string,
-  focused: boolean,
-  dashed: boolean,
-): google.maps.PolylineOptions {
-  if (dashed) {
-    return {
-      strokeColor: color,
-      strokeOpacity: 0,
-      strokeWeight: focused ? 3.5 : 2.5,
-      geodesic: true,
-      clickable: false,
-      zIndex: focused ? 8 : 3,
-      icons: [
-        {
-          icon: {
-            path: 'M 0,-1 0,1',
-            strokeOpacity: focused ? 1 : 0.9,
-            strokeColor: color,
-            scale: focused ? 3 : 2.5,
-          },
-          offset: '0',
-          repeat: '10px',
-        },
-      ],
-    };
+type PendingDashMode = 'normal' | 'focused' | 'dimmed';
+
+function pendingDashMode(
+  requestId: string,
+  restaurantId: string | undefined,
+  focusedRequestId: string | null,
+  focusedRestaurantId: string | null,
+): PendingDashMode {
+  if (focusedRequestId) {
+    if (requestId === focusedRequestId) return 'focused';
+    return 'dimmed';
   }
+  if (focusedRestaurantId) {
+    if (restaurantId === focusedRestaurantId) return 'normal';
+    return 'dimmed';
+  }
+  return 'normal';
+}
+
+function dashedPolylineStyle(color: string, mode: PendingDashMode): google.maps.PolylineOptions {
+  const focused = mode === 'focused';
+  const dimmed = mode === 'dimmed';
   return {
     strokeColor: color,
-    strokeOpacity: focused ? 0.95 : 0.85,
-    strokeWeight: focused ? 5 : 3,
+    strokeOpacity: 0,
+    strokeWeight: focused ? 5 : dimmed ? 2 : 2.5,
     geodesic: true,
     clickable: false,
-    zIndex: focused ? 9 : 4,
+    zIndex: focused ? 10 : dimmed ? 2 : 3,
+    icons: [
+      {
+        icon: {
+          path: 'M 0,-1 0,1',
+          strokeOpacity: focused ? 1 : dimmed ? 0.28 : 0.9,
+          strokeColor: color,
+          scale: focused ? 4 : dimmed ? 2 : 2.5,
+        },
+        offset: '0',
+        repeat: dimmed ? '14px' : '10px',
+      },
+    ],
   };
 }
 
-const REQUEST_ROUTE_STYLE: google.maps.PolylineOptions = {
-  strokeColor: '#F97316',
-  strokeOpacity: 0,
-  strokeWeight: 2.5,
-  geodesic: true,
-  clickable: false,
-  zIndex: 3,
-  icons: [
-    {
-      icon: {
-        path: 'M 0,-1 0,1',
-        strokeOpacity: 0.9,
-        strokeColor: '#F97316',
-        scale: 2.5,
+function focusedDashedHaloStyle(): google.maps.PolylineOptions {
+  return {
+    strokeColor: '#FFFFFF',
+    strokeOpacity: 0,
+    strokeWeight: 8,
+    geodesic: true,
+    clickable: false,
+    zIndex: 9,
+    icons: [
+      {
+        icon: {
+          path: 'M 0,-1 0,1',
+          strokeOpacity: 0.95,
+          strokeColor: '#FFFFFF',
+          scale: 5.5,
+        },
+        offset: '0',
+        repeat: '10px',
       },
-      offset: '0',
-      repeat: '10px',
-    },
-  ],
-};
+    ],
+  };
+}
 
-const FOCUSED_REQUEST_ROUTE_STYLE: google.maps.PolylineOptions = {
-  strokeColor: '#EA580C',
-  strokeOpacity: 0,
-  strokeWeight: 3.5,
-  geodesic: true,
-  clickable: false,
-  zIndex: 8,
-  icons: [
-    {
-      icon: {
-        path: 'M 0,-1 0,1',
-        strokeOpacity: 1,
-        strokeColor: '#EA580C',
-        scale: 3,
-      },
-      offset: '0',
-      repeat: '10px',
-    },
-  ],
-};
+function coloredPolylineStyle(
+  color: string,
+  focused: boolean,
+  dimmed = false,
+): google.maps.PolylineOptions {
+  return {
+    strokeColor: color,
+    strokeOpacity: dimmed ? 0.28 : focused ? 0.95 : 0.85,
+    strokeWeight: dimmed ? 2 : focused ? 5 : 3,
+    geodesic: true,
+    clickable: false,
+    zIndex: focused ? 12 : dimmed ? 2 : 4,
+  };
+}
+
+const PENDING_ROUTE_COLOR = '#F97316';
 
 const ACTIVE_ROUTE_STYLE: google.maps.PolylineOptions = {
   strokeColor: '#2563EB',
@@ -149,7 +156,7 @@ const FOCUSED_ACTIVE_ROUTE_STYLE: google.maps.PolylineOptions = {
   strokeWeight: 5,
   geodesic: true,
   clickable: false,
-  zIndex: 9,
+  zIndex: 12,
 };
 
 const NEXT_LEG_ROUTE_STYLE: google.maps.PolylineOptions = {
@@ -208,10 +215,12 @@ function createRequestLabel(
   pending: boolean,
   focused = false,
   color?: string,
+  dimmed = false,
 ): HTMLElement {
   const el = document.createElement('div');
   el.className = pending ? `${styles.requestLabel} ${styles.requestLabelPending}` : styles.requestLabel;
   if (focused) el.classList.add(styles.requestLabelFocused);
+  if (dimmed) el.classList.add(styles.requestLabelDim);
   if (color) el.style.background = color;
   el.textContent = formatShortId(shortId);
   el.setAttribute('aria-hidden', 'true');
@@ -343,6 +352,7 @@ export function DispatchMonitorMap({
   selectedZoneId,
   focusedRequestId = null,
   focusedDriverId = null,
+  focusedRestaurantId = null,
   onReorderItinerary,
 }: DispatchMonitorMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -357,6 +367,14 @@ export function DispatchMonitorMap({
   const itinerary = useMemo(
     () => (snapshot && focusedDriverId ? buildDriverItinerary(snapshot, focusedDriverId) : null),
     [focusedDriverId, snapshot],
+  );
+  const focusedBusiness = useMemo(
+    () =>
+      snapshot && focusedRestaurantId
+        ? liveBusinessesFromRequests(snapshot.requests).find((row) => row.id === focusedRestaurantId) ??
+          null
+        : null,
+    [focusedRestaurantId, snapshot],
   );
   const colorByZone = selectedZoneId === ALL_ZONES_ID;
   const zoneIds = useMemo(() => zones.map((zone) => zone.id), [zones]);
@@ -478,19 +496,34 @@ export function DispatchMonitorMap({
       markersRef.current = [];
       polylinesRef.current = [];
 
-      const points: google.maps.LatLngLiteral[] = [];
       const requestZoneId = (requestId: string | null | undefined) =>
         snapshot.requests.find((row) => row.id === requestId)?.zone_id ?? null;
       const driverZoneId = (driver: (typeof snapshot.drivers)[number]) =>
         requestZoneId(driver.active_request_id) ?? driver.registered_zone_id ?? null;
       const colorFor = (zoneId: string | null | undefined) =>
         colorByZone ? zoneColorForId(zoneId, zoneIds).solid : undefined;
+      const restaurantRequestIds = new Set(
+        focusedRestaurantId
+          ? snapshot.requests
+              .filter((row) => row.restaurant_id === focusedRestaurantId)
+              .map((row) => row.id)
+          : [],
+      );
+      const restaurantDriverIds = new Set(
+        focusedRestaurantId
+          ? snapshot.requests
+              .filter(
+                (row) =>
+                  row.restaurant_id === focusedRestaurantId && row.assigned_driver_id,
+              )
+              .map((row) => row.assigned_driver_id as string)
+          : [],
+      );
 
       for (const driver of snapshot.drivers) {
         if (driver.last_lat == null || driver.last_lng == null) continue;
         const focused = driver.id === focusedDriverId;
         const position = { lat: driver.last_lat, lng: driver.last_lng };
-        points.push(position);
 
         const pin = document.createElement('div');
         pin.className = styles.driverPin;
@@ -499,6 +532,9 @@ export function DispatchMonitorMap({
         if (driver.credit_blocked) pin.classList.add(styles.driverPinBlocked);
         if (focused) pin.classList.add(styles.driverPinFocused);
         if (focusedDriverId && !focused) pin.classList.add(styles.pinDim);
+        if (focusedRestaurantId && !restaurantDriverIds.has(driver.id)) {
+          pin.classList.add(styles.pinDim);
+        }
         const driverColor = colorFor(driverZoneId(driver));
         if (driverColor) {
           const swatch = document.createElement('span');
@@ -532,7 +568,6 @@ export function DispatchMonitorMap({
         for (const stop of itinerary.stops) {
           if (stop.kind !== 'restaurant' && stop.kind !== 'dropoff') continue;
           const position = { lat: stop.lat, lng: stop.lng };
-          points.push(position);
           const pin = createNumberedPin(
             stop.kind,
             stop.sequence ?? 0,
@@ -553,13 +588,23 @@ export function DispatchMonitorMap({
       } else {
         for (const request of snapshot.requests) {
           const requestFocused = request.id === focusedRequestId;
+          const restaurantFocused = Boolean(
+            focusedRestaurantId && request.restaurant_id === focusedRestaurantId,
+          );
+          const dimOther =
+            (Boolean(focusedRequestId) && !requestFocused) ||
+            (Boolean(focusedRestaurantId) && !restaurantFocused);
+          const highlightPin = requestFocused || restaurantFocused;
           const dropoff = { lat: request.dropoff_lat, lng: request.dropoff_lng };
-          points.push(dropoff);
 
           const dropPin = document.createElement('div');
-          dropPin.className = requestFocused
-            ? `${styles.dropoffPin} ${styles.dropoffPinFocused}`
-            : styles.dropoffPin;
+          dropPin.className = [
+            styles.dropoffPin,
+            highlightPin ? styles.dropoffPinFocused : '',
+            dimOther ? styles.pinDim : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
           const dropColor = colorFor(request.zone_id);
           if (dropColor) dropPin.style.background = dropColor;
           dropPin.title = request.dropoff_address;
@@ -570,18 +615,21 @@ export function DispatchMonitorMap({
               position: dropoff,
               title: request.customer_name,
               content: dropPin,
-              zIndex: requestFocused ? 12 : undefined,
+              zIndex: highlightPin ? 16 : undefined,
             }),
           );
 
           if (request.restaurant_lat != null && request.restaurant_lng != null) {
             const restaurant = { lat: request.restaurant_lat, lng: request.restaurant_lng };
-            points.push(restaurant);
 
             const restaurantPin = document.createElement('div');
-            restaurantPin.className = requestFocused
-              ? `${styles.restaurantPin} ${styles.restaurantPinFocused}`
-              : styles.restaurantPin;
+            restaurantPin.className = [
+              styles.restaurantPin,
+              highlightPin ? styles.restaurantPinFocused : '',
+              dimOther ? styles.pinDim : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
             const restaurantColor = colorFor(request.zone_id);
             if (restaurantColor) restaurantPin.style.background = restaurantColor;
 
@@ -591,7 +639,7 @@ export function DispatchMonitorMap({
                 position: restaurant,
                 title: request.restaurant_name,
                 content: restaurantPin,
-                zIndex: requestFocused ? 12 : undefined,
+                zIndex: highlightPin ? 16 : undefined,
               }),
             );
           }
@@ -651,17 +699,26 @@ export function DispatchMonitorMap({
 
       for (const { request, path } of pendingRoadPaths) {
         const focused = request.id === focusedRequestId;
-        const zoneColor = colorFor(request.zone_id);
-        points.push(path[0], path[path.length - 1]);
+        const mode = pendingDashMode(
+          request.id,
+          request.restaurant_id,
+          focusedRequestId,
+          focusedRestaurantId,
+        );
+        if (mode === 'focused') {
+          polylinesRef.current.push(
+            new google.maps.Polyline({
+              map,
+              path,
+              ...focusedDashedHaloStyle(),
+            }),
+          );
+        }
         polylinesRef.current.push(
           new google.maps.Polyline({
             map,
             path,
-            ...(zoneColor
-              ? coloredPolylineStyle(zoneColor, focused, true)
-              : focused
-                ? FOCUSED_REQUEST_ROUTE_STYLE
-                : REQUEST_ROUTE_STYLE),
+            ...dashedPolylineStyle(PENDING_ROUTE_COLOR, mode),
           }),
         );
         markersRef.current.push(
@@ -669,25 +726,34 @@ export function DispatchMonitorMap({
             map,
             position: pointAlongPath(path),
             gmpClickable: false,
-            zIndex: focused ? 10 : 6,
-            content: createRequestLabel(request.short_id, true, focused, zoneColor),
+            zIndex: focused ? 18 : mode === 'dimmed' ? 5 : 6,
+            content: createRequestLabel(
+              request.short_id,
+              true,
+              focused,
+              undefined,
+              mode === 'dimmed',
+            ),
           }),
         );
       }
 
       for (const { route, path } of roadPaths) {
         const focused = route.request_id === focusedRequestId;
+        const restaurantOwned = restaurantRequestIds.has(route.request_id);
+        const dimmed = Boolean(focusedRestaurantId) && !restaurantOwned;
         const zoneColor = colorFor(route.zone_id ?? requestZoneId(route.request_id));
-        points.push(path[0], path[path.length - 1]);
         polylinesRef.current.push(
           new google.maps.Polyline({
             map,
             path,
             ...(zoneColor
-              ? coloredPolylineStyle(zoneColor, focused, false)
-              : focused
+              ? coloredPolylineStyle(zoneColor, focused || restaurantOwned, dimmed)
+              : focused || restaurantOwned
                 ? FOCUSED_ACTIVE_ROUTE_STYLE
-                : ACTIVE_ROUTE_STYLE),
+                : dimmed
+                  ? { ...ACTIVE_ROUTE_STYLE, strokeOpacity: 0.28, strokeWeight: 2, zIndex: 2 }
+                  : ACTIVE_ROUTE_STYLE),
           }),
         );
         markersRef.current.push(
@@ -695,14 +761,19 @@ export function DispatchMonitorMap({
             map,
             position: pointAlongPath(path),
             gmpClickable: false,
-            zIndex: focused ? 11 : 7,
-            content: createRequestLabel(route.short_id, false, focused, zoneColor),
+            zIndex: focused || restaurantOwned ? 18 : dimmed ? 5 : 7,
+            content: createRequestLabel(
+              route.short_id,
+              false,
+              focused || restaurantOwned,
+              zoneColor,
+              dimmed,
+            ),
           }),
         );
       }
 
       for (const { current, path } of itineraryRoadPaths) {
-        points.push(...path);
         polylinesRef.current.push(
           new google.maps.Polyline({
             map,
@@ -738,8 +809,31 @@ export function DispatchMonitorMap({
           ]
         : [];
 
-      let fitKey = `all:${snapshot.generated_at}`;
-      let nextPoints: google.maps.LatLngLiteral[] | null = points;
+      const focusedRestaurantPoints: google.maps.LatLngLiteral[] = [];
+      if (focusedRestaurantId) {
+        for (const { request, path } of pendingRoadPaths) {
+          if (request.restaurant_id === focusedRestaurantId) {
+            focusedRestaurantPoints.push(...path);
+          }
+        }
+        for (const { route, path } of roadPaths) {
+          if (restaurantRequestIds.has(route.request_id)) {
+            focusedRestaurantPoints.push(...path);
+          }
+        }
+        const sample = snapshot.requests.find(
+          (row) => row.restaurant_id === focusedRestaurantId,
+        );
+        if (sample?.restaurant_lat != null && sample.restaurant_lng != null) {
+          focusedRestaurantPoints.push({
+            lat: sample.restaurant_lat,
+            lng: sample.restaurant_lng,
+          });
+        }
+      }
+
+      let fitKey = `overview:${selectedZoneId ?? 'none'}`;
+      let nextPoints: google.maps.LatLngLiteral[] | null = zoneRingPoints(visibleZones);
       let padding = 56;
 
       if (focusedDriver) {
@@ -751,10 +845,15 @@ export function DispatchMonitorMap({
         padding = 96;
       } else if (focusedRequest) {
         fitKey = `request:${focusedRequest.id}`;
-        nextPoints = focusedRequestPoints.length > 0 ? focusedRequestPoints : points;
+        nextPoints = focusedRequestPoints.length > 0 ? focusedRequestPoints : zoneRingPoints(visibleZones);
         padding = 88;
-      } else {
-        fitKey = `overview:${selectedZoneId ?? 'none'}:${points.length}:${points[0]?.lat ?? 0},${points[0]?.lng ?? 0}`;
+      } else if (focusedRestaurantId) {
+        fitKey = `restaurant:${focusedRestaurantId}`;
+        nextPoints =
+          focusedRestaurantPoints.length > 0
+            ? focusedRestaurantPoints
+            : zoneRingPoints(visibleZones);
+        padding = 88;
       }
 
       if (lastFitKeyRef.current !== fitKey) {
@@ -770,7 +869,7 @@ export function DispatchMonitorMap({
     return () => {
       cancelled = true;
     };
-  }, [colorByZone, focusedDriverId, focusedRequestId, itinerary, mapReady, snapshot, visibleZones, zoneIds]);
+  }, [colorByZone, focusedDriverId, focusedRequestId, focusedRestaurantId, itinerary, mapReady, snapshot, visibleZones, zoneIds]);
 
   if (mapError) {
     return (
@@ -851,6 +950,42 @@ export function DispatchMonitorMap({
               ))}
             </ol>
           )}
+        </aside>
+      ) : focusedBusiness ? (
+        <aside className={styles.itineraryCard} aria-label={`Negocio ${focusedBusiness.name}`}>
+          <p className={styles.itineraryHeading}>
+            <span>{focusedBusiness.name}</span>
+          </p>
+          {focusedBusiness.address ? (
+            <p className={styles.itineraryKicker}>{focusedBusiness.address}</p>
+          ) : (
+            <p className={styles.itineraryKicker}>Sin dirección registrada</p>
+          )}
+          {focusedBusiness.phone ? (
+            <p className={styles.itineraryKicker}>{focusedBusiness.phone}</p>
+          ) : null}
+          {focusedBusiness.zoneName ? (
+            <p className={styles.itineraryKicker}>{focusedBusiness.zoneName}</p>
+          ) : null}
+          <p className={styles.itineraryKicker}>
+            {focusedBusiness.queueCount} en cola · {focusedBusiness.activeCount} en curso
+            {focusedBusiness.unassignedCount
+              ? ` · ${focusedBusiness.unassignedCount} sin asignar`
+              : ''}
+          </p>
+          <ol className={styles.itineraryList}>
+            {focusedBusiness.requests.map((request) => (
+              <li key={request.id} className={styles.itineraryStep}>
+                <span className={`${styles.itineraryCopy} ${styles.businessOrder}`}>
+                  <strong>
+                    {formatShortId(request.short_id)} · {requestStatusLabel(request.status)}
+                  </strong>
+                  <span>{request.customer_name}</span>
+                  <span className={styles.itineraryDetail}>{request.dropoff_address}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
         </aside>
       ) : null}
     </div>
