@@ -136,6 +136,29 @@
   font-weight: 600;
 }
 
+.costPair {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.costChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.45rem;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--color-text) 6%, var(--color-surface));
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.costChipDelivery {
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  color: var(--color-primary);
+}
+
 .statusChip {
   display: inline-flex;
   align-items: center;
@@ -298,6 +321,10 @@
   color: var(--color-primary);
 }
 
+.costCard {
+  margin-top: 0.95rem;
+}
+
 .riderCard {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -422,6 +449,32 @@
   color: var(--color-text-secondary);
   font-size: 0.82rem;
   line-height: 1.4;
+}
+
+.historyRider {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem 0.7rem;
+  margin: 0.95rem 0 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.historyRiderName {
+  color: var(--color-text);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.historyRiderPlate {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
 }
 
 .trackingLink {

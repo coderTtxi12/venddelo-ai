@@ -8,6 +8,7 @@ import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
 import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { useState } from 'react';
+import { DispatchCostBreakdown } from '@/components/dispatch/DispatchCostBreakdown';
 import {
   formatDispatchShortId,
   type DispatchAssignedRider,
@@ -132,6 +133,7 @@ function RiderPhoto({ rider }: { rider: DispatchAssignedRider }) {
 type DispatchRecentRequestsProps = {
   requests: DispatchRequest[];
   subdomain: string;
+  variant?: 'active' | 'history';
   busy?: boolean;
   onRetry: (request: DispatchRequest) => void;
   onCancel: (request: DispatchRequest) => void;
@@ -141,6 +143,7 @@ type DispatchRecentRequestsProps = {
 export function DispatchRecentRequests({
   requests,
   subdomain,
+  variant = 'active',
   busy = false,
   onRetry,
   onCancel,
@@ -148,6 +151,7 @@ export function DispatchRecentRequests({
 }: DispatchRecentRequestsProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const isHistory = variant === 'history';
 
   async function copyTracking(request: DispatchRequest) {
     if (!subdomain) return;
@@ -166,8 +170,12 @@ export function DispatchRecentRequests({
   return (
     <section className={styles.card} aria-labelledby="dispatch-list-title">
       <header className={styles.sectionHeading}>
-        <h2 id="dispatch-list-title">Solicitudes recientes</h2>
-        <p>Estado, rastreo y detalle de cada entrega.</p>
+        <h2 id="dispatch-list-title">{isHistory ? 'Historial' : 'Solicitudes activas'}</h2>
+        <p>
+          {isHistory
+            ? 'Entregas y cancelaciones.'
+            : 'Estado, rastreo y detalle de cada entrega en curso.'}
+        </p>
       </header>
       <ul className={styles.list}>
         {requests.length ? (
@@ -209,7 +217,16 @@ export function DispatchRecentRequests({
                           <span className={`${styles.statusChip} ${statusTone(request.status)}`}>
                             {STATUS_LABELS[request.status]}
                           </span>
-                          <span>{money(request.quoted_fee_cents)}</span>
+                          <span className={styles.costPair}>
+                            {request.payment_method !== 'transfer' ? (
+                              <span className={styles.costChip}>
+                                Restaurante {money(request.collect_cents)}
+                              </span>
+                            ) : null}
+                            <span className={`${styles.costChip} ${styles.costChipDelivery}`}>
+                              Envío {money(request.quoted_fee_cents)}
+                            </span>
+                          </span>
                           <span>{paymentLabel(request.payment_method)}</span>
                           {rider ? (
                             <span className={styles.riderHint}>
@@ -227,7 +244,7 @@ export function DispatchRecentRequests({
                       </span>
                     </button>
                     <div className={styles.quickActions}>
-                      {trackingUrl ? (
+                      {!isHistory && trackingUrl ? (
                         <>
                           <button
                             type="button"
@@ -261,7 +278,15 @@ export function DispatchRecentRequests({
                   </div>
 
                   <div className={styles.details} id={detailsId} hidden={!expanded}>
-                    {rider ? (
+                    {isHistory && rider ? (
+                      <p className={styles.historyRider} aria-label="Repartidor">
+                        <span className={styles.historyRiderName}>{rider.first_name}</span>
+                        <span className={styles.historyRiderPlate}>
+                          {rider.plate_suffix ? `···${rider.plate_suffix}` : 'Sin placas'}
+                        </span>
+                      </p>
+                    ) : null}
+                    {!isHistory && rider ? (
                       <article className={styles.riderCard} aria-label="Datos del repartidor">
                         <RiderPhoto rider={rider} />
                         <div className={styles.riderBody}>
@@ -316,7 +341,9 @@ export function DispatchRecentRequests({
                           </div>
                         ) : null}
                       </article>
-                    ) : riderAlreadyAssigned(request) && request.status !== 'delivered' ? (
+                    ) : !isHistory &&
+                      riderAlreadyAssigned(request) &&
+                      request.status !== 'delivered' ? (
                       <p className={styles.assignedNote}>
                         Ya hay un repartidor asignado. Este envío no se puede cancelar.
                       </p>
@@ -343,15 +370,10 @@ export function DispatchRecentRequests({
                         <dt>Pago</dt>
                         <dd>
                           {paymentLabel(request.payment_method)}
-                          {request.collect_cents > 0 ? ` · cobrar ${money(request.collect_cents)}` : ''}
                           {request.payment_method === 'cash' && request.cash_denomination_cents
                             ? ` · paga con ${money(request.cash_denomination_cents)}`
                             : null}
                         </dd>
-                      </div>
-                      <div>
-                        <dt>Envío</dt>
-                        <dd>{money(request.quoted_fee_cents)}</dd>
                       </div>
                       <div>
                         <dt>Paquete</dt>
@@ -375,7 +397,15 @@ export function DispatchRecentRequests({
                       ) : null}
                     </dl>
 
-                    {trackingUrl ? (
+                    <div className={styles.costCard}>
+                      <DispatchCostBreakdown
+                        restaurantCents={request.collect_cents}
+                        deliveryCents={request.quoted_fee_cents}
+                        paymentMethod={request.payment_method}
+                      />
+                    </div>
+
+                    {!isHistory && trackingUrl ? (
                       <a
                         className={styles.trackingLink}
                         href={trackingUrl}
@@ -427,7 +457,11 @@ export function DispatchRecentRequests({
         ) : (
           <li className={styles.empty}>
             <LocalShippingOutlinedIcon aria-hidden />
-            <span>Todavía no hay solicitudes de delivery.</span>
+            <span>
+              {isHistory
+                ? 'Todavía no hay entregas ni cancelaciones.'
+                : 'No hay envíos en curso.'}
+            </span>
           </li>
         )}
       </ul>
