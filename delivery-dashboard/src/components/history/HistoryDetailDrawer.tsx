@@ -1,10 +1,14 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { DriverPhoneContact } from '@/components/drivers/DriverPhoneContact';
+import { DispatchRequestLogSections } from '@/components/monitor/DispatchRequestLogSections';
 import { RightDrawer } from '@/components/ui/RightDrawer';
-import type { DispatchHistoryItem } from '@/lib/api/types';
+import { getAssignmentLog } from '@/lib/api/deliveryProviders';
+import type { AssignmentLog, DispatchHistoryItem } from '@/lib/api/types';
 import {
+  ASSIGNMENT_LOG_ERROR,
+  assignmentSchedulerLines,
   caseLabel,
   formatCoords,
   formatDateTime,
@@ -19,6 +23,7 @@ import styles from '@/components/monitor/RequestDetailDrawer.module.css';
 type HistoryDetailDrawerProps = {
   open: boolean;
   item: DispatchHistoryItem | null;
+  accessToken: string | null;
   onClose: () => void;
 };
 
@@ -68,7 +73,45 @@ function holdStatusLabel(status: string | null | undefined): string | null {
   return status;
 }
 
-export function HistoryDetailDrawer({ open, item, onClose }: HistoryDetailDrawerProps) {
+export function HistoryDetailDrawer({
+  open,
+  item,
+  accessToken,
+  onClose,
+}: HistoryDetailDrawerProps) {
+  const [log, setLog] = useState<AssignmentLog | null>(null);
+  const [logError, setLogError] = useState<string | null>(null);
+  const [logLoading, setLogLoading] = useState(false);
+
+  useEffect(() => {
+    setLog(null);
+    setLogError(null);
+  }, [item?.id]);
+
+  useEffect(() => {
+    if (!open || !item || !accessToken) {
+      setLog(null);
+      setLogError(null);
+      return;
+    }
+    let cancelled = false;
+    setLogLoading(true);
+    setLogError(null);
+    void getAssignmentLog(accessToken, item.id)
+      .then((data) => {
+        if (!cancelled) setLog(data);
+      })
+      .catch(() => {
+        if (!cancelled) setLogError(ASSIGNMENT_LOG_ERROR);
+      })
+      .finally(() => {
+        if (!cancelled) setLogLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, item?.id, accessToken]);
+
   const cashDenom = item ? cashDenominationLine(item) : null;
   const dropoffCoords = item ? formatCoords(item.dropoff_lat, item.dropoff_lng) : null;
   const dropoffMaps = item
@@ -80,6 +123,10 @@ export function HistoryDetailDrawer({ open, item, onClose }: HistoryDetailDrawer
   const restaurantMaps = item
     ? mapsSearchUrl(item.restaurant_lat, item.restaurant_lng)
     : null;
+  const visibleLog = item && log?.request_id === item.id ? log : null;
+  const schedulerLines = item
+    ? assignmentSchedulerLines(visibleLog, item.status, Date.now())
+    : [];
 
   return (
     <RightDrawer
@@ -146,6 +193,15 @@ export function HistoryDetailDrawer({ open, item, onClose }: HistoryDetailDrawer
               </DetailRow>
             </dl>
           </section>
+
+          <DispatchRequestLogSections
+            timeline={item.timeline ?? []}
+            schedulerLines={schedulerLines}
+            logError={logError}
+            logLoading={logLoading}
+            hasLog={visibleLog != null}
+            assignmentEvents={visibleLog?.events ?? []}
+          />
 
           <section className={styles.section} aria-labelledby="history-detail-tiempos">
             <h3 id="history-detail-tiempos" className={styles.heading}>
