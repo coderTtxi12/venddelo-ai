@@ -48,29 +48,27 @@ def test_case_a_pre_free_finishes_current_dropoff_first():
     assert [stop.kind for stop in stops] == ["dropoff", "restaurant", "dropoff"]
 
 
-def test_case_c_picks_nearest_restaurant_then_dropoffs():
-    far = _job(
-        "far",
-        restaurant_lat=19.50,
-        restaurant_lng=-99.20,
-        dropoff_lat=19.51,
-        dropoff_lng=-99.21,
-    )
-    near = _job(
-        "near",
-        restaurant_lat=19.431,
-        restaurant_lng=-99.131,
-        dropoff_lat=19.432,
-        dropoff_lng=-99.132,
-    )
-    stops = plan_itinerary([far, near], case="C", rider_lat=19.43, rider_lng=-99.13)
-    assert [stop.kind for stop in stops] == [
-        "restaurant",
-        "restaurant",
-        "dropoff",
-        "dropoff",
+def test_case_c_keeps_pickups_then_appends_new_dropoff():
+    old = _job("old")
+    nxt = _job("new")
+    previous = [
+        ItineraryStop(kind="restaurant", request_id="old"),
+        ItineraryStop(kind="dropoff", request_id="old"),
     ]
-    assert [stop.request_id for stop in stops[:2]] == ["near", "far"]
+    stops = plan_itinerary(
+        [old, nxt],
+        case="C",
+        rider_lat=19.43,
+        rider_lng=-99.13,
+        previous=previous,
+        new_request_ids={"new"},
+    )
+    assert stops == [
+        ItineraryStop(kind="restaurant", request_id="old"),
+        ItineraryStop(kind="restaurant", request_id="new"),
+        ItineraryStop(kind="dropoff", request_id="old"),
+        ItineraryStop(kind="dropoff", request_id="new"),
+    ]
 
 
 def test_case_d_inserts_new_pickup_then_keeps_existing_then_new_dropoff():
