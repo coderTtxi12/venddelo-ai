@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -328,6 +328,49 @@ class RiderFcmTokenUpdate(BaseModel):
     fcm_token: str = Field(min_length=1)
 
 
+class RiderHistoryHoldDTO(BaseModel):
+    request_id: uuid.UUID
+    short_id: str
+    restaurant_name: str
+    amount_cents: int
+    customer_name: str
+
+
+class RiderHistoryItemDTO(BaseModel):
+    id: uuid.UUID
+    short_id: str
+    status: str
+    closed_at: datetime
+    restaurant_name: str
+    restaurant_address: str | None = None
+    dropoff_address: str
+    quoted_fee_cents: int
+    payment_method: str
+    collect_cents: int
+    cash_denomination_cents: int | None = None
+    package_count: int
+    package_size: str
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    notes: str | None = None
+    credit_hold_cents: int = 0
+
+
+class RiderHistoryPageDTO(BaseModel):
+    start: date
+    end: date
+    items: list[RiderHistoryItemDTO]
+    total: int
+    delivered_count: int
+    cancelled_count: int
+    earnings_cents: int
+    has_more: bool
+    credit_limit_cents: int
+    credit_held_cents: int
+    credit_available_cents: int
+    active_holds: list[RiderHistoryHoldDTO] = Field(default_factory=list)
+
+
 class RiderOfferStopDTO(BaseModel):
     restaurant_name: str
     dropoff_address: str
@@ -424,7 +467,17 @@ class DispatchMonitorDriverDTO(BaseModel):
     pre_free_eta_seconds: int | None = None
     occupied_job_count: int = 0
     active_package_count: int = 0
+    registered_zone_id: uuid.UUID | None = None
+    registered_zone_name: str | None = None
     itinerary: list[DriverItineraryStopDTO] = Field(default_factory=list)
+
+
+class DispatchMonitorTimelineEventDTO(BaseModel):
+    at: datetime | None = None
+    kind: str
+    driver_name: str | None = None
+    case_applied: str | None = None
+    current: bool = False
 
 
 class DispatchMonitorRequestDTO(BaseModel):
@@ -439,6 +492,7 @@ class DispatchMonitorRequestDTO(BaseModel):
     dropoff_lat: float
     dropoff_lng: float
     dropoff_address: str
+    dropoff_maps_url: str | None = None
     payment_method: str
     collect_cents: int
     cash_denomination_cents: int | None = None
@@ -451,6 +505,7 @@ class DispatchMonitorRequestDTO(BaseModel):
     assigned_driver_name: str | None = None
     last_assigned_driver_name: str | None = None
     dispatch_group_id: uuid.UUID | None = None
+    zone_id: uuid.UUID | None = None
     zone_name: str | None = None
     package_size: str
     package_count: int = 1
@@ -462,6 +517,8 @@ class DispatchMonitorRequestDTO(BaseModel):
     search_blockers: list[DispatchMonitorSearchBlockerDTO] = Field(default_factory=list)
     cycle_rejected_count: int = 0
     cycle_silent_count: int = 0
+    created_at: datetime | None = None
+    timeline: list[DispatchMonitorTimelineEventDTO] = Field(default_factory=list)
 
 
 class DispatchMonitorOfferDTO(BaseModel):
@@ -503,6 +560,7 @@ class DispatchMonitorRouteDTO(BaseModel):
     destination_lat: float
     destination_lng: float
     destination_label: str
+    zone_id: uuid.UUID | None = None
 
 
 class DispatchMonitorSnapshotDTO(BaseModel):
