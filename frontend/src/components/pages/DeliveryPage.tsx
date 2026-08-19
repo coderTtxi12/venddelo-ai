@@ -10,7 +10,6 @@ import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DeliveryLocationValue } from '@/components/digital-menu/CheckoutDeliveryAddressPicker';
-import { DispatchCostBreakdown } from '@/components/dispatch/DispatchCostBreakdown';
 import { DispatchDeliveryAddressPicker } from '@/components/dispatch/DispatchDeliveryAddressPicker';
 import { DispatchRecentRequests } from '@/components/dispatch/DispatchRecentRequests';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
@@ -279,10 +278,6 @@ export default function DeliveryPage() {
         : null,
     [created, subdomain],
   );
-
-  const restaurantCollectCents = parsePesosToCents(collectAmount);
-  const quotedDeliveryCents =
-    deliveryQuote?.available === true ? deliveryQuote.delivery_fee_cents : 0;
 
   const activeRequests = useMemo(
     () => requests.filter((item) => !isDispatchHistoryStatus(item.status)),
@@ -668,6 +663,28 @@ export default function DeliveryPage() {
             </p>
           ) : null}
 
+          {deliveryQuote?.available && location.latitude != null ? (
+            <div className={styles.feeCard} role="status">
+              <span className={styles.feeLabel}>Costo de envío</span>
+              <span className={styles.feeValue}>
+                {formatMoney(deliveryQuote.delivery_fee_cents / 100, 'MXN')}
+              </span>
+              <span className={styles.feeHint}>
+                {deliveryQuote.inside_polygon
+                  ? 'Dentro de la zona de cobertura.'
+                  : deliveryQuote.distance_km != null
+                    ? `${deliveryQuote.distance_km.toFixed(1)} km de ruta · solo horario diurno`
+                    : 'Fuera del polígono de cobertura · solo horario diurno'}
+              </span>
+              {deliveryWeatherFeeNotice ? (
+                <p className={styles.weatherNotice}>
+                  <WaterDropOutlinedIcon className={styles.weatherIcon} aria-hidden />
+                  <span>{deliveryWeatherFeeNotice}</span>
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className={styles.gridThree}>
             <div className={styles.field}>
               <span className={styles.label} id="payment-method-label">
@@ -724,29 +741,6 @@ export default function DeliveryPage() {
               </div>
             ) : null}
           </div>
-
-          {deliveryQuote?.available && location.latitude != null ? (
-            <DispatchCostBreakdown
-              restaurantCents={paymentMethod === 'transfer' ? 0 : restaurantCollectCents}
-              deliveryCents={quotedDeliveryCents}
-              paymentMethod={paymentMethod}
-              hint={
-                deliveryQuote.inside_polygon
-                  ? 'Restaurante es lo que cobra tu negocio. Envío es la tarifa de Mexy.'
-                  : deliveryQuote.distance_km != null
-                    ? `${deliveryQuote.distance_km.toFixed(1)} km de ruta · solo horario diurno`
-                    : 'Fuera del polígono de cobertura · solo horario diurno'
-              }
-              weatherNotice={
-                deliveryWeatherFeeNotice ? (
-                  <p className={styles.weatherNotice}>
-                    <WaterDropOutlinedIcon className={styles.weatherIcon} aria-hidden />
-                    <span>{deliveryWeatherFeeNotice}</span>
-                  </p>
-                ) : null
-              }
-            />
-          ) : null}
 
           <div className={styles.gridThree}>
             <div className={styles.field}>
