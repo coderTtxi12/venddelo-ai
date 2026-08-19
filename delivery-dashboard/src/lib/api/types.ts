@@ -541,6 +541,7 @@ export type DispatchHistoryItem = {
   updated_at: string;
   dispatch_group_id?: string | null;
   case_applied?: string | null;
+  timeline?: DispatchMonitorTimelineEvent[];
 };
 
 export type DispatchHistoryPage = {
