@@ -21,7 +21,7 @@ export default function ZonePicker() {
   const zoneIds = useMemo(() => zones.map((zone) => zone.id), [zones]);
   const options = useMemo<ZoneOption[]>(() => {
     const zoneOptions = zones.map((zone) => ({ id: zone.id, name: zone.name }));
-    if (pathname === '/monitor' || selectedZoneId === ALL_ZONES_ID) {
+    if (pathname === '/monitor' || pathname === '/historial' || selectedZoneId === ALL_ZONES_ID) {
       return [{ id: ALL_ZONES_ID, name: 'Todas' }, ...zoneOptions];
     }
     return zoneOptions;
