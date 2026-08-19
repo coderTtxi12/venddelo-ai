@@ -3,18 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Literal
-from uuid import uuid4
 
 from app.modules.delivery_dispatch.geo import geodesic_meters
 
 _OCCUPIED_STATUSES = frozenset({"assigned", "picked_up", "in_transit"})
 _ON_ROUTE_STATUSES = frozenset({"picked_up", "in_transit"})
-_GROUPABLE_STATUSES = frozenset({"scheduled", "searching"})
 CaseName = Literal["A", "B", "C", "D", "E"]
 
 _PICKUP_PROXIMITY_WEIGHT = 3
-_DESTINATION_COMPAT_WEIGHT = 3
-_DETOUR_WEIGHT = 2
 _CAPACITY_WEIGHT = 2
 
 
@@ -50,6 +46,7 @@ class EngineRequest:
     cycle_rejected_driver_ids: tuple[str, ...] = ()
     cycle_silent_driver_ids: tuple[str, ...] = ()
     dispatch_group_id: str | None = None
+    restaurant_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -69,6 +66,9 @@ class EngineDriver:
     active_dropoff_lat: float | None = None
     active_dropoff_lng: float | None = None
     occupied_job_count: int = 0
+    heading_restaurant_id: str | None = None
+    last_dropoff_lat: float | None = None
+    last_dropoff_lng: float | None = None
 
 
 @dataclass(frozen=True)
@@ -132,11 +132,9 @@ def choose_assignments(context: EngineContext) -> EngineResult:
                 high_demand=False,
             )
 
-    group = _nearby_dropoff_group(context, due)
-    if len(group) >= 2:
-        result = _assign_case_c(context, group)
-        if result.offers:
-            return result
+    hooked = _assign_case_c(context)
+    if hooked.offers:
+        return hooked
 
     driver = _nearest_free(context, context.request, taken=set())
     if driver is not None:
@@ -268,107 +266,75 @@ def _assign_case_b(
     return tuple(offers)
 
 
-def _nearby_dropoff_group(
-    context: EngineContext,
-    due: tuple[EngineRequest, ...],
-) -> tuple[EngineRequest, ...]:
-    radius = context.settings.near_destination_radius_meters
-    current = context.request
-    group = [
-        request
-        for request in due
-        if request.status in _GROUPABLE_STATUSES
-        and _is_groupable_sibling(current, request)
-        and geodesic_meters(
-            current.dropoff_lat,
-            current.dropoff_lng,
-            request.dropoff_lat,
-            request.dropoff_lng,
-        )
-        <= radius
-    ]
-    return tuple(group)
-
-
-def _is_groupable_sibling(current: EngineRequest, request: EngineRequest) -> bool:
-    if request.id == current.id:
-        return True
-    if request.dispatch_group_id is None:
-        return True
-    return request.dispatch_group_id == current.dispatch_group_id
-
-
-def _assign_case_c(context: EngineContext, group: tuple[EngineRequest, ...]) -> EngineResult:
-    group_id = str(uuid4())
-    driver = _nearest_free_for_group(context, group)
-    if driver is None:
-        return EngineResult(case="C", offers=(), high_demand=True, group_id=None)
-    offers = tuple(
-        EngineOffer(
-            request_id=request.id,
-            driver_id=driver.id,
-            case="C",
-            group_id=group_id,
-        )
-        for request in group
-    )
-    return EngineResult(case="C", offers=offers, high_demand=True, group_id=group_id)
-
-
-def _nearest_free_for_group(
-    context: EngineContext,
-    group: tuple[EngineRequest, ...],
-) -> EngineDriver | None:
+def _assign_case_c(context: EngineContext) -> EngineResult:
+    request = context.request
     candidates = [
         driver
         for driver in context.drivers
-        if _is_free_for_group(context, group, driver)
+        if _is_case_c_hook(context, request, driver)
     ]
     if not candidates:
-        return None
+        return EngineResult(case=None, offers=(), high_demand=True)
 
     def distance(driver: EngineDriver) -> float:
-        return min(
-            geodesic_meters(
-                driver.last_lat or 0.0,
-                driver.last_lng or 0.0,
-                request.restaurant_lat,
-                request.restaurant_lng,
-            )
-            for request in group
+        return geodesic_meters(
+            driver.last_dropoff_lat or 0.0,
+            driver.last_dropoff_lng or 0.0,
+            request.dropoff_lat,
+            request.dropoff_lng,
         )
 
-    return min(candidates, key=distance)
+    winner = min(candidates, key=distance)
+    return EngineResult(
+        case="C",
+        offers=(EngineOffer(request_id=request.id, driver_id=winner.id, case="C"),),
+        high_demand=True,
+    )
 
 
-def _is_free_for_group(
+def _is_case_c_hook(
     context: EngineContext,
-    group: tuple[EngineRequest, ...],
+    request: EngineRequest,
     driver: EngineDriver,
 ) -> bool:
-    if not _is_online_fresh(context, driver):
+    if not request.restaurant_id or not driver.heading_restaurant_id:
         return False
-    if driver.status != "active" or not driver.is_online:
+    if driver.active_request_status != "assigned":
         return False
-    if driver.has_open_offer:
+    if driver.heading_restaurant_id != request.restaurant_id:
         return False
-    if any(driver.id in request.cycle_rejected_driver_ids for request in group):
+    if driver.last_dropoff_lat is None or driver.last_dropoff_lng is None:
         return False
-    if any(driver.id in request.cycle_silent_driver_ids for request in group):
+    if not _is_eligible(context, request, driver):
         return False
-    if any(request.package_size == "grande" for request in group) and driver.compartment_size != "grande":
-        return False
-    extra_packages = sum(request.package_count for request in group)
-    if driver.active_package_count + extra_packages > context.settings.max_active_packages_per_driver:
-        return False
-    cash_needed = sum(
-        request.collect_cents for request in group if request.payment_method == "cash"
+    distance = geodesic_meters(
+        driver.last_dropoff_lat,
+        driver.last_dropoff_lng,
+        request.dropoff_lat,
+        request.dropoff_lng,
     )
-    if cash_needed:
-        available = driver.credit_limit_cents - driver.credit_held_cents
-        if available < cash_needed:
-            return False
-    return _is_pre_free_or_idle(context, driver)
+    return distance <= context.settings.near_destination_radius_meters
+
+
+def nn_last_dropoff(
+    dropoffs: tuple[tuple[float, float], ...],
+    *,
+    origin_lat: float,
+    origin_lng: float,
+) -> tuple[float, float] | None:
+    remaining = list(dropoffs)
+    if not remaining:
+        return None
+    lat, lng = origin_lat, origin_lng
+    last = remaining[0]
+    while remaining:
+        last = min(
+            remaining,
+            key=lambda point: geodesic_meters(lat, lng, point[0], point[1]),
+        )
+        remaining.remove(last)
+        lat, lng = last
+    return last
 
 
 def _assign_case_d(context: EngineContext) -> tuple[EngineOffer, ...]:
