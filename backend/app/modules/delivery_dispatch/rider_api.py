@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import Annotated
+from datetime import date
+from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Response, status
 
 from app.api.deps import get_synced_user
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
@@ -12,6 +12,7 @@ from app.modules.delivery_dispatch.schemas import (
     DeliveryTaskPayload,
     RiderAssignmentDTO,
     RiderFcmTokenUpdate,
+    RiderHistoryPageDTO,
     RiderLocationUpdate,
     RiderOfferDTO,
     RiderOnlineUpdate,
@@ -35,6 +36,21 @@ def get_rider_me(
     service: RiderDispatchService = Depends(_rider_service),
 ) -> RiderProfileDTO:
     return service.get_me(user)
+
+
+@rider_router.get("/me/history", response_model=RiderHistoryPageDTO)
+def get_rider_history(
+    user: UserDTO = Depends(get_synced_user),
+    service: RiderDispatchService = Depends(_rider_service),
+    start: date | None = Query(default=None),
+    end: date | None = Query(default=None),
+    status: Literal["delivered", "cancelled"] | None = Query(default=None),
+    limit: int | None = Query(default=None, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> RiderHistoryPageDTO:
+    return service.get_history(
+        user, start=start, end=end, status=status, limit=limit, offset=offset
+    )
 
 
 @rider_router.patch("/me/online", response_model=RiderProfileDTO)
