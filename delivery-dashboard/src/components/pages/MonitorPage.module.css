@@ -347,15 +347,21 @@
 
 .sortDir {
   display: inline-flex;
+  flex-direction: row;
   align-items: center;
-  gap: 0.12rem;
-  font-size: 0.72rem;
-  font-weight: 900;
-  line-height: 1;
+  gap: 0.06rem;
+  line-height: 0;
+  font-size: 1rem;
+}
+
+.sortArrow {
+  display: block;
+  color: inherit;
+  transition: color 200ms ease;
 }
 
 .sortDirIdle {
-  color: #d1d5db;
+  color: #94a3b8;
 }
 
 .sortDirActive {
@@ -363,6 +369,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sortArrow,
   .panelChevron,
   .panelChevronCollapsed {
     transition: none;
