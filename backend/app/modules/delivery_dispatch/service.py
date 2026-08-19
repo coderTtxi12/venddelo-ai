@@ -75,6 +75,7 @@ from app.modules.delivery_dispatch.schemas import (
     DispatchPaymentUpdate,
     DispatchRequestCreate,
     DispatchRequestDTO,
+    DispatchRetryDTO,
     DriverItineraryStopDTO,
     ItineraryUpdate,
     ManualOfferCreate,
@@ -586,6 +587,36 @@ class DeliveryDispatchService:
             expires_at=offer.expires_at,
             tracking_token=request.tracking_token,
             short_id=request.short_id,
+        )
+
+    def retry_unassigned(
+        self,
+        user_id: uuid.UUID,
+        request_id: uuid.UUID,
+    ) -> DispatchRetryDTO:
+        provider_id, member_role = self._require_provider_with_role(user_id)
+        require_manage_partnerships(member_role)
+        request = self._session.scalar(
+            select(DeliveryDispatchRequest)
+            .where(
+                DeliveryDispatchRequest.id == request_id,
+                DeliveryDispatchRequest.delivery_provider_id == provider_id,
+            )
+            .with_for_update()
+        )
+        if request is None:
+            raise NotFoundError("Solicitud de delivery no encontrada")
+        if request.status != "unassigned":
+            raise ValidationError("Solo puedes reintentar solicitudes sin asignar")
+        restart_unassigned_search(self._session, request, datetime.now(UTC))
+        self._session.flush()
+        self._session.refresh(request)
+        notify_request_realtime(self._session, request)
+        notify_dispatch_monitor_changed(provider_id)
+        return DispatchRetryDTO(
+            id=request.id,
+            status=request.status,
+            search_at=request.search_at,
         )
 
     def get_assignment_log(self, user_id: uuid.UUID, request_id: uuid.UUID) -> AssignmentLogDTO:
