@@ -170,6 +170,7 @@ def list_dispatch_history_endpoint(
     status: Literal["delivered", "cancelled"] | None = Query(default=None),
     driver_id: UUID | None = Query(default=None),
     zone_id: UUID | None = Query(default=None),
+    restaurant_id: UUID | None = Query(default=None),
     limit: int | None = Query(default=None, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> ProviderHistoryPageDTO:
@@ -180,6 +181,7 @@ def list_dispatch_history_endpoint(
         status=status,
         driver_id=driver_id,
         zone_id=zone_id,
+        restaurant_id=restaurant_id,
         limit=limit,
         offset=offset,
     )
