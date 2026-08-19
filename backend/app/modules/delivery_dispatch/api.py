@@ -12,6 +12,8 @@ from app.modules.delivery_dispatch.schemas import (
     DeliveryDriverDocumentsUpdate,
     DeliveryDriverDTO,
     DeliveryDriverUpdate,
+    DriverItineraryStopDTO,
+    ItineraryUpdate,
     ManualOfferCreate,
     ManualOfferDTO,
     SearchLeadTimeDTO,
@@ -111,6 +113,19 @@ def create_manual_offer(
     service: DeliveryDispatchService = Depends(_service),
 ) -> ManualOfferDTO:
     return service.create_manual_offer(user.id, request_id, data)
+
+
+@router.patch(
+    "/me/drivers/{driver_id}/itinerary",
+    response_model=list[DriverItineraryStopDTO],
+)
+def patch_driver_itinerary(
+    driver_id: UUID,
+    data: ItineraryUpdate,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryDispatchService = Depends(_service),
+) -> list[DriverItineraryStopDTO]:
+    return service.update_driver_itinerary(user.id, driver_id, data)
 
 
 @router.get("/me/search-lead-times", response_model=list[SearchLeadTimeDTO])
