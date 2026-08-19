@@ -1141,11 +1141,11 @@ def _driver_busy(
     case: str,
     settings_row: DeliveryProviderAssignmentSettings,
 ) -> bool:
-    del now
     open_offer = session.scalar(
         select(DeliveryDispatchOffer.id).where(
             DeliveryDispatchOffer.driver_id == driver.id,
             DeliveryDispatchOffer.status == "offered",
+            DeliveryDispatchOffer.expires_at > now,
         )
     )
     if open_offer is not None:
