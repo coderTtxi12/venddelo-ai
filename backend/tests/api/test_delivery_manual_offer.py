@@ -333,3 +333,46 @@ def test_manual_offer_rejects_busy_driver(client, engine):
         headers=AUTH,
     )
     assert same.status_code == 201, same.text
+
+
+@requires_db
+def test_provider_retry_restarts_search_like_restaurant(client, engine):
+    from app.modules.delivery_dispatch.tasks import stub_bus
+
+    restaurant_id, _driver_ids = _fleet(client, engine, "provider-retry")
+    request_id = _create_dispatch_request(client, restaurant_id)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        row = session.get(DeliveryDispatchRequest, request_id)
+        assert row is not None
+        row.status = "unassigned"
+        session.commit()
+
+    stub_bus.clear()
+    _as_mexy()
+    retried = client.post(
+        f"/api/v1/delivery-providers/me/dispatch-requests/{request_id}/retry",
+        headers=AUTH,
+    )
+    assert retried.status_code == 200, retried.text
+    body = retried.json()
+    assert body["id"] == str(request_id)
+    assert body["status"] == "searching"
+    assert any(
+        job.kind == "search" and job.payload.get("request_id") == str(request_id)
+        for job in stub_bus.jobs
+    )
+
+    with factory() as session:
+        row = session.get(DeliveryDispatchRequest, request_id)
+        assert row is not None
+        assert row.status == "searching"
+        assert row.cycle_rejected_driver_ids == []
+        assert row.cycle_silent_driver_ids == []
+
+    again = client.post(
+        f"/api/v1/delivery-providers/me/dispatch-requests/{request_id}/retry",
+        headers=AUTH,
+    )
+    assert again.status_code == 400
+    assert again.json()["error"]["message"] == "Solo puedes reintentar solicitudes sin asignar"
