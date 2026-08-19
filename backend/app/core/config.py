@@ -81,6 +81,10 @@ class Settings(BaseSettings):
     menu_public_domain: str = "mxy.mx"
     delivery_tasks_backend: str = "stub"
     delivery_tasks_secret: str | None = None
+    gcp_project: str | None = None
+    cloud_tasks_location: str = "us-central1"
+    cloud_tasks_queue: str = "delivery-dispatch"
+    delivery_tasks_handler_url: str | None = None
     firebase_credentials_path: str | None = None
     firebase_credentials_json: str | None = None
 
