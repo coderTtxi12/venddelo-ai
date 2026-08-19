@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import ReplayOutlinedIcon from '@mui/icons-material/ReplayOutlined';
 import { DriverAvatar } from '@/components/drivers/DriverAvatar';
 import { DriverMetaTags } from '@/components/drivers/DriverMetaTags';
 import { RightDrawer } from '@/components/ui/RightDrawer';
@@ -14,12 +15,14 @@ type AssignDriverDrawerProps = {
   request: DispatchMonitorRequest | null;
   drivers: DispatchMonitorDriver[];
   submitting: boolean;
+  busyKind?: 'system' | 'manual' | null;
   error: string | null;
   onClose: () => void;
   onAssign: (
     driverId: string,
     itinerary?: Array<{ kind: 'restaurant' | 'dropoff'; request_id: string }>,
   ) => void;
+  onSystemAssign?: () => void;
 };
 
 type DraftStop = {
@@ -64,9 +67,11 @@ export function AssignDriverDrawer({
   request,
   drivers,
   submitting,
+  busyKind = null,
   error,
   onClose,
   onAssign,
+  onSystemAssign,
 }: AssignDriverDrawerProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draftStops, setDraftStops] = useState<DraftStop[]>([]);
@@ -145,10 +150,6 @@ export function AssignDriverDrawer({
     >
       {request ? (
         <>
-          <p className={styles.hint}>
-            Se envía una oferta al repartidor. El pedido no cambia de rider hasta que acepte. El
-            link de rastreo del negocio no cambia.
-          </p>
           <div className={styles.summary}>
             <span>{formatShortId(request.short_id)} · {request.customer_name}</span>
             <span>{request.restaurant_name}</span>
@@ -166,6 +167,43 @@ export function AssignDriverDrawer({
               {error}
             </p>
           ) : null}
+          {request.status === 'unassigned' && onSystemAssign ? (
+            <section className={styles.systemBlock} aria-labelledby="system-assign-title">
+              <h2 id="system-assign-title" className={styles.systemTitle}>
+                Asignación del sistema
+              </h2>
+              <p className={styles.systemHint}>
+                El motor vuelve a buscar.
+              </p>
+              <button
+                type="button"
+                className={styles.systemAssign}
+                disabled={submitting}
+                onClick={onSystemAssign}
+              >
+                <ReplayOutlinedIcon className={styles.systemIcon} aria-hidden />
+                {busyKind === 'system' ? 'Buscando…' : 'Que el sistema asigne'}
+              </button>
+            </section>
+          ) : (
+            <p className={styles.hint}>
+              Se envía una oferta al repartidor. El pedido no cambia de rider hasta que acepte. El
+              link de rastreo del negocio no cambia.
+            </p>
+          )}
+          <section
+            className={`${styles.manualBlock}${request.status === 'unassigned' ? ` ${styles.manualBlockSecondary}` : ''}`}
+            aria-labelledby="manual-assign-title"
+          >
+            <h2 id="manual-assign-title" className={styles.manualTitle}>
+              Elegir repartidor
+            </h2>
+            {request.status === 'unassigned' ? (
+              <p className={styles.hint}>
+                Oferta directa. El pedido no cambia de rider hasta que acepte. El link de rastreo
+                del negocio no cambia.
+              </p>
+            ) : null}
           <ul className={styles.list}>
             {rows.map(({ driver, isCurrent, warnings, disabled }) => {
               const active = selectedId === driver.id;
@@ -268,12 +306,13 @@ export function AssignDriverDrawer({
               );
             }}
           >
-            {submitting
+            {busyKind === 'manual'
               ? 'Enviando oferta…'
               : selected
                 ? `Enviar oferta a ${selected.driver.first_name}`
                 : 'Elige un repartidor'}
           </button>
+          </section>
         </>
       ) : null}
     </RightDrawer>
