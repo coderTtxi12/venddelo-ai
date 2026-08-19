@@ -16,6 +16,7 @@ from app.db.models.delivery import (
     DeliveryProviderZone,
 )
 from app.db.models.restaurant import Restaurant
+from app.modules.delivery_dispatch.monitor import _offers_by_request, _timeline_events
 from app.modules.delivery_dispatch.schemas import (
     ProviderHistoryItemDTO,
     RiderHistoryHoldDTO,
@@ -131,6 +132,7 @@ def _to_provider_item(
     driver: DeliveryDriver | None,
     zone: DeliveryProviderZone | None,
     case_applied: str | None,
+    offers: list[DeliveryDispatchOffer],
 ) -> ProviderHistoryItemDTO:
     base = _to_item(request, restaurant, hold)
     driver_name = None
@@ -155,6 +157,12 @@ def _to_provider_item(
         dispatch_group_id=request.dispatch_group_id,
         case_applied=case_applied,
         credit_hold_status=hold.status if hold is not None else None,
+        timeline=_timeline_events(
+            request,
+            timeout_at=request.search_at,
+            assigned_name=driver_name,
+            offers=offers,
+        ),
     )
 
 
@@ -269,6 +277,11 @@ def list_dispatch_history(
 
     requests = [request for request, *_rest in rows]
     cases = _accepted_cases(session, requests) if include_provider_fields else {}
+    offers_by_request = (
+        _offers_by_request(session, [request.id for request in requests])
+        if include_provider_fields
+        else {}
+    )
     if include_provider_fields:
         items = [
             _to_provider_item(
@@ -278,6 +291,7 @@ def list_dispatch_history(
                 driver,
                 zone,
                 cases.get(request.id),
+                offers_by_request.get(request.id, []),
             )
             for request, restaurant, hold, driver, zone in rows
         ]
