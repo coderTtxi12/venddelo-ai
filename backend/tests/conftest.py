@@ -37,6 +37,16 @@ def _reset_langsmith_tracing_state():
     clear_langsmith_env_cache()
 
 
+@pytest.fixture(autouse=True)
+def _force_delivery_tasks_stub(monkeypatch):
+    monkeypatch.setenv("DELIVERY_TASKS_BACKEND", "stub")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
 @pytest.fixture(scope="session")
 def engine():
     eng = create_engine(TEST_URL)
