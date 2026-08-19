@@ -407,7 +407,7 @@ export default function AssignmentPage() {
 
               <Section
                 title="Desvío (caso D)"
-                hint="En alta demanda, si el rider ya salió (recogió o va en camino), el motor puede sumarle un pedido cuando esté a esta distancia en línea recta del restaurante nuevo. No mira el dropoff."
+                hint="En alta demanda, si no hay libres ni recolecta pendiente en ese restaurante, el motor puede sumarle el pedido a un rider que ya salió y esté a esta distancia en línea recta del restaurante nuevo. No mira el dropoff."
               >
                 <div className={styles.fieldGrid}>
                   <NumberField
