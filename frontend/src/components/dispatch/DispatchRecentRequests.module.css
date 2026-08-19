@@ -234,6 +234,7 @@
   font-size: 0.8rem;
   font-weight: 650;
   cursor: pointer;
+  text-decoration: none;
   touch-action: manipulation;
   transition:
     border-color 180ms ease,
