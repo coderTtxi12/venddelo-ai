@@ -986,16 +986,55 @@ def _load_drivers(session: Session, provider_id: uuid.UUID) -> list[DeliveryDriv
     )
 
 
+def expire_stale_open_offers(session: Session, now: datetime) -> int:
+    offers = list(
+        session.scalars(
+            select(DeliveryDispatchOffer)
+            .where(
+                DeliveryDispatchOffer.status == "offered",
+                DeliveryDispatchOffer.expires_at <= now,
+            )
+            .with_for_update(skip_locked=True)
+        ).all()
+    )
+    for offer in offers:
+        offer.status = "expired"
+        if offer.responded_at is None:
+            offer.responded_at = now
+        request = session.get(DeliveryDispatchRequest, offer.request_id)
+        if request is None or request.status in _OCCUPIED:
+            continue
+        restore_status = None
+        if offer.case_applied == "M" and isinstance(offer.score_json, dict):
+            restore_status = offer.score_json.get("restore_status")
+        if restore_status == "unassigned":
+            request.status = "unassigned"
+        elif request.status == "offered":
+            request.status = "searching"
+        notify_request_realtime(session, request)
+        driver = session.get(DeliveryDriver, offer.driver_id)
+        record_assignment_event(
+            session,
+            request,
+            kind="expired",
+            tone="warn",
+            title=expired_title(driver.first_name if driver else None),
+            detail="La oferta venció y ya no bloquea al rider.",
+            driver_id=offer.driver_id,
+        )
+    return len(offers)
+
+
 def _live_offer(
     session: Session,
     request_id: uuid.UUID,
     now: datetime,
 ) -> DeliveryDispatchOffer | None:
-    del now
     return session.scalar(
         select(DeliveryDispatchOffer).where(
             DeliveryDispatchOffer.request_id == request_id,
             DeliveryDispatchOffer.status == "offered",
+            DeliveryDispatchOffer.expires_at > now,
         )
     )
 
