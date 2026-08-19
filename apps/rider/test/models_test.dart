@@ -55,6 +55,26 @@ void main() {
     expect(profile.creditAvailableCents, 35000);
     expect(formatMoneyCents(profile.creditAvailableCents), r'$350.00');
     expect(profile.itinerary, isEmpty);
+    expect(profile.plate, isEmpty);
+  });
+
+  test('RiderProfile.fromJson keeps vehicle and photo path', () {
+    final profile = RiderProfile.fromJson({
+      'id': 'd1',
+      'first_name': 'Ana',
+      'last_name': 'Pérez',
+      'is_online': true,
+      'assignments': const [],
+      'profile_photo_path': 'drivers/ana.webp',
+      'plate': 'ABC123',
+      'motorcycle_brand': 'Italika',
+      'motorcycle_color': 'Rojo',
+    });
+
+    expect(profile.profilePhotoPath, 'drivers/ana.webp');
+    expect(profile.plate, 'ABC123');
+    expect(profile.motorcycleBrand, 'Italika');
+    expect(profile.motorcycleColor, 'Rojo');
   });
 
   test('RiderProfile.fromJson keeps persisted itinerary stops', () {
