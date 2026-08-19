@@ -20,6 +20,15 @@ from app.db.models.delivery import (
     DeliveryProviderAssignmentSettings,
 )
 from app.db.models.restaurant import Restaurant
+from app.modules.delivery_dispatch.assignment_log import (
+    expired_title,
+    manual_title,
+    offered_detail,
+    offered_title,
+    record_assignment_event,
+    searched_detail_from_context,
+    timed_out_title,
+)
 from app.modules.delivery_dispatch.cloud_tasks import GcpTaskBus
 from app.modules.delivery_dispatch.engine import (
     EngineContext,
@@ -175,11 +184,17 @@ def run_search(session: Session, request_id: uuid.UUID, now: datetime) -> None:
         DeliveryProviderAssignmentSettings,
         request.delivery_provider_id,
     )
-    timeout_seconds = (
-        settings_row.assignment_timeout_seconds if settings_row is not None else 900
-    )
+    timeout_seconds = settings_row.assignment_timeout_seconds if settings_row is not None else 900
     if assignment_timed_out(now, _as_utc(request.search_at), timeout_seconds):
         request.status = "unassigned"
+        record_assignment_event(
+            session,
+            request,
+            kind="timed_out",
+            tone="warn",
+            title=timed_out_title(),
+            detail=None,
+        )
         notify_request_realtime(session, request)
         return
     _assign_or_retry(session, request, now)
@@ -192,9 +207,7 @@ def handle_expire_offer(session: Session, offer_id: uuid.UUID, now: datetime) ->
         return
     request, _group = lock_request_and_group(session, peek.request_id)
     offer = session.scalar(
-        select(DeliveryDispatchOffer)
-        .where(DeliveryDispatchOffer.id == offer_id)
-        .with_for_update()
+        select(DeliveryDispatchOffer).where(DeliveryDispatchOffer.id == offer_id).with_for_update()
     )
     if offer is None or offer.status != "offered":
         return
@@ -226,10 +239,21 @@ def handle_expire_offer(session: Session, offer_id: uuid.UUID, now: datetime) ->
         *(request.cycle_silent_driver_ids or []),
         offer.driver_id,
     ]
-    former_members = _clear_dispatch_group(session, request)
-    _timeout_unresumable_former_members(
-        session, former_members, skip_id=request.id, now=now
+    driver = offer.driver
+    if driver is None:
+        driver = session.get(DeliveryDriver, offer.driver_id)
+    record_assignment_event(
+        session,
+        request,
+        kind="expired",
+        tone="warn",
+        title=expired_title(driver.first_name if driver else None),
+        detail="Sigue buscando.",
+        next_attempt_at=request.next_attempt_at if request.status == "searching" else None,
+        driver_id=offer.driver_id,
     )
+    former_members = _clear_dispatch_group(session, request)
+    _timeout_unresumable_former_members(session, former_members, skip_id=request.id, now=now)
     _assign_or_retry(session, request, now)
     _resume_former_group_members(session, former_members, skip_id=request.id, now=now)
     notify_request_realtime(session, request)
@@ -257,9 +281,7 @@ def reject_offer_and_search(
         offer.driver_id,
     ]
     former_members = _clear_dispatch_group(session, request)
-    _timeout_unresumable_former_members(
-        session, former_members, skip_id=request.id, now=now
-    )
+    _timeout_unresumable_former_members(session, former_members, skip_id=request.id, now=now)
     _assign_or_retry(session, request, now)
     _resume_former_group_members(session, former_members, skip_id=request.id, now=now)
 
@@ -306,9 +328,7 @@ def release_group_on_cancel(
     )
     for member in remaining:
         member.dispatch_group_id = None
-    _timeout_unresumable_former_members(
-        session, remaining, skip_id=request.id, now=now
-    )
+    _timeout_unresumable_former_members(session, remaining, skip_id=request.id, now=now)
     _resume_former_group_members(session, remaining, skip_id=request.id, now=now)
 
 
@@ -338,6 +358,8 @@ def _assign_or_retry(
 
     extra_excluded: set[str] = set()
     drivers = list(_load_drivers(session, request.delivery_provider_id))
+    last_context: EngineContext | None = None
+    last_high_demand = False
     for _ in range(len(drivers) + 1):
         context = _build_context(
             session,
@@ -347,9 +369,17 @@ def _assign_or_retry(
             now,
             extra_excluded=extra_excluded,
         )
+        last_context = context
         result = choose_assignments(context)
+        last_high_demand = result.high_demand
         if not result.offers:
-            _enqueue_retry(session, request, now)
+            _enqueue_retry(
+                session,
+                request,
+                now,
+                context=context,
+                high_demand=result.high_demand,
+            )
             return
 
         expires_at = now + timedelta(seconds=settings_row.offer_timeout_seconds)
@@ -395,7 +425,13 @@ def _assign_or_retry(
             if conflict:
                 continue
             if not persisted_current:
-                _enqueue_retry(session, request, now)
+                _enqueue_retry(
+                    session,
+                    request,
+                    now,
+                    context=context,
+                    high_demand=result.high_demand,
+                )
             return
 
         chosen = next(
@@ -403,7 +439,13 @@ def _assign_or_retry(
             None,
         )
         if chosen is None:
-            _enqueue_retry(session, request, now)
+            _enqueue_retry(
+                session,
+                request,
+                now,
+                context=context,
+                high_demand=result.high_demand,
+            )
             return
 
         driver_id = uuid.UUID(chosen.driver_id)
@@ -437,7 +479,13 @@ def _assign_or_retry(
             _attach_case_c_group(session, request, result, now, locked_members)
         return
 
-    _enqueue_retry(session, request, now)
+    _enqueue_retry(
+        session,
+        request,
+        now,
+        context=last_context,
+        high_demand=last_high_demand,
+    )
 
 
 def lock_request_and_group(
@@ -645,6 +693,29 @@ def _persist_dispatch_offer(
         },
         session=session,
     )
+    name = driver.first_name
+    if case == "M":
+        record_assignment_event(
+            session,
+            request,
+            kind="manual",
+            tone="ok",
+            title=manual_title(name),
+            detail=offered_detail("M"),
+            case_applied="M",
+            driver_id=driver.id,
+        )
+    else:
+        record_assignment_event(
+            session,
+            request,
+            kind="offered",
+            tone="ok",
+            title=offered_title(name),
+            detail=offered_detail(case),
+            case_applied=case,
+            driver_id=driver.id,
+        )
     return offer
 
 
@@ -655,6 +726,9 @@ def _enqueue_retry(
     session: Session,
     request: DeliveryDispatchRequest,
     now: datetime,
+    *,
+    context: EngineContext | None = None,
+    high_demand: bool = False,
 ) -> None:
     retry_seconds = 30
     settings_row = session.get(
@@ -671,6 +745,18 @@ def _enqueue_retry(
         request.next_attempt_at,
         {"kind": "retry", "request_id": str(request.id)},
         session=session,
+    )
+    detail = "No hay repartidores dados de alta."
+    if context is not None:
+        detail = searched_detail_from_context(context, high_demand=high_demand)
+    record_assignment_event(
+        session,
+        request,
+        kind="searched",
+        tone="warn",
+        title="Buscó rider",
+        detail=detail,
+        next_attempt_at=request.next_attempt_at,
     )
 
 
@@ -810,9 +896,9 @@ def _to_engine_driver(
         is_online=driver.is_online,
         last_lat=driver.last_lat,
         last_lng=driver.last_lng,
-        location_updated_at=_as_utc(driver.location_updated_at)
-        if driver.location_updated_at
-        else None,
+        location_updated_at=(
+            _as_utc(driver.location_updated_at) if driver.location_updated_at else None
+        ),
         credit_limit_cents=driver.credit_limit_cents,
         credit_held_cents=driver.credit_held_cents,
         compartment_size=driver.compartment_size,
