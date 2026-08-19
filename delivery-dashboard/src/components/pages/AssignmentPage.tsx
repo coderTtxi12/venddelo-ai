@@ -386,6 +386,42 @@ export default function AssignmentPage() {
                   />
                 </div>
               </Section>
+
+              <Section
+                title="Enganche (caso C)"
+                hint="En alta demanda, si un rider ya va a recoger a ese restaurante y aún no salió, el motor puede sumarle el pedido cuando el último dropoff de su ruta quede cerca del nuevo, en línea recta."
+              >
+                <div className={styles.fieldGrid}>
+                  <NumberField
+                    id="near-dropoff"
+                    label="Radio de dropoff cercano"
+                    hint="Metros en línea recta entre el último dropoff del rider y el nuevo. Por defecto 800."
+                    min={0}
+                    value={assignmentSettings.near_destination_radius_meters}
+                    onChange={(value) =>
+                      patchAssignmentField('near_destination_radius_meters', value)
+                    }
+                  />
+                </div>
+              </Section>
+
+              <Section
+                title="Desvío (caso D)"
+                hint="En alta demanda, si el rider ya salió (recogió o va en camino), el motor puede sumarle un pedido cuando esté a esta distancia en línea recta del restaurante nuevo. No mira el dropoff."
+              >
+                <div className={styles.fieldGrid}>
+                  <NumberField
+                    id="d-pickup"
+                    label="Radio al restaurante"
+                    hint="Metros en línea recta del GPS del rider al restaurante nuevo. Por defecto 1000."
+                    min={0}
+                    value={assignmentSettings.max_pickup_detour_meters}
+                    onChange={(value) =>
+                      patchAssignmentField('max_pickup_detour_meters', value)
+                    }
+                  />
+                </div>
+              </Section>
             </div>
           </fieldset>
         </>
