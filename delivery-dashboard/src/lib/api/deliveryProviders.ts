@@ -26,6 +26,7 @@ import type {
   DeliveryDriverCreateInput,
   DeliveryDriverDocumentsUpdateInput,
   DeliveryDriverUpdateInput,
+  DispatchHistoryPage,
   DispatchMonitorSnapshot,
 } from './types';
 
@@ -300,6 +301,32 @@ export function getMyDispatchMonitor(token: string, zoneId?: string | null) {
     ? `/delivery-providers/me/dispatch-monitor?zone_id=${encodeURIComponent(zoneId)}`
     : '/delivery-providers/me/dispatch-monitor';
   return apiRequest<DispatchMonitorSnapshot>(path, { token });
+}
+
+export function getMyDispatchHistory(
+  token: string,
+  params: {
+    start: string;
+    end: string;
+    status?: 'delivered' | 'cancelled';
+    driverId?: string | null;
+    zoneId?: string | null;
+    limit?: number;
+    offset?: number;
+  },
+) {
+  const qs = new URLSearchParams();
+  qs.set('start', params.start);
+  qs.set('end', params.end);
+  if (params.status) qs.set('status', params.status);
+  if (params.driverId) qs.set('driver_id', params.driverId);
+  if (params.zoneId) qs.set('zone_id', params.zoneId);
+  qs.set('limit', String(params.limit ?? 50));
+  qs.set('offset', String(params.offset ?? 0));
+  return apiRequest<DispatchHistoryPage>(
+    `/delivery-providers/me/dispatch-history?${qs.toString()}`,
+    { token },
+  );
 }
 
 export function createMyManualDispatchOffer(
