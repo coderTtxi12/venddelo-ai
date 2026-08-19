@@ -381,6 +381,22 @@ class RiderController extends ChangeNotifier {
     );
   }
 
+  Future<RiderHistoryPage> getHistory({
+    required String start,
+    required String end,
+    String? status,
+    int limit = 50,
+    int offset = 0,
+  }) {
+    return _api.getHistory(
+      start: start,
+      end: end,
+      status: status,
+      limit: limit,
+      offset: offset,
+    );
+  }
+
   Future<void> _forceOfflineAfterAuthFailure() async {
     errorMessage = locationAuthFailedMessage;
     _applyOffer(null);
