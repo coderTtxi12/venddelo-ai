@@ -1409,7 +1409,7 @@ class RiderDispatchService:
             case=offer.case_applied,
             rider_lat=locked_driver.last_lat,
             rider_lng=locked_driver.last_lng,
-            pre_free=had_in_transit and offer.case_applied == "A",
+            pre_free=had_in_transit and offer.case_applied in {"A", "E"},
             new_request_ids={str(row.id) for row in claimed},
         )
         self._session.flush()
