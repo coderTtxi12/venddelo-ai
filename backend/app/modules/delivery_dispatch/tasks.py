@@ -61,6 +61,7 @@ class StubTaskBus:
 
 
 stub_bus = StubTaskBus()
+_SESSION_PENDING_KEY = "delivery_pending_gcp_jobs"
 _pending_gcp_jobs: ContextVar[list[QueuedTask] | None] = ContextVar(
     "delivery_pending_gcp_jobs",
     default=None,
@@ -72,19 +73,43 @@ def get_task_bus() -> StubTaskBus:
     return stub_bus
 
 
-def enqueue(kind: str, eta: datetime, payload: dict) -> None:
-    if get_settings().delivery_tasks_backend == "gcp":
-        pending = _pending_gcp_jobs.get()
-        if pending is None:
+def _gcp_buffer(session: Session | None) -> list[QueuedTask]:
+    if session is not None:
+        pending = session.info.get(_SESSION_PENDING_KEY)
+        if not isinstance(pending, list):
             pending = []
-            _pending_gcp_jobs.set(pending)
-        pending.append(QueuedTask(kind=kind, eta=eta, payload=payload))
+            session.info[_SESSION_PENDING_KEY] = pending
+        return pending
+    pending = _pending_gcp_jobs.get()
+    if pending is None:
+        pending = []
+        _pending_gcp_jobs.set(pending)
+    return pending
+
+
+def enqueue(
+    kind: str,
+    eta: datetime,
+    payload: dict,
+    session: Session | None = None,
+) -> None:
+    if get_settings().delivery_tasks_backend == "gcp":
+        _gcp_buffer(session).append(QueuedTask(kind=kind, eta=eta, payload=payload))
+        logger.info(
+            "cloud tasks buffered kind=%s request_id=%s via=%s",
+            kind,
+            payload.get("request_id"),
+            "session" if session is not None else "context",
+        )
         return
     stub_bus.enqueue(kind, eta, payload)
 
 
-def flush_delivery_tasks() -> None:
-    pending = list(_pending_gcp_jobs.get() or [])
+def flush_delivery_tasks(session: Session | None = None) -> None:
+    pending: list[QueuedTask] = []
+    if session is not None:
+        pending.extend(session.info.pop(_SESSION_PENDING_KEY, []) or [])
+    pending.extend(_pending_gcp_jobs.get() or [])
     _pending_gcp_jobs.set([])
     if not pending:
         return
@@ -100,7 +125,9 @@ def flush_delivery_tasks() -> None:
         )
 
 
-def discard_delivery_tasks() -> None:
+def discard_delivery_tasks(session: Session | None = None) -> None:
+    if session is not None:
+        session.info.pop(_SESSION_PENDING_KEY, None)
     _pending_gcp_jobs.set([])
 
 
