@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -18,6 +19,7 @@ from app.db.models.delivery import (
     DeliveryProviderAssignmentSettings,
 )
 from app.db.models.restaurant import Restaurant
+from app.modules.delivery_dispatch.cloud_tasks import GcpTaskBus
 from app.modules.delivery_dispatch.engine import (
     EngineContext,
     EngineDriver,
@@ -56,6 +58,11 @@ class StubTaskBus:
 
 
 stub_bus = StubTaskBus()
+_pending_gcp_jobs: ContextVar[list[QueuedTask] | None] = ContextVar(
+    "delivery_pending_gcp_jobs",
+    default=None,
+)
+_gcp_bus: GcpTaskBus | None = None
 
 
 def get_task_bus() -> StubTaskBus:
@@ -63,7 +70,28 @@ def get_task_bus() -> StubTaskBus:
 
 
 def enqueue(kind: str, eta: datetime, payload: dict) -> None:
-    get_task_bus().enqueue(kind, eta, payload)
+    if get_settings().delivery_tasks_backend == "gcp":
+        pending = _pending_gcp_jobs.get()
+        if pending is None:
+            pending = []
+            _pending_gcp_jobs.set(pending)
+        pending.append(QueuedTask(kind=kind, eta=eta, payload=payload))
+        return
+    stub_bus.enqueue(kind, eta, payload)
+
+
+def flush_delivery_tasks() -> None:
+    pending = list(_pending_gcp_jobs.get() or [])
+    _pending_gcp_jobs.set([])
+    if not pending:
+        return
+    bus = _gcp_bus if _gcp_bus is not None else GcpTaskBus.from_settings(get_settings())
+    for job in pending:
+        bus.enqueue(job.kind, job.eta, job.payload)
+
+
+def discard_delivery_tasks() -> None:
+    _pending_gcp_jobs.set([])
 
 
 def authorize_internal_task(secret_header: str | None) -> None:
