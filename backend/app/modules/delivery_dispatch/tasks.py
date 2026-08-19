@@ -643,6 +643,7 @@ def _persist_dispatch_offer(
             "request_id": str(request.id),
             "offer_id": str(offer.id),
         },
+        session=session,
     )
     return offer
 
@@ -669,6 +670,7 @@ def _enqueue_retry(
         "retry",
         request.next_attempt_at,
         {"kind": "retry", "request_id": str(request.id)},
+        session=session,
     )
 
 
@@ -941,6 +943,7 @@ def _resume_former_group_members(
             "search",
             now,
             {"kind": "search", "request_id": str(member.id)},
+            session=session,
         )
 
 
