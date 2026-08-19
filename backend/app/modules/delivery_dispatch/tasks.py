@@ -361,6 +361,23 @@ def reset_cycle_driver_ids(request: DeliveryDispatchRequest) -> None:
     request.cycle_silent_driver_ids = []
 
 
+def restart_unassigned_search(
+    session: Session | None,
+    request: DeliveryDispatchRequest,
+    now: datetime,
+) -> None:
+    request.status = "searching"
+    request.search_at = now
+    request.next_attempt_at = now
+    reset_cycle_driver_ids(request)
+    enqueue(
+        "search",
+        now,
+        {"kind": "search", "request_id": str(request.id)},
+        session=session,
+    )
+
+
 def _assign_or_retry(
     session: Session,
     request: DeliveryDispatchRequest,
