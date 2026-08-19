@@ -36,7 +36,17 @@ from app.db.models.restaurant import Restaurant
 from app.infra.storage.factory import build_storage
 from app.modules.assistant.image_webp import WEBP_CONTENT_TYPE, convert_image_bytes_to_webp
 from app.modules.delivery_dispatch.geo import geodesic_meters
-from app.modules.delivery_dispatch.rider_route import group_offer_totals, order_offer_stops
+from app.modules.delivery_dispatch.itinerary import (
+    ItineraryStop,
+    complete_stop,
+    hydrate_itinerary,
+    load_plan,
+    parse_manual_stops,
+    pickup_before_dropoff,
+    rebuild_driver_itinerary,
+    remove_request_stops,
+    replace_plan,
+)
 from app.modules.delivery_dispatch.maps_url import (
     extract_maps_query_text,
     geocode_address_text,
@@ -44,12 +54,12 @@ from app.modules.delivery_dispatch.maps_url import (
     should_follow_maps_redirect,
 )
 from app.modules.delivery_dispatch.monitor import build_dispatch_monitor_snapshot
-from app.modules.delivery_dispatch.tracking_view import build_tracking_rider_dto
 from app.modules.delivery_dispatch.monitor_notify import (
     notify_dispatch_monitor_changed,
     notify_driver_location_realtime,
     notify_request_realtime,
 )
+from app.modules.delivery_dispatch.rider_route import group_offer_totals, order_offer_stops
 from app.modules.delivery_dispatch.schemas import (
     AssignmentSettingsDTO,
     AssignmentSettingsUpdate,
@@ -61,6 +71,8 @@ from app.modules.delivery_dispatch.schemas import (
     DispatchPaymentUpdate,
     DispatchRequestCreate,
     DispatchRequestDTO,
+    DriverItineraryStopDTO,
+    ItineraryUpdate,
     ManualOfferCreate,
     ManualOfferDTO,
     PublicDispatchTrackingDTO,
@@ -76,6 +88,7 @@ from app.modules.delivery_dispatch.short_id import allocate_dispatch_short_id
 from app.modules.delivery_dispatch.tasks import (
     close_offered_offers,
     enqueue,
+    lock_request_and_group,
     persist_dispatch_offer,
     reject_offer_and_search,
     release_group_on_cancel,
@@ -83,6 +96,7 @@ from app.modules.delivery_dispatch.tasks import (
 )
 from app.modules.delivery_dispatch.tracking_view import (
     build_public_tracking_dto,
+    build_tracking_rider_dto,
 )
 from app.modules.delivery_providers.permissions import (
     require_manage_partnerships,
@@ -467,6 +481,20 @@ class DeliveryDispatchService:
                 DeliveryDispatchOffer.expires_at > now,
             )
         )
+        if (
+            open_for_driver is not None
+            and open_for_driver.request_id == request.id
+            and open_for_driver.case_applied == "M"
+        ):
+            return ManualOfferDTO(
+                id=open_for_driver.id,
+                request_id=request.id,
+                driver_id=driver.id,
+                case_applied=open_for_driver.case_applied,
+                expires_at=open_for_driver.expires_at,
+                tracking_token=request.tracking_token,
+                short_id=request.short_id,
+            )
         if open_for_driver is not None and open_for_driver.request_id != request.id:
             raise ConflictError("El repartidor ya tiene una oferta abierta")
 
@@ -480,6 +508,17 @@ class DeliveryDispatchService:
         extra_score: dict = {"manual": True}
         if restore_status is not None and not keep_status:
             extra_score["restore_status"] = restore_status
+        if data.itinerary:
+            planned = [
+                ItineraryStop(kind=item.kind, request_id=str(item.request_id))
+                for item in data.itinerary
+            ]
+            if not pickup_before_dropoff(planned):
+                raise ValidationError("No se puede entregar un pedido antes de recogerlo.")
+            extra_score["itinerary"] = [
+                {"kind": item.kind, "request_id": str(item.request_id)}
+                for item in data.itinerary
+            ]
 
         offer = persist_dispatch_offer(
             self._session,
@@ -492,6 +531,8 @@ class DeliveryDispatchService:
             keep_request_status=keep_status,
             extra_score=extra_score,
         )
+        if offer is None:
+            raise ConflictError("No se pudo crear la oferta. Intenta de nuevo.")
         self._session.flush()
         notify_dispatch_monitor_changed(provider_id)
         return ManualOfferDTO(
@@ -503,6 +544,36 @@ class DeliveryDispatchService:
             tracking_token=request.tracking_token,
             short_id=request.short_id,
         )
+
+    def update_driver_itinerary(
+        self,
+        user_id: uuid.UUID,
+        driver_id: uuid.UUID,
+        data: ItineraryUpdate,
+    ) -> list[DriverItineraryStopDTO]:
+        provider_id, member_role = self._require_provider_with_role(user_id)
+        require_manage_partnerships(member_role)
+        driver = self._session.scalar(
+            select(DeliveryDriver).where(
+                DeliveryDriver.id == driver_id,
+                DeliveryDriver.delivery_provider_id == provider_id,
+            )
+        )
+        if driver is None:
+            raise NotFoundError("Repartidor no encontrado")
+        current = set(load_plan(self._session, driver.id))
+        incoming = [
+            ItineraryStop(kind=item.kind, request_id=str(item.request_id))
+            for item in data.stops
+        ]
+        if set(incoming) != current:
+            raise ConflictError("El itinerario cambió. Recarga el monitor.")
+        if not pickup_before_dropoff(incoming):
+            raise ValidationError("No se puede entregar un pedido antes de recogerlo.")
+        replace_plan(self._session, driver.id, incoming)
+        self._session.flush()
+        notify_dispatch_monitor_changed(provider_id)
+        return hydrate_itinerary(self._session, driver.id)
 
     def _upload_document(
         self,
@@ -1113,6 +1184,11 @@ class RiderDispatchService:
     def accept_offer(self, user: UserDTO, offer_id: uuid.UUID) -> RiderOfferDTO:
         driver = self._require_driver(user)
         now = datetime.now(UTC)
+        peek = self._session.get(DeliveryDispatchOffer, offer_id)
+        if peek is None or peek.driver_id != driver.id:
+            raise ConflictError("La oferta ya no está disponible")
+
+        request, group_rows = lock_request_and_group(self._session, peek.request_id)
         offer = self._session.scalar(
             select(DeliveryDispatchOffer)
             .where(
@@ -1121,14 +1197,15 @@ class RiderDispatchService:
             )
             .with_for_update()
         )
-        if offer is None or offer.status != "offered" or offer.expires_at <= now:
+        if offer is None:
             raise ConflictError("La oferta ya no está disponible")
-
-        request = self._session.scalar(
-            select(DeliveryDispatchRequest)
-            .where(DeliveryDispatchRequest.id == offer.request_id)
-            .with_for_update()
-        )
+        if request is None:
+            request = self._session.scalar(
+                select(DeliveryDispatchRequest)
+                .where(DeliveryDispatchRequest.id == offer.request_id)
+                .with_for_update()
+            )
+            group_rows = [request] if request is not None else []
         if request is None or request.status in {"delivered", "cancelled"}:
             raise ConflictError("La oferta ya no está disponible")
 
@@ -1137,52 +1214,112 @@ class RiderDispatchService:
         )
         assert locked_driver is not None
 
-        offer.status = "accepted"
-        offer.responded_at = now
+        if offer.status == "accepted" and request.assigned_driver_id == locked_driver.id:
+            return self._to_offer_dto(offer)
+        if offer.status != "offered" or offer.expires_at <= now:
+            raise ConflictError("La oferta ya no está disponible")
+
         if offer.case_applied == "M":
+            previous_id = request.assigned_driver_id
+            offer.status = "accepted"
+            offer.responded_at = now
             self._swap_assigned_driver(request, locked_driver, now)
+            if previous_id is not None and previous_id != locked_driver.id:
+                remove_request_stops(self._session, previous_id, request.id)
+            manual = None
+            if isinstance(offer.score_json, dict):
+                manual = parse_manual_stops(offer.score_json.get("itinerary"))
+            rebuild_driver_itinerary(
+                self._session,
+                locked_driver.id,
+                case="M",
+                rider_lat=locked_driver.last_lat,
+                rider_lng=locked_driver.last_lng,
+                new_request_ids={str(request.id)},
+                manual=manual,
+            )
             self._session.flush()
             self._session.refresh(offer)
             notify_request_realtime(self._session, request)
             return self._to_offer_dto(offer)
 
-        if request.status != "offered":
+        if request.assigned_driver_id not in {None, locked_driver.id}:
+            raise ConflictError("La oferta ya no está disponible")
+        if request.status == "assigned" and request.assigned_driver_id == locked_driver.id:
+            offer.status = "accepted"
+            offer.responded_at = now
+            self._session.flush()
+            self._session.refresh(offer)
+            notify_request_realtime(self._session, request)
+            return self._to_offer_dto(offer)
+        if request.status not in {"offered", "searching"}:
+            raise ConflictError("La oferta ya no está disponible")
+        if not self._can_claim_request(request, locked_driver.id):
             raise ConflictError("La oferta ya no está disponible")
 
-        group_rows = [request]
-        if request.dispatch_group_id is not None:
-            group_rows = list(
-                self._session.scalars(
-                    select(DeliveryDispatchRequest)
-                    .where(DeliveryDispatchRequest.dispatch_group_id == request.dispatch_group_id)
-                    .with_for_update()
-                ).all()
+        had_in_transit = (
+            self._session.scalar(
+                select(DeliveryDispatchRequest.id).where(
+                    DeliveryDispatchRequest.assigned_driver_id == locked_driver.id,
+                    DeliveryDispatchRequest.status == "in_transit",
+                )
             )
-            if request not in group_rows:
-                group_rows.append(request)
+            is not None
+        )
+        offer.status = "accepted"
+        offer.responded_at = now
+        if request not in group_rows:
+            group_rows = [request, *group_rows]
+        claimed: list[DeliveryDispatchRequest] = []
         for row in group_rows:
-            if row.status not in {"searching", "offered"}:
+            if not self._can_claim_request(row, locked_driver.id):
                 continue
             row.status = "assigned"
             row.assigned_driver_id = locked_driver.id
             if row.payment_method == "cash":
-                hold = DeliveryCreditHold(
-                    driver_id=locked_driver.id,
-                    request_id=row.id,
-                    amount_cents=row.collect_cents,
-                    status="held",
-                )
-                self._session.add(hold)
-                locked_driver.credit_held_cents += row.collect_cents
+                self._ensure_cash_hold(row, locked_driver, row.credit_hold)
+            claimed.append(row)
+        rebuild_driver_itinerary(
+            self._session,
+            locked_driver.id,
+            case=offer.case_applied,
+            rider_lat=locked_driver.last_lat,
+            rider_lng=locked_driver.last_lng,
+            pre_free=had_in_transit and offer.case_applied == "A",
+            new_request_ids={str(row.id) for row in claimed},
+        )
         self._session.flush()
         self._session.refresh(offer)
-        for row in group_rows:
+        for row in claimed:
             notify_request_realtime(self._session, row)
         return self._to_offer_dto(offer)
+
+    def _can_claim_request(
+        self,
+        row: DeliveryDispatchRequest,
+        driver_id: uuid.UUID,
+    ) -> bool:
+        if row.status not in {"scheduled", "searching", "offered"}:
+            return False
+        if row.assigned_driver_id not in {None, driver_id}:
+            return False
+        live = self._session.scalar(
+            select(DeliveryDispatchOffer).where(
+                DeliveryDispatchOffer.request_id == row.id,
+                DeliveryDispatchOffer.status == "offered",
+            )
+        )
+        if live is not None and live.driver_id != driver_id:
+            return False
+        return True
 
     def reject_offer(self, user: UserDTO, offer_id: uuid.UUID) -> RiderOfferDTO:
         driver = self._require_driver(user)
         now = datetime.now(UTC)
+        peek = self._session.get(DeliveryDispatchOffer, offer_id)
+        if peek is None or peek.driver_id != driver.id:
+            raise ConflictError("La oferta ya no está disponible")
+        request, _group = lock_request_and_group(self._session, peek.request_id)
         offer = self._session.scalar(
             select(DeliveryDispatchOffer)
             .where(
@@ -1193,11 +1330,12 @@ class RiderDispatchService:
         )
         if offer is None or offer.status != "offered":
             raise ConflictError("La oferta ya no está disponible")
-        request = self._session.scalar(
-            select(DeliveryDispatchRequest)
-            .where(DeliveryDispatchRequest.id == offer.request_id)
-            .with_for_update()
-        )
+        if request is None:
+            request = self._session.scalar(
+                select(DeliveryDispatchRequest)
+                .where(DeliveryDispatchRequest.id == offer.request_id)
+                .with_for_update()
+            )
         if request is None:
             raise ConflictError("La oferta ya no está disponible")
         reject_offer_and_search(self._session, offer, request, now)
@@ -1224,6 +1362,10 @@ class RiderDispatchService:
         if request.status != expected:
             raise ConflictError("No puedes cambiar el estado de este envío")
         request.status = new_status
+        if new_status == "picked_up":
+            complete_stop(self._session, driver.id, request.id, "restaurant")
+        elif new_status == "delivered":
+            complete_stop(self._session, driver.id, request.id, "dropoff")
         self._session.flush()
         self._session.refresh(request)
         notify_request_realtime(self._session, request)
@@ -1237,6 +1379,8 @@ class RiderDispatchService:
         now: datetime,
     ) -> None:
         previous_id = request.assigned_driver_id
+        if previous_id == new_driver.id:
+            return
         hold = request.credit_hold
         if previous_id is not None and previous_id != new_driver.id:
             previous = self._session.scalar(
@@ -1305,6 +1449,7 @@ class RiderDispatchService:
     def _to_profile(self, driver: DeliveryDriver) -> RiderProfileDTO:
         profile = RiderProfileDTO.model_validate(driver)
         profile.assignments = self._list_assignments(driver.id)
+        profile.itinerary = hydrate_itinerary(self._session, driver.id)
         return profile
 
     def _list_assignments(self, driver_id: uuid.UUID) -> list[RiderAssignmentDTO]:
@@ -1317,6 +1462,8 @@ class RiderDispatchService:
             )
         ).all()
         cases = self._accepted_cases([request for request, _ in rows])
+        plan = load_plan(self._session, driver_id)
+        order = {stop.request_id: index for index, stop in enumerate(plan)}
         assignments = [
             self._to_assignment_dto(
                 request,
@@ -1325,7 +1472,12 @@ class RiderDispatchService:
             )
             for request, restaurant in rows
         ]
-        assignments.sort(key=lambda item: _ASSIGNMENT_STATUS_ORDER.get(item.status, 99))
+        assignments.sort(
+            key=lambda item: (
+                order.get(str(item.id), 99),
+                _ASSIGNMENT_STATUS_ORDER.get(item.status, 99),
+            )
+        )
         return assignments
 
     def _accepted_cases(
@@ -1347,7 +1499,9 @@ class RiderDispatchService:
             current_at = (
                 current.responded_at or current.created_at if current is not None else None
             )
-            if current is None or (offer_at is not None and (current_at is None or offer_at >= current_at)):
+            if current is None or (
+                offer_at is not None and (current_at is None or offer_at >= current_at)
+            ):
                 latest[offer.request_id] = offer
         cases = {request_id: offer.case_applied for request_id, offer in latest.items()}
         group_case: dict[uuid.UUID, str] = {}
