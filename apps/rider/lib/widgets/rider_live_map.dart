@@ -76,6 +76,10 @@ class RiderMapController {
     await moveNavigation(target: target, bearing: 0, tilt: 0, zoom: zoom);
   }
 
+  Future<void> flatten({required LatLng target, double zoom = 16}) async {
+    await moveNavigation(target: target, bearing: 0, tilt: 0, zoom: zoom);
+  }
+
   Future<void> lookOverview({
     required LatLng target,
     double bearing = 0,
