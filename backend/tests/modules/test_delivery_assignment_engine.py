@@ -45,9 +45,11 @@ def _request(
     dropoff_lat: float | None = None,
     dropoff_lng: float | None = None,
     dispatch_group_id: str | None = None,
+    restaurant_id: str = "rest-1",
 ) -> EngineRequest:
     return EngineRequest(
         id=request_id,
+        restaurant_id=restaurant_id,
         restaurant_lat=restaurant_lat,
         restaurant_lng=restaurant_lng,
         dropoff_lat=restaurant_lat if dropoff_lat is None else dropoff_lat,
@@ -79,6 +81,9 @@ def _driver(
     active_dropoff_lat: float | None = None,
     active_dropoff_lng: float | None = None,
     occupied_job_count: int | None = None,
+    heading_restaurant_id: str | None = None,
+    last_dropoff_lat: float | None = None,
+    last_dropoff_lng: float | None = None,
 ) -> EngineDriver:
     occupied = occupied_job_count
     if occupied is None:
@@ -99,6 +104,9 @@ def _driver(
         active_dropoff_lat=active_dropoff_lat,
         active_dropoff_lng=active_dropoff_lng,
         occupied_job_count=occupied,
+        heading_restaurant_id=heading_restaurant_id,
+        last_dropoff_lat=last_dropoff_lat,
+        last_dropoff_lng=last_dropoff_lng,
     )
 
 
