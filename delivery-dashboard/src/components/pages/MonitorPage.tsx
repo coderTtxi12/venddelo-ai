@@ -536,6 +536,7 @@ export default function MonitorPage() {
   const [focusedDriverId, setFocusedDriverId] = useState<string | null>(null);
   const [driverFilter, setDriverFilter] = useState<DriverFilter>('all');
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [logNonce, setLogNonce] = useState(0);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -568,10 +569,12 @@ export default function MonitorPage() {
   useDispatchMonitorSocket(accessToken, {
     onEvent: () => {
       void loadSnapshot();
+      setLogNonce((value) => value + 1);
     },
     onStatusChange: setConnectionStatus,
     onReconnect: () => {
       void loadSnapshot();
+      setLogNonce((value) => value + 1);
     },
   });
 
@@ -897,6 +900,8 @@ export default function MonitorPage() {
       <RequestDetailDrawer
         open={detailRequest !== null}
         request={detailRequest}
+        accessToken={accessToken}
+        refreshNonce={logNonce}
         onClose={() => setDetailRequestId(null)}
       />
       <AssignDriverDrawer

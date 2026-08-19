@@ -1,4 +1,5 @@
 import type {
+  AssignmentLog,
   DispatchMonitorMetrics,
   DispatchMonitorOffer,
   DispatchMonitorRequest,
@@ -165,6 +166,40 @@ export function timelineEventTone(
     return 'ok';
   }
   return 'neutral';
+}
+
+export const ASSIGNMENT_LOG_ERROR = 'No se pudo cargar la asignación.';
+export const ASSIGNMENT_LOG_LOADING = 'Cargando…';
+export const ASSIGNMENT_LOG_EMPTY = 'Aún no hay pasadas del motor.';
+
+export function assignmentSchedulerLines(
+  log: AssignmentLog | null,
+  status: string,
+  nowMs: number,
+): string[] {
+  if (status === 'scheduled' && log?.next_attempt_at) {
+    const wait = formatCountdown(log.next_attempt_at, nowMs);
+    return wait ? [`Empieza a buscar ${wait}`] : [`Empieza a buscar ${formatTime(log.next_attempt_at)}`];
+  }
+  if (status === 'unassigned') {
+    return ['Se agotó el tiempo de búsqueda'];
+  }
+  const lines: string[] = [];
+  if (log?.last_search_at) {
+    lines.push(`Última búsqueda ${formatTimelineTime(log.last_search_at)}`);
+  }
+  if (status === 'searching' && log?.next_attempt_at) {
+    const retry = Date.parse(log.next_attempt_at);
+    if (Number.isFinite(retry) && retry - nowMs > 2000) {
+      const wait = formatCountdown(log.next_attempt_at, nowMs);
+      if (wait) lines.push(`Próxima en ${wait}`);
+    }
+  }
+  if (log?.assignment_timeout_at && (status === 'searching' || status === 'offered')) {
+    const wait = formatCountdown(log.assignment_timeout_at, nowMs);
+    if (wait) lines.push(`Timeout ${wait}`);
+  }
+  return lines;
 }
 
 export function requestSchedulerLine(request: DispatchMonitorRequest, nowMs: number): string | null {

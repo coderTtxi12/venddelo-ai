@@ -549,3 +549,21 @@ export type DispatchHistoryPage = {
   earnings_cents: number;
   has_more: boolean;
 };
+
+export type AssignmentLogEvent = {
+  id: string;
+  at: string;
+  kind: string;
+  tone: 'ok' | 'wait' | 'warn' | string;
+  title: string;
+  detail: string | null;
+  next_attempt_at: string | null;
+};
+
+export type AssignmentLog = {
+  request_id: string;
+  last_search_at: string | null;
+  next_attempt_at: string | null;
+  assignment_timeout_at: string | null;
+  events: AssignmentLogEvent[];
+};

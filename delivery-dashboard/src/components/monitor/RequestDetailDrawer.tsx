@@ -1,10 +1,15 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { DriverPhoneContact } from '@/components/drivers/DriverPhoneContact';
 import { RightDrawer } from '@/components/ui/RightDrawer';
-import type { DispatchMonitorRequest } from '@/lib/api/types';
+import { getAssignmentLog } from '@/lib/api/deliveryProviders';
+import type { AssignmentLog, DispatchMonitorRequest } from '@/lib/api/types';
 import {
+  ASSIGNMENT_LOG_EMPTY,
+  ASSIGNMENT_LOG_ERROR,
+  ASSIGNMENT_LOG_LOADING,
+  assignmentSchedulerLines,
   blockersSummary,
   caseLabel,
   formatCoords,
@@ -24,6 +29,8 @@ import styles from './RequestDetailDrawer.module.css';
 type RequestDetailDrawerProps = {
   open: boolean;
   request: DispatchMonitorRequest | null;
+  accessToken: string | null;
+  refreshNonce: number;
   onClose: () => void;
 };
 
@@ -51,11 +58,60 @@ function ExternalLink({ href, children }: { href: string; children: string }) {
   );
 }
 
+function assignmentEventToneClass(
+  tone: string,
+  isNow: boolean,
+): string {
+  if (isNow) return styles.toneNow;
+  if (tone === 'ok') return styles.toneOk;
+  if (tone === 'warn') return styles.toneWarn;
+  return styles.toneNeutral;
+}
+
 export function RequestDetailDrawer({
   open,
   request,
+  accessToken,
+  refreshNonce,
   onClose,
 }: RequestDetailDrawerProps) {
+  const [log, setLog] = useState<AssignmentLog | null>(null);
+  const [logError, setLogError] = useState<string | null>(null);
+  const [logLoading, setLogLoading] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !request || !accessToken) {
+      setLog(null);
+      setLogError(null);
+      return;
+    }
+    let cancelled = false;
+    setLogLoading(true);
+    setLogError(null);
+    void getAssignmentLog(accessToken, request.id)
+      .then((data) => {
+        if (!cancelled) setLog(data);
+      })
+      .catch(() => {
+        if (!cancelled) setLogError(ASSIGNMENT_LOG_ERROR);
+      })
+      .finally(() => {
+        if (!cancelled) setLogLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, request?.id, accessToken, refreshNonce]);
+
   const cashDenom = request ? requestCashDenominationLine(request) : null;
   const blockers = request ? blockersSummary(request.search_blockers) : null;
   const dropoffCoords = request ? formatCoords(request.dropoff_lat, request.dropoff_lng) : null;
@@ -75,6 +131,23 @@ export function RequestDetailDrawer({
       ? request.cash_denomination_cents - request.collect_cents
       : null;
   const timeline = request?.timeline ?? [];
+  const schedulerLog: AssignmentLog | null =
+    log ??
+    (request?.status === 'scheduled'
+      ? {
+          request_id: request.id,
+          last_search_at: null,
+          next_attempt_at: request.search_at,
+          assignment_timeout_at: request.assignment_timeout_at ?? null,
+          events: [],
+        }
+      : null);
+  const schedulerLines = request
+    ? assignmentSchedulerLines(schedulerLog, request.status, nowMs)
+    : [];
+  const assignmentEvents = log?.events ?? [];
+  const highlightLast =
+    request?.status === 'searching' || request?.status === 'offered';
 
   return (
     <RightDrawer
@@ -139,6 +212,49 @@ export function RequestDetailDrawer({
               <DetailRow label="Paquete">{requestPackageLine(request)}</DetailRow>
               <DetailRow label="Notas">{request.notes?.trim() || null}</DetailRow>
             </dl>
+          </section>
+
+          <section className={styles.section} aria-labelledby="request-detail-asignacion">
+            <h3 id="request-detail-asignacion" className={styles.heading}>
+              Asignación
+            </h3>
+            {schedulerLines.length > 0 ? (
+              <div className={styles.scheduler}>
+                {schedulerLines.map((line) => (
+                  <span key={line}>{line}</span>
+                ))}
+              </div>
+            ) : null}
+            {logError ? (
+              <p className={styles.alert} role="alert">
+                {logError}
+              </p>
+            ) : logLoading && !log ? (
+              <p className={styles.empty}>{ASSIGNMENT_LOG_LOADING}</p>
+            ) : assignmentEvents.length === 0 ? (
+              <p className={styles.empty}>{ASSIGNMENT_LOG_EMPTY}</p>
+            ) : (
+              <ol className={styles.timeline}>
+                {assignmentEvents.map((event, index) => {
+                  const isNow = highlightLast && index === assignmentEvents.length - 1;
+                  return (
+                    <li
+                      key={event.id}
+                      className={`${styles.step} ${assignmentEventToneClass(event.tone, isNow)}`}
+                    >
+                      <time className={styles.time} dateTime={event.at}>
+                        {formatTimelineTime(event.at)}
+                      </time>
+                      <span className={styles.marker} aria-hidden />
+                      <span className={styles.event}>
+                        <strong>{event.title}</strong>
+                        {event.detail ? <span>{event.detail}</span> : null}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
           </section>
 
           <section className={styles.section} aria-labelledby="request-detail-operacion">

@@ -26,6 +26,7 @@ import type {
   DeliveryDriverCreateInput,
   DeliveryDriverDocumentsUpdateInput,
   DeliveryDriverUpdateInput,
+  AssignmentLog,
   DispatchHistoryPage,
   DispatchMonitorSnapshot,
 } from './types';
@@ -294,6 +295,13 @@ export function uploadMyDeliveryDriverDocuments(
     token,
     body,
   });
+}
+
+export function getAssignmentLog(token: string, requestId: string) {
+  return apiRequest<AssignmentLog>(
+    `/delivery-providers/me/dispatch-requests/${requestId}/assignment-log`,
+    { token },
+  );
 }
 
 export function getMyDispatchMonitor(token: string, zoneId?: string | null) {
