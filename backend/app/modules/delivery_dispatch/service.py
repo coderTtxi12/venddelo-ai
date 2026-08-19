@@ -98,7 +98,7 @@ from app.modules.delivery_dispatch.tasks import (
     persist_dispatch_offer,
     reject_offer_and_search,
     release_group_on_cancel,
-    reset_cycle_driver_ids,
+    restart_unassigned_search,
 )
 from app.modules.delivery_dispatch.tracking_view import (
     build_public_tracking_dto,
@@ -1023,17 +1023,7 @@ class RestaurantDispatchService:
         row = self._request(restaurant.id, request_id)
         if row.status != "unassigned":
             raise ValidationError("Solo puedes reintentar solicitudes sin asignar")
-        now = datetime.now(UTC)
-        row.status = "searching"
-        row.search_at = now
-        row.next_attempt_at = now
-        reset_cycle_driver_ids(row)
-        enqueue(
-            "search",
-            now,
-            {"kind": "search", "request_id": str(row.id)},
-            session=self._session,
-        )
+        restart_unassigned_search(self._session, row, datetime.now(UTC))
         return self._flush_request(row)
 
     def confirm_rider_cash(
