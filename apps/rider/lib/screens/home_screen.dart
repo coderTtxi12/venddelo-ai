@@ -275,6 +275,13 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     if (enabling) {
       unawaited(_moveDriveCamera());
+    } else {
+      final position = widget.controller.currentPosition;
+      if (position != null) {
+        unawaited(
+          _mapController.flatten(target: latLngFromPosition(position)),
+        );
+      }
     }
   }
 
