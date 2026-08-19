@@ -144,6 +144,7 @@ def _to_provider_item(
         assigned_driver_name=driver_name,
         zone_id=request.zone_id,
         zone_name=zone.name if zone is not None else None,
+        restaurant_id=request.restaurant_id,
         restaurant_lat=restaurant.latitude if restaurant is not None else None,
         restaurant_lng=restaurant.longitude if restaurant is not None else None,
         dropoff_lat=request.dropoff_lat,
