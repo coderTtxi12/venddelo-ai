@@ -66,6 +66,12 @@ class ManualOfferDTO(BaseModel):
     short_id: str
 
 
+class DispatchRetryDTO(BaseModel):
+    id: uuid.UUID
+    status: str
+    search_at: datetime
+
+
 class DriverItineraryStopDTO(BaseModel):
     sequence: int
     kind: Literal["restaurant", "dropoff"]
