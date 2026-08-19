@@ -47,6 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedRoute = 0;
   String? _routeQueryKey;
   DateTime? _lastRerouteAt;
+  DateTime? _lastDriveMoveAt;
+  DateTime? _ignoreMapGestureUntil;
   BitmapDescriptor? _restaurantIcon;
   BitmapDescriptor? _dropoffIcon;
 
