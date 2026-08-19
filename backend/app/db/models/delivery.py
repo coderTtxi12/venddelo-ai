@@ -530,6 +530,15 @@ class DeliveryProviderAssignmentSettings(TimestampMixin, Base):
     max_destination_detour_minutes: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="8"
     )
+    max_extra_route_meters: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="3840"
+    )
+    max_pickup_detour_meters: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="1000"
+    )
+    max_destination_detour_meters: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="3840"
+    )
     max_active_packages_per_driver: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="3"
     )
