@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
 
 import '../formatters.dart';
+import '../rider_display.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import 'rider_slide_to_confirm.dart';
+import 'rider_widgets.dart';
 
 Future<void> showRiderProfileMenu({
   required BuildContext context,
   required String name,
   required bool isOnline,
   int? creditAvailableCents,
+  String? photoUrl,
+  String? plate,
+  String? motorcycleBrand,
+  String? motorcycleColor,
   required VoidCallback onOpenAccount,
   required VoidCallback onSignOut,
 }) {
@@ -28,6 +35,10 @@ Future<void> showRiderProfileMenu({
         name: name,
         isOnline: isOnline,
         creditAvailableCents: creditAvailableCents,
+        photoUrl: photoUrl,
+        plate: plate,
+        motorcycleBrand: motorcycleBrand,
+        motorcycleColor: motorcycleColor,
         onOpenAccount: () {
           Navigator.of(sheetContext).pop();
           onOpenAccount();
@@ -47,6 +58,10 @@ class RiderProfileMenuSheet extends StatelessWidget {
     required this.name,
     required this.isOnline,
     this.creditAvailableCents,
+    this.photoUrl,
+    this.plate,
+    this.motorcycleBrand,
+    this.motorcycleColor,
     required this.onOpenAccount,
     required this.onSignOut,
   });
@@ -54,6 +69,10 @@ class RiderProfileMenuSheet extends StatelessWidget {
   final String name;
   final bool isOnline;
   final int? creditAvailableCents;
+  final String? photoUrl;
+  final String? plate;
+  final String? motorcycleBrand;
+  final String? motorcycleColor;
   final VoidCallback onOpenAccount;
   final VoidCallback onSignOut;
 
@@ -61,93 +80,69 @@ class RiderProfileMenuSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final credit = creditAvailableCents;
+    final vehicle = _vehicleLine(motorcycleBrand, motorcycleColor);
+    final plateLabel = (plate ?? '').trim();
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                _ProfileAvatar(name: name, size: 56),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name.isEmpty ? 'Repartidor' : name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      _OnlineBadge(isOnline: isOnline),
-                    ],
-                  ),
-                ),
-              ],
+            _ProfileAvatar(name: name, photoUrl: photoUrl, size: 72),
+            const SizedBox(height: 14),
+            Text(
+              name.isEmpty ? 'Repartidor' : name,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+                color: AppColors.textPrimary,
+              ),
             ),
-            if (credit != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      'Crédito disponible',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      formatMoneyCents(credit),
-                      style: textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
+            const SizedBox(height: 8),
+            _OnlineStatus(isOnline: isOnline),
+            if (vehicle.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _VehicleLine(text: vehicle, color: motorcycleColor),
+            ],
+            if (plateLabel.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Placas $plateLabel',
+                textAlign: TextAlign.center,
+                style: textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  color: AppColors.textPrimary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],
-            const SizedBox(height: 18),
-            Text(
-              'Opciones',
-              style: textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppColors.textMuted,
-                letterSpacing: 0.4,
+            if (credit != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Crédito ${formatMoneyCents(credit)}',
+                textAlign: TextAlign.center,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
+            ],
+            const SizedBox(height: 22),
+            RiderPrimaryButton(
+              label: 'Historial y ganancias',
+              onPressed: onOpenAccount,
             ),
-            const SizedBox(height: 10),
-            _ProfileMenuTile(
-              icon: Icons.receipt_long_rounded,
-              title: 'Historial y ganancias',
-              subtitle: 'Entregas, crédito y holds',
-              onTap: onOpenAccount,
-            ),
-            const SizedBox(height: 8),
-            const Divider(),
-            const SizedBox(height: 8),
-            _ProfileMenuTile(
-              icon: Icons.logout_rounded,
-              title: 'Cerrar sesión',
-              subtitle: 'Salir de esta cuenta',
-              destructive: true,
-              onTap: onSignOut,
+            const SizedBox(height: 14),
+            RiderSlideToConfirm(
+              label: 'Desliza para cerrar sesión',
+              compact: true,
+              onConfirmed: onSignOut,
             ),
           ],
         ),
@@ -156,147 +151,174 @@ class RiderProfileMenuSheet extends StatelessWidget {
   }
 }
 
-class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({required this.name, required this.size});
+class _ProfileAvatar extends StatefulWidget {
+  const _ProfileAvatar({
+    required this.name,
+    required this.size,
+    this.photoUrl,
+  });
 
   final String name;
   final double size;
+  final String? photoUrl;
+
+  @override
+  State<_ProfileAvatar> createState() => _ProfileAvatarState();
+}
+
+class _ProfileAvatarState extends State<_ProfileAvatar> {
+  var _broken = false;
+
+  @override
+  void didUpdateWidget(covariant _ProfileAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.photoUrl != widget.photoUrl) {
+      _broken = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final initial = _profileInitial(name);
-    return Container(
-      width: size,
-      height: size,
+    final url = widget.photoUrl;
+    final initial = _profileInitial(widget.name);
+    final showPhoto = url != null && url.isNotEmpty && !_broken;
+
+    return Align(
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppColors.cta.withValues(alpha: 0.12),
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Text(
-        initial,
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: AppColors.cta,
-              fontWeight: FontWeight.w800,
-            ),
+      child: Semantics(
+        image: showPhoto,
+        label: showPhoto ? 'Foto de ${widget.name}' : 'Sin foto de perfil',
+        child: Container(
+          width: widget.size,
+          height: widget.size,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.cta.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: showPhoto
+              ? Image.network(
+                  url,
+                  width: widget.size,
+                  height: widget.size,
+                  fit: BoxFit.cover,
+                  semanticLabel: 'Foto de ${widget.name}',
+                  errorBuilder: (context, error, stackTrace) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted && !_broken) {
+                        setState(() => _broken = true);
+                      }
+                    });
+                    return _Initials(initial: initial);
+                  },
+                )
+              : _Initials(initial: initial),
+        ),
       ),
     );
   }
 }
 
-class _OnlineBadge extends StatelessWidget {
-  const _OnlineBadge({required this.isOnline});
+class _Initials extends StatelessWidget {
+  const _Initials({required this.initial});
+
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      initial,
+      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            color: AppColors.cta,
+            fontWeight: FontWeight.w800,
+          ),
+    );
+  }
+}
+
+class _OnlineStatus extends StatelessWidget {
+  const _OnlineStatus({required this.isOnline});
 
   final bool isOnline;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: isOnline
-            ? AppColors.online.withValues(alpha: 0.12)
-            : AppColors.border,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        isOnline ? 'En línea' : 'Desconectado',
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: isOnline ? AppColors.success : AppColors.textMuted,
-            ),
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: isOnline ? AppColors.online : AppColors.offline,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          isOnline ? 'En línea' : 'Desconectado',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: isOnline ? AppColors.success : AppColors.textMuted,
+              ),
+        ),
+      ],
     );
   }
 }
 
-class _ProfileMenuTile extends StatelessWidget {
-  const _ProfileMenuTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.destructive = false,
-  });
+class _VehicleLine extends StatelessWidget {
+  const _VehicleLine({required this.text, this.color});
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  final bool destructive;
+  final String text;
+  final String? color;
 
   @override
   Widget build(BuildContext context) {
-    final accent = destructive ? AppColors.danger : AppColors.cta;
-    return Semantics(
-      button: true,
-      label: '$title. $subtitle',
-      child: Material(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 64),
-            padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: destructive
-                    ? AppColors.danger.withValues(alpha: 0.22)
-                    : AppColors.border,
+    final colorLabel = (color ?? '').trim();
+    final hex = colorLabel.isEmpty ? null : motorcycleColorHex(colorLabel);
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 6,
+      children: [
+        Text(
+          text,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
               ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icon, color: accent, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: destructive
-                                  ? AppColors.danger
-                                  : AppColors.textPrimary,
-                            ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: destructive ? AppColors.danger : AppColors.textMuted,
-                  size: 24,
-                ),
-              ],
+        ),
+        if (hex != null)
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: _parseHex(hex),
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.border),
             ),
           ),
-        ),
-      ),
+      ],
     );
   }
+}
+
+String _vehicleLine(String? brand, String? color) {
+  final parts = <String>[vehicleTypeLabel()];
+  final brandLabel = (brand ?? '').trim();
+  final colorLabel = (color ?? '').trim();
+  if (brandLabel.isNotEmpty) parts.add(brandLabel);
+  if (colorLabel.isNotEmpty) parts.add(colorLabel);
+  return parts.join(' · ');
+}
+
+Color _parseHex(String hex) {
+  final value = hex.replaceFirst('#', '');
+  return Color(int.parse('FF$value', radix: 16));
 }
 
 String _profileInitial(String name) {
