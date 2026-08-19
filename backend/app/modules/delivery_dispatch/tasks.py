@@ -1044,7 +1044,6 @@ def _live_group_offer(
     request: DeliveryDispatchRequest,
     now: datetime,
 ) -> DeliveryDispatchOffer | None:
-    del now
     if request.dispatch_group_id is None:
         return None
     return session.scalar(
@@ -1056,6 +1055,7 @@ def _live_group_offer(
         .where(
             DeliveryDispatchRequest.dispatch_group_id == request.dispatch_group_id,
             DeliveryDispatchOffer.status == "offered",
+            DeliveryDispatchOffer.expires_at > now,
         )
     )
 
