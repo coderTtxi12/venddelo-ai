@@ -389,7 +389,7 @@ export default function AssignmentPage() {
 
               <Section
                 title="Enganche (caso C)"
-                hint="En alta demanda, si un rider ya va a recoger a ese restaurante y aún no salió, el motor puede sumarle el pedido cuando el último dropoff de su ruta quede cerca del nuevo, en línea recta."
+                hint="En alta demanda, si al rider todavía le falta recoger en ese restaurante, el motor puede sumarle el pedido cuando el último dropoff de lo que aún lleva quede cerca del nuevo, en línea recta."
               >
                 <div className={styles.fieldGrid}>
                   <NumberField
