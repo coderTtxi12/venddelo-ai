@@ -7,7 +7,7 @@ import re
 import secrets
 import ssl
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import urljoin, urlparse
 
 from sqlalchemy import func, select
@@ -36,6 +36,7 @@ from app.db.models.restaurant import Restaurant
 from app.infra.storage.factory import build_storage
 from app.modules.assistant.image_webp import WEBP_CONTENT_TYPE, convert_image_bytes_to_webp
 from app.modules.delivery_dispatch.geo import geodesic_meters
+from app.modules.delivery_dispatch.history import list_active_holds, list_dispatch_history
 from app.modules.delivery_dispatch.itinerary import (
     ItineraryStop,
     complete_stop,
@@ -75,8 +76,10 @@ from app.modules.delivery_dispatch.schemas import (
     ItineraryUpdate,
     ManualOfferCreate,
     ManualOfferDTO,
+    ProviderHistoryPageDTO,
     PublicDispatchTrackingDTO,
     RiderAssignmentDTO,
+    RiderHistoryPageDTO,
     RiderOfferDTO,
     RiderOfferStopDTO,
     RiderProfileDTO,
@@ -433,6 +436,42 @@ class DeliveryDispatchService:
             self._session,
             provider_id,
             zone_id=zone_id,
+        )
+
+    def list_history(
+        self,
+        user_id: uuid.UUID,
+        *,
+        start: date | None = None,
+        end: date | None = None,
+        status: str | None = None,
+        driver_id: uuid.UUID | None = None,
+        zone_id: uuid.UUID | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> ProviderHistoryPageDTO:
+        provider_id = self._require_provider_id(user_id)
+        payload = list_dispatch_history(
+            self._session,
+            provider_id=provider_id,
+            driver_id=driver_id,
+            zone_id=zone_id,
+            start=start,
+            end=end,
+            status=status,
+            limit=limit,
+            offset=offset,
+            include_provider_fields=True,
+        )
+        return ProviderHistoryPageDTO(
+            start=payload["start"],
+            end=payload["end"],
+            items=payload["items"],
+            total=payload["total"],
+            delivered_count=payload["delivered_count"],
+            cancelled_count=payload["cancelled_count"],
+            earnings_cents=payload["earnings_cents"],
+            has_more=payload["has_more"],
         )
 
     def create_manual_offer(
@@ -1136,6 +1175,42 @@ class RiderDispatchService:
                 "Tu correo no está dado de alta. Pide a Mexy que te registre."
             )
         return self._to_profile(driver)
+
+    def get_history(
+        self,
+        user: UserDTO,
+        *,
+        start: date | None = None,
+        end: date | None = None,
+        status: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> RiderHistoryPageDTO:
+        driver = self._require_driver(user)
+        payload = list_dispatch_history(
+            self._session,
+            driver_id=driver.id,
+            start=start,
+            end=end,
+            status=status,
+            limit=limit,
+            offset=offset,
+        )
+        available = max(0, driver.credit_limit_cents - driver.credit_held_cents)
+        return RiderHistoryPageDTO(
+            start=payload["start"],
+            end=payload["end"],
+            items=payload["items"],
+            total=payload["total"],
+            delivered_count=payload["delivered_count"],
+            cancelled_count=payload["cancelled_count"],
+            earnings_cents=payload["earnings_cents"],
+            has_more=payload["has_more"],
+            credit_limit_cents=driver.credit_limit_cents,
+            credit_held_cents=driver.credit_held_cents,
+            credit_available_cents=available,
+            active_holds=list_active_holds(self._session, driver.id),
+        )
 
     def set_online(self, user: UserDTO, is_online: bool) -> RiderProfileDTO:
         driver = self._require_driver(user)
