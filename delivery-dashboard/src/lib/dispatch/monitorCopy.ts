@@ -3,6 +3,7 @@ import type {
   DispatchMonitorOffer,
   DispatchMonitorRequest,
   DispatchMonitorSearchBlocker,
+  DispatchMonitorTimelineEvent,
 } from '@/lib/api/types';
 import { formatMoney } from '@/lib/pricing/tariffUtils';
 
@@ -91,6 +92,77 @@ export function formatSearchStartedAt(value: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+export function formatDateTime(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return null;
+  return new Date(parsed).toLocaleString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function mapsSearchUrl(lat: number | null | undefined, lng: number | null | undefined): string | null {
+  if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+  return `https://www.google.com/maps?q=${lat},${lng}`;
+}
+
+export function formatCoords(lat: number | null | undefined, lng: number | null | undefined): string | null {
+  if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+  return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+}
+
+export function formatTimelineTime(value: string | null | undefined): string {
+  if (!value) return 'sin hora';
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return 'sin hora';
+  return new Date(parsed).toLocaleTimeString('es-MX', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+export function timelineEventTitle(event: DispatchMonitorTimelineEvent): string {
+  const driver = event.driver_name?.trim() || 'repartidor';
+  if (event.kind === 'requested') return 'Solicitado';
+  if (event.kind === 'search_started') return 'Empezó la búsqueda';
+  if (event.kind === 'ready') return 'Listo para recoger';
+  if (event.kind === 'offered') {
+    return event.current ? `Esperando a ${driver}` : `Oferta a ${driver}`;
+  }
+  if (event.kind === 'rejected') return `${driver} rechazó`;
+  if (event.kind === 'expired') return `${driver} no respondió`;
+  if (event.kind === 'closed') return `Oferta a ${driver} cerrada`;
+  if (event.kind === 'accepted') return `${driver} aceptó`;
+  if (event.kind === 'picked_up') return 'Recogido';
+  if (event.kind === 'in_transit') return 'En camino';
+  if (event.kind === 'delivered') return 'Entregado';
+  if (event.kind === 'unassigned') return 'Se agotó la búsqueda';
+  if (event.kind === 'cancelled') return 'Cancelado';
+  return event.kind;
+}
+
+export function timelineEventTone(
+  event: DispatchMonitorTimelineEvent,
+): 'now' | 'warn' | 'alert' | 'ok' | 'neutral' {
+  if (event.current) return 'now';
+  if (event.kind === 'rejected' || event.kind === 'expired' || event.kind === 'unassigned') {
+    return 'warn';
+  }
+  if (event.kind === 'cancelled') return 'alert';
+  if (event.kind === 'accepted' || event.kind === 'picked_up' || event.kind === 'delivered') {
+    return 'ok';
+  }
+  return 'neutral';
 }
 
 export function requestSchedulerLine(request: DispatchMonitorRequest, nowMs: number): string | null {
