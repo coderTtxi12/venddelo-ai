@@ -25,6 +25,7 @@ from app.modules.delivery_dispatch.engine import (
     high_demand_breakdown,
     pre_free_eta_seconds,
 )
+from app.modules.delivery_dispatch.itinerary import hydrate_itinerary
 from app.modules.delivery_dispatch.schemas import (
     DispatchMonitorCreditHoldDTO,
     DispatchMonitorDriverDTO,
@@ -388,6 +389,7 @@ def build_dispatch_monitor_snapshot(
                 pre_free_eta_seconds=pre_free_eta,
                 occupied_job_count=len(occupied),
                 active_package_count=package_count,
+                itinerary=hydrate_itinerary(session, driver.id),
             )
         )
 
