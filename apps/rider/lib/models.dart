@@ -76,6 +76,7 @@ class RiderProfile {
     required this.lastName,
     required this.isOnline,
     required this.assignments,
+    this.itinerary = const [],
     this.creditLimitCents = 0,
     this.creditHeldCents = 0,
   });
@@ -85,6 +86,7 @@ class RiderProfile {
   final String lastName;
   final bool isOnline;
   final List<RiderAssignment> assignments;
+  final List<PersistedItineraryStop> itinerary;
   final int creditLimitCents;
   final int creditHeldCents;
 
@@ -95,6 +97,7 @@ class RiderProfile {
 
   factory RiderProfile.fromJson(Map<String, dynamic> json) {
     final raw = json['assignments'] as List<dynamic>? ?? const [];
+    final rawItinerary = json['itinerary'] as List<dynamic>? ?? const [];
     return RiderProfile(
       id: json['id'] as String,
       firstName: json['first_name'] as String,
@@ -105,6 +108,44 @@ class RiderProfile {
       assignments: raw
           .map((item) => RiderAssignment.fromJson(item as Map<String, dynamic>))
           .toList(),
+      itinerary: rawItinerary
+          .map((item) => PersistedItineraryStop.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class PersistedItineraryStop {
+  const PersistedItineraryStop({
+    required this.sequence,
+    required this.kind,
+    required this.requestId,
+    this.current = false,
+    this.title,
+    this.action,
+    this.lat,
+    this.lng,
+  });
+
+  final int sequence;
+  final String kind;
+  final String requestId;
+  final bool current;
+  final String? title;
+  final String? action;
+  final double? lat;
+  final double? lng;
+
+  factory PersistedItineraryStop.fromJson(Map<String, dynamic> json) {
+    return PersistedItineraryStop(
+      sequence: _asInt(json['sequence']) ?? 0,
+      kind: json['kind'] as String? ?? 'dropoff',
+      requestId: json['request_id'] as String,
+      current: json['current'] as bool? ?? false,
+      title: json['title'] as String?,
+      action: json['action'] as String?,
+      lat: _asDouble(json['lat']),
+      lng: _asDouble(json['lng']),
     );
   }
 }
