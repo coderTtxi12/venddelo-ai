@@ -705,7 +705,7 @@ class DeliveryDispatchAssignmentEvent(UUIDPrimaryKeyMixin, TimestampMixin, Base)
             name="assignment_event_tone_allowed",
         ),
         CheckConstraint(
-            "case_applied IS NULL OR case_applied IN ('A','B','C','D','M')",
+            "case_applied IS NULL OR case_applied IN ('A','B','C','D','E','M')",
             name="assignment_event_case_allowed",
         ),
         Index(
@@ -744,7 +744,7 @@ class DeliveryDispatchOffer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="status_allowed",
         ),
         CheckConstraint(
-            "case_applied IN ('A','B','C','D','M')",
+            "case_applied IN ('A','B','C','D','E','M')",
             name="case_applied_allowed",
         ),
         Index(
