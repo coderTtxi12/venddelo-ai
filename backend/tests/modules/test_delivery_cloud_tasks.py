@@ -1,3 +1,4 @@
+from contextvars import copy_context
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -120,6 +121,38 @@ def test_gcp_enqueue_waits_until_flush() -> None:
     assert len(client.created) == 1
     body = client.created[0]["task"]["http_request"]["body"]
     assert b"req-gcp" in body
+
+
+def test_gcp_flush_keeps_jobs_when_route_and_teardown_use_different_contexts() -> None:
+    """FastAPI copies context into each threadpool hop; ContextVar cannot carry the buffer."""
+
+    class _Session:
+        def __init__(self) -> None:
+            self.info: dict = {}
+
+    session = _Session()
+    client = _FakeTasksClient()
+    bus, _ = _bus(client)
+    settings = SimpleNamespace(delivery_tasks_backend="gcp")
+    eta = datetime.now(UTC)
+
+    with (
+        patch("app.modules.delivery_dispatch.tasks.get_settings", return_value=settings),
+        patch("app.modules.delivery_dispatch.tasks._gcp_bus", bus),
+    ):
+        copy_context().run(
+            lambda: enqueue(
+                "search",
+                eta,
+                {"kind": "search", "request_id": "req-session"},
+                session=session,
+            )
+        )
+        copy_context().run(lambda: flush_delivery_tasks(session))
+
+    assert len(client.created) == 1
+    body = client.created[0]["task"]["http_request"]["body"]
+    assert b"req-session" in body
 
 
 def test_discard_drops_buffered_gcp_tasks() -> None:
