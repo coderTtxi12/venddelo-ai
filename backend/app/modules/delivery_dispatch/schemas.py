@@ -384,6 +384,7 @@ class ProviderHistoryItemDTO(RiderHistoryItemDTO):
     assigned_driver_name: str | None = None
     zone_id: uuid.UUID | None = None
     zone_name: str | None = None
+    restaurant_id: uuid.UUID
     restaurant_lat: float | None = None
     restaurant_lng: float | None = None
     dropoff_lat: float
