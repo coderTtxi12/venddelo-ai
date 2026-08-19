@@ -450,6 +450,7 @@ class DeliveryDispatchService:
         status: str | None = None,
         driver_id: uuid.UUID | None = None,
         zone_id: uuid.UUID | None = None,
+        restaurant_id: uuid.UUID | None = None,
         limit: int | None = None,
         offset: int = 0,
     ) -> ProviderHistoryPageDTO:
@@ -459,6 +460,7 @@ class DeliveryDispatchService:
             provider_id=provider_id,
             driver_id=driver_id,
             zone_id=zone_id,
+            restaurant_id=restaurant_id,
             start=start,
             end=end,
             status=status,
