@@ -124,6 +124,30 @@ class RiderApi {
     _decode(response);
   }
 
+  Future<RiderHistoryPage> getHistory({
+    required String start,
+    required String end,
+    String? status,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final response = await _send(
+      () => _client.get(
+        _uri('/rider/me/history').replace(
+          queryParameters: {
+            'start': start,
+            'end': end,
+            'limit': '$limit',
+            'offset': '$offset',
+            'status': ?status,
+          },
+        ),
+        headers: _headers(),
+      ),
+    );
+    return RiderHistoryPage.fromJson(_decode(response) as Map<String, dynamic>);
+  }
+
   Future<RiderAssignment> transitionAssignment(
     String requestId,
     String action,
