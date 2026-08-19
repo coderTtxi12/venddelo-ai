@@ -392,8 +392,26 @@ class DeliveryDispatchService:
         provider_id, member_role = self._require_provider_with_role(user_id)
         require_write_provider_config(member_role)
         row = self._get_or_raise_settings(provider_id)
-        for field, value in data.model_dump(exclude_unset=True).items():
+        payload = data.model_dump(exclude_unset=True)
+        for field, value in payload.items():
             setattr(row, field, value)
+        speed = row.pre_free_speed_mps or 8.0
+        pairs = (
+            ("max_pickup_detour_meters", "max_pickup_detour_minutes"),
+            ("max_destination_detour_meters", "max_destination_detour_minutes"),
+            ("max_extra_route_meters", "max_extra_route_minutes"),
+        )
+        for meters_field, minutes_field in pairs:
+            if meters_field in payload:
+                meters = getattr(row, meters_field) or 0
+                setattr(
+                    row,
+                    minutes_field,
+                    int(round(meters / (60 * speed))) if speed else 0,
+                )
+            elif minutes_field in payload:
+                minutes = getattr(row, minutes_field) or 0
+                setattr(row, meters_field, int(round(minutes * 60 * speed)))
         self._session.flush()
         self._session.refresh(row)
         return AssignmentSettingsDTO.model_validate(row)
