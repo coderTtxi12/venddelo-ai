@@ -89,6 +89,11 @@ export function RequestDetailDrawer({
   }, [open]);
 
   useEffect(() => {
+    setLog(null);
+    setLogError(null);
+  }, [request?.id]);
+
+  useEffect(() => {
     if (!open || !request || !accessToken) {
       setLog(null);
       setLogError(null);
@@ -229,10 +234,13 @@ export function RequestDetailDrawer({
               <p className={styles.alert} role="alert">
                 {logError}
               </p>
-            ) : logLoading && !log ? (
+            ) : null}
+            {logLoading && !log ? (
               <p className={styles.empty}>{ASSIGNMENT_LOG_LOADING}</p>
             ) : assignmentEvents.length === 0 ? (
-              <p className={styles.empty}>{ASSIGNMENT_LOG_EMPTY}</p>
+              logError && !log ? null : (
+                <p className={styles.empty}>{ASSIGNMENT_LOG_EMPTY}</p>
+              )
             ) : (
               <ol className={styles.timeline}>
                 {assignmentEvents.map((event, index) => {
