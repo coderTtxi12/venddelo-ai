@@ -462,6 +462,9 @@ export default function DeliveryPage() {
       setRequests((current) =>
         current.map((item) => (item.id === updated.id ? updated : item)),
       );
+      setCreated((current) =>
+        current && current.id === updated.id ? updated : current,
+      );
       return true;
     } catch (actionError) {
       setError(
