@@ -17,6 +17,7 @@ import '../models.dart';
 import '../rider_controller.dart';
 import '../theme/app_colors.dart';
 import '../widgets/rider_live_map.dart';
+import '../widgets/rider_profile_menu.dart';
 import '../widgets/rider_slide_to_confirm.dart';
 import '../widgets/rider_widgets.dart';
 import 'account_screen.dart';
@@ -298,6 +299,26 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _openProfileMenu() {
+    return showRiderProfileMenu(
+      context: context,
+      name: widget.controller.profile == null
+          ? 'Repartidor'
+          : '${widget.controller.profile!.firstName} ${widget.controller.profile!.lastName}'
+              .trim(),
+      isOnline: widget.controller.profile?.isOnline ?? false,
+      creditAvailableCents: widget.controller.profile?.creditAvailableCents,
+      onOpenAccount: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => AccountScreen(controller: widget.controller),
+          ),
+        );
+      },
+      onSignOut: widget.onSignOut,
+    );
+  }
+
   void _toggleOverview() {
     final position = widget.controller.currentPosition;
     final selected = _selectedRouteOption;
@@ -415,20 +436,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: _TopStatusChip(name: name, isOnline: isOnline),
                       ),
                       const SizedBox(width: 10),
-                      _RoundIconButton(
-                        icon: Icons.person_rounded,
-                        tooltip: 'Cuenta',
-                        size: 52,
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => AccountScreen(
-                                controller: widget.controller,
-                                onSignOut: widget.onSignOut,
-                              ),
-                            ),
-                          );
-                        },
+                      _ProfileIconButton(
+                        name: name,
+                        onPressed: () => unawaited(_openProfileMenu()),
                       ),
                     ],
                   ),
@@ -617,20 +627,68 @@ class _CreditChip extends StatelessWidget {
   }
 }
 
+class _ProfileIconButton extends StatelessWidget {
+  const _ProfileIconButton({
+    required this.name,
+    required this.onPressed,
+  });
+
+  final String name;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.trim().isEmpty
+        ? 'R'
+        : name.trim().characters.first.toUpperCase();
+    return Semantics(
+      button: true,
+      label: 'Perfil',
+      child: Material(
+        color: AppColors.surface,
+        shape: const CircleBorder(),
+        elevation: 3,
+        shadowColor: const Color(0x33000000),
+        child: InkWell(
+          onTap: onPressed,
+          customBorder: const CircleBorder(),
+          child: Ink(
+            width: 52,
+            height: 52,
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                initial,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.cta,
+                    ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _RoundIconButton extends StatelessWidget {
   const _RoundIconButton({
     required this.icon,
     required this.onPressed,
     required this.tooltip,
     this.highlighted = false,
-    this.size = 64,
   });
+
+  static const double _size = 64;
 
   final IconData icon;
   final VoidCallback onPressed;
   final String tooltip;
   final bool highlighted;
-  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -642,10 +700,10 @@ class _RoundIconButton extends StatelessWidget {
       child: IconButton(
         tooltip: tooltip,
         onPressed: onPressed,
-        iconSize: size * 0.48,
+        iconSize: _size * 0.48,
         padding: EdgeInsets.zero,
         visualDensity: VisualDensity.standard,
-        constraints: BoxConstraints.tightFor(width: size, height: size),
+        constraints: BoxConstraints.tightFor(width: _size, height: _size),
         color: highlighted ? AppColors.cta : AppColors.textPrimary,
         icon: Icon(icon),
       ),
