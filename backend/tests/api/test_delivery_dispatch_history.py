@@ -228,6 +228,11 @@ def test_provider_history_lists_company_rows_and_filters_driver(client, engine):
     assert body["items"][0]["assigned_driver_name"]
     assert body["items"][0]["zone_id"]
     assert "dropoff_lat" in body["items"][0]
+    kinds = [event["kind"] for event in body["items"][0]["timeline"]]
+    assert "requested" in kinds
+    assert "accepted" in kinds
+    assert "delivered" in kinds
+    assert any(event["current"] for event in body["items"][0]["timeline"])
 
     other = client.get(
         "/api/v1/delivery-providers/me/dispatch-history",
