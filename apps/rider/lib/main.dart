@@ -20,7 +20,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await _configureGoogleMapsAndroid();
+  _configureGoogleMapsAndroid();
   FlutterForegroundTask.initCommunicationPort();
   if (AppConfig.isConfigured) {
     await Supabase.initialize(
@@ -40,21 +40,14 @@ Future<void> main() async {
   runApp(const MexyRiderApp());
 }
 
-Future<void> _configureGoogleMapsAndroid() async {
+void _configureGoogleMapsAndroid() {
   if (kIsWeb) {
     return;
   }
   final mapsImplementation = GoogleMapsFlutterPlatform.instance;
-  if (mapsImplementation is! GoogleMapsFlutterAndroid) {
-    return;
-  }
-  // Stack overlays (sheet, chips) need Hybrid Composition on Xiaomi/Impeller.
-  mapsImplementation.useAndroidViewSurface = true;
-  try {
-    await mapsImplementation.initializeWithRenderer(AndroidMapRenderer.latest);
-    await mapsImplementation.warmup();
-  } catch (error, stackTrace) {
-    debugPrint('Google Maps renderer init skipped: $error\n$stackTrace');
+  if (mapsImplementation is GoogleMapsFlutterAndroid) {
+    // Stack overlays (sheet, chips) need Hybrid Composition on Xiaomi/Impeller.
+    mapsImplementation.useAndroidViewSurface = true;
   }
 }
 
