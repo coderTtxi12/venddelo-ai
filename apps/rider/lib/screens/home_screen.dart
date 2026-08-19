@@ -185,12 +185,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final position = widget.controller.currentPosition;
     final destination = _destination;
     if (job == null || position == null || destination == null) {
-      if (_routes != null || _driveView) {
+      if (_routes != null) {
         setState(() {
           _routes = null;
           _selectedRoute = 0;
           _routeQueryKey = null;
-          _driveView = false;
           _overview = false;
           _lastRerouteAt = null;
         });
