@@ -297,11 +297,9 @@ def _is_case_c_hook(
     request: EngineRequest,
     driver: EngineDriver,
 ) -> bool:
-    if not request.restaurant_id or not driver.heading_restaurant_id:
+    if not request.restaurant_id:
         return False
-    if driver.active_request_status != "assigned":
-        return False
-    if driver.heading_restaurant_id != request.restaurant_id:
+    if request.restaurant_id not in driver.assigned_restaurant_ids:
         return False
     if driver.last_dropoff_lat is None or driver.last_dropoff_lng is None:
         return False
