@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DriverAvatar } from '@/components/drivers/DriverAvatar';
 import { DriverMetaTags } from '@/components/drivers/DriverMetaTags';
 import { RightDrawer } from '@/components/ui/RightDrawer';
 import type { DispatchMonitorDriver, DispatchMonitorRequest } from '@/lib/api/types';
 import { formatShortId, requestMoneyLine, requestPackageLine } from '@/lib/dispatch/monitorCopy';
+import { pickupBeforeDropoff } from '@/lib/dispatch/driverItinerary';
 import styles from './AssignDriverDrawer.module.css';
 
 type AssignDriverDrawerProps = {
@@ -15,8 +16,35 @@ type AssignDriverDrawerProps = {
   submitting: boolean;
   error: string | null;
   onClose: () => void;
-  onAssign: (driverId: string) => void;
+  onAssign: (
+    driverId: string,
+    itinerary?: Array<{ kind: 'restaurant' | 'dropoff'; request_id: string }>,
+  ) => void;
 };
+
+type DraftStop = {
+  kind: 'restaurant' | 'dropoff';
+  request_id: string;
+  label: string;
+  short_id: string;
+};
+
+function moveStop(stops: DraftStop[], from: number, to: number): DraftStop[] | null {
+  if (to < 0 || to >= stops.length) return null;
+  const next = [...stops];
+  [next[from], next[to]] = [next[to], next[from]];
+  return pickupBeforeDropoff(next) ? next : null;
+}
+
+function pairToneByRequest(stops: DraftStop[]): Map<string, number> {
+  const tones = new Map<string, number>();
+  for (const stop of stops) {
+    if (!tones.has(stop.request_id)) {
+      tones.set(stop.request_id, tones.size % 6);
+    }
+  }
+  return tones;
+}
 
 function requestStatusLabel(status: string): string {
   const labels: Record<string, string> = {
@@ -41,6 +69,7 @@ export function AssignDriverDrawer({
   onAssign,
 }: AssignDriverDrawerProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draftStops, setDraftStops] = useState<DraftStop[]>([]);
 
   const rows = useMemo(() => {
     if (!request) return [];
@@ -70,6 +99,40 @@ export function AssignDriverDrawer({
   }, [drivers, request, submitting]);
 
   const selected = rows.find((row) => row.driver.id === selectedId);
+  const pairTones = useMemo(() => pairToneByRequest(draftStops), [draftStops]);
+
+  useEffect(() => {
+    if (!request || !selectedId) {
+      setDraftStops([]);
+      return;
+    }
+    const driver = drivers.find((item) => item.id === selectedId);
+    if (!driver) {
+      setDraftStops([]);
+      return;
+    }
+    const existing: DraftStop[] = (driver.itinerary ?? [])
+      .filter((stop) => stop.request_id !== request.id)
+      .map((stop) => ({
+        kind: stop.kind,
+        request_id: stop.request_id,
+        short_id: stop.short_id || '',
+        label: `${stop.action || (stop.kind === 'restaurant' ? 'Recoger' : 'Entregar')} · ${stop.title || formatShortId(stop.short_id)}`,
+      }));
+    const pickup: DraftStop = {
+      kind: 'restaurant',
+      request_id: request.id,
+      short_id: request.short_id,
+      label: `Recoger · ${request.restaurant_name}`,
+    };
+    const dropoff: DraftStop = {
+      kind: 'dropoff',
+      request_id: request.id,
+      short_id: request.short_id,
+      label: `Entregar · ${request.customer_name}`,
+    };
+    setDraftStops([...existing, pickup, dropoff]);
+  }, [request?.id, selectedId]);
 
   return (
     <RightDrawer
@@ -140,13 +203,69 @@ export function AssignDriverDrawer({
               );
             })}
           </ul>
+          {selected && draftStops.length > 0 ? (
+            <div className={styles.routeBox}>
+              <p className={styles.routeTitle}>Orden de la ruta</p>
+              <p className={styles.routeHint}>
+                Mismo color e ID = mismo pedido. Recoger siempre antes de entregar.
+              </p>
+              <ol className={styles.routeList}>
+                {draftStops.map((stop, index) => {
+                  const pair = pairTones.get(stop.request_id) ?? 0;
+                  const shortId = formatShortId(stop.short_id);
+                  return (
+                    <li
+                      key={`${stop.kind}-${stop.request_id}-${index}`}
+                      className={styles.routeStop}
+                      data-pair={pair}
+                    >
+                      <span className={styles.routeMark} aria-hidden />
+                      <span className={styles.routeIndex}>{index + 1}</span>
+                      <span className={styles.routeLabel}>{stop.label}</span>
+                      {shortId ? <span className={styles.routePair}>{shortId}</span> : <span />}
+                      <span className={styles.routeBtns}>
+                        <button
+                          type="button"
+                          aria-label={`Subir ${stop.label}`}
+                          disabled={index === 0 || moveStop(draftStops, index, index - 1) == null}
+                          onClick={() => {
+                            const next = moveStop(draftStops, index, index - 1);
+                            if (next) setDraftStops(next);
+                          }}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Bajar ${stop.label}`}
+                          disabled={
+                            index === draftStops.length - 1 ||
+                            moveStop(draftStops, index, index + 1) == null
+                          }
+                          onClick={() => {
+                            const next = moveStop(draftStops, index, index + 1);
+                            if (next) setDraftStops(next);
+                          }}
+                        >
+                          ↓
+                        </button>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          ) : null}
           <button
             type="button"
             className={styles.confirm}
             disabled={!selected || selected.disabled || submitting}
             onClick={() => {
               if (!selected) return;
-              onAssign(selected.driver.id);
+              onAssign(
+                selected.driver.id,
+                draftStops.map((stop) => ({ kind: stop.kind, request_id: stop.request_id })),
+              );
             }}
           >
             {submitting
