@@ -81,7 +81,7 @@ def _driver(
     active_dropoff_lat: float | None = None,
     active_dropoff_lng: float | None = None,
     occupied_job_count: int | None = None,
-    heading_restaurant_id: str | None = None,
+    assigned_restaurant_ids: tuple[str, ...] = (),
     last_dropoff_lat: float | None = None,
     last_dropoff_lng: float | None = None,
 ) -> EngineDriver:
@@ -104,7 +104,7 @@ def _driver(
         active_dropoff_lat=active_dropoff_lat,
         active_dropoff_lng=active_dropoff_lng,
         occupied_job_count=occupied,
-        heading_restaurant_id=heading_restaurant_id,
+        assigned_restaurant_ids=assigned_restaurant_ids,
         last_dropoff_lat=last_dropoff_lat,
         last_dropoff_lng=last_dropoff_lng,
     )
