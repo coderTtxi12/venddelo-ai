@@ -264,6 +264,147 @@ int? _asInt(dynamic value) {
   return null;
 }
 
+class RiderHistoryHold {
+  const RiderHistoryHold({
+    required this.requestId,
+    required this.shortId,
+    required this.restaurantName,
+    required this.amountCents,
+    required this.customerName,
+  });
+
+  final String requestId;
+  final String shortId;
+  final String restaurantName;
+  final int amountCents;
+  final String customerName;
+
+  factory RiderHistoryHold.fromJson(Map<String, dynamic> json) {
+    return RiderHistoryHold(
+      requestId: json['request_id'] as String,
+      shortId: json['short_id'] as String? ?? '',
+      restaurantName: json['restaurant_name'] as String? ?? '',
+      amountCents: _asInt(json['amount_cents']) ?? 0,
+      customerName: json['customer_name'] as String? ?? '',
+    );
+  }
+}
+
+class RiderHistoryItem {
+  const RiderHistoryItem({
+    required this.id,
+    required this.shortId,
+    required this.status,
+    required this.closedAt,
+    required this.restaurantName,
+    required this.dropoffAddress,
+    required this.quotedFeeCents,
+    required this.paymentMethod,
+    required this.collectCents,
+    required this.packageCount,
+    required this.packageSize,
+    this.restaurantAddress,
+    this.cashDenominationCents,
+    this.customerName,
+    this.customerPhone,
+    this.notes,
+    this.creditHoldCents = 0,
+  });
+
+  final String id;
+  final String shortId;
+  final String status;
+  final DateTime closedAt;
+  final String restaurantName;
+  final String? restaurantAddress;
+  final String dropoffAddress;
+  final int quotedFeeCents;
+  final String paymentMethod;
+  final int collectCents;
+  final int? cashDenominationCents;
+  final int packageCount;
+  final String packageSize;
+  final String? customerName;
+  final String? customerPhone;
+  final String? notes;
+  final int creditHoldCents;
+
+  factory RiderHistoryItem.fromJson(Map<String, dynamic> json) {
+    return RiderHistoryItem(
+      id: json['id'] as String,
+      shortId: json['short_id'] as String? ?? '',
+      status: json['status'] as String,
+      closedAt: DateTime.parse(json['closed_at'] as String),
+      restaurantName: json['restaurant_name'] as String? ?? '',
+      restaurantAddress: json['restaurant_address'] as String?,
+      dropoffAddress: json['dropoff_address'] as String? ?? '',
+      quotedFeeCents: _asInt(json['quoted_fee_cents']) ?? 0,
+      paymentMethod: json['payment_method'] as String? ?? '',
+      collectCents: _asInt(json['collect_cents']) ?? 0,
+      cashDenominationCents: _asInt(json['cash_denomination_cents']),
+      packageCount: _asInt(json['package_count']) ?? 1,
+      packageSize: json['package_size'] as String? ?? 'normal',
+      customerName: json['customer_name'] as String?,
+      customerPhone: json['customer_phone'] as String?,
+      notes: json['notes'] as String?,
+      creditHoldCents: _asInt(json['credit_hold_cents']) ?? 0,
+    );
+  }
+}
+
+class RiderHistoryPage {
+  const RiderHistoryPage({
+    required this.start,
+    required this.end,
+    required this.items,
+    required this.total,
+    required this.deliveredCount,
+    required this.cancelledCount,
+    required this.earningsCents,
+    required this.hasMore,
+    required this.creditLimitCents,
+    required this.creditHeldCents,
+    required this.creditAvailableCents,
+    this.activeHolds = const [],
+  });
+
+  final String start;
+  final String end;
+  final List<RiderHistoryItem> items;
+  final int total;
+  final int deliveredCount;
+  final int cancelledCount;
+  final int earningsCents;
+  final bool hasMore;
+  final int creditLimitCents;
+  final int creditHeldCents;
+  final int creditAvailableCents;
+  final List<RiderHistoryHold> activeHolds;
+
+  factory RiderHistoryPage.fromJson(Map<String, dynamic> json) {
+    final rawItems = json['items'] as List<dynamic>? ?? const [];
+    final rawHolds = json['active_holds'] as List<dynamic>? ?? const [];
+    return RiderHistoryPage(
+      start: json['start'] as String,
+      end: json['end'] as String,
+      items: rawItems
+          .map((item) => RiderHistoryItem.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      total: _asInt(json['total']) ?? 0,
+      deliveredCount: _asInt(json['delivered_count']) ?? 0,
+      cancelledCount: _asInt(json['cancelled_count']) ?? 0,
+      earningsCents: _asInt(json['earnings_cents']) ?? 0,
+      hasMore: json['has_more'] as bool? ?? false,
+      creditLimitCents: _asInt(json['credit_limit_cents']) ?? 0,
+      creditHeldCents: _asInt(json['credit_held_cents']) ?? 0,
+      creditAvailableCents: _asInt(json['credit_available_cents']) ?? 0,
+      activeHolds: rawHolds
+          .map((item) => RiderHistoryHold.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
 String formatShortId(String shortId) {
   final value = shortId.trim().toUpperCase();
   if (value.isEmpty) {
