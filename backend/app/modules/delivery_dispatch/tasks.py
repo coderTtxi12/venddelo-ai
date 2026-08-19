@@ -275,6 +275,17 @@ def reject_offer_and_search(
         restore_status = offer.score_json.get("restore_status")
     if restore_status == "unassigned":
         request.status = "unassigned"
+        driver = session.get(DeliveryDriver, offer.driver_id)
+        record_assignment_event(
+            session,
+            request,
+            kind="rejected",
+            tone="warn",
+            title=rejected_title(driver.first_name if driver else None),
+            detail=None,
+            next_attempt_at=None,
+            driver_id=offer.driver_id,
+        )
         return
     request.status = "searching"
     request.cycle_rejected_driver_ids = [
@@ -367,6 +378,14 @@ def _assign_or_retry(
         now, _as_utc(request.search_at), settings_row.assignment_timeout_seconds
     ):
         request.status = "unassigned"
+        record_assignment_event(
+            session,
+            request,
+            kind="timed_out",
+            tone="warn",
+            title=timed_out_title(),
+            detail=None,
+        )
         return
 
     extra_excluded: set[str] = set()
@@ -1022,6 +1041,14 @@ def _timeout_unresumable_former_members(
         )
         if assignment_timed_out(now, _as_utc(member.search_at), timeout_seconds):
             member.status = "unassigned"
+            record_assignment_event(
+                session,
+                member,
+                kind="timed_out",
+                tone="warn",
+                title=timed_out_title(),
+                detail=None,
+            )
 
 
 def _resume_former_group_members(

@@ -195,6 +195,97 @@ def test_timeout_records_timed_out(client, engine):
 
 
 @requires_db
+def test_assign_or_retry_timeout_records_timed_out(client, engine):
+    from app.modules.delivery_dispatch.tasks import _assign_or_retry
+
+    restaurant_id, _ids = _setup_ready_fleet(
+        client,
+        engine,
+        driver_count=0,
+        min_protected_drivers=0,
+        high_demand_available_drivers_max=0,
+        subdomain="log-retry-timeout",
+    )
+    request_id = _create_dispatch_request(client, restaurant_id)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    now = datetime.now(UTC)
+    with factory() as session:
+        request = session.get(DeliveryDispatchRequest, request_id)
+        assert request is not None
+        settings = session.get(DeliveryProviderAssignmentSettings, request.delivery_provider_id)
+        assert settings is not None
+        settings.assignment_timeout_seconds = 1
+        request.status = "searching"
+        request.search_at = now - timedelta(seconds=5)
+        session.flush()
+        _assign_or_retry(session, request, now)
+        session.commit()
+        row = session.scalar(
+            select(DeliveryDispatchAssignmentEvent).where(
+                DeliveryDispatchAssignmentEvent.request_id == request_id,
+                DeliveryDispatchAssignmentEvent.kind == "timed_out",
+            )
+        )
+        request = session.get(DeliveryDispatchRequest, request_id)
+    assert request is not None
+    assert request.status == "unassigned"
+    assert row is not None
+    assert row.tone == "warn"
+    assert row.title == "Se agotó la búsqueda"
+    assert row.detail is None
+
+
+@requires_db
+def test_timeout_unresumable_sibling_records_timed_out(client, engine):
+    import uuid
+
+    from app.modules.delivery_dispatch.tasks import _timeout_unresumable_former_members
+
+    restaurant_id, _ids = _setup_ready_fleet(
+        client,
+        engine,
+        driver_count=0,
+        min_protected_drivers=0,
+        high_demand_available_drivers_max=0,
+        subdomain="log-sibling-timeout",
+    )
+    request_a = _create_dispatch_request(client, restaurant_id)
+    request_b = _create_dispatch_request(client, restaurant_id)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    now = datetime.now(UTC)
+    with factory() as session:
+        primary = session.get(DeliveryDispatchRequest, request_a)
+        sibling = session.get(DeliveryDispatchRequest, request_b)
+        assert primary is not None and sibling is not None
+        settings = session.get(DeliveryProviderAssignmentSettings, sibling.delivery_provider_id)
+        assert settings is not None
+        settings.assignment_timeout_seconds = 1
+        group_id = uuid.uuid4()
+        primary.dispatch_group_id = group_id
+        sibling.dispatch_group_id = group_id
+        sibling.status = "searching"
+        sibling.search_at = now - timedelta(seconds=5)
+        session.flush()
+        _timeout_unresumable_former_members(
+            session, [primary, sibling], skip_id=primary.id, now=now
+        )
+        session.commit()
+        row = session.scalar(
+            select(DeliveryDispatchAssignmentEvent).where(
+                DeliveryDispatchAssignmentEvent.request_id == request_b,
+                DeliveryDispatchAssignmentEvent.kind == "timed_out",
+            )
+        )
+        sibling = session.get(DeliveryDispatchRequest, request_b)
+    assert sibling is not None
+    assert sibling.status == "unassigned"
+    assert row is not None
+    assert row.tone == "warn"
+    assert row.title == "Se agotó la búsqueda"
+    assert row.detail is None
+
+
+@requires_db
 def test_assignment_log_get_returns_events_and_404_cross_company(client, engine):
     from app.modules.delivery_dispatch.tasks import handle_task
 
@@ -297,3 +388,55 @@ def test_reject_records_assignment_event(client, engine):
             )
         )
     assert "rejected" in kinds
+
+
+@requires_db
+def test_reject_restore_unassigned_records_rejected(client, engine):
+    restaurant_id, driver_id = _setup_ready_rider(client, engine)
+    request_id = _create_dispatch_request(client, restaurant_id)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        request = session.get(DeliveryDispatchRequest, request_id)
+        assert request is not None
+        request.status = "unassigned"
+        session.commit()
+
+    _as_mexy()
+    offered = client.post(
+        f"/api/v1/delivery-providers/me/dispatch-requests/{request_id}/manual-offer",
+        json={"driver_id": driver_id},
+        headers=AUTH,
+    )
+    assert offered.status_code == 201, offered.text
+    offer_id = offered.json()["id"]
+
+    _as_rider()
+    rejected = client.post(
+        f"/api/v1/rider/me/offers/{offer_id}/reject",
+        headers=AUTH,
+    )
+    assert rejected.status_code == 200, rejected.text
+
+    with factory() as session:
+        kinds = list(
+            session.scalars(
+                select(DeliveryDispatchAssignmentEvent.kind)
+                .where(DeliveryDispatchAssignmentEvent.request_id == request_id)
+                .order_by(DeliveryDispatchAssignmentEvent.created_at)
+            )
+        )
+        row = session.scalar(
+            select(DeliveryDispatchAssignmentEvent).where(
+                DeliveryDispatchAssignmentEvent.request_id == request_id,
+                DeliveryDispatchAssignmentEvent.kind == "rejected",
+            )
+        )
+        request = session.get(DeliveryDispatchRequest, request_id)
+    assert request is not None
+    assert request.status == "unassigned"
+    assert "rejected" in kinds
+    assert row is not None
+    assert row.tone == "warn"
+    assert row.detail is None
+    assert row.next_attempt_at is None
+    assert row.driver_id is not None
