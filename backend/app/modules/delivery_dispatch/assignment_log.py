@@ -27,6 +27,7 @@ CASE_DETAILS = {
     "B": "Varios pedidos listos · riders en paralelo",
     "C": "Alta demanda · entregas cercanas, un rider",
     "D": "Alta demanda · rider que ya iba de camino",
+    "E": "Alta demanda · rider libre más cercano al restaurante",
     "M": "Asignación manual desde el monitor",
 }
 
