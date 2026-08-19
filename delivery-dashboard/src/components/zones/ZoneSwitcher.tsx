@@ -16,7 +16,7 @@ export default function ZoneSwitcher({ onAddZone }: ZoneSwitcherProps) {
   const pathname = usePathname();
   const { canWriteProviderConfig } = useDeliveryProviderAccess();
   const { loading, zones, selectedZoneId, setSelectedZoneId } = useDeliveryZone();
-  const showAllChip = pathname === '/monitor' || selectedZoneId === ALL_ZONES_ID;
+  const showAllChip = pathname === '/monitor' || pathname === '/historial' || selectedZoneId === ALL_ZONES_ID;
 
   if (pathname === '/repartidores' || pathname === '/asignacion') {
     return (
