@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import { AssignDriverDrawer } from '@/components/monitor/AssignDriverDrawer';
 import { DispatchMonitorMap } from '@/components/monitor/DispatchMonitorMap';
 import { RequestDetailDrawer } from '@/components/monitor/RequestDetailDrawer';
@@ -38,7 +39,9 @@ import {
   useDispatchMonitorSocket,
   type DispatchMonitorSocketStatus,
 } from '@/lib/dispatch/useDispatchMonitorSocket';
+import { liveBusinessesFromRequests, type MonitorLiveBusiness } from '@/lib/dispatch/liveBusinesses';
 import { formatMoney } from '@/lib/pricing/tariffUtils';
+import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { zoneColorForId } from '@/lib/dispatch/zoneColors';
 import panelStyles from './PartnershipsPage.module.css';
 import styles from './MonitorPage.module.css';
@@ -519,6 +522,95 @@ function DriversList({
   );
 }
 
+function BusinessLogo({ name, logoPath }: { name: string; logoPath: string | null }) {
+  const url = storagePublicUrl(logoPath);
+  if (url) {
+    return <img src={url} alt="" className={styles.businessLogo} />;
+  }
+  return (
+    <span className={styles.businessLogoFallback} aria-hidden>
+      {name.trim().charAt(0).toUpperCase() || (
+        <StorefrontOutlinedIcon sx={{ fontSize: 16 }} />
+      )}
+    </span>
+  );
+}
+
+function BusinessesList({
+  businesses,
+  focusedRestaurantId,
+  onFocus,
+  colorByZone = false,
+  zoneIds = [],
+}: {
+  businesses: MonitorLiveBusiness[];
+  focusedRestaurantId: string | null;
+  onFocus: (business: MonitorLiveBusiness) => void;
+  colorByZone?: boolean;
+  zoneIds?: string[];
+}) {
+  if (businesses.length === 0) {
+    return <p className={styles.emptyHint}>Ningún negocio con pedidos en este momento.</p>;
+  }
+  return (
+    <ul className={styles.list}>
+      {businesses.map((business) => {
+        const focused = focusedRestaurantId === business.id;
+        const liveCount = business.queueCount + business.activeCount + business.unassignedCount;
+        return (
+          <li
+            key={business.id}
+            className={`${styles.queueCard}${focused ? ` ${styles.queueCardFocused}` : ''}`}
+          >
+            <button
+              type="button"
+              className={styles.queueCardButton}
+              onClick={() => onFocus(business)}
+              aria-pressed={focused}
+              aria-label={`Ver pedidos de ${business.name}`}
+            >
+              <div className={styles.listMain}>
+                <BusinessLogo name={business.name} logoPath={business.logoPath} />
+                <div className={styles.listContent}>
+                  <span className={styles.listTitle}>{business.name}</span>
+                  {business.address ? (
+                    <span className={styles.listAddress}>{business.address}</span>
+                  ) : null}
+                  {business.phone ? <span className={styles.listMeta}>{business.phone}</span> : null}
+                  <span className={styles.listMeta}>
+                    {liveCount} pedido{liveCount === 1 ? '' : 's'} · {business.queueCount} en cola ·{' '}
+                    {business.activeCount} en curso
+                    {business.unassignedCount ? ` · ${business.unassignedCount} sin asignar` : ''}
+                  </span>
+                  {colorByZone && business.zoneName ? (
+                    <span className={styles.listMeta}>
+                      <ZoneSwatch zoneId={business.zoneId} zoneIds={zoneIds} />
+                      {business.zoneName}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </button>
+            <div className={styles.queueCardSide}>
+              <div className={styles.listAsideChips}>
+                {business.queueCount > 0 ? (
+                  <span className={styles.dueChip}>{business.queueCount} cola</span>
+                ) : null}
+                {business.activeCount > 0 ? (
+                  <span className={styles.chipOnline}>{business.activeCount} en curso</span>
+                ) : null}
+                {business.unassignedCount > 0 ? (
+                  <span className={styles.warnChip}>{business.unassignedCount} sin asignar</span>
+                ) : null}
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export default function MonitorPage() {
   const { accessToken } = useAuth();
   const { canManagePartnerships } = useDeliveryProviderAccess();
@@ -534,6 +626,7 @@ export default function MonitorPage() {
   const [assignError, setAssignError] = useState<string | null>(null);
   const [focusedRequestId, setFocusedRequestId] = useState<string | null>(null);
   const [focusedDriverId, setFocusedDriverId] = useState<string | null>(null);
+  const [focusedRestaurantId, setFocusedRestaurantId] = useState<string | null>(null);
   const [driverFilter, setDriverFilter] = useState<DriverFilter>('all');
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [logNonce, setLogNonce] = useState(0);
@@ -607,6 +700,11 @@ export default function MonitorPage() {
     [snapshot],
   );
 
+  const businesses = useMemo(
+    () => liveBusinessesFromRequests(snapshot?.requests ?? []),
+    [snapshot],
+  );
+
   const detailRequest = useMemo(
     () => (snapshot?.requests ?? []).find((row) => row.id === detailRequestId) ?? null,
     [detailRequestId, snapshot],
@@ -630,14 +728,28 @@ export default function MonitorPage() {
     if (!stillVisible) setFocusedDriverId(null);
   }, [focusedDriverId, snapshot]);
 
+  useEffect(() => {
+    if (!focusedRestaurantId) return;
+    const stillVisible = businesses.some((row) => row.id === focusedRestaurantId);
+    if (!stillVisible) setFocusedRestaurantId(null);
+  }, [businesses, focusedRestaurantId]);
+
   function handleFocusRequest(request: DispatchMonitorRequest) {
     setFocusedDriverId(null);
+    setFocusedRestaurantId(null);
     setFocusedRequestId((current) => (current === request.id ? null : request.id));
   }
 
   function handleFocusDriver(driver: DispatchMonitorDriver) {
     setFocusedRequestId(null);
+    setFocusedRestaurantId(null);
     setFocusedDriverId((current) => (current === driver.id ? null : driver.id));
+  }
+
+  function handleFocusBusiness(business: MonitorLiveBusiness) {
+    setFocusedRequestId(null);
+    setFocusedDriverId(null);
+    setFocusedRestaurantId((current) => (current === business.id ? null : business.id));
   }
 
   function handleOpenDetail(request: DispatchMonitorRequest) {
@@ -783,6 +895,7 @@ export default function MonitorPage() {
                 selectedZoneId={selectedZoneId}
                 focusedRequestId={focusedRequestId}
                 focusedDriverId={focusedDriverId}
+                focusedRestaurantId={focusedRestaurantId}
                 onReorderItinerary={handleReorderItinerary}
               />
               <div className={styles.mapLegend} role="list" aria-label="Leyenda del mapa">
@@ -889,6 +1002,17 @@ export default function MonitorPage() {
                   onFilterChange={handleDriverFilter}
                   focusedDriverId={focusedDriverId}
                   onFocus={handleFocusDriver}
+                  colorByZone={isAllZones}
+                  zoneIds={zoneIds}
+                />
+              </section>
+
+              <section className={styles.panel}>
+                <h2 className={styles.panelTitle}>Negocios en operación</h2>
+                <BusinessesList
+                  businesses={businesses}
+                  focusedRestaurantId={focusedRestaurantId}
+                  onFocus={handleFocusBusiness}
                   colorByZone={isAllZones}
                   zoneIds={zoneIds}
                 />
