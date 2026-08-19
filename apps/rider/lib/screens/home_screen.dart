@@ -431,6 +431,11 @@ class _HomeScreenState extends State<HomeScreen> {
               extraMarkers: extraMarkers,
               polylines: polylines,
               onUserGesture: () {
+                final ignoreUntil = _ignoreMapGestureUntil;
+                if (ignoreUntil != null &&
+                    DateTime.now().isBefore(ignoreUntil)) {
+                  return;
+                }
                 if (_followRider || _driveView) {
                   setState(() {
                     _followRider = false;
