@@ -686,7 +686,7 @@ function DriverFormFields({
 export default function DriversPage() {
   const { accessToken } = useAuth();
   const { canWriteProviderConfig } = useDeliveryProviderAccess();
-  const { zones, selectedZoneId } = useDeliveryZone();
+  const { zones, effectiveZoneId } = useDeliveryZone();
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
   const [createForm, setCreateForm] = useState<DriverFormState>(() => createEmptyForm());
   const [createFormKey, setCreateFormKey] = useState(0);
@@ -700,7 +700,7 @@ export default function DriversPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const defaultZoneId = selectedZoneId ?? zones[0]?.id ?? '';
+  const defaultZoneId = effectiveZoneId ?? zones[0]?.id ?? '';
 
   const loadDrivers = useCallback(async () => {
     if (!accessToken) return;
