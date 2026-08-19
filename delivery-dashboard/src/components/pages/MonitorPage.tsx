@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AssignDriverDrawer } from '@/components/monitor/AssignDriverDrawer';
 import { DispatchMonitorMap } from '@/components/monitor/DispatchMonitorMap';
+import { RequestDetailDrawer } from '@/components/monitor/RequestDetailDrawer';
 import { DriverAvatar } from '@/components/drivers/DriverAvatar';
 import { DriverMetaTags } from '@/components/drivers/DriverMetaTags';
-import { DriverPhoneContact } from '@/components/drivers/DriverPhoneContact';
 import { PanelPageShell, type PanelPageStyles } from '@/components/pages/PanelPageShell';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
@@ -39,6 +39,7 @@ import {
   type DispatchMonitorSocketStatus,
 } from '@/lib/dispatch/useDispatchMonitorSocket';
 import { formatMoney } from '@/lib/pricing/tariffUtils';
+import { zoneColorForId } from '@/lib/dispatch/zoneColors';
 import panelStyles from './PartnershipsPage.module.css';
 import styles from './MonitorPage.module.css';
 
@@ -47,6 +48,17 @@ function connectionLabel(status: DispatchMonitorSocketStatus): string {
   if (status === 'connecting') return 'Conectando…';
   if (status === 'reconnecting') return 'Reconectando…';
   return 'Sin conexión';
+}
+
+function ZoneSwatch({ zoneId, zoneIds }: { zoneId?: string | null; zoneIds: string[] }) {
+  const color = zoneColorForId(zoneId, zoneIds);
+  return (
+    <span
+      className={styles.zoneSwatch}
+      style={{ background: color.solid }}
+      aria-hidden
+    />
+  );
 }
 
 function MetricCard({
@@ -106,18 +118,24 @@ function QueueList({
   requests,
   canAssign,
   onAssign,
+  onDetail,
   onFocus,
   focusedRequestId,
   nowMs,
   emptyHint = 'Sin pedidos en cola.',
+  colorByZone = false,
+  zoneIds = [],
 }: {
   requests: DispatchMonitorRequest[];
   canAssign: boolean;
   onAssign: (request: DispatchMonitorRequest) => void;
+  onDetail: (request: DispatchMonitorRequest) => void;
   onFocus: (request: DispatchMonitorRequest) => void;
   focusedRequestId: string | null;
   nowMs: number;
   emptyHint?: string;
+  colorByZone?: boolean;
+  zoneIds?: string[];
 }) {
   if (requests.length === 0) {
     return <p className={styles.emptyHint}>{emptyHint}</p>;
@@ -150,7 +168,13 @@ function QueueList({
               </span>
               <span className={styles.listMeta}>
                 {request.restaurant_name}
-                {request.zone_name ? ` · ${request.zone_name}` : ''}
+                {colorByZone && request.zone_name ? (
+                  <>
+                    {' · '}
+                    <ZoneSwatch zoneId={request.zone_id} zoneIds={zoneIds} />
+                    {request.zone_name}
+                  </>
+                ) : null}
               </span>
               <span className={styles.listAddress}>{request.dropoff_address}</span>
               <span className={styles.queueMeta}>
@@ -170,18 +194,18 @@ function QueueList({
             <div className={styles.queueCardSide}>
               <span className={styles.statusChip}>{requestStatusLabel(request.status)}</span>
               {request.is_due_search ? <span className={styles.dueChip}>Listo</span> : null}
+              <button
+                type="button"
+                className={styles.detailButton}
+                onClick={() => onDetail(request)}
+                aria-label={`Ver detalle de ${formatShortId(request.short_id)}`}
+              >
+                Detalle
+              </button>
               {canAssign ? (
                 <button type="button" className={styles.assignButton} onClick={() => onAssign(request)}>
                   Asignar
                 </button>
-              ) : null}
-              {request.customer_phone ? (
-                <DriverPhoneContact
-                  phone={request.customer_phone}
-                  compact
-                  stopPropagation
-                  className={styles.asidePhone}
-                />
               ) : null}
             </div>
           </li>
@@ -195,16 +219,22 @@ function ActiveList({
   requests,
   canAssign,
   onAssign,
+  onDetail,
   onFocus,
   focusedRequestId,
   nowMs,
+  colorByZone = false,
+  zoneIds = [],
 }: {
   requests: DispatchMonitorRequest[];
   canAssign: boolean;
   onAssign: (request: DispatchMonitorRequest) => void;
+  onDetail: (request: DispatchMonitorRequest) => void;
   onFocus: (request: DispatchMonitorRequest) => void;
   focusedRequestId: string | null;
   nowMs: number;
+  colorByZone?: boolean;
+  zoneIds?: string[];
 }) {
   if (requests.length === 0) {
     return <p className={styles.emptyHint}>Sin entregas en curso.</p>;
@@ -231,6 +261,13 @@ function ActiveList({
               </span>
               <span className={styles.listMeta}>
                 {request.assigned_driver_name ?? 'Sin repartidor'} · {request.restaurant_name}
+                {colorByZone && request.zone_name ? (
+                  <>
+                    {' · '}
+                    <ZoneSwatch zoneId={request.zone_id} zoneIds={zoneIds} />
+                    {request.zone_name}
+                  </>
+                ) : null}
               </span>
               <span className={styles.listAddress}>{request.dropoff_address}</span>
               <span className={styles.listMeta}>
@@ -241,18 +278,18 @@ function ActiveList({
             </button>
             <div className={styles.queueCardSide}>
               <span className={styles.statusChip}>{requestStatusLabel(request.status)}</span>
+              <button
+                type="button"
+                className={styles.detailButton}
+                onClick={() => onDetail(request)}
+                aria-label={`Ver detalle de ${formatShortId(request.short_id)}`}
+              >
+                Detalle
+              </button>
               {canAssign ? (
                 <button type="button" className={styles.assignButton} onClick={() => onAssign(request)}>
                   Asignar
                 </button>
-              ) : null}
-              {request.customer_phone ? (
-                <DriverPhoneContact
-                  phone={request.customer_phone}
-                  compact
-                  stopPropagation
-                  className={styles.asidePhone}
-                />
               ) : null}
             </div>
           </li>
@@ -325,6 +362,8 @@ function DriversList({
   onFilterChange,
   focusedDriverId,
   onFocus,
+  colorByZone = false,
+  zoneIds = [],
 }: {
   drivers: DispatchMonitorDriver[];
   maxPackages: number;
@@ -332,6 +371,8 @@ function DriversList({
   onFilterChange: (filter: DriverFilter) => void;
   focusedDriverId: string | null;
   onFocus: (driver: DispatchMonitorDriver) => void;
+  colorByZone?: boolean;
+  zoneIds?: string[];
 }) {
   const counts = {
     all: drivers.length,
@@ -442,6 +483,15 @@ function DriversList({
                       <span className={styles.listMeta}>
                         {occupation} · {packages} · crédito {credit}
                       </span>
+                      {colorByZone && driver.registered_zone_name ? (
+                        <span className={styles.listMeta}>
+                          <ZoneSwatch
+                            zoneId={driver.registered_zone_id}
+                            zoneIds={zoneIds}
+                          />
+                          {driver.registered_zone_name}
+                        </span>
+                      ) : null}
                       <span className={styles.listMeta}>{gpsAgeLabel(driver.location_age_seconds)}</span>
                     </div>
                   </div>
@@ -459,12 +509,6 @@ function DriversList({
                     {driver.credit_blocked ? <span className={styles.alertChip}>Sin crédito</span> : null}
                     {isStaleGps(driver) ? <span className={styles.warnChip}>GPS viejo</span> : null}
                   </div>
-                  <DriverPhoneContact
-                    phone={driver.phone}
-                    compact
-                    stopPropagation
-                    className={styles.asidePhone}
-                  />
                 </div>
               </li>
             );
@@ -478,12 +522,14 @@ function DriversList({
 export default function MonitorPage() {
   const { accessToken } = useAuth();
   const { canManagePartnerships } = useDeliveryProviderAccess();
-  const { selectedZoneId, zones } = useDeliveryZone();
+  const { selectedZoneId, zones, isAllZones, loading: zonesLoading } = useDeliveryZone();
+  const zoneIds = useMemo(() => zones.map((zone) => zone.id), [zones]);
   const [snapshot, setSnapshot] = useState<DispatchMonitorSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<DispatchMonitorSocketStatus>('offline');
   const [assigningRequest, setAssigningRequest] = useState<DispatchMonitorRequest | null>(null);
+  const [detailRequestId, setDetailRequestId] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [focusedRequestId, setFocusedRequestId] = useState<string | null>(null);
@@ -499,17 +545,20 @@ export default function MonitorPage() {
   }, []);
 
   const loadSnapshot = useCallback(async () => {
-    if (!accessToken) return;
+    if (!accessToken || zonesLoading) return;
     setError(null);
     try {
-      const data = await getMyDispatchMonitor(accessToken, selectedZoneId);
+      const data = await getMyDispatchMonitor(
+        accessToken,
+        isAllZones ? null : selectedZoneId,
+      );
       setSnapshot(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el monitor');
     } finally {
       setLoading(false);
     }
-  }, [accessToken, selectedZoneId]);
+  }, [accessToken, isAllZones, selectedZoneId, zonesLoading]);
 
   useEffect(() => {
     setLoading(true);
@@ -555,6 +604,17 @@ export default function MonitorPage() {
     [snapshot],
   );
 
+  const detailRequest = useMemo(
+    () => (snapshot?.requests ?? []).find((row) => row.id === detailRequestId) ?? null,
+    [detailRequestId, snapshot],
+  );
+
+  useEffect(() => {
+    if (!detailRequestId) return;
+    const stillVisible = (snapshot?.requests ?? []).some((row) => row.id === detailRequestId);
+    if (!stillVisible) setDetailRequestId(null);
+  }, [detailRequestId, snapshot]);
+
   useEffect(() => {
     if (!focusedRequestId) return;
     const stillVisible = (snapshot?.requests ?? []).some((row) => row.id === focusedRequestId);
@@ -575,6 +635,18 @@ export default function MonitorPage() {
   function handleFocusDriver(driver: DispatchMonitorDriver) {
     setFocusedRequestId(null);
     setFocusedDriverId((current) => (current === driver.id ? null : driver.id));
+  }
+
+  function handleOpenDetail(request: DispatchMonitorRequest) {
+    setAssigningRequest(null);
+    setAssignError(null);
+    setDetailRequestId(request.id);
+  }
+
+  function handleOpenAssign(request: DispatchMonitorRequest) {
+    setDetailRequestId(null);
+    setAssignError(null);
+    setAssigningRequest(request);
   }
 
   function handleDriverFilter(next: DriverFilter) {
@@ -710,23 +782,39 @@ export default function MonitorPage() {
                 focusedDriverId={focusedDriverId}
                 onReorderItinerary={handleReorderItinerary}
               />
-              <div className={styles.mapLegend}>
-                <span>
-                  <span className={styles.legendZone} aria-hidden /> Zona de cobertura
-                </span>
-                <span>
+              <div className={styles.mapLegend} role="list" aria-label="Leyenda del mapa">
+                {isAllZones
+                  ? zones.map((zone) => (
+                      <span key={zone.id} role="listitem">
+                        <span
+                          className={styles.legendZone}
+                          style={{
+                            background: zoneColorForId(zone.id, zoneIds).fill,
+                            borderColor: zoneColorForId(zone.id, zoneIds).stroke,
+                          }}
+                          aria-hidden
+                        />
+                        {zone.name}
+                      </span>
+                    ))
+                  : (
+                      <span role="listitem">
+                        <span className={styles.legendZone} aria-hidden /> Zona de cobertura
+                      </span>
+                    )}
+                <span role="listitem">
                   <span className={styles.legendDriver} aria-hidden /> Repartidor
                 </span>
-                <span>
+                <span role="listitem">
                   <span className={styles.legendRestaurant} aria-hidden /> Restaurante
                 </span>
-                <span>
+                <span role="listitem">
                   <span className={styles.legendDropoff} aria-hidden /> Entrega
                 </span>
-                <span>
+                <span role="listitem">
                   <span className={styles.legendRequestRoute} aria-hidden /> Ruta en solicitud
                 </span>
-                <span>
+                <span role="listitem">
                   <span className={styles.legendRoute} aria-hidden /> Ruta activa
                 </span>
               </div>
@@ -741,10 +829,10 @@ export default function MonitorPage() {
                   nowMs={nowMs}
                   focusedRequestId={focusedRequestId}
                   onFocus={handleFocusRequest}
-                  onAssign={(request) => {
-                    setAssignError(null);
-                    setAssigningRequest(request);
-                  }}
+                  onDetail={handleOpenDetail}
+                  onAssign={handleOpenAssign}
+                  colorByZone={isAllZones}
+                  zoneIds={zoneIds}
                 />
               </section>
 
@@ -757,10 +845,10 @@ export default function MonitorPage() {
                   emptyHint="Sin pedidos sin asignar."
                   focusedRequestId={focusedRequestId}
                   onFocus={handleFocusRequest}
-                  onAssign={(request) => {
-                    setAssignError(null);
-                    setAssigningRequest(request);
-                  }}
+                  onDetail={handleOpenDetail}
+                  onAssign={handleOpenAssign}
+                  colorByZone={isAllZones}
+                  zoneIds={zoneIds}
                 />
               </section>
 
@@ -772,10 +860,10 @@ export default function MonitorPage() {
                   nowMs={nowMs}
                   focusedRequestId={focusedRequestId}
                   onFocus={handleFocusRequest}
-                  onAssign={(request) => {
-                    setAssignError(null);
-                    setAssigningRequest(request);
-                  }}
+                  onDetail={handleOpenDetail}
+                  onAssign={handleOpenAssign}
+                  colorByZone={isAllZones}
+                  zoneIds={zoneIds}
                 />
               </section>
 
@@ -798,12 +886,19 @@ export default function MonitorPage() {
                   onFilterChange={handleDriverFilter}
                   focusedDriverId={focusedDriverId}
                   onFocus={handleFocusDriver}
+                  colorByZone={isAllZones}
+                  zoneIds={zoneIds}
                 />
               </section>
             </aside>
           </div>
         </>
       )}
+      <RequestDetailDrawer
+        open={detailRequest !== null}
+        request={detailRequest}
+        onClose={() => setDetailRequestId(null)}
+      />
       <AssignDriverDrawer
         open={assigningRequest !== null}
         request={assigningRequest}
