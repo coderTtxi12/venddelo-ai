@@ -22,6 +22,8 @@ export function requestStatusLabel(status: string): string {
     assigned: 'Asignado',
     picked_up: 'Recogido',
     in_transit: 'En camino',
+    delivered: 'Entregado',
+    cancelled: 'Cancelado',
   };
   return labels[status] ?? status;
 }
