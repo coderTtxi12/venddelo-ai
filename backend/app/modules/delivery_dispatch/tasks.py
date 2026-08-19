@@ -938,7 +938,9 @@ def _to_engine_driver(
     occupied_jobs: list[DeliveryDispatchRequest],
     active_package_count: int,
     has_open_offer: bool,
-    restaurants: dict[uuid.UUID, Restaurant] | None = None,
+    *,
+    origin_lat: float,
+    origin_lng: float,
 ) -> EngineDriver:
     active = None
     if len(occupied_jobs) == 1:
@@ -948,9 +950,23 @@ def _to_engine_driver(
             (job for job in occupied_jobs if job.status == "in_transit"),
             occupied_jobs[0],
         )
-    heading_restaurant_id, last_dropoff_lat, last_dropoff_lng = _heading_restaurant_last_dropoff(
-        occupied_jobs,
-        restaurants or {},
+    assigned_restaurant_ids = tuple(
+        sorted(
+            {
+                str(job.restaurant_id)
+                for job in occupied_jobs
+                if job.status == "assigned" and job.restaurant_id is not None
+            }
+        )
+    )
+    last = nn_last_dropoff(
+        tuple(
+            (job.dropoff_lat, job.dropoff_lng)
+            for job in occupied_jobs
+            if job.dropoff_lat is not None and job.dropoff_lng is not None
+        ),
+        origin_lat=origin_lat,
+        origin_lng=origin_lng,
     )
     return EngineDriver(
         id=str(driver.id),
@@ -970,36 +986,10 @@ def _to_engine_driver(
         active_dropoff_lat=active.dropoff_lat if active is not None else None,
         active_dropoff_lng=active.dropoff_lng if active is not None else None,
         occupied_job_count=len(occupied_jobs),
-        heading_restaurant_id=heading_restaurant_id,
-        last_dropoff_lat=last_dropoff_lat,
-        last_dropoff_lng=last_dropoff_lng,
+        assigned_restaurant_ids=assigned_restaurant_ids,
+        last_dropoff_lat=last[0] if last is not None else None,
+        last_dropoff_lng=last[1] if last is not None else None,
     )
-
-
-def _heading_restaurant_last_dropoff(
-    occupied_jobs: list[DeliveryDispatchRequest],
-    restaurants: dict[uuid.UUID, Restaurant],
-) -> tuple[str | None, float | None, float | None]:
-    if not occupied_jobs:
-        return None, None, None
-    if any(job.status != "assigned" for job in occupied_jobs):
-        return None, None, None
-    restaurant_ids = {job.restaurant_id for job in occupied_jobs}
-    if len(restaurant_ids) != 1:
-        return None, None, None
-    restaurant_id = next(iter(restaurant_ids))
-    restaurant = restaurants.get(restaurant_id)
-    origin_lat = restaurant.latitude if restaurant and restaurant.latitude is not None else 0.0
-    origin_lng = restaurant.longitude if restaurant and restaurant.longitude is not None else 0.0
-    dropoffs = tuple(
-        (job.dropoff_lat, job.dropoff_lng)
-        for job in occupied_jobs
-        if job.dropoff_lat is not None and job.dropoff_lng is not None
-    )
-    last = nn_last_dropoff(dropoffs, origin_lat=origin_lat, origin_lng=origin_lng)
-    if last is None:
-        return str(restaurant_id), None, None
-    return str(restaurant_id), last[0], last[1]
 
 
 def _engine_settings(row: DeliveryProviderAssignmentSettings) -> EngineSettings:
