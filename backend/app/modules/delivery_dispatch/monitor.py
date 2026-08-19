@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
@@ -35,6 +36,12 @@ from app.modules.delivery_dispatch.schemas import (
     DispatchMonitorRouteDTO,
     DispatchMonitorSearchBlockerDTO,
     DispatchMonitorSnapshotDTO,
+    DispatchMonitorTimelineEventDTO,
+)
+from app.modules.delivery_dispatch.timeline import (
+    TimelineOffer,
+    TimelineRequest,
+    build_operation_timeline,
 )
 
 _ACTIVE_REQUEST_STATUSES = frozenset(
@@ -158,6 +165,67 @@ def _last_accepted_driver_names(
             continue
         names[offer.request_id] = _driver_name(offer.driver)
     return names
+
+
+def _offers_by_request(
+    session: Session,
+    request_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, list[DeliveryDispatchOffer]]:
+    grouped: dict[uuid.UUID, list[DeliveryDispatchOffer]] = defaultdict(list)
+    if not request_ids:
+        return grouped
+    offers = session.scalars(
+        select(DeliveryDispatchOffer)
+        .where(DeliveryDispatchOffer.request_id.in_(request_ids))
+        .options(selectinload(DeliveryDispatchOffer.driver))
+        .order_by(DeliveryDispatchOffer.created_at.asc())
+    ).all()
+    for offer in offers:
+        grouped[offer.request_id].append(offer)
+    return grouped
+
+
+def _timeline_events(
+    request: DeliveryDispatchRequest,
+    *,
+    timeout_at: datetime,
+    assigned_name: str | None,
+    offers: list[DeliveryDispatchOffer],
+) -> list[DispatchMonitorTimelineEventDTO]:
+    events = build_operation_timeline(
+        TimelineRequest(
+            created_at=request.created_at,
+            ready_at=request.ready_at,
+            search_at=request.search_at,
+            status=request.status,
+            cancelled_at=request.cancelled_at,
+            picked_up_at=request.picked_up_at,
+            in_transit_at=request.in_transit_at,
+            delivered_at=request.delivered_at,
+            assigned_driver_name=assigned_name,
+            assignment_timeout_at=timeout_at,
+        ),
+        [
+            TimelineOffer(
+                created_at=offer.created_at,
+                responded_at=offer.responded_at,
+                status=offer.status,
+                driver_name=_driver_name(offer.driver) if offer.driver is not None else "Repartidor",
+                case_applied=offer.case_applied,
+            )
+            for offer in offers
+        ],
+    )
+    return [
+        DispatchMonitorTimelineEventDTO(
+            at=event.at,
+            kind=event.kind,
+            driver_name=event.driver_name,
+            case_applied=event.case_applied,
+            current=event.current,
+        )
+        for event in events
+    ]
 
 
 def build_dispatch_monitor_snapshot(
@@ -389,6 +457,10 @@ def build_dispatch_monitor_snapshot(
                 pre_free_eta_seconds=pre_free_eta,
                 occupied_job_count=len(occupied),
                 active_package_count=package_count,
+                registered_zone_id=driver.registered_zone_id,
+                registered_zone_name=zone_names.get(driver.registered_zone_id)
+                if driver.registered_zone_id is not None
+                else None,
                 itinerary=hydrate_itinerary(session, driver.id),
             )
         )
@@ -399,6 +471,7 @@ def build_dispatch_monitor_snapshot(
     requests_in_progress = 0
     driver_names = {driver.id: _driver_name(driver) for driver in drivers}
     last_accepted_names = _last_accepted_driver_names(session, [row.id for row in requests])
+    offers_by_request = _offers_by_request(session, [row.id for row in requests])
 
     for request in requests:
         restaurant = restaurants.get(request.restaurant_id)
@@ -454,6 +527,7 @@ def build_dispatch_monitor_snapshot(
                 dropoff_lat=request.dropoff_lat,
                 dropoff_lng=request.dropoff_lng,
                 dropoff_address=request.dropoff_address,
+                dropoff_maps_url=request.dropoff_maps_url,
                 payment_method=request.payment_method,
                 collect_cents=request.collect_cents,
                 cash_denomination_cents=request.cash_denomination_cents,
@@ -466,6 +540,7 @@ def build_dispatch_monitor_snapshot(
                 assigned_driver_name=assigned_name,
                 last_assigned_driver_name=last_assigned_name,
                 dispatch_group_id=request.dispatch_group_id,
+                zone_id=request.zone_id,
                 zone_name=zone_names.get(request.zone_id),
                 package_size=request.package_size,
                 package_count=request.package_count,
@@ -477,6 +552,13 @@ def build_dispatch_monitor_snapshot(
                 search_blockers=blockers,
                 cycle_rejected_count=len(request.cycle_rejected_driver_ids),
                 cycle_silent_count=len(request.cycle_silent_driver_ids),
+                created_at=request.created_at,
+                timeline=_timeline_events(
+                    request,
+                    timeout_at=timeout_at,
+                    assigned_name=assigned_name,
+                    offers=offers_by_request.get(request.id, []),
+                ),
             )
         )
 
@@ -517,6 +599,7 @@ def build_dispatch_monitor_snapshot(
                     destination_lat=destination_lat,
                     destination_lng=destination_lng,
                     destination_label=destination_label,
+                    zone_id=request.zone_id,
                 )
             )
 
