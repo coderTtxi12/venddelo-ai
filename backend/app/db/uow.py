@@ -98,6 +98,6 @@ def get_uow() -> Iterator[SqlAlchemyUnitOfWork]:
         try:
             yield uow
             uow.commit()
-            flush_delivery_tasks()
+            flush_delivery_tasks(uow.session)
         finally:
-            discard_delivery_tasks()
+            discard_delivery_tasks(uow.session)
