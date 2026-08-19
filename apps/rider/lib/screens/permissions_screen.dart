@@ -102,51 +102,60 @@ class _PermissionsScreenState extends State<PermissionsScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 12),
-              Text(
-                'Permisos necesarios',
-                style: Theme.of(context).textTheme.headlineMedium,
+              Expanded(
+                child: snapshot == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const SizedBox(height: 12),
+                            Text(
+                              'Permisos necesarios',
+                              style: Theme.of(context).textTheme.headlineMedium,
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Para recibir ofertas y repartir en línea, Mexy necesita GPS en segundo plano y notificaciones.',
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                            ),
+                            const SizedBox(height: 24),
+                            _PermissionTile(
+                              title: 'GPS activado',
+                              subtitle:
+                                  'El teléfono debe tener ubicación encendida.',
+                              granted: snapshot.locationServiceEnabled,
+                            ),
+                            const SizedBox(height: 10),
+                            _PermissionTile(
+                              title: 'Ubicación siempre',
+                              subtitle:
+                                  'Para seguir tu ruta aunque la app esté en segundo plano.',
+                              granted: snapshot.locationAlwaysGranted,
+                            ),
+                            const SizedBox(height: 10),
+                            _PermissionTile(
+                              title: 'Notificaciones',
+                              subtitle:
+                                  'Para el servicio en línea y avisos del sistema.',
+                              granted: snapshot.notificationsGranted,
+                            ),
+                            if (snapshot.firebaseAvailable) ...[
+                              const SizedBox(height: 10),
+                              _PermissionTile(
+                                title: 'Alertas de ofertas',
+                                subtitle:
+                                    'Para avisarte al instante cuando llegue un envío.',
+                                granted: snapshot.pushNotificationsGranted,
+                              ),
+                            ],
+                            const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
               ),
-              const SizedBox(height: 10),
-              Text(
-                'Para recibir ofertas y repartir en línea, Mexy necesita GPS en segundo plano y notificaciones.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-              ),
-              const SizedBox(height: 24),
-              if (snapshot != null) ...[
-                _PermissionTile(
-                  title: 'GPS activado',
-                  subtitle: 'El teléfono debe tener ubicación encendida.',
-                  granted: snapshot.locationServiceEnabled,
-                ),
-                const SizedBox(height: 10),
-                _PermissionTile(
-                  title: 'Ubicación siempre',
-                  subtitle:
-                      'Para seguir tu ruta aunque la app esté en segundo plano.',
-                  granted: snapshot.locationAlwaysGranted,
-                ),
-                const SizedBox(height: 10),
-                _PermissionTile(
-                  title: 'Notificaciones',
-                  subtitle: 'Para el servicio en línea y avisos del sistema.',
-                  granted: snapshot.notificationsGranted,
-                ),
-                if (snapshot.firebaseAvailable) ...[
-                  const SizedBox(height: 10),
-                  _PermissionTile(
-                    title: 'Alertas de ofertas',
-                    subtitle: 'Para avisarte al instante cuando llegue un envío.',
-                    granted: snapshot.pushNotificationsGranted,
-                  ),
-                ],
-              ] else
-                const Expanded(
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              const Spacer(),
               if (_error != null) ...[
                 RiderErrorBanner(message: _error!),
                 const SizedBox(height: 12),
