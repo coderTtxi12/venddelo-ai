@@ -67,9 +67,7 @@ class RiderMapController {
         ),
       );
     } finally {
-      // Release AOT fires onCameraMoveStarted after the animation; keep the
-      // lock long enough that it is not treated as a user pan (which untilts).
-      await Future<void>.delayed(const Duration(milliseconds: 900));
+      await Future<void>.delayed(const Duration(milliseconds: 280));
       _programmaticMove = false;
     }
   }
