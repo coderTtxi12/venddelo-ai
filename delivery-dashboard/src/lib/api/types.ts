@@ -378,6 +378,20 @@ export type DispatchMonitorDriver = {
   pre_free_eta_seconds?: number | null;
   occupied_job_count?: number;
   active_package_count?: number;
+  itinerary?: DriverItineraryStopApi[];
+};
+
+export type DriverItineraryStopApi = {
+  sequence: number;
+  kind: 'restaurant' | 'dropoff';
+  request_id: string;
+  current?: boolean;
+  title?: string | null;
+  detail?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  short_id?: string | null;
+  action?: string | null;
 };
 
 export type DispatchMonitorSearchBlocker = {
