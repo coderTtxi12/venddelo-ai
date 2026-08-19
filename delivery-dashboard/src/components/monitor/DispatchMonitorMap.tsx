@@ -10,6 +10,7 @@ import {
 } from '@/lib/dispatch/driverItinerary';
 import { fetchRoadRoute } from '@/lib/dispatch/fetchRoadRoute';
 import { formatShortId } from '@/lib/dispatch/monitorCopy';
+import { ALL_ZONES_ID, zoneColorForId, type ZoneColor } from '@/lib/dispatch/zoneColors';
 import { motorcycleColorHex } from '@/lib/drivers/motorcycleColors';
 import { getGoogleMapsMapId, loadGoogleMaps } from '@/lib/loadGoogleMaps';
 import styles from './DispatchMonitorMap.module.css';
@@ -26,18 +27,6 @@ type DispatchMonitorMapProps = {
   ) => void;
 };
 
-const ZONE_STYLE = {
-  fillColor: '#93C5FD',
-  fillOpacity: 0.16,
-  strokeColor: '#2563EB',
-  strokeWeight: 2,
-  strokeOpacity: 0.7,
-  editable: false,
-  draggable: false,
-  clickable: false,
-  zIndex: 1,
-} as const;
-
 const SELECTED_ZONE_STYLE = {
   fillColor: '#2563EB',
   fillOpacity: 0.18,
@@ -50,7 +39,58 @@ const SELECTED_ZONE_STYLE = {
   zIndex: 2,
 } as const;
 
+function zonePolygonStyle(color: ZoneColor, emphasized: boolean) {
+  return {
+    fillColor: color.fill,
+    fillOpacity: emphasized ? 0.18 : 0.14,
+    strokeColor: color.stroke,
+    strokeWeight: emphasized ? 2.5 : 2,
+    strokeOpacity: emphasized ? 0.95 : 0.8,
+    editable: false,
+    draggable: false,
+    clickable: false,
+    zIndex: emphasized ? 2 : 1,
+  } as const;
+}
+
 const PENDING_REQUEST_STATUSES = new Set(['scheduled', 'searching', 'offered', 'unassigned']);
+
+function coloredPolylineStyle(
+  color: string,
+  focused: boolean,
+  dashed: boolean,
+): google.maps.PolylineOptions {
+  if (dashed) {
+    return {
+      strokeColor: color,
+      strokeOpacity: 0,
+      strokeWeight: focused ? 3.5 : 2.5,
+      geodesic: true,
+      clickable: false,
+      zIndex: focused ? 8 : 3,
+      icons: [
+        {
+          icon: {
+            path: 'M 0,-1 0,1',
+            strokeOpacity: focused ? 1 : 0.9,
+            strokeColor: color,
+            scale: focused ? 3 : 2.5,
+          },
+          offset: '0',
+          repeat: '10px',
+        },
+      ],
+    };
+  }
+  return {
+    strokeColor: color,
+    strokeOpacity: focused ? 0.95 : 0.85,
+    strokeWeight: focused ? 5 : 3,
+    geodesic: true,
+    clickable: false,
+    zIndex: focused ? 9 : 4,
+  };
+}
 
 const REQUEST_ROUTE_STYLE: google.maps.PolylineOptions = {
   strokeColor: '#F97316',
@@ -154,24 +194,36 @@ function ringCentroid(ring: google.maps.LatLngLiteral[]): google.maps.LatLngLite
   return { lat: sum.lat / ring.length, lng: sum.lng / ring.length };
 }
 
-function createZoneLabel(name: string, selected: boolean): HTMLElement {
+function createZoneLabel(name: string, selected: boolean, color?: string): HTMLElement {
   const el = document.createElement('div');
   el.className = selected ? `${styles.zoneLabel} ${styles.zoneLabelSelected}` : styles.zoneLabel;
+  if (color) el.style.background = color;
   el.textContent = name;
   el.setAttribute('aria-hidden', 'true');
   return el;
 }
 
-function createRequestLabel(shortId: string, pending: boolean, focused = false): HTMLElement {
+function createRequestLabel(
+  shortId: string,
+  pending: boolean,
+  focused = false,
+  color?: string,
+): HTMLElement {
   const el = document.createElement('div');
   el.className = pending ? `${styles.requestLabel} ${styles.requestLabelPending}` : styles.requestLabel;
   if (focused) el.classList.add(styles.requestLabelFocused);
+  if (color) el.style.background = color;
   el.textContent = formatShortId(shortId);
   el.setAttribute('aria-hidden', 'true');
   return el;
 }
 
-function createNumberedPin(kind: 'restaurant' | 'dropoff', sequence: number, current: boolean): HTMLElement {
+function createNumberedPin(
+  kind: 'restaurant' | 'dropoff',
+  sequence: number,
+  current: boolean,
+  color?: string,
+): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = styles.stopPin;
   const badge = document.createElement('span');
@@ -180,6 +232,7 @@ function createNumberedPin(kind: 'restaurant' | 'dropoff', sequence: number, cur
   const pin = document.createElement('div');
   pin.className = kind === 'restaurant' ? styles.restaurantPin : styles.dropoffPin;
   pin.classList.add(styles.stopPinMark);
+  if (color) pin.style.background = color;
   wrap.append(badge, pin);
   wrap.setAttribute('aria-hidden', 'true');
   return wrap;
@@ -305,6 +358,13 @@ export function DispatchMonitorMap({
     () => (snapshot && focusedDriverId ? buildDriverItinerary(snapshot, focusedDriverId) : null),
     [focusedDriverId, snapshot],
   );
+  const colorByZone = selectedZoneId === ALL_ZONES_ID;
+  const zoneIds = useMemo(() => zones.map((zone) => zone.id), [zones]);
+  const visibleZones = useMemo(() => {
+    if (colorByZone) return zones;
+    if (!selectedZoneId) return [];
+    return zones.filter((zone) => zone.id === selectedZoneId);
+  }, [colorByZone, selectedZoneId, zones]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -358,16 +418,16 @@ export function DispatchMonitorMap({
       zonePolygonsRef.current = [];
       zoneLabelsRef.current = [];
 
-      for (const zone of zones) {
+      for (const zone of visibleZones) {
         if (!zone.polygon) continue;
         const ring = geoJsonToLatLngRing(zone.polygon);
         if (ring.length < 3) continue;
 
-        const selected = zone.id === selectedZoneId;
+        const color = zoneColorForId(zone.id, zoneIds);
         const overlay = new google.maps.Polygon({
           paths: ring,
           map,
-          ...(selected ? SELECTED_ZONE_STYLE : ZONE_STYLE),
+          ...(colorByZone ? zonePolygonStyle(color, true) : SELECTED_ZONE_STYLE),
         });
         zonePolygonsRef.current.push(overlay);
 
@@ -379,8 +439,8 @@ export function DispatchMonitorMap({
             map,
             position: centroid,
             gmpClickable: false,
-            zIndex: selected ? 4 : 3,
-            content: createZoneLabel(zone.name, selected),
+            zIndex: 4,
+            content: createZoneLabel(zone.name, !colorByZone, colorByZone ? color.stroke : undefined),
           }),
         );
       }
@@ -389,7 +449,7 @@ export function DispatchMonitorMap({
     return () => {
       cancelled = true;
     };
-  }, [mapReady, selectedZoneId, zones]);
+  }, [colorByZone, mapReady, selectedZoneId, visibleZones, zoneIds]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -397,7 +457,7 @@ export function DispatchMonitorMap({
 
     if (!snapshot) {
       lastFitKeyRef.current = null;
-      fitBounds(map, zoneRingPoints(zones));
+      fitBounds(map, zoneRingPoints(visibleZones));
       return;
     }
 
@@ -419,6 +479,12 @@ export function DispatchMonitorMap({
       polylinesRef.current = [];
 
       const points: google.maps.LatLngLiteral[] = [];
+      const requestZoneId = (requestId: string | null | undefined) =>
+        snapshot.requests.find((row) => row.id === requestId)?.zone_id ?? null;
+      const driverZoneId = (driver: (typeof snapshot.drivers)[number]) =>
+        requestZoneId(driver.active_request_id) ?? driver.registered_zone_id ?? null;
+      const colorFor = (zoneId: string | null | undefined) =>
+        colorByZone ? zoneColorForId(zoneId, zoneIds).solid : undefined;
 
       for (const driver of snapshot.drivers) {
         if (driver.last_lat == null || driver.last_lng == null) continue;
@@ -433,6 +499,13 @@ export function DispatchMonitorMap({
         if (driver.credit_blocked) pin.classList.add(styles.driverPinBlocked);
         if (focused) pin.classList.add(styles.driverPinFocused);
         if (focusedDriverId && !focused) pin.classList.add(styles.pinDim);
+        const driverColor = colorFor(driverZoneId(driver));
+        if (driverColor) {
+          const swatch = document.createElement('span');
+          swatch.className = styles.zonePinSwatch;
+          swatch.style.background = driverColor;
+          pin.appendChild(swatch);
+        }
 
         const dot = document.createElement('span');
         dot.className = styles.driverDot;
@@ -460,7 +533,12 @@ export function DispatchMonitorMap({
           if (stop.kind !== 'restaurant' && stop.kind !== 'dropoff') continue;
           const position = { lat: stop.lat, lng: stop.lng };
           points.push(position);
-          const pin = createNumberedPin(stop.kind, stop.sequence ?? 0, stop.current);
+          const pin = createNumberedPin(
+            stop.kind,
+            stop.sequence ?? 0,
+            stop.current,
+            colorFor(requestZoneId(stop.requestId)),
+          );
           pin.title = `${stop.sequence}. ${stop.action} · ${stop.title}`;
           markersRef.current.push(
             new AdvancedMarkerElement({
@@ -482,6 +560,8 @@ export function DispatchMonitorMap({
           dropPin.className = requestFocused
             ? `${styles.dropoffPin} ${styles.dropoffPinFocused}`
             : styles.dropoffPin;
+          const dropColor = colorFor(request.zone_id);
+          if (dropColor) dropPin.style.background = dropColor;
           dropPin.title = request.dropoff_address;
 
           markersRef.current.push(
@@ -502,6 +582,8 @@ export function DispatchMonitorMap({
             restaurantPin.className = requestFocused
               ? `${styles.restaurantPin} ${styles.restaurantPinFocused}`
               : styles.restaurantPin;
+            const restaurantColor = colorFor(request.zone_id);
+            if (restaurantColor) restaurantPin.style.background = restaurantColor;
 
             markersRef.current.push(
               new AdvancedMarkerElement({
@@ -569,12 +651,17 @@ export function DispatchMonitorMap({
 
       for (const { request, path } of pendingRoadPaths) {
         const focused = request.id === focusedRequestId;
+        const zoneColor = colorFor(request.zone_id);
         points.push(path[0], path[path.length - 1]);
         polylinesRef.current.push(
           new google.maps.Polyline({
             map,
             path,
-            ...(focused ? FOCUSED_REQUEST_ROUTE_STYLE : REQUEST_ROUTE_STYLE),
+            ...(zoneColor
+              ? coloredPolylineStyle(zoneColor, focused, true)
+              : focused
+                ? FOCUSED_REQUEST_ROUTE_STYLE
+                : REQUEST_ROUTE_STYLE),
           }),
         );
         markersRef.current.push(
@@ -583,19 +670,24 @@ export function DispatchMonitorMap({
             position: pointAlongPath(path),
             gmpClickable: false,
             zIndex: focused ? 10 : 6,
-            content: createRequestLabel(request.short_id, true, focused),
+            content: createRequestLabel(request.short_id, true, focused, zoneColor),
           }),
         );
       }
 
       for (const { route, path } of roadPaths) {
         const focused = route.request_id === focusedRequestId;
+        const zoneColor = colorFor(route.zone_id ?? requestZoneId(route.request_id));
         points.push(path[0], path[path.length - 1]);
         polylinesRef.current.push(
           new google.maps.Polyline({
             map,
             path,
-            ...(focused ? FOCUSED_ACTIVE_ROUTE_STYLE : ACTIVE_ROUTE_STYLE),
+            ...(zoneColor
+              ? coloredPolylineStyle(zoneColor, focused, false)
+              : focused
+                ? FOCUSED_ACTIVE_ROUTE_STYLE
+                : ACTIVE_ROUTE_STYLE),
           }),
         );
         markersRef.current.push(
@@ -604,7 +696,7 @@ export function DispatchMonitorMap({
             position: pointAlongPath(path),
             gmpClickable: false,
             zIndex: focused ? 11 : 7,
-            content: createRequestLabel(route.short_id, false, focused),
+            content: createRequestLabel(route.short_id, false, focused, zoneColor),
           }),
         );
       }
@@ -662,14 +754,14 @@ export function DispatchMonitorMap({
         nextPoints = focusedRequestPoints.length > 0 ? focusedRequestPoints : points;
         padding = 88;
       } else {
-        fitKey = `overview:${points.length}:${points[0]?.lat ?? 0},${points[0]?.lng ?? 0}`;
+        fitKey = `overview:${selectedZoneId ?? 'none'}:${points.length}:${points[0]?.lat ?? 0},${points[0]?.lng ?? 0}`;
       }
 
       if (lastFitKeyRef.current !== fitKey) {
         if (nextPoints && nextPoints.length > 0) {
           fitBounds(map, nextPoints, padding);
         } else if (!focusedDriver) {
-          fitBounds(map, zoneRingPoints(zones));
+          fitBounds(map, zoneRingPoints(visibleZones));
         }
         lastFitKeyRef.current = fitKey;
       }
@@ -678,7 +770,7 @@ export function DispatchMonitorMap({
     return () => {
       cancelled = true;
     };
-  }, [focusedDriverId, focusedRequestId, itinerary, mapReady, snapshot, zones]);
+  }, [colorByZone, focusedDriverId, focusedRequestId, itinerary, mapReady, snapshot, visibleZones, zoneIds]);
 
   if (mapError) {
     return (
@@ -729,7 +821,10 @@ export function DispatchMonitorMap({
                     const [moved] = next.splice(from, 1);
                     next.splice(index, 0, moved);
                     const payload = next
-                      .filter((item) => item.kind === 'restaurant' || item.kind === 'dropoff')
+                      .filter(
+                        (item): item is typeof item & { kind: 'restaurant' | 'dropoff' } =>
+                          item.kind === 'restaurant' || item.kind === 'dropoff',
+                      )
                       .map((item) => ({
                         kind: item.kind,
                         request_id: item.requestId || '',
