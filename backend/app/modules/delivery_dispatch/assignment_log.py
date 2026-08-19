@@ -25,8 +25,8 @@ BLOCKER_LABELS = {
 CASE_DETAILS = {
     "A": "El más cercano al restaurante",
     "B": "Varios pedidos listos · riders en paralelo",
-    "C": "Alta demanda · entregas cercanas, un rider",
-    "D": "Alta demanda · rider que ya iba de camino",
+    "C": "Alta demanda · mismo restaurante, último dropoff cercano",
+    "D": "Alta demanda · rider ocupado cerca del restaurante",
     "E": "Alta demanda · rider libre más cercano al restaurante",
     "M": "Asignación manual desde el monitor",
 }
