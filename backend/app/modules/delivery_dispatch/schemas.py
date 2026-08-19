@@ -517,7 +517,11 @@ class DispatchMonitorRequestDTO(BaseModel):
     status: str
     customer_name: str
     customer_phone: str
+    restaurant_id: uuid.UUID
     restaurant_name: str
+    restaurant_address: str | None = None
+    restaurant_phone: str | None = None
+    restaurant_logo_path: str | None = None
     restaurant_lat: float | None = None
     restaurant_lng: float | None = None
     dropoff_lat: float
