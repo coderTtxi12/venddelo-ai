@@ -45,8 +45,8 @@ export function caseLabel(caseApplied: string | null | undefined): string | null
 export function caseHint(caseApplied: string | null | undefined): string | null {
   if (caseApplied === 'A') return 'Rider libre más cercano al restaurante';
   if (caseApplied === 'B') return 'Varios pedidos due, riders en paralelo';
-  if (caseApplied === 'C') return 'Alta demanda · dropoffs cercanos, un rider';
-  if (caseApplied === 'D') return 'Alta demanda · rider en ruta';
+  if (caseApplied === 'C') return 'Alta demanda · mismo restaurante, último dropoff cercano';
+  if (caseApplied === 'D') return 'Alta demanda · rider ocupado cerca del restaurante';
   if (caseApplied === 'E') return 'Alta demanda · rider libre más cercano al restaurante';
   if (caseApplied === 'M') return 'Oferta enviada a mano desde el monitor';
   return null;
