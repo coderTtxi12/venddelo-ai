@@ -8,6 +8,8 @@ type DriverPhoneContactProps = {
   phone: string | null | undefined;
   className?: string;
   compact?: boolean;
+  /** Hide the phone number and keep only WhatsApp / call actions. */
+  iconsOnly?: boolean;
   /** Stops parent button handlers when embedded in clickable cards. */
   stopPropagation?: boolean;
 };
@@ -16,6 +18,7 @@ export function DriverPhoneContact({
   phone,
   className,
   compact = false,
+  iconsOnly = false,
   stopPropagation = false,
 }: DriverPhoneContactProps) {
   const trimmed = phone?.trim();
@@ -34,6 +37,7 @@ export function DriverPhoneContact({
   const rootClass = [
     styles.root,
     compact ? styles.compact : '',
+    iconsOnly ? styles.iconsOnly : '',
     className ?? '',
   ]
     .filter(Boolean)
@@ -41,15 +45,17 @@ export function DriverPhoneContact({
 
   return (
     <div className={rootClass} onClick={handleClick}>
-      <a
-        href={whatsappHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={styles.numberLink}
-        aria-label={`WhatsApp ${trimmed}`}
-      >
-        {trimmed}
-      </a>
+      {iconsOnly ? null : (
+        <a
+          href={whatsappHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.numberLink}
+          aria-label={`WhatsApp ${trimmed}`}
+        >
+          {trimmed}
+        </a>
+      )}
       <span className={styles.actions} aria-hidden={false}>
         <a
           href={whatsappHref}
