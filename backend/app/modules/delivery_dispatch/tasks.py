@@ -165,6 +165,7 @@ def handle_task(session: Session, payload: dict, now: datetime | None = None) ->
 
 
 def run_search(session: Session, request_id: uuid.UUID, now: datetime) -> None:
+    expire_stale_open_offers(session, now)
     request = session.scalar(
         select(DeliveryDispatchRequest)
         .where(
@@ -406,6 +407,7 @@ def _assign_or_retry(
         return
 
     extra_excluded: set[str] = set()
+    expire_stale_open_offers(session, now)
     drivers = list(_load_drivers(session, request.delivery_provider_id))
     last_context: EngineContext | None = None
     last_high_demand = False
