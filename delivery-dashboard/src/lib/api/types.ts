@@ -231,6 +231,9 @@ export type DeliveryAssignmentSettings = {
   max_extra_route_minutes: number;
   max_pickup_detour_minutes: number;
   max_destination_detour_minutes: number;
+  max_extra_route_meters: number;
+  max_pickup_detour_meters: number;
+  max_destination_detour_meters: number;
   max_active_packages_per_driver: number;
   assignment_retry_seconds: number;
   assignment_timeout_seconds: number;
