@@ -10,7 +10,7 @@ from app.modules.delivery_dispatch.geo import geodesic_meters
 _OCCUPIED_STATUSES = frozenset({"assigned", "picked_up", "in_transit"})
 _ON_ROUTE_STATUSES = frozenset({"picked_up", "in_transit"})
 _GROUPABLE_STATUSES = frozenset({"scheduled", "searching"})
-CaseName = Literal["A", "B", "C", "D"]
+CaseName = Literal["A", "B", "C", "D", "E"]
 
 _PICKUP_PROXIMITY_WEIGHT = 3
 _DESTINATION_COMPAT_WEIGHT = 3
@@ -137,6 +137,14 @@ def choose_assignments(context: EngineContext) -> EngineResult:
         result = _assign_case_c(context, group)
         if result.offers:
             return result
+
+    driver = _nearest_free(context, context.request, taken=set())
+    if driver is not None:
+        return EngineResult(
+            case="E",
+            offers=(EngineOffer(request_id=context.request.id, driver_id=driver.id, case="E"),),
+            high_demand=True,
+        )
 
     offers = _assign_case_d(context)
     if offers:
