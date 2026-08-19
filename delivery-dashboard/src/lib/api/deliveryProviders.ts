@@ -339,6 +339,13 @@ export function getMyDispatchHistory(
   );
 }
 
+export function retryMyUnassignedDispatchRequest(token: string, requestId: string) {
+  return apiRequest<{ id: string; status: string; search_at: string }>(
+    `/delivery-providers/me/dispatch-requests/${requestId}/retry`,
+    { method: 'POST', token },
+  );
+}
+
 export function createMyManualDispatchOffer(
   token: string,
   requestId: string,
