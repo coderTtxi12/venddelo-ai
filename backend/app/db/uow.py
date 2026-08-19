@@ -92,6 +92,12 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
 
 
 def get_uow() -> Iterator[SqlAlchemyUnitOfWork]:
+    from app.modules.delivery_dispatch.tasks import discard_delivery_tasks, flush_delivery_tasks
+
     with SqlAlchemyUnitOfWork() as uow:
-        yield uow
-        uow.commit()
+        try:
+            yield uow
+            uow.commit()
+            flush_delivery_tasks()
+        finally:
+            discard_delivery_tasks()
