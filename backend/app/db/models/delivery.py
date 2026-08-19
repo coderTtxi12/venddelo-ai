@@ -472,6 +472,9 @@ class DeliveryDriver(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     offers: Mapped[list["DeliveryDispatchOffer"]] = relationship(back_populates="driver")
     credit_holds: Mapped[list["DeliveryCreditHold"]] = relationship(back_populates="driver")
+    itinerary_stops: Mapped[list["DeliveryDriverItineraryStop"]] = relationship(
+        back_populates="driver"
+    )
 
     __table_args__ = (
         Index(
@@ -740,4 +743,31 @@ class DeliveryCreditHold(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "status IN ('held','released')",
             name="status_allowed",
         ),
+    )
+
+
+class DeliveryDriverItineraryStop(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "delivery_driver_itinerary_stops"
+
+    driver_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_drivers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_dispatch_requests.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+
+    driver: Mapped["DeliveryDriver"] = relationship(back_populates="itinerary_stops")
+    request: Mapped["DeliveryDispatchRequest"] = relationship()
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('restaurant','dropoff')", name="kind_allowed"),
+        UniqueConstraint("driver_id", "sequence", name="uq_driver_itinerary_sequence"),
+        UniqueConstraint("driver_id", "request_id", "kind", name="uq_driver_itinerary_stop"),
+        Index("ix_delivery_driver_itinerary_driver", "driver_id", "sequence"),
     )
