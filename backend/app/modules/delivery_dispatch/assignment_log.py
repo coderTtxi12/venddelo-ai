@@ -50,7 +50,7 @@ def searched_detail(
         return "No hay repartidores dados de alta."
     if eligible_count > 0:
         if high_demand:
-            return "Había riders libres, pero no se pudo agrupar ni encadenar."
+            return "Había riders elegibles, pero no se pudo enganchar ni encadenar."
         return "Había riders, pero el motor no soltó oferta (reserva de libres)."
     parts = []
     for code, count in sorted(blocker_counts.items(), key=lambda item: (-item[1], item[0])):
