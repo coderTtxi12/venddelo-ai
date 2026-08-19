@@ -21,6 +21,10 @@
   animation: drawerIn 160ms ease-out;
 }
 
+.drawerNarrow {
+  width: min(440px, 92vw);
+}
+
 @keyframes drawerIn {
   from {
     transform: translateX(12px);

@@ -1,16 +1,17 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import styles from './RightDrawer.module.css';
 
 type RightDrawerProps = {
   open: boolean;
   title: string;
   onClose: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
+  size?: 'default' | 'narrow';
 };
 
-export function RightDrawer({ open, title, onClose, children }: RightDrawerProps) {
+export function RightDrawer({ open, title, onClose, children, size = 'default' }: RightDrawerProps) {
   useEffect(() => {
     if (!open) return;
 
@@ -33,7 +34,7 @@ export function RightDrawer({ open, title, onClose, children }: RightDrawerProps
   return (
     <div className={styles.backdrop} onClick={onClose} role="presentation">
       <div
-        className={styles.drawer}
+        className={`${styles.drawer}${size === 'narrow' ? ` ${styles.drawerNarrow}` : ''}`}
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
