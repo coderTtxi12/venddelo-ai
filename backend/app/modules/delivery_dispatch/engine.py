@@ -395,70 +395,28 @@ def _score_case_d(
         return None
     if not _is_eligible(context, request, driver):
         return None
-    if driver.active_dropoff_lat is None or driver.active_dropoff_lng is None:
-        return None
     if driver.last_lat is None or driver.last_lng is None:
         return None
 
-    speed = context.settings.pre_free_speed_mps
     pickup_m = geodesic_meters(
         driver.last_lat, driver.last_lng, request.restaurant_lat, request.restaurant_lng
     )
-    dest_m = geodesic_meters(
-        request.dropoff_lat,
-        request.dropoff_lng,
-        driver.active_dropoff_lat,
-        driver.active_dropoff_lng,
-    )
-    pickup_minutes = _meters_to_minutes(pickup_m, speed)
-    dest_minutes = _meters_to_minutes(dest_m, speed)
-    if pickup_minutes > context.settings.max_pickup_detour_minutes:
-        return None
-    if dest_minutes > context.settings.max_destination_detour_minutes:
-        return None
-    if pickup_minutes + dest_minutes > context.settings.max_extra_route_minutes:
+    if pickup_m > context.settings.max_pickup_detour_meters:
         return None
 
     pickup_score = _proximity_score(pickup_m)
-    dest_score = _proximity_score(dest_m)
-    detour_score = _detour_score(
-        pickup_minutes,
-        dest_minutes,
-        context.settings.max_pickup_detour_minutes,
-        context.settings.max_destination_detour_minutes,
-    )
     remaining = context.settings.max_active_packages_per_driver - (
         driver.active_package_count + request.package_count
     )
     capacity_score = max(0, min(100, remaining * 50))
     return (
         _PICKUP_PROXIMITY_WEIGHT * pickup_score
-        + _DESTINATION_COMPAT_WEIGHT * dest_score
-        + _DETOUR_WEIGHT * detour_score
         + _CAPACITY_WEIGHT * capacity_score
     )
 
 
-def _meters_to_minutes(meters: float, speed_mps: float) -> float:
-    if speed_mps <= 0:
-        return float("inf")
-    return (meters / speed_mps) / 60.0
-
-
 def _proximity_score(meters: float) -> int:
     return max(0, min(100, int(100 - meters / 50)))
-
-
-def _detour_score(
-    pickup_minutes: float,
-    dest_minutes: float,
-    max_pickup: int,
-    max_dest: int,
-) -> int:
-    pickup_ratio = pickup_minutes / max_pickup if max_pickup else 1.0
-    dest_ratio = dest_minutes / max_dest if max_dest else 1.0
-    used = max(pickup_ratio, dest_ratio)
-    return max(0, min(100, int(100 * (1 - used))))
 
 
 def _nearest_free(
