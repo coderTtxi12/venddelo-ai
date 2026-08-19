@@ -862,6 +862,7 @@ class RestaurantDispatchService:
             "search",
             search_at,
             {"kind": "search", "request_id": str(row.id)},
+            session=self._session,
         )
         self._session.refresh(row)
         notify_request_realtime(self._session, row)
@@ -980,7 +981,12 @@ class RestaurantDispatchService:
         row.search_at = now
         row.next_attempt_at = now
         reset_cycle_driver_ids(row)
-        enqueue("search", now, {"kind": "search", "request_id": str(row.id)})
+        enqueue(
+            "search",
+            now,
+            {"kind": "search", "request_id": str(row.id)},
+            session=self._session,
+        )
         return self._flush_request(row)
 
     def confirm_rider_cash(
