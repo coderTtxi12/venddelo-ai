@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -22,6 +23,7 @@ from app.modules.delivery_dispatch.engine import (
     EngineDriver,
     EngineOffer,
     EngineRequest,
+    EngineResult,
     EngineSettings,
     assignment_timed_out,
     choose_assignments,
@@ -120,6 +122,10 @@ def run_search(session: Session, request_id: uuid.UUID, now: datetime) -> None:
 
 
 def handle_expire_offer(session: Session, offer_id: uuid.UUID, now: datetime) -> None:
+    peek = session.get(DeliveryDispatchOffer, offer_id)
+    if peek is None or peek.status != "offered":
+        return
+    request, _group = lock_request_and_group(session, peek.request_id)
     offer = session.scalar(
         select(DeliveryDispatchOffer)
         .where(DeliveryDispatchOffer.id == offer_id)
@@ -127,11 +133,12 @@ def handle_expire_offer(session: Session, offer_id: uuid.UUID, now: datetime) ->
     )
     if offer is None or offer.status != "offered":
         return
-    request = session.scalar(
-        select(DeliveryDispatchRequest)
-        .where(DeliveryDispatchRequest.id == offer.request_id)
-        .with_for_update()
-    )
+    if request is None:
+        request = session.scalar(
+            select(DeliveryDispatchRequest)
+            .where(DeliveryDispatchRequest.id == offer.request_id)
+            .with_for_update()
+        )
     if request is None:
         return
     offer.status = "expired"
@@ -300,11 +307,12 @@ def _assign_or_retry(
             if busy:
                 continue
             persisted_current = False
+            conflict = False
             for item, driver in prepared:
                 target = _lock_offer_target(session, request, uuid.UUID(item.request_id), now)
                 if target is None:
                     continue
-                _persist_dispatch_offer(
+                created = _persist_dispatch_offer(
                     session,
                     target,
                     driver,
@@ -313,8 +321,14 @@ def _assign_or_retry(
                     group_id=result.group_id,
                     expires_at=expires_at,
                 )
+                if created is None:
+                    extra_excluded.add(item.driver_id)
+                    conflict = True
+                    break
                 if target.id == request.id:
                     persisted_current = True
+            if conflict:
+                continue
             if not persisted_current:
                 _enqueue_retry(session, request, now)
             return
@@ -337,7 +351,12 @@ def _assign_or_retry(
             extra_excluded.add(chosen.driver_id)
             continue
 
-        _persist_dispatch_offer(
+        if chosen.case == "C" and result.group_id:
+            locked_members = _lock_case_c_members(session, request, result)
+        else:
+            locked_members = {request.id: request}
+
+        created = _persist_dispatch_offer(
             session,
             request,
             driver,
@@ -346,22 +365,92 @@ def _assign_or_retry(
             group_id=result.group_id,
             expires_at=expires_at,
         )
+        if created is None:
+            extra_excluded.add(chosen.driver_id)
+            continue
         if result.case == "C" and result.group_id:
-            group_uuid = uuid.UUID(result.group_id)
-            for item in result.offers:
-                grouped = session.get(DeliveryDispatchRequest, uuid.UUID(item.request_id))
-                if grouped is None:
-                    continue
-                if (
-                    grouped.dispatch_group_id is not None
-                    and grouped.dispatch_group_id != group_uuid
-                    and _live_group_offer(session, grouped, now) is not None
-                ):
-                    continue
-                grouped.dispatch_group_id = group_uuid
+            _attach_case_c_group(session, request, result, now, locked_members)
         return
 
     _enqueue_retry(session, request, now)
+
+
+def lock_request_and_group(
+    session: Session,
+    request_id: uuid.UUID,
+) -> tuple[DeliveryDispatchRequest | None, list[DeliveryDispatchRequest]]:
+    locked: dict[uuid.UUID, DeliveryDispatchRequest] = {}
+    pending = {request_id}
+    while pending:
+        for rid in sorted(pending):
+            row = session.scalar(
+                select(DeliveryDispatchRequest)
+                .where(DeliveryDispatchRequest.id == rid)
+                .with_for_update()
+            )
+            if row is not None:
+                locked[rid] = row
+        pending = set()
+        for row in locked.values():
+            if row.dispatch_group_id is None:
+                continue
+            member_ids = session.scalars(
+                select(DeliveryDispatchRequest.id).where(
+                    DeliveryDispatchRequest.dispatch_group_id == row.dispatch_group_id
+                )
+            )
+            for member_id in member_ids:
+                if member_id not in locked:
+                    pending.add(member_id)
+    request = locked.get(request_id)
+    return request, [locked[rid] for rid in sorted(locked)]
+
+
+def _lock_case_c_members(
+    session: Session,
+    request: DeliveryDispatchRequest,
+    result: EngineResult,
+) -> dict[uuid.UUID, DeliveryDispatchRequest]:
+    locked = {request.id: request}
+    member_ids = sorted({uuid.UUID(item.request_id) for item in result.offers})
+    for member_id in member_ids:
+        if member_id == request.id:
+            continue
+        row = session.scalar(
+            select(DeliveryDispatchRequest)
+            .where(
+                DeliveryDispatchRequest.id == member_id,
+                DeliveryDispatchRequest.status.in_(tuple(_SEARCHABLE)),
+            )
+            .with_for_update(skip_locked=True)
+        )
+        if row is not None:
+            locked[member_id] = row
+    return locked
+
+
+def _attach_case_c_group(
+    session: Session,
+    request: DeliveryDispatchRequest,
+    result: EngineResult,
+    now: datetime,
+    locked_members: dict[uuid.UUID, DeliveryDispatchRequest],
+) -> None:
+    if result.group_id is None:
+        return
+    locked_members.setdefault(request.id, request)
+    group_uuid = uuid.UUID(result.group_id)
+    for item in result.offers:
+        grouped = locked_members.get(uuid.UUID(item.request_id))
+        if grouped is None:
+            continue
+        if (
+            grouped.dispatch_group_id is not None
+            and grouped.dispatch_group_id != group_uuid
+            and _live_group_offer(session, grouped, now) is not None
+        ):
+            continue
+        grouped.dispatch_group_id = group_uuid
 
 
 def _lock_offer_target(
@@ -389,6 +478,42 @@ def _lock_offer_target(
     return target
 
 
+_LIVE_OFFER_CONSTRAINTS = frozenset(
+    {
+        "uq_delivery_dispatch_offers_one_offered_per_driver",
+        "uq_delivery_dispatch_offers_one_offered_per_request",
+    }
+)
+
+
+def _is_live_offer_conflict(exc: IntegrityError) -> bool:
+    orig = getattr(exc, "orig", None)
+    diag = getattr(orig, "diag", None)
+    constraint = getattr(diag, "constraint_name", None)
+    if constraint in _LIVE_OFFER_CONSTRAINTS:
+        return True
+    return "uq_delivery_dispatch_offers_one_offered" in str(exc).lower()
+
+
+def _compatible_live_offer(
+    session: Session,
+    request: DeliveryDispatchRequest,
+    driver: DeliveryDriver,
+) -> DeliveryDispatchOffer | None:
+    live_request = _live_offer(session, request.id, datetime.now(UTC))
+    if live_request is not None:
+        return live_request if live_request.driver_id == driver.id else None
+    live_driver = session.scalar(
+        select(DeliveryDispatchOffer).where(
+            DeliveryDispatchOffer.driver_id == driver.id,
+            DeliveryDispatchOffer.status == "offered",
+        )
+    )
+    if live_driver is not None and live_driver.request_id == request.id:
+        return live_driver
+    return None
+
+
 def _persist_dispatch_offer(
     session: Session,
     request: DeliveryDispatchRequest,
@@ -400,7 +525,22 @@ def _persist_dispatch_offer(
     expires_at: datetime,
     keep_request_status: bool = False,
     extra_score: dict | None = None,
-) -> DeliveryDispatchOffer:
+) -> DeliveryDispatchOffer | None:
+    existing = _compatible_live_offer(session, request, driver)
+    if existing is not None:
+        return existing
+    if _live_offer(session, request.id, datetime.now(UTC)) is not None:
+        return None
+    if (
+        session.scalar(
+            select(DeliveryDispatchOffer.id).where(
+                DeliveryDispatchOffer.driver_id == driver.id,
+                DeliveryDispatchOffer.status == "offered",
+            )
+        )
+        is not None
+    ):
+        return None
     score_json: dict = {"case": case, "group_id": group_id}
     if extra_score:
         score_json.update(extra_score)
@@ -412,8 +552,14 @@ def _persist_dispatch_offer(
         expires_at=expires_at,
         score_json=score_json,
     )
-    session.add(offer)
-    session.flush()
+    try:
+        with session.begin_nested():
+            session.add(offer)
+            session.flush()
+    except IntegrityError as exc:
+        if not _is_live_offer_conflict(exc):
+            raise
+        return _compatible_live_offer(session, request, driver)
     if not keep_request_status:
         request.status = "offered"
     request.decision_json = {
