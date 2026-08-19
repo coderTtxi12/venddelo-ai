@@ -272,6 +272,16 @@ export function DispatchRecentRequests({
                             <WhatsAppIcon fontSize="small" />
                             <span>Compartir en WhatsApp</span>
                           </button>
+                          <a
+                            className={styles.iconButton}
+                            href={trackingUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={`Rastrear envío ${shortId}`}
+                          >
+                            <OpenInNewOutlinedIcon sx={{ fontSize: 16 }} aria-hidden />
+                            <span>Rastrear</span>
+                          </a>
                         </>
                       ) : null}
                     </div>
