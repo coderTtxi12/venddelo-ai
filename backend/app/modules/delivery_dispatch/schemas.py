@@ -371,6 +371,14 @@ class RiderHistoryPageDTO(BaseModel):
     active_holds: list[RiderHistoryHoldDTO] = Field(default_factory=list)
 
 
+class DispatchMonitorTimelineEventDTO(BaseModel):
+    at: datetime | None = None
+    kind: str
+    driver_name: str | None = None
+    case_applied: str | None = None
+    current: bool = False
+
+
 class ProviderHistoryItemDTO(RiderHistoryItemDTO):
     assigned_driver_id: uuid.UUID | None = None
     assigned_driver_name: str | None = None
@@ -501,14 +509,6 @@ class DispatchMonitorDriverDTO(BaseModel):
     registered_zone_id: uuid.UUID | None = None
     registered_zone_name: str | None = None
     itinerary: list[DriverItineraryStopDTO] = Field(default_factory=list)
-
-
-class DispatchMonitorTimelineEventDTO(BaseModel):
-    at: datetime | None = None
-    kind: str
-    driver_name: str | None = None
-    case_applied: str | None = None
-    current: bool = False
 
 
 class DispatchMonitorRequestDTO(BaseModel):
