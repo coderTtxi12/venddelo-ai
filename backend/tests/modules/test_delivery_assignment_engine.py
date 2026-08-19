@@ -413,17 +413,19 @@ def test_case_d_discards_driver_over_detour_threshold():
     )
     far_driver = _driver(
         "far-on-route",
-        last_lat=19.50,
-        last_lng=-99.20,
+        last_lat=19.49,
+        last_lng=-99.19,
         active_request_status="in_transit",
         active_package_count=1,
         active_dropoff_lat=19.50,
         active_dropoff_lng=-99.20,
     )
     pickup_minutes = (
-        geodesic_meters(19.50, -99.20, RESTAURANT_LAT, RESTAURANT_LNG) / 8 / 60
+        geodesic_meters(19.49, -99.19, RESTAURANT_LAT, RESTAURANT_LNG) / 8 / 60
     )
     assert pickup_minutes > 8
+    far_eta_seconds = geodesic_meters(19.49, -99.19, 19.50, -99.20) / 8
+    assert far_eta_seconds > 60
 
     result = choose_assignments(
         _context(
