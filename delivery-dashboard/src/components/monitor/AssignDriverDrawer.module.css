@@ -91,3 +91,120 @@
   cursor: not-allowed;
   opacity: 0.55;
 }
+
+.routeBox {
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+}
+
+.routeTitle {
+  margin: 0 0 0.2rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text, #1e293b);
+}
+
+.routeHint {
+  margin: 0 0 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-text-secondary, #64748b);
+  line-height: 1.4;
+}
+
+.routeList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.routeStop {
+  --pair: #2563eb;
+  display: grid;
+  grid-template-columns: 6px 1.1rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text, #1e293b);
+}
+
+.routeStop:last-child {
+  border-bottom: none;
+}
+
+.routeStop[data-pair='0'] { --pair: #2563eb; }
+.routeStop[data-pair='1'] { --pair: #ea580c; }
+.routeStop[data-pair='2'] { --pair: #0f766e; }
+.routeStop[data-pair='3'] { --pair: #7c3aed; }
+.routeStop[data-pair='4'] { --pair: #be123c; }
+.routeStop[data-pair='5'] { --pair: #0369a1; }
+
+.routeMark {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pair);
+}
+
+.routeIndex {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.routeLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.routePair {
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--pair);
+}
+
+.routeBtns {
+  display: flex;
+}
+
+.routeBtns button {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary, #64748b);
+  cursor: pointer;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+.routeBtns button:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: var(--color-text, #1e293b);
+}
+
+.routeBtns button:focus-visible {
+  outline: 2px solid var(--color-primary, #2563eb);
+  outline-offset: 1px;
+}
+
+.routeBtns button:disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .routeBtns button {
+    transition: none;
+  }
+}
