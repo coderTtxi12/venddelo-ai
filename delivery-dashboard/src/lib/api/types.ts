@@ -378,6 +378,8 @@ export type DispatchMonitorDriver = {
   pre_free_eta_seconds?: number | null;
   occupied_job_count?: number;
   active_package_count?: number;
+  registered_zone_id?: string | null;
+  registered_zone_name?: string | null;
   itinerary?: DriverItineraryStopApi[];
 };
 
@@ -411,6 +413,7 @@ export type DispatchMonitorRequest = {
   dropoff_lat: number;
   dropoff_lng: number;
   dropoff_address: string;
+  dropoff_maps_url?: string | null;
   payment_method: string;
   collect_cents: number;
   cash_denomination_cents?: number | null;
@@ -423,6 +426,7 @@ export type DispatchMonitorRequest = {
   assigned_driver_name: string | null;
   last_assigned_driver_name?: string | null;
   dispatch_group_id: string | null;
+  zone_id?: string | null;
   zone_name: string | null;
   package_size: string;
   package_count?: number;
@@ -434,6 +438,16 @@ export type DispatchMonitorRequest = {
   search_blockers?: DispatchMonitorSearchBlocker[];
   cycle_rejected_count?: number;
   cycle_silent_count?: number;
+  created_at?: string | null;
+  timeline?: DispatchMonitorTimelineEvent[];
+};
+
+export type DispatchMonitorTimelineEvent = {
+  at: string | null;
+  kind: string;
+  driver_name?: string | null;
+  case_applied?: string | null;
+  current?: boolean;
 };
 
 export type DispatchMonitorOffer = {
@@ -475,6 +489,7 @@ export type DispatchMonitorRoute = {
   destination_lat: number;
   destination_lng: number;
   destination_label: string;
+  zone_id?: string | null;
 };
 
 export type DispatchMonitorSnapshot = {
