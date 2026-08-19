@@ -18,6 +18,9 @@ import {
   patchMyDeliveryProviderZone,
 } from '@/lib/api/deliveryProviders';
 import type { DeliveryProviderZone, DeliveryProviderZoneWrite } from '@/lib/api/types';
+import { ALL_ZONES_ID } from '@/lib/dispatch/zoneColors';
+
+export { ALL_ZONES_ID };
 
 const STORAGE_KEY = 'delivery.selectedZoneId';
 
@@ -26,6 +29,8 @@ type DeliveryZoneContextValue = {
   zones: DeliveryProviderZone[];
   selectedZoneId: string | null;
   selectedZone: DeliveryProviderZone | null;
+  isAllZones: boolean;
+  effectiveZoneId: string | null;
   setSelectedZoneId: (zoneId: string) => void;
   refreshZones: () => Promise<DeliveryProviderZone[]>;
   listMyZones: () => Promise<DeliveryProviderZone[]>;
@@ -55,6 +60,7 @@ function resolveSelectedZoneId(
   preferredId: string | null,
 ): string | null {
   if (zones.length === 0) return null;
+  if (preferredId === ALL_ZONES_ID) return ALL_ZONES_ID;
   if (preferredId && zones.some((zone) => zone.id === preferredId)) {
     return preferredId;
   }
@@ -162,6 +168,11 @@ export function DeliveryZoneProvider({ children }: { children: ReactNode }) {
     () => zones.find((zone) => zone.id === selectedZoneId) ?? null,
     [zones, selectedZoneId],
   );
+  const isAllZones = selectedZoneId === ALL_ZONES_ID;
+  const effectiveZoneId = useMemo(
+    () => (isAllZones ? zones[0]?.id ?? null : selectedZoneId),
+    [isAllZones, selectedZoneId, zones],
+  );
 
   const value = useMemo<DeliveryZoneContextValue>(
     () => ({
@@ -169,6 +180,8 @@ export function DeliveryZoneProvider({ children }: { children: ReactNode }) {
       zones,
       selectedZoneId,
       selectedZone,
+      isAllZones,
+      effectiveZoneId,
       setSelectedZoneId,
       refreshZones,
       listMyZones: refreshZones,
@@ -181,6 +194,8 @@ export function DeliveryZoneProvider({ children }: { children: ReactNode }) {
       zones,
       selectedZoneId,
       selectedZone,
+      isAllZones,
+      effectiveZoneId,
       setSelectedZoneId,
       refreshZones,
       createZone,
