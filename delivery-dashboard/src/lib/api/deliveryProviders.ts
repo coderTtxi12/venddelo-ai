@@ -306,6 +306,7 @@ export function createMyManualDispatchOffer(
   token: string,
   requestId: string,
   driverId: string,
+  itinerary?: Array<{ kind: 'restaurant' | 'dropoff'; request_id: string }>,
 ) {
   return apiRequest<{
     id: string;
@@ -317,6 +318,25 @@ export function createMyManualDispatchOffer(
   }>(`/delivery-providers/me/dispatch-requests/${requestId}/manual-offer`, {
     method: 'POST',
     token,
-    body: { driver_id: driverId },
+    body: { driver_id: driverId, itinerary: itinerary ?? null },
+  });
+}
+
+export function updateDriverItinerary(
+  token: string,
+  driverId: string,
+  stops: Array<{ kind: 'restaurant' | 'dropoff'; request_id: string }>,
+) {
+  return apiRequest<
+    Array<{
+      sequence: number;
+      kind: 'restaurant' | 'dropoff';
+      request_id: string;
+      current?: boolean;
+    }>
+  >(`/delivery-providers/me/drivers/${driverId}/itinerary`, {
+    method: 'PATCH',
+    token,
+    body: { stops },
   });
 }
