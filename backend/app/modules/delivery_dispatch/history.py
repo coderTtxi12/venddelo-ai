@@ -199,6 +199,7 @@ def list_dispatch_history(
     provider_id: uuid.UUID | None = None,
     driver_id: uuid.UUID | None = None,
     zone_id: uuid.UUID | None = None,
+    restaurant_id: uuid.UUID | None = None,
     start: date | None = None,
     end: date | None = None,
     status: str | None = None,
@@ -225,6 +226,8 @@ def list_dispatch_history(
         filters.append(DeliveryDispatchRequest.delivery_provider_id == provider_id)
     if zone_id is not None:
         filters.append(DeliveryDispatchRequest.zone_id == zone_id)
+    if restaurant_id is not None:
+        filters.append(DeliveryDispatchRequest.restaurant_id == restaurant_id)
 
     page_limit = _clamp_limit(limit)
     page_offset = max(0, offset)
