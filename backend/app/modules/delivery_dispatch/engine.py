@@ -66,7 +66,7 @@ class EngineDriver:
     active_dropoff_lat: float | None = None
     active_dropoff_lng: float | None = None
     occupied_job_count: int = 0
-    heading_restaurant_id: str | None = None
+    assigned_restaurant_ids: tuple[str, ...] = ()
     last_dropoff_lat: float | None = None
     last_dropoff_lng: float | None = None
 
