@@ -117,6 +117,7 @@ export function RequestDetailDrawer({
     };
   }, [open, request?.id, accessToken, refreshNonce]);
 
+  const visibleLog = request && log?.request_id === request.id ? log : null;
   const cashDenom = request ? requestCashDenominationLine(request) : null;
   const blockers = request ? blockersSummary(request.search_blockers) : null;
   const dropoffCoords = request ? formatCoords(request.dropoff_lat, request.dropoff_lng) : null;
@@ -137,7 +138,7 @@ export function RequestDetailDrawer({
       : null;
   const timeline = request?.timeline ?? [];
   const schedulerLog: AssignmentLog | null =
-    log ??
+    visibleLog ??
     (request?.status === 'scheduled'
       ? {
           request_id: request.id,
@@ -150,7 +151,7 @@ export function RequestDetailDrawer({
   const schedulerLines = request
     ? assignmentSchedulerLines(schedulerLog, request.status, nowMs)
     : [];
-  const assignmentEvents = log?.events ?? [];
+  const assignmentEvents = visibleLog?.events ?? [];
   const highlightLast =
     request?.status === 'searching' || request?.status === 'offered';
 
@@ -235,10 +236,10 @@ export function RequestDetailDrawer({
                 {logError}
               </p>
             ) : null}
-            {logLoading && !log ? (
+            {logLoading && !visibleLog ? (
               <p className={styles.empty}>{ASSIGNMENT_LOG_LOADING}</p>
             ) : assignmentEvents.length === 0 ? (
-              logError && !log ? null : (
+              logError && !visibleLog ? null : (
                 <p className={styles.empty}>{ASSIGNMENT_LOG_EMPTY}</p>
               )
             ) : (
