@@ -88,7 +88,7 @@ def plan_itinerary(
         return _plan_case_d(pending, previous or [], new_ids)
 
     if case == "C":
-        return _plan_nn(jobs, pending, rider_lat, rider_lng)
+        return _plan_case_c(pending, previous or [], new_ids)
 
     if pre_free:
         current = [
@@ -127,6 +127,42 @@ def _plan_case_d(
         if stop not in set(new_pickups + kept + new_dropoffs)
     ]
     return [*new_pickups, *kept, *leftover, *new_dropoffs]
+
+
+def _plan_case_c(
+    pending: list[ItineraryStop],
+    previous: list[ItineraryStop],
+    new_ids: set[str],
+) -> list[ItineraryStop]:
+    pending_set = set(pending)
+    new_pickups = [
+        stop for stop in pending if stop.kind == "restaurant" and stop.request_id in new_ids
+    ]
+    new_dropoffs = [
+        stop for stop in pending if stop.kind == "dropoff" and stop.request_id in new_ids
+    ]
+    kept = [
+        stop
+        for stop in previous
+        if stop in pending_set and stop.request_id not in new_ids
+    ]
+    leftover = [
+        stop
+        for stop in pending
+        if stop not in set(new_pickups + kept + new_dropoffs)
+    ]
+    kept_pickups = [stop for stop in kept if stop.kind == "restaurant"]
+    leftover_pickups = [stop for stop in leftover if stop.kind == "restaurant"]
+    kept_dropoffs = [stop for stop in kept if stop.kind == "dropoff"]
+    leftover_dropoffs = [stop for stop in leftover if stop.kind == "dropoff"]
+    return [
+        *kept_pickups,
+        *leftover_pickups,
+        *new_pickups,
+        *kept_dropoffs,
+        *leftover_dropoffs,
+        *new_dropoffs,
+    ]
 
 
 def _plan_nn(
