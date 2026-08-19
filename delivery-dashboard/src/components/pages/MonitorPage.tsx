@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import ArrowDownwardOutlinedIcon from '@mui/icons-material/ArrowDownwardOutlined';
+import ArrowUpwardOutlinedIcon from '@mui/icons-material/ArrowUpwardOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import { AssignDriverDrawer } from '@/components/monitor/AssignDriverDrawer';
@@ -198,8 +200,12 @@ function MonitorPanel({
             }
           >
             <span className={styles.sortDir} aria-hidden>
-              <span className={sortDir === 'asc' ? styles.sortDirActive : styles.sortDirIdle}>↑</span>
-              <span className={sortDir === 'desc' ? styles.sortDirActive : styles.sortDirIdle}>↓</span>
+              <span className={sortDir === 'asc' ? styles.sortDirActive : styles.sortDirIdle}>
+                <ArrowUpwardOutlinedIcon className={styles.sortArrow} fontSize="inherit" />
+              </span>
+              <span className={sortDir === 'desc' ? styles.sortDirActive : styles.sortDirIdle}>
+                <ArrowDownwardOutlinedIcon className={styles.sortArrow} fontSize="inherit" />
+              </span>
             </span>
           </button>
         ) : null}
