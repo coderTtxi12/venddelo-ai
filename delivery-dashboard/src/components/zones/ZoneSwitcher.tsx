@@ -4,6 +4,7 @@ import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import { usePathname, useRouter } from 'next/navigation';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
+import { ALL_ZONES_ID } from '@/lib/dispatch/zoneColors';
 import styles from './ZoneSwitcher.module.css';
 
 type ZoneSwitcherProps = {
@@ -15,6 +16,7 @@ export default function ZoneSwitcher({ onAddZone }: ZoneSwitcherProps) {
   const pathname = usePathname();
   const { canWriteProviderConfig } = useDeliveryProviderAccess();
   const { loading, zones, selectedZoneId, setSelectedZoneId } = useDeliveryZone();
+  const showAllChip = pathname === '/monitor' || selectedZoneId === ALL_ZONES_ID;
 
   if (pathname === '/repartidores' || pathname === '/asignacion') {
     return (
@@ -65,6 +67,17 @@ export default function ZoneSwitcher({ onAddZone }: ZoneSwitcherProps) {
   return (
     <div className={styles.bar}>
       <div className={styles.tablist} role="tablist" aria-label="Zonas de reparto">
+        {showAllChip ? (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={selectedZoneId === ALL_ZONES_ID}
+            className={`${styles.chip} ${selectedZoneId === ALL_ZONES_ID ? styles.chipSelected : ''}`}
+            onClick={() => setSelectedZoneId(ALL_ZONES_ID)}
+          >
+            Todas
+          </button>
+        ) : null}
         {zones.map((zone) => {
           const selected = zone.id === selectedZoneId;
           return (
