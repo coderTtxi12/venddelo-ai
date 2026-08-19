@@ -69,10 +69,22 @@ class _HomeScreenState extends State<HomeScreen> {
       widget.controller.profile?.assignments ?? const [],
       riderLat: position?.latitude,
       riderLng: position?.longitude,
+      itinerary: widget.controller.profile?.itinerary,
     );
   }
 
+  List<PersistedItineraryStop> get _persistedItinerary =>
+      widget.controller.profile?.itinerary ?? const [];
+
   RiderAssignment? get _currentJob => _jobs.current;
+
+  LatLng? get _destination {
+    return navigationTargetForJobs(
+      _currentJob,
+      itinerary: _persistedItinerary,
+      assignments: widget.controller.profile?.assignments ?? const [],
+    );
+  }
 
   String? get _currentRouteJobKey {
     final job = _currentJob;
@@ -111,7 +123,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Set<Marker> _stackedMarkers(RiderJobSplit jobs) {
-    final pins = stackedJobPins(jobs);
+    final position = widget.controller.currentPosition;
+    final pins = stackedJobPins(
+      jobs,
+      riderLat: position?.latitude,
+      riderLng: position?.longitude,
+      itinerary: _persistedItinerary,
+    );
     return {
       for (var index = 0; index < pins.length; index++)
         Marker(
@@ -120,8 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
           anchor: MonitorMapStyle.pinAnchor,
           zIndexInt: pins[index].current ? 3 : 2,
           infoWindow: InfoWindow(
-            title: pins[index].kind == 'restaurant' ? 'Recoger' : 'Entregar',
-            snippet: pins[index].label,
+            title: pins[index].label,
           ),
           icon: pins[index].kind == 'restaurant'
               ? _restaurantIcon ??
@@ -163,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _syncRoutes() async {
     final job = _currentJob;
     final position = widget.controller.currentPosition;
-    final destination = job == null ? null : assignmentNavigationTarget(job);
+    final destination = _destination;
     if (job == null || position == null || destination == null) {
       if (_routes != null || _driveView) {
         setState(() {
@@ -265,8 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     final origin = latLngFromPosition(position);
-    final job = _currentJob;
-    final destination = job == null ? null : assignmentNavigationTarget(job);
+    final destination = _destination;
     final selected = _selectedRouteOption;
     final lookAt = selected == null
         ? destination
@@ -322,7 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
         : latLngFromPosition(position);
 
     final job = jobs.current;
-    final destination = job == null ? null : assignmentNavigationTarget(job);
+    final destination = _destination;
     final selectedRoute = _selectedRouteOption;
     final extraMarkers = _stackedMarkers(jobs);
     final polylines = <Polyline>{};
@@ -482,6 +498,7 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: controller,
               sheetController: _sheetController,
               jobs: jobs,
+              itinerary: _persistedItinerary,
               isOnline: isOnline,
               peekHeight: peekHeight,
               expandedHeight: expandedHeight,
@@ -681,6 +698,7 @@ class _HomeBottomSheet extends StatelessWidget {
     required this.controller,
     required this.sheetController,
     required this.jobs,
+    required this.itinerary,
     required this.isOnline,
     required this.peekHeight,
     required this.expandedHeight,
@@ -689,6 +707,7 @@ class _HomeBottomSheet extends StatelessWidget {
   final RiderController controller;
   final SheetController sheetController;
   final RiderJobSplit jobs;
+  final List<PersistedItineraryStop> itinerary;
   final bool isOnline;
   final double peekHeight;
   final double expandedHeight;
@@ -824,26 +843,17 @@ class _HomeBottomSheet extends StatelessWidget {
                     )
                   else
                     _JobCard(assignment: job),
-                  for (final queued in jobs.queued)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.schedule_rounded,
-                            color: AppColors.textMuted,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              queuedJobLabel(queued),
-                              style: Theme.of(context).textTheme.bodyLarge,
-                            ),
-                          ),
-                        ],
+                  if (job != null) ...[
+                    const SizedBox(height: 14),
+                    _RouteFlow(
+                      stops: riderItineraryStops(
+                        jobs,
+                        riderLat: controller.currentPosition?.latitude,
+                        riderLng: controller.currentPosition?.longitude,
+                        itinerary: itinerary,
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -893,6 +903,119 @@ double _headingDegrees(double heading) {
 }
 
 double _quantize(double value) => (value * 1000).round() / 1000;
+
+class _RouteFlow extends StatelessWidget {
+  const _RouteFlow({required this.stops});
+
+  final List<RiderItineraryStop> stops;
+
+  @override
+  Widget build(BuildContext context) {
+    if (stops.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Semantics(
+      label: 'Ruta prevista, ${stops.length} paradas. Ahora: ${stops.first.action} ${stops.first.title}',
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Tu ruta',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+                color: AppColors.cta,
+              ),
+            ),
+            Text(
+              'Te guiamos al paso actual. El resto es la ruta prevista.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 10),
+            for (var index = 0; index < stops.length; index++) ...[
+              if (index > 0) const SizedBox(height: 8),
+              _RouteFlowStep(stop: stops[index]),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RouteFlowStep extends StatelessWidget {
+  const _RouteFlowStep({required this.stop});
+
+  final RiderItineraryStop stop;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = stop.current;
+    final badgeColor = now ? AppColors.cta : const Color(0xFFEA580C);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: badgeColor,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            '${stop.sequence}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                now ? 'Ahora · ${stop.action}' : stop.action,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: badgeColor,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              Text(
+                stop.title,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              if (stop.detail != null &&
+                  stop.detail!.trim().isNotEmpty &&
+                  stop.detail != stop.title)
+                Text(
+                  stop.detail!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textMuted,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _JobCard extends StatelessWidget {
   const _JobCard({required this.assignment});
