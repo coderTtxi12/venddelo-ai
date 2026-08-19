@@ -975,9 +975,9 @@ def _engine_settings(row: DeliveryProviderAssignmentSettings) -> EngineSettings:
         pre_free_eta_seconds=row.pre_free_eta_seconds,
         pre_free_speed_mps=row.pre_free_speed_mps,
         near_destination_radius_meters=row.near_destination_radius_meters,
-        max_extra_route_minutes=row.max_extra_route_minutes,
-        max_pickup_detour_minutes=row.max_pickup_detour_minutes,
-        max_destination_detour_minutes=row.max_destination_detour_minutes,
+        max_extra_route_meters=row.max_extra_route_meters,
+        max_pickup_detour_meters=row.max_pickup_detour_meters,
+        max_destination_detour_meters=row.max_destination_detour_meters,
         assignment_timeout_seconds=row.assignment_timeout_seconds,
     )
 
