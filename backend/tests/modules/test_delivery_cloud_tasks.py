@@ -169,3 +169,28 @@ def test_discard_drops_buffered_gcp_tasks() -> None:
         flush_delivery_tasks()
 
     assert client.created == []
+
+
+def test_restart_unassigned_search_enqueues_search_like_restaurant_retry() -> None:
+    from app.modules.delivery_dispatch.tasks import restart_unassigned_search
+
+    stub_bus.clear()
+    now = datetime(2026, 8, 19, 12, 0, tzinfo=UTC)
+    request = SimpleNamespace(
+        id="req-retry",
+        status="unassigned",
+        search_at=now - timedelta(minutes=20),
+        next_attempt_at=now - timedelta(minutes=1),
+        cycle_rejected_driver_ids=["d1"],
+        cycle_silent_driver_ids=["d2"],
+    )
+
+    restart_unassigned_search(None, request, now)
+
+    assert request.status == "searching"
+    assert request.search_at == now
+    assert request.next_attempt_at == now
+    assert request.cycle_rejected_driver_ids == []
+    assert request.cycle_silent_driver_ids == []
+    assert stub_bus.jobs[-1].kind == "search"
+    assert stub_bus.jobs[-1].payload == {"kind": "search", "request_id": "req-retry"}
