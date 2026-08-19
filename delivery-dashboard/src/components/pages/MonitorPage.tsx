@@ -10,7 +10,7 @@ import { PanelPageShell, type PanelPageStyles } from '@/components/pages/PanelPa
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { useAuth } from '@/hooks/useAuth';
-import { createMyManualDispatchOffer, getMyDispatchMonitor } from '@/lib/api/deliveryProviders';
+import { createMyManualDispatchOffer, getMyDispatchMonitor, updateDriverItinerary } from '@/lib/api/deliveryProviders';
 import type {
   DispatchMonitorCreditHold,
   DispatchMonitorDriver,
@@ -584,18 +584,34 @@ export default function MonitorPage() {
 
   const metrics = snapshot?.metrics;
 
-  async function handleManualOffer(driverId: string) {
+  async function handleManualOffer(
+    driverId: string,
+    itinerary?: Array<{ kind: 'restaurant' | 'dropoff'; request_id: string }>,
+  ) {
     if (!accessToken || !assigningRequest) return;
     setAssigning(true);
     setAssignError(null);
     try {
-      await createMyManualDispatchOffer(accessToken, assigningRequest.id, driverId);
+      await createMyManualDispatchOffer(accessToken, assigningRequest.id, driverId, itinerary);
       setAssigningRequest(null);
       await loadSnapshot();
     } catch (err) {
       setAssignError(err instanceof Error ? err.message : 'No se pudo enviar la oferta');
     } finally {
       setAssigning(false);
+    }
+  }
+
+  async function handleReorderItinerary(
+    driverId: string,
+    stops: Array<{ kind: 'restaurant' | 'dropoff'; request_id: string }>,
+  ) {
+    if (!accessToken) return;
+    try {
+      await updateDriverItinerary(accessToken, driverId, stops);
+      await loadSnapshot();
+    } catch {
+      await loadSnapshot();
     }
   }
 
@@ -692,6 +708,7 @@ export default function MonitorPage() {
                 selectedZoneId={selectedZoneId}
                 focusedRequestId={focusedRequestId}
                 focusedDriverId={focusedDriverId}
+                onReorderItinerary={handleReorderItinerary}
               />
               <div className={styles.mapLegend}>
                 <span>
@@ -797,8 +814,8 @@ export default function MonitorPage() {
           setAssigningRequest(null);
           setAssignError(null);
         }}
-        onAssign={(driverId) => {
-          void handleManualOffer(driverId);
+        onAssign={(driverId, itinerary) => {
+          void handleManualOffer(driverId, itinerary);
         }}
       />
     </PanelPageShell>
