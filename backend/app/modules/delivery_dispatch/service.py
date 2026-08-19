@@ -95,6 +95,7 @@ from app.modules.delivery_dispatch.short_id import allocate_dispatch_short_id
 from app.modules.delivery_dispatch.tasks import (
     close_offered_offers,
     enqueue,
+    expire_stale_open_offers,
     lock_request_and_group,
     persist_dispatch_offer,
     reject_offer_and_search,
@@ -489,6 +490,7 @@ class DeliveryDispatchService:
         provider_id, member_role = self._require_provider_with_role(user_id)
         require_manage_partnerships(member_role)
         now = datetime.now(UTC)
+        expire_stale_open_offers(self._session, now)
         request = self._session.scalar(
             select(DeliveryDispatchRequest)
             .where(
