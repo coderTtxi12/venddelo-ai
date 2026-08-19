@@ -244,6 +244,30 @@ def test_provider_history_lists_company_rows_and_filters_driver(client, engine):
 
 
 @requires_db
+def test_provider_history_filters_restaurant(client, engine):
+    restaurant_id, _driver_id = _setup_ready_rider(client, engine)
+    request_id = _accept_and_deliver(client, engine, restaurant_id)
+
+    _as_mexy()
+    matched = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"restaurant_id": restaurant_id},
+        headers=AUTH,
+    )
+    assert matched.status_code == 200, matched.text
+    assert [row["id"] for row in matched.json()["items"]] == [request_id]
+    assert matched.json()["items"][0]["restaurant_id"] == restaurant_id
+
+    empty = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"restaurant_id": str(uuid.uuid4())},
+        headers=AUTH,
+    )
+    assert empty.status_code == 200
+    assert empty.json()["items"] == []
+
+
+@requires_db
 def test_provider_history_zone_filter_and_non_member(client, engine):
     restaurant_id, _driver_id = _setup_ready_rider(client, engine)
     request_id = _accept_and_deliver(client, engine, restaurant_id)
