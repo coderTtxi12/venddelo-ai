@@ -295,6 +295,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (position == null) {
       return;
     }
+    final now = DateTime.now();
+    if (_lastDriveMoveAt != null &&
+        now.difference(_lastDriveMoveAt!) < const Duration(milliseconds: 650)) {
+      return;
+    }
+    _lastDriveMoveAt = now;
     final origin = latLngFromPosition(position);
     final destination = _destination;
     final selected = _selectedRouteOption;
