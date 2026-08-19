@@ -478,22 +478,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.trackingLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin: 0.95rem 0 0;
-  color: var(--color-primary);
-  font-size: 0.82rem;
-  font-weight: 650;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.trackingLink:hover {
-  text-decoration: underline;
-}
-
 .actions {
   display: flex;
   flex-wrap: wrap;
