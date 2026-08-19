@@ -429,6 +429,23 @@
   gap: 0.55rem;
 }
 
+.businessLogo,
+.businessLogoFallback {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+  object-fit: cover;
+  background: color-mix(in srgb, #ea580c 16%, var(--color-surface));
+  color: #9a3412;
+  font-size: 0.85rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, #ea580c 28%, var(--color-border));
+}
+
 .listContent {
   min-width: 0;
   display: flex;
