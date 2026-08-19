@@ -395,7 +395,8 @@ def test_case_c_skips_siblings_already_in_live_group():
     offered_ids = {offer.request_id for offer in result.offers}
     assert "req-1" not in offered_ids
     assert "req-2" not in offered_ids
-    assert result.case != "C"
+    assert result.case == "E"
+    assert offered_ids == {"req-3"}
 
 
 def test_case_d_discards_driver_over_detour_threshold():
