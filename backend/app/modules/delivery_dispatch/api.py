@@ -1,6 +1,8 @@
+from datetime import date
+from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api.deps import get_synced_user
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
@@ -16,6 +18,7 @@ from app.modules.delivery_dispatch.schemas import (
     ItineraryUpdate,
     ManualOfferCreate,
     ManualOfferDTO,
+    ProviderHistoryPageDTO,
     SearchLeadTimeDTO,
     SearchLeadTimeUpdate,
 )
@@ -143,3 +146,27 @@ def patch_search_lead_times(
     service: DeliveryDispatchService = Depends(_service),
 ) -> list[SearchLeadTimeDTO]:
     return service.update_search_lead_times(user.id, data)
+
+
+@router.get("/me/dispatch-history", response_model=ProviderHistoryPageDTO)
+def list_dispatch_history_endpoint(
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryDispatchService = Depends(_service),
+    start: date | None = Query(default=None),
+    end: date | None = Query(default=None),
+    status: Literal["delivered", "cancelled"] | None = Query(default=None),
+    driver_id: UUID | None = Query(default=None),
+    zone_id: UUID | None = Query(default=None),
+    limit: int | None = Query(default=None, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> ProviderHistoryPageDTO:
+    return service.list_history(
+        user.id,
+        start=start,
+        end=end,
+        status=status,
+        driver_id=driver_id,
+        zone_id=zone_id,
+        limit=limit,
+        offset=offset,
+    )
