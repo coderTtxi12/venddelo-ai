@@ -52,7 +52,8 @@ def _clean(engine):
 def _accept_and_deliver(client, engine, restaurant_id: str) -> str:
     request_id, offer_id = _create_and_offer(client, engine, restaurant_id)
     _as_rider()
-    assert client.post(f"/api/v1/rider/me/offers/{offer_id}/accept", headers=AUTH).status_code == 200
+    accepted = client.post(f"/api/v1/rider/me/offers/{offer_id}/accept", headers=AUTH)
+    assert accepted.status_code == 200
     assert client.post(
         f"/api/v1/rider/me/assignments/{request_id}/picked-up", headers=AUTH
     ).status_code == 200
@@ -93,7 +94,8 @@ def test_rider_history_includes_own_cancelled_not_others(client, engine):
     restaurant_id, _driver_id = _setup_ready_rider(client, engine)
     request_id, offer_id = _create_and_offer(client, engine, restaurant_id)
     _as_rider()
-    assert client.post(f"/api/v1/rider/me/offers/{offer_id}/accept", headers=AUTH).status_code == 200
+    accepted = client.post(f"/api/v1/rider/me/offers/{offer_id}/accept", headers=AUTH)
+    assert accepted.status_code == 200
     _as_owner()
     cancel = client.post(
         f"/api/v1/restaurants/me/dispatch-requests/{request_id}/cancel",
@@ -160,7 +162,8 @@ def test_rider_history_earnings_ignore_cancelled_and_paginate(client, engine):
     second = _accept_and_deliver(client, engine, restaurant_id)
     request_id, offer_id = _create_and_offer(client, engine, restaurant_id)
     _as_rider()
-    assert client.post(f"/api/v1/rider/me/offers/{offer_id}/accept", headers=AUTH).status_code == 200
+    accepted = client.post(f"/api/v1/rider/me/offers/{offer_id}/accept", headers=AUTH)
+    assert accepted.status_code == 200
     _as_owner()
     assert client.post(
         f"/api/v1/restaurants/me/dispatch-requests/{request_id}/cancel",
@@ -209,3 +212,52 @@ def test_rider_history_excludes_yesterday_when_asking_today(client, engine):
     )
     assert history.status_code == 200
     assert history.json()["items"] == []
+
+
+@requires_db
+def test_provider_history_lists_company_rows_and_filters_driver(client, engine):
+    restaurant_id, driver_id = _setup_ready_rider(client, engine)
+    request_id = _accept_and_deliver(client, engine, restaurant_id)
+
+    _as_mexy()
+    listed = client.get("/api/v1/delivery-providers/me/dispatch-history", headers=AUTH)
+    assert listed.status_code == 200, listed.text
+    body = listed.json()
+    assert [row["id"] for row in body["items"]] == [request_id]
+    assert body["items"][0]["assigned_driver_id"] == driver_id
+    assert body["items"][0]["assigned_driver_name"]
+    assert body["items"][0]["zone_id"]
+    assert "dropoff_lat" in body["items"][0]
+
+    other = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"driver_id": str(uuid.uuid4())},
+        headers=AUTH,
+    )
+    assert other.status_code == 200
+    assert other.json()["items"] == []
+
+
+@requires_db
+def test_provider_history_zone_filter_and_non_member(client, engine):
+    restaurant_id, _driver_id = _setup_ready_rider(client, engine)
+    request_id = _accept_and_deliver(client, engine, restaurant_id)
+    _as_mexy()
+    full = client.get("/api/v1/delivery-providers/me/dispatch-history", headers=AUTH)
+    zone_id = full.json()["items"][0]["zone_id"]
+    filtered = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"zone_id": zone_id},
+        headers=AUTH,
+    )
+    assert [row["id"] for row in filtered.json()["items"]] == [request_id]
+    empty = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"zone_id": str(uuid.uuid4())},
+        headers=AUTH,
+    )
+    assert empty.json()["items"] == []
+
+    _as_owner()
+    denied = client.get("/api/v1/delivery-providers/me/dispatch-history", headers=AUTH)
+    assert denied.status_code in {403, 404}
