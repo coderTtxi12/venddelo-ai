@@ -894,40 +894,31 @@ class _HomeBottomSheet extends StatelessWidget {
                 ),
               ),
             ),
-            Expanded(
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                children: [
-                  if (controller.showIosKillWarning) ...[
-                    const RiderInfoBanner(
-                      message:
-                          'Si cierras la app deslizándola hacia arriba, el GPS se detiene y no recibirás ofertas.',
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                  if (controller.errorMessage != null) ...[
-                    RiderErrorBanner(message: controller.errorMessage!),
-                    const SizedBox(height: 10),
-                  ],
-                  if (controller.needsLocationSettings) ...[
-                    TextButton(
-                      onPressed: controller.openLocationSettings,
-                      child: const Text('Abrir ajustes de ubicación'),
-                    ),
-                    const SizedBox(height: 6),
-                  ],
-                  if (job == null)
-                    Text(
-                      isOnline
-                          ? 'Te avisaremos cuando llegue una oferta cercana.'
-                          : 'Ponte en línea para recibir envíos cerca de ti.',
-                      style: Theme.of(context).textTheme.bodyLarge
-                          ?.copyWith(color: AppColors.textSecondary),
-                    )
-                  else
+            if (job != null)
+              Expanded(
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  children: [
+                    if (controller.showIosKillWarning) ...[
+                      const RiderInfoBanner(
+                        message:
+                            'Si cierras la app deslizándola hacia arriba, el GPS se detiene y no recibirás ofertas.',
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    if (controller.errorMessage != null) ...[
+                      RiderErrorBanner(message: controller.errorMessage!),
+                      const SizedBox(height: 10),
+                    ],
+                    if (controller.needsLocationSettings) ...[
+                      TextButton(
+                        onPressed: controller.openLocationSettings,
+                        child: const Text('Abrir ajustes de ubicación'),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
                     _JobCard(assignment: job),
-                  if (job != null) ...[
                     const SizedBox(height: 14),
                     _RouteFlow(
                       stops: riderItineraryStops(
@@ -938,9 +929,42 @@ class _HomeBottomSheet extends StatelessWidget {
                       ),
                     ),
                   ],
-                ],
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (controller.showIosKillWarning) ...[
+                      const RiderInfoBanner(
+                        message:
+                            'Si cierras la app deslizándola hacia arriba, el GPS se detiene y no recibirás ofertas.',
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    if (controller.errorMessage != null) ...[
+                      RiderErrorBanner(message: controller.errorMessage!),
+                      const SizedBox(height: 10),
+                    ],
+                    if (controller.needsLocationSettings) ...[
+                      TextButton(
+                        onPressed: controller.openLocationSettings,
+                        child: const Text('Abrir ajustes de ubicación'),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                    Text(
+                      isOnline
+                          ? 'Te avisaremos cuando llegue una oferta cercana.'
+                          : 'Ponte en línea para recibir envíos cerca de ti.',
+                      style: Theme.of(context).textTheme.bodyLarge
+                          ?.copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
               ),
-            ),
             Padding(
               padding: EdgeInsets.fromLTRB(
                 20,
