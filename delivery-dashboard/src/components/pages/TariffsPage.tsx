@@ -65,7 +65,7 @@ type BracketField = keyof Pick<
 
 export default function TariffsPage() {
   const { accessToken } = useAuth();
-  const { selectedZoneId } = useDeliveryZone();
+  const { effectiveZoneId } = useDeliveryZone();
   const { canWriteProviderConfig, canManageWeather, isOperator } = useDeliveryProviderAccess();
   const tariffsReadOnly = !canWriteProviderConfig;
   const [config, setConfig] = useState<DeliveryProviderPricingConfig>(() =>
@@ -100,12 +100,12 @@ export default function TariffsPage() {
     let cancelled = false;
 
     async function load() {
-      if (!accessToken || !selectedZoneId) return;
+      if (!accessToken || !effectiveZoneId) return;
       setLoading(true);
       setError(null);
 
       try {
-        const response = await getMyDeliveryProviderPricing(accessToken, selectedZoneId);
+        const response = await getMyDeliveryProviderPricing(accessToken, effectiveZoneId);
         if (cancelled) return;
         setConfig(response.config);
         setInitialConfig(response.config);
@@ -122,7 +122,7 @@ export default function TariffsPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, selectedZoneId]);
+  }, [accessToken, effectiveZoneId]);
 
   useEffect(() => {
     return () => {
@@ -230,7 +230,7 @@ export default function TariffsPage() {
   };
 
   const handleSave = async () => {
-    if (!accessToken || !selectedZoneId || !isDirty) return;
+    if (!accessToken || !effectiveZoneId || !isDirty) return;
 
     const bracketError = validateBracketsClient(
       config.outside_polygon.brackets,
@@ -246,7 +246,7 @@ export default function TariffsPage() {
     setSuccess(null);
 
     try {
-      const saved = await updateMyDeliveryProviderPricing(accessToken, selectedZoneId, { config });
+      const saved = await updateMyDeliveryProviderPricing(accessToken, effectiveZoneId, { config });
       setConfig(saved.config);
       setInitialConfig(saved.config);
       setWeatherMode(saved.weather_mode);
@@ -260,7 +260,7 @@ export default function TariffsPage() {
   };
 
   const handleWeatherChange = async (mode: DeliveryWeatherMode) => {
-    if (!accessToken || !selectedZoneId || weatherSaving || mode === weatherMode) return;
+    if (!accessToken || !effectiveZoneId || weatherSaving || mode === weatherMode) return;
 
     setWeatherSaving(true);
     setError(null);
@@ -268,7 +268,7 @@ export default function TariffsPage() {
     setWeatherSuccess(null);
 
     try {
-      const saved = await updateMyDeliveryProviderWeatherMode(accessToken, selectedZoneId, {
+      const saved = await updateMyDeliveryProviderWeatherMode(accessToken, effectiveZoneId, {
         weather_mode: mode,
       });
       setWeatherMode(saved.weather_mode);
@@ -304,7 +304,7 @@ export default function TariffsPage() {
       setSimError('No hay sesión activa. Inicia sesión de nuevo.');
       return;
     }
-    if (!selectedZoneId) {
+    if (!effectiveZoneId) {
       setSimError('Selecciona una zona de reparto.');
       return;
     }
@@ -324,7 +324,7 @@ export default function TariffsPage() {
 
     try {
       const distance = Number.parseFloat(simDistance.replace(',', '.'));
-      const result = await simulateMyDeliveryProviderPricing(accessToken, selectedZoneId, {
+      const result = await simulateMyDeliveryProviderPricing(accessToken, effectiveZoneId, {
         inside_polygon: simInside,
         distance_km: simInside ? null : distance,
         is_night: simInside ? simNight : false,
@@ -340,7 +340,7 @@ export default function TariffsPage() {
     } finally {
       setSimulating(false);
     }
-  }, [accessToken, config.outside_polygon.max_distance_km, selectedZoneId, simDistance, simInside, simNight, simWeather]);
+  }, [accessToken, config.outside_polygon.max_distance_km, effectiveZoneId, simDistance, simInside, simNight, simWeather]);
 
   return (
     <PanelPageShell
