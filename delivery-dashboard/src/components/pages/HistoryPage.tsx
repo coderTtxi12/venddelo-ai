@@ -348,6 +348,7 @@ export default function HistoryPage() {
       <HistoryDetailDrawer
         open={selected !== null}
         item={selected}
+        accessToken={accessToken}
         onClose={() => setSelected(null)}
       />
     </PanelPageShell>
