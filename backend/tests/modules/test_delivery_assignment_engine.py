@@ -252,6 +252,36 @@ def test_high_demand_prefers_e_over_d_when_idle_exists():
     assert result.offers[0].driver_id == "idle"
 
 
+def test_high_demand_prefers_e_over_c_when_idle_exists():
+    last_lat, last_lng = 19.4340, -99.1332
+    request = _request("req-new", dropoff_lat=19.4345, dropoff_lng=-99.1332)
+    nearby_m = geodesic_meters(last_lat, last_lng, 19.4345, -99.1332)
+    assert nearby_m <= 800
+
+    idle = _driver("idle", last_lat=19.4330, last_lng=-99.1335)
+    hooked = _driver(
+        "hooked",
+        last_lat=RESTAURANT_LAT,
+        last_lng=RESTAURANT_LNG,
+        active_request_status="assigned",
+        active_package_count=1,
+        assigned_restaurant_ids=("rest-1",),
+        last_dropoff_lat=last_lat,
+        last_dropoff_lng=last_lng,
+    )
+    result = choose_assignments(
+        _context(
+            request,
+            (hooked, idle),
+            settings=_settings(high_demand_available_drivers_max=2),
+        )
+    )
+
+    assert result.high_demand is True
+    assert result.case == "E"
+    assert result.offers[0].driver_id == "idle"
+
+
 def test_rejected_driver_is_not_offered():
     request = _request(rejected=("near",))
     near = _driver("near", last_lat=19.4330, last_lng=-99.1335)
