@@ -15,6 +15,7 @@ import '../maps/open_external_maps.dart';
 import '../maps/selected_route_store.dart';
 import '../models.dart';
 import '../rider_controller.dart';
+import '../rider_display.dart';
 import '../theme/app_colors.dart';
 import '../widgets/rider_live_map.dart';
 import '../widgets/rider_profile_menu.dart';
@@ -300,14 +301,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openProfileMenu() {
+    final profile = widget.controller.profile;
     return showRiderProfileMenu(
       context: context,
-      name: widget.controller.profile == null
+      name: profile == null
           ? 'Repartidor'
-          : '${widget.controller.profile!.firstName} ${widget.controller.profile!.lastName}'
-              .trim(),
-      isOnline: widget.controller.profile?.isOnline ?? false,
-      creditAvailableCents: widget.controller.profile?.creditAvailableCents,
+          : '${profile.firstName} ${profile.lastName}'.trim(),
+      isOnline: profile?.isOnline ?? false,
+      creditAvailableCents: profile?.creditAvailableCents,
+      photoUrl: riderPhotoUrl(profile?.profilePhotoPath),
+      plate: profile?.plate,
+      motorcycleBrand: profile?.motorcycleBrand,
+      motorcycleColor: profile?.motorcycleColor,
       onOpenAccount: () {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
