@@ -19,6 +19,7 @@ from app.modules.delivery_dispatch.schemas import (
     ItineraryUpdate,
     ManualOfferCreate,
     ManualOfferDTO,
+    DispatchRetryDTO,
     ProviderHistoryPageDTO,
     SearchLeadTimeDTO,
     SearchLeadTimeUpdate,
@@ -117,6 +118,18 @@ def create_manual_offer(
     service: DeliveryDispatchService = Depends(_service),
 ) -> ManualOfferDTO:
     return service.create_manual_offer(user.id, request_id, data)
+
+
+@router.post(
+    "/me/dispatch-requests/{request_id}/retry",
+    response_model=DispatchRetryDTO,
+)
+def retry_unassigned_dispatch_request(
+    request_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryDispatchService = Depends(_service),
+) -> DispatchRetryDTO:
+    return service.retry_unassigned(user.id, request_id)
 
 
 @router.get(
