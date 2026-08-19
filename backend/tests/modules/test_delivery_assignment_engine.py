@@ -201,23 +201,47 @@ def test_case_b_protects_min_drivers():
     assert result.offers[0].request_id == "req-1"
 
 
-def test_high_demand_returns_no_offers():
+def test_high_demand_idle_is_case_e():
     request = _request()
-    drivers = (
-        _driver("d1", last_lat=19.4330, last_lng=-99.1335),
-        _driver("d2", last_lat=19.4340, last_lng=-99.1340),
-    )
+    near = _driver("near", last_lat=19.4330, last_lng=-99.1335)
+    far = _driver("far", last_lat=19.4500, last_lng=-99.1600)
     result = choose_assignments(
         _context(
             request,
-            drivers,
+            (far, near),
             settings=_settings(high_demand_available_drivers_max=2),
         )
     )
 
     assert result.high_demand is True
-    assert result.offers == ()
-    assert result.case is None
+    assert result.case == "E"
+    assert result.offers[0].driver_id == "near"
+    assert result.offers[0].case == "E"
+
+
+def test_high_demand_prefers_e_over_d_when_idle_exists():
+    request = _request("req-1", dropoff_lat=19.4326, dropoff_lng=-99.1332)
+    idle = _driver("idle", last_lat=19.4330, last_lng=-99.1335)
+    on_route = _driver(
+        "on-route",
+        last_lat=19.4330,
+        last_lng=-99.1335,
+        active_request_status="picked_up",
+        active_package_count=1,
+        active_dropoff_lat=19.4340,
+        active_dropoff_lng=-99.1332,
+    )
+    result = choose_assignments(
+        _context(
+            request,
+            (on_route, idle),
+            settings=_settings(high_demand_available_drivers_max=2),
+        )
+    )
+
+    assert result.high_demand is True
+    assert result.case == "E"
+    assert result.offers[0].driver_id == "idle"
 
 
 def test_rejected_driver_is_not_offered():
