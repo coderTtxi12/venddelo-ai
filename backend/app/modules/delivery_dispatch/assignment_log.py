@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import uuid
+from datetime import datetime
+
+from sqlalchemy.orm import Session
+
+from app.db.models.delivery import DeliveryDispatchAssignmentEvent, DeliveryDispatchRequest
 from app.modules.delivery_dispatch.engine import EngineContext, eligibility_blockers
 
 BLOCKER_LABELS = {
@@ -92,3 +98,29 @@ def searched_detail_from_context(context: EngineContext, *, high_demand: bool) -
         blocker_counts=counts,
         high_demand=high_demand,
     )
+
+
+def record_assignment_event(
+    session: Session,
+    request: DeliveryDispatchRequest,
+    *,
+    kind: str,
+    tone: str,
+    title: str,
+    detail: str | None,
+    next_attempt_at: datetime | None = None,
+    case_applied: str | None = None,
+    driver_id: uuid.UUID | None = None,
+) -> DeliveryDispatchAssignmentEvent:
+    row = DeliveryDispatchAssignmentEvent(
+        request_id=request.id,
+        kind=kind,
+        tone=tone,
+        title=title,
+        detail=detail,
+        next_attempt_at=next_attempt_at,
+        case_applied=case_applied,
+        driver_id=driver_id,
+    )
+    session.add(row)
+    return row

@@ -638,6 +638,9 @@ class DeliveryDispatchRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="dispatch_requests"
     )
     offers: Mapped[list["DeliveryDispatchOffer"]] = relationship(back_populates="request")
+    assignment_events: Mapped[list["DeliveryDispatchAssignmentEvent"]] = relationship(
+        back_populates="request",
+    )
     credit_hold: Mapped["DeliveryCreditHold | None"] = relationship(
         back_populates="request",
         uselist=False,
@@ -666,6 +669,50 @@ class DeliveryDispatchRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ),
         Index("ix_delivery_dispatch_requests_provider_lookup", "delivery_provider_id", "status", "search_at"),
         Index("ix_delivery_dispatch_requests_driver_lookup", "assigned_driver_id", "status"),
+    )
+
+
+class DeliveryDispatchAssignmentEvent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "delivery_dispatch_assignment_events"
+
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_dispatch_requests.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    tone: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    case_applied: Mapped[str | None] = mapped_column(String, nullable=True)
+    driver_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_drivers.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    request: Mapped["DeliveryDispatchRequest"] = relationship(back_populates="assignment_events")
+    driver: Mapped["DeliveryDriver | None"] = relationship()
+
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('searched','offered','expired','rejected','timed_out','manual')",
+            name="assignment_event_kind_allowed",
+        ),
+        CheckConstraint(
+            "tone IN ('ok','wait','warn')",
+            name="assignment_event_tone_allowed",
+        ),
+        CheckConstraint(
+            "case_applied IS NULL OR case_applied IN ('A','B','C','D','M')",
+            name="assignment_event_case_allowed",
+        ),
+        Index(
+            "ix_delivery_dispatch_assignment_events_request_created",
+            "request_id",
+            "created_at",
+        ),
     )
 
 

@@ -121,3 +121,9 @@ def test_searched_detail_from_context_blockers_and_high_demand() -> None:
     )
     text = searched_detail_from_context(_context(drivers), high_demand=True)
     assert text == "Nadie elegible: 2 offline, 1 GPS viejo · alta demanda"
+
+
+def test_record_assignment_event_signature_imports() -> None:
+    from app.modules.delivery_dispatch.assignment_log import record_assignment_event
+
+    assert callable(record_assignment_event)
