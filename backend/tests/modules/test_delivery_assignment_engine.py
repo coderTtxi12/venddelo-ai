@@ -534,12 +534,8 @@ def test_case_d_discards_driver_over_detour_threshold():
         active_dropoff_lat=19.50,
         active_dropoff_lng=-99.20,
     )
-    pickup_minutes = (
-        geodesic_meters(19.49, -99.19, RESTAURANT_LAT, RESTAURANT_LNG) / 8 / 60
-    )
-    assert pickup_minutes > 8
-    far_eta_seconds = geodesic_meters(19.49, -99.19, 19.50, -99.20) / 8
-    assert far_eta_seconds > 60
+    pickup_m = geodesic_meters(19.49, -99.19, RESTAURANT_LAT, RESTAURANT_LNG)
+    assert pickup_m > 3840
 
     result = choose_assignments(
         _context(
@@ -554,6 +550,65 @@ def test_case_d_discards_driver_over_detour_threshold():
     assert len(result.offers) == 1
     assert result.offers[0].driver_id == "ok-on-route"
     assert result.offers[0].request_id == "req-1"
+
+
+def test_case_d_rejects_when_pickup_over_meter_radius():
+    request = _request("req-1", dropoff_lat=19.4340, dropoff_lng=-99.1332)
+    rider_lat, rider_lng = 19.4400, -99.1400
+    pickup_m = geodesic_meters(rider_lat, rider_lng, RESTAURANT_LAT, RESTAURANT_LNG)
+    assert 500 < pickup_m < 3840
+
+    on_route = _driver(
+        "on-route",
+        last_lat=rider_lat,
+        last_lng=rider_lng,
+        active_request_status="picked_up",
+        active_package_count=1,
+        active_dropoff_lat=19.4340,
+        active_dropoff_lng=-99.1332,
+    )
+    result = choose_assignments(
+        _context(
+            request,
+            (on_route,),
+            settings=_settings(
+                high_demand_available_drivers_max=2,
+                max_pickup_detour_meters=500,
+            ),
+        )
+    )
+
+    assert result.high_demand is True
+    assert result.case is None
+    assert result.offers == ()
+
+
+def test_case_d_hooks_when_current_dropoff_is_far():
+    request = _request("req-1", dropoff_lat=19.50, dropoff_lng=-99.20)
+    far_dropoff_m = geodesic_meters(19.50, -99.20, 19.4340, -99.1332)
+    assert far_dropoff_m > 3840
+    pickup_m = geodesic_meters(19.4330, -99.1335, RESTAURANT_LAT, RESTAURANT_LNG)
+    assert pickup_m <= 1000
+
+    on_route = _driver(
+        "on-route",
+        last_lat=19.4330,
+        last_lng=-99.1335,
+        active_request_status="picked_up",
+        active_package_count=1,
+        active_dropoff_lat=19.4340,
+        active_dropoff_lng=-99.1332,
+    )
+    result = choose_assignments(
+        _context(
+            request,
+            (on_route,),
+            settings=_settings(high_demand_available_drivers_max=2),
+        )
+    )
+
+    assert result.case == "D"
+    assert result.offers[0].driver_id == "on-route"
 
 
 def test_assignment_times_out_at_search_at_plus_timeout():
