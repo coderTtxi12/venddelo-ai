@@ -407,7 +407,11 @@ export type DispatchMonitorRequest = {
   status: string;
   customer_name: string;
   customer_phone?: string;
+  restaurant_id?: string;
   restaurant_name: string;
+  restaurant_address?: string | null;
+  restaurant_phone?: string | null;
+  restaurant_logo_path?: string | null;
   restaurant_lat: number | null;
   restaurant_lng: number | null;
   dropoff_lat: number;
