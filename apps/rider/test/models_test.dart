@@ -54,6 +54,34 @@ void main() {
     expect(profile.creditHeldCents, 15000);
     expect(profile.creditAvailableCents, 35000);
     expect(formatMoneyCents(profile.creditAvailableCents), r'$350.00');
+    expect(profile.itinerary, isEmpty);
+  });
+
+  test('RiderProfile.fromJson keeps persisted itinerary stops', () {
+    final profile = RiderProfile.fromJson({
+      'id': 'd1',
+      'first_name': 'Ana',
+      'last_name': 'Pérez',
+      'is_online': true,
+      'assignments': const [],
+      'itinerary': [
+        {
+          'sequence': 1,
+          'kind': 'restaurant',
+          'request_id': 'r1',
+          'current': true,
+          'title': 'Tacos',
+          'action': 'Recoger',
+          'lat': 19.43,
+          'lng': -99.13,
+        },
+      ],
+    });
+
+    expect(profile.itinerary, hasLength(1));
+    expect(profile.itinerary.first.kind, 'restaurant');
+    expect(profile.itinerary.first.requestId, 'r1');
+    expect(profile.itinerary.first.action, 'Recoger');
   });
 
   test('RiderAssignment.fromJson keeps customer contact after pickup', () {
