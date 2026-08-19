@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from collections import defaultdict
 from contextvars import ContextVar
@@ -33,6 +34,8 @@ from app.modules.delivery_dispatch.engine import (
 from app.modules.delivery_dispatch.geo import geodesic_meters
 from app.modules.delivery_dispatch.monitor_notify import notify_request_realtime
 from app.modules.delivery_dispatch.notify import notify_offer
+
+logger = logging.getLogger(__name__)
 
 _SEARCHABLE = frozenset({"scheduled", "searching", "offered"})
 _OCCUPIED = frozenset({"assigned", "picked_up", "in_transit"})
@@ -85,9 +88,16 @@ def flush_delivery_tasks() -> None:
     _pending_gcp_jobs.set([])
     if not pending:
         return
-    bus = _gcp_bus if _gcp_bus is not None else GcpTaskBus.from_settings(get_settings())
-    for job in pending:
-        bus.enqueue(job.kind, job.eta, job.payload)
+    try:
+        bus = _gcp_bus if _gcp_bus is not None else GcpTaskBus.from_settings(get_settings())
+        for job in pending:
+            bus.enqueue(job.kind, job.eta, job.payload)
+    except Exception:
+        logger.exception(
+            "cloud tasks flush failed count=%s; local needs "
+            "`gcloud auth application-default login`",
+            len(pending),
+        )
 
 
 def discard_delivery_tasks() -> None:
