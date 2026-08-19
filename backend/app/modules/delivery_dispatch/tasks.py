@@ -849,15 +849,6 @@ def _build_context(
     ).all()
     occupied_by_driver: dict[uuid.UUID, list[DeliveryDispatchRequest]] = defaultdict(list)
     active_packages: dict[uuid.UUID, int] = {}
-    occupied_restaurant_ids = {
-        row.restaurant_id for row in occupied_rows if row.restaurant_id is not None
-    }
-    occupied_restaurants = {
-        row.id: row
-        for row in session.scalars(
-            select(Restaurant).where(Restaurant.id.in_(occupied_restaurant_ids))
-        ).all()
-    } if occupied_restaurant_ids else {}
     for row in occupied_rows:
         if row.assigned_driver_id is None:
             continue
@@ -899,7 +890,8 @@ def _build_context(
             occupied_by_driver.get(driver.id, []),
             active_packages.get(driver.id, 0),
             driver.id in open_offer_ids,
-            occupied_restaurants,
+            origin_lat=restaurant_lat,
+            origin_lng=restaurant_lng,
         )
         for driver in drivers
     )
