@@ -79,6 +79,10 @@ class RiderProfile {
     this.itinerary = const [],
     this.creditLimitCents = 0,
     this.creditHeldCents = 0,
+    this.profilePhotoPath = '',
+    this.plate = '',
+    this.motorcycleBrand = '',
+    this.motorcycleColor = '',
   });
 
   final String id;
@@ -89,6 +93,10 @@ class RiderProfile {
   final List<PersistedItineraryStop> itinerary;
   final int creditLimitCents;
   final int creditHeldCents;
+  final String profilePhotoPath;
+  final String plate;
+  final String motorcycleBrand;
+  final String motorcycleColor;
 
   int get creditAvailableCents {
     final available = creditLimitCents - creditHeldCents;
@@ -105,6 +113,10 @@ class RiderProfile {
       isOnline: json['is_online'] as bool,
       creditLimitCents: _asInt(json['credit_limit_cents']) ?? 0,
       creditHeldCents: _asInt(json['credit_held_cents']) ?? 0,
+      profilePhotoPath: json['profile_photo_path'] as String? ?? '',
+      plate: json['plate'] as String? ?? '',
+      motorcycleBrand: json['motorcycle_brand'] as String? ?? '',
+      motorcycleColor: json['motorcycle_color'] as String? ?? '',
       assignments: raw
           .map((item) => RiderAssignment.fromJson(item as Map<String, dynamic>))
           .toList(),
