@@ -1,12 +1,16 @@
 'use client';
 
+import CheckOutlinedIcon from '@mui/icons-material/CheckOutlined';
+import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlined';
-import DoneAllOutlinedIcon from '@mui/icons-material/DoneAllOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
+import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
 import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DeliveryLocationValue } from '@/components/digital-menu/CheckoutDeliveryAddressPicker';
+import { DispatchCostBreakdown } from '@/components/dispatch/DispatchCostBreakdown';
 import { DispatchDeliveryAddressPicker } from '@/components/dispatch/DispatchDeliveryAddressPicker';
 import { DispatchRecentRequests } from '@/components/dispatch/DispatchRecentRequests';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
@@ -25,6 +29,7 @@ import {
   type DispatchCreateInput,
   type DispatchRequest,
   formatDispatchShortId,
+  isDispatchHistoryStatus,
 } from '@/lib/api/dispatch';
 import { getPublicCheckoutConfig, type PublicDeliveryService } from '@/lib/api/public';
 import { ApiError } from '@/lib/api/types';
@@ -32,6 +37,10 @@ import { getRestaurant } from '@/lib/api/restaurants';
 import { formatMoney } from '@/lib/currency';
 import { getDeliveryWeatherNotice } from '@/lib/digital-menu/checkout/deliveryWeatherNotice';
 import { usePublicDeliveryQuote } from '@/lib/digital-menu/checkout/usePublicDeliveryQuote';
+import {
+  useRestaurantDispatchSocket,
+  type RestaurantDispatchSocketStatus,
+} from '@/lib/dispatch/useRestaurantDispatchSocket';
 import { isActiveDeliveryPartnership } from '@/lib/fetchActiveDeliveryProviderConfig';
 import { DEFAULT_COUNTRY_ISO, findCountryByIso, formatE164 } from '@/lib/phone/countryDialCodes';
 import { publicMenuOrigin } from '@/lib/restaurantSubdomain';
@@ -51,6 +60,41 @@ function parsePesosToCents(input: string): number {
   const trimmed = input.trim();
   if (!trimmed) return 0;
   return Math.round(Number(trimmed) * 100);
+}
+
+const LIVE_COPY: Record<
+  RestaurantDispatchSocketStatus,
+  { label: string; hint: string; tone: 'live' | 'pending' | 'muted' }
+> = {
+  live: {
+    label: 'En vivo',
+    hint: 'Las solicitudes se actualizan automáticamente',
+    tone: 'live',
+  },
+  connecting: {
+    label: 'Conectando',
+    hint: 'Estableciendo enlace en tiempo real',
+    tone: 'pending',
+  },
+  reconnecting: {
+    label: 'Reconectando',
+    hint: 'Sincronizando solicitudes al restablecer la conexión',
+    tone: 'pending',
+  },
+  offline: {
+    label: 'Sin enlace',
+    hint: 'No hay conexión en tiempo real',
+    tone: 'muted',
+  },
+};
+
+function shareTrackingWhatsApp(shortId: string, url: string) {
+  const text = `Rastrea tu entrega ${shortId}\n${url}`;
+  window.open(
+    `https://wa.me/?text=${encodeURIComponent(text)}`,
+    '_blank',
+    'noopener,noreferrer',
+  );
 }
 
 export default function DeliveryPage() {
@@ -86,6 +130,9 @@ export default function DeliveryPage() {
   const [phoneCountryIso, setPhoneCountryIso] = useState(DEFAULT_COUNTRY_ISO);
   const [phoneLocal, setPhoneLocal] = useState('');
   const [formExpanded, setFormExpanded] = useState(true);
+  const [copiedTracking, setCopiedTracking] = useState(false);
+  const [socketStatus, setSocketStatus] = useState<RestaurantDispatchSocketStatus>('offline');
+  const [listView, setListView] = useState<'active' | 'history'>('active');
   const didInitFormCollapse = useRef(false);
 
   const courierAvailable = deliveryService?.available ?? false;
@@ -186,6 +233,30 @@ export default function DeliveryPage() {
     }
   }, [accessToken, selectedRestaurantId]);
 
+  const refreshRequests = useCallback(async () => {
+    if (!accessToken || !selectedRestaurantId) return;
+    try {
+      const rows = await listDispatchRequests(accessToken, selectedRestaurantId);
+      setRequests(rows);
+      setCreated((current) => {
+        if (!current) return current;
+        return rows.find((item) => item.id === current.id) ?? current;
+      });
+    } catch {
+      /* keep the current list until the next successful refresh */
+    }
+  }, [accessToken, selectedRestaurantId]);
+
+  useRestaurantDispatchSocket(selectedRestaurantId, accessToken, {
+    onEvent: () => {
+      void refreshRequests();
+    },
+    onStatusChange: setSocketStatus,
+    onReconnect: () => {
+      void refreshRequests();
+    },
+  });
+
   useEffect(() => {
     if (loading || didInitFormCollapse.current) return;
     if (requests.length > 0) {
@@ -208,6 +279,27 @@ export default function DeliveryPage() {
         : null,
     [created, subdomain],
   );
+
+  const restaurantCollectCents = parsePesosToCents(collectAmount);
+  const quotedDeliveryCents =
+    deliveryQuote?.available === true ? deliveryQuote.delivery_fee_cents : 0;
+
+  const activeRequests = useMemo(
+    () => requests.filter((item) => !isDispatchHistoryStatus(item.status)),
+    [requests],
+  );
+  const historyRequests = useMemo(
+    () => requests.filter((item) => isDispatchHistoryStatus(item.status)),
+    [requests],
+  );
+  const createdIsOpen = created != null && !isDispatchHistoryStatus(created.status);
+  const liveCopy = LIVE_COPY[socketStatus];
+  const liveDotClass =
+    liveCopy.tone === 'live'
+      ? styles.liveDotLive
+      : liveCopy.tone === 'pending'
+        ? styles.liveDotPending
+        : styles.liveDotMuted;
 
   const paymentOptions = useMemo(
     () => [
@@ -324,6 +416,7 @@ export default function DeliveryPage() {
         notes: String(form.get('notes') ?? '').trim() || null,
       });
       setCreated(row);
+      setCopiedTracking(false);
       setRequests((current) => [row, ...current]);
       setLocation(EMPTY_LOCATION);
       setMapsUrl(null);
@@ -389,6 +482,17 @@ export default function DeliveryPage() {
     }
   }
 
+  async function copyCreatedTracking() {
+    if (!trackingUrl) return;
+    try {
+      await navigator.clipboard.writeText(trackingUrl);
+      setCopiedTracking(true);
+      window.setTimeout(() => setCopiedTracking(false), 2000);
+    } catch {
+      window.prompt('Copia el enlace de rastreo', trackingUrl);
+    }
+  }
+
   const confirmCopy = confirm
     ? confirm.kind === 'cancel'
       ? confirm.step === 1
@@ -435,6 +539,16 @@ export default function DeliveryPage() {
         <div>
           <h1>Delivery</h1>
           <p>Solicita un repartidor para una entrega creada fuera del menú digital.</p>
+        </div>
+        <div
+          className={styles.liveIndicator}
+          role="status"
+          aria-live="polite"
+          aria-label={`${liveCopy.label}. ${liveCopy.hint}`}
+          title={liveCopy.hint}
+        >
+          <span className={`${styles.liveDot} ${liveDotClass}`} aria-hidden />
+          <span className={styles.liveLabel}>{liveCopy.label}</span>
         </div>
       </header>
 
@@ -551,28 +665,6 @@ export default function DeliveryPage() {
             </p>
           ) : null}
 
-          {deliveryQuote?.available && location.latitude != null ? (
-            <div className={styles.feeCard} role="status">
-              <span className={styles.feeLabel}>Costo de envío</span>
-              <span className={styles.feeValue}>
-                {formatMoney(deliveryQuote.delivery_fee_cents / 100, 'MXN')}
-              </span>
-              <span className={styles.feeHint}>
-                {deliveryQuote.inside_polygon
-                  ? 'Dentro de la zona de cobertura.'
-                  : deliveryQuote.distance_km != null
-                    ? `${deliveryQuote.distance_km.toFixed(1)} km de ruta · solo horario diurno`
-                    : 'Fuera del polígono de cobertura · solo horario diurno'}
-              </span>
-              {deliveryWeatherFeeNotice ? (
-                <p className={styles.weatherNotice}>
-                  <WaterDropOutlinedIcon className={styles.weatherIcon} aria-hidden />
-                  <span>{deliveryWeatherFeeNotice}</span>
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-
           <div className={styles.gridThree}>
             <div className={styles.field}>
               <span className={styles.label} id="payment-method-label">
@@ -593,7 +685,7 @@ export default function DeliveryPage() {
             {paymentMethod !== 'transfer' ? (
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="collect-amount">
-                  {paymentMethod === 'card_terminal' ? 'Cuánto cobrar' : 'Monto a cobrar'}
+                  Monto del restaurante
                 </label>
                 <input
                   id="collect-amount"
@@ -606,6 +698,7 @@ export default function DeliveryPage() {
                   onChange={(event) => setCollectAmount(event.target.value)}
                   disabled={!courierAvailable}
                 />
+                <p className={styles.fieldHint}>Sin incluir el costo de envío.</p>
               </div>
             ) : null}
 
@@ -628,6 +721,29 @@ export default function DeliveryPage() {
               </div>
             ) : null}
           </div>
+
+          {deliveryQuote?.available && location.latitude != null ? (
+            <DispatchCostBreakdown
+              restaurantCents={paymentMethod === 'transfer' ? 0 : restaurantCollectCents}
+              deliveryCents={quotedDeliveryCents}
+              paymentMethod={paymentMethod}
+              hint={
+                deliveryQuote.inside_polygon
+                  ? 'Restaurante es lo que cobra tu negocio. Envío es la tarifa de Mexy.'
+                  : deliveryQuote.distance_km != null
+                    ? `${deliveryQuote.distance_km.toFixed(1)} km de ruta · solo horario diurno`
+                    : 'Fuera del polígono de cobertura · solo horario diurno'
+              }
+              weatherNotice={
+                deliveryWeatherFeeNotice ? (
+                  <p className={styles.weatherNotice}>
+                    <WaterDropOutlinedIcon className={styles.weatherIcon} aria-hidden />
+                    <span>{deliveryWeatherFeeNotice}</span>
+                  </p>
+                ) : null
+              }
+            />
+          ) : null}
 
           <div className={styles.gridThree}>
             <div className={styles.field}>
@@ -726,41 +842,121 @@ export default function DeliveryPage() {
         </div>
       </section>
 
-      {created && trackingUrl ? (
+      {createdIsOpen && trackingUrl ? (
         <section className={styles.success} aria-live="polite">
-          <DoneAllOutlinedIcon />
-          <div>
-            <h2>Solicitud {formatDispatchShortId(created.short_id)} creada</h2>
-            <p>
-              La búsqueda inicia el{' '}
+          <div className={styles.successMark} aria-hidden>
+            <CheckOutlinedIcon fontSize="small" />
+          </div>
+          <div className={styles.successBody}>
+            <div className={styles.successHeading}>
+              <h2>Pedido {formatDispatchShortId(created.short_id)} solicitado</h2>
+              <button
+                type="button"
+                className={styles.successDismiss}
+                aria-label="Cerrar aviso"
+                onClick={() => setCreated(null)}
+              >
+                <CloseOutlinedIcon sx={{ fontSize: 18 }} />
+              </button>
+            </div>
+            <p className={styles.successMeta}>
+              Búsqueda{' '}
               {new Date(created.search_at).toLocaleString('es-MX', {
                 dateStyle: 'medium',
                 timeStyle: 'short',
               })}
-              .
             </p>
-            <div className={styles.trackingLink}>
-              <a href={trackingUrl} target="_blank" rel="noreferrer">{trackingUrl}</a>
+            <p className={styles.successCosts}>
+              {created.payment_method === 'transfer' ? (
+                <span>Envío {formatMoney(created.quoted_fee_cents / 100, 'MXN')}</span>
+              ) : (
+                <>
+                  <span>Restaurante {formatMoney(created.collect_cents / 100, 'MXN')}</span>
+                  <span aria-hidden>·</span>
+                  <span>Envío {formatMoney(created.quoted_fee_cents / 100, 'MXN')}</span>
+                </>
+              )}
+            </p>
+            <div className={styles.successActions}>
               <button
                 type="button"
-                aria-label="Copiar enlace de rastreo"
-                onClick={() => navigator.clipboard.writeText(trackingUrl)}
+                className={styles.successAction}
+                onClick={() => void copyCreatedTracking()}
               >
-                <ContentCopyOutlinedIcon fontSize="small" />
+                {copiedTracking ? (
+                  <CheckOutlinedIcon fontSize="small" />
+                ) : (
+                  <ContentCopyOutlinedIcon fontSize="small" />
+                )}
+                {copiedTracking ? 'Enlace copiado' : 'Copiar rastreo'}
               </button>
+              <button
+                type="button"
+                className={`${styles.successAction} ${styles.successWhatsApp}`}
+                onClick={() =>
+                  shareTrackingWhatsApp(formatDispatchShortId(created.short_id), trackingUrl)
+                }
+              >
+                <WhatsAppIcon fontSize="small" />
+                WhatsApp
+              </button>
+              <a
+                className={styles.successAction}
+                href={trackingUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <OpenInNewOutlinedIcon sx={{ fontSize: 16 }} aria-hidden />
+                Abrir rastreo
+              </a>
             </div>
           </div>
         </section>
       ) : null}
 
-      <DispatchRecentRequests
-        requests={requests}
-        subdomain={subdomain}
-        busy={confirming}
-        onRetry={(request) => void runAction(request, 'retry')}
-        onCancel={(request) => setConfirm({ kind: 'cancel', request, step: 1 })}
-        onConfirmCash={(request) => setConfirm({ kind: 'cash', request, step: 1 })}
-      />
+      <div className={styles.listTabs} role="tablist" aria-label="Solicitudes de delivery">
+        <button
+          type="button"
+          role="tab"
+          id="delivery-tab-active"
+          aria-selected={listView === 'active'}
+          aria-controls="delivery-panel-active"
+          className={`${styles.listTab} ${listView === 'active' ? styles.listTabActive : ''}`}
+          onClick={() => setListView('active')}
+        >
+          Activos
+          <span className={styles.listTabCount}>{activeRequests.length}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="delivery-tab-history"
+          aria-selected={listView === 'history'}
+          aria-controls="delivery-panel-history"
+          className={`${styles.listTab} ${listView === 'history' ? styles.listTabActive : ''}`}
+          onClick={() => setListView('history')}
+        >
+          Historial
+          <span className={styles.listTabCount}>{historyRequests.length}</span>
+        </button>
+      </div>
+
+      <div
+        id={listView === 'active' ? 'delivery-panel-active' : 'delivery-panel-history'}
+        role="tabpanel"
+        aria-labelledby={listView === 'active' ? 'delivery-tab-active' : 'delivery-tab-history'}
+      >
+        <DispatchRecentRequests
+          key={listView}
+          variant={listView}
+          requests={listView === 'active' ? activeRequests : historyRequests}
+          subdomain={subdomain}
+          busy={confirming}
+          onRetry={(request) => void runAction(request, 'retry')}
+          onCancel={(request) => setConfirm({ kind: 'cancel', request, step: 1 })}
+          onConfirmCash={(request) => setConfirm({ kind: 'cash', request, step: 1 })}
+        />
+      </div>
       <ConfirmDialog
         open={confirm != null && confirmCopy != null}
         title={confirmCopy?.title ?? ''}
