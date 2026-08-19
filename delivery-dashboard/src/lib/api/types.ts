@@ -511,6 +511,7 @@ export type DispatchHistoryItem = {
   short_id: string;
   status: 'delivered' | 'cancelled' | string;
   closed_at: string;
+  restaurant_id?: string | null;
   restaurant_name: string;
   restaurant_address?: string | null;
   dropoff_address: string;
