@@ -40,6 +40,7 @@ from app.modules.delivery_dispatch.engine import (
     EngineSettings,
     assignment_timed_out,
     choose_assignments,
+    nn_last_dropoff,
 )
 from app.modules.delivery_dispatch.geo import geodesic_meters
 from app.modules.delivery_dispatch.monitor_notify import notify_request_realtime
@@ -848,6 +849,15 @@ def _build_context(
     ).all()
     occupied_by_driver: dict[uuid.UUID, list[DeliveryDispatchRequest]] = defaultdict(list)
     active_packages: dict[uuid.UUID, int] = {}
+    occupied_restaurant_ids = {
+        row.restaurant_id for row in occupied_rows if row.restaurant_id is not None
+    }
+    occupied_restaurants = {
+        row.id: row
+        for row in session.scalars(
+            select(Restaurant).where(Restaurant.id.in_(occupied_restaurant_ids))
+        ).all()
+    } if occupied_restaurant_ids else {}
     for row in occupied_rows:
         if row.assigned_driver_id is None:
             continue
@@ -889,6 +899,7 @@ def _build_context(
             occupied_by_driver.get(driver.id, []),
             active_packages.get(driver.id, 0),
             driver.id in open_offer_ids,
+            occupied_restaurants,
         )
         for driver in drivers
     )
@@ -914,6 +925,7 @@ def _to_engine_request(
         silent = silent + tuple(extra_excluded)
     return EngineRequest(
         id=str(request.id),
+        restaurant_id=str(request.restaurant_id),
         restaurant_lat=restaurant_lat,
         restaurant_lng=restaurant_lng,
         package_size=request.package_size,
@@ -934,6 +946,7 @@ def _to_engine_driver(
     occupied_jobs: list[DeliveryDispatchRequest],
     active_package_count: int,
     has_open_offer: bool,
+    restaurants: dict[uuid.UUID, Restaurant] | None = None,
 ) -> EngineDriver:
     active = None
     if len(occupied_jobs) == 1:
@@ -943,6 +956,10 @@ def _to_engine_driver(
             (job for job in occupied_jobs if job.status == "in_transit"),
             occupied_jobs[0],
         )
+    heading_restaurant_id, last_dropoff_lat, last_dropoff_lng = _heading_restaurant_last_dropoff(
+        occupied_jobs,
+        restaurants or {},
+    )
     return EngineDriver(
         id=str(driver.id),
         status=driver.status,
@@ -961,7 +978,36 @@ def _to_engine_driver(
         active_dropoff_lat=active.dropoff_lat if active is not None else None,
         active_dropoff_lng=active.dropoff_lng if active is not None else None,
         occupied_job_count=len(occupied_jobs),
+        heading_restaurant_id=heading_restaurant_id,
+        last_dropoff_lat=last_dropoff_lat,
+        last_dropoff_lng=last_dropoff_lng,
     )
+
+
+def _heading_restaurant_last_dropoff(
+    occupied_jobs: list[DeliveryDispatchRequest],
+    restaurants: dict[uuid.UUID, Restaurant],
+) -> tuple[str | None, float | None, float | None]:
+    if not occupied_jobs:
+        return None, None, None
+    if any(job.status != "assigned" for job in occupied_jobs):
+        return None, None, None
+    restaurant_ids = {job.restaurant_id for job in occupied_jobs}
+    if len(restaurant_ids) != 1:
+        return None, None, None
+    restaurant_id = next(iter(restaurant_ids))
+    restaurant = restaurants.get(restaurant_id)
+    origin_lat = restaurant.latitude if restaurant and restaurant.latitude is not None else 0.0
+    origin_lng = restaurant.longitude if restaurant and restaurant.longitude is not None else 0.0
+    dropoffs = tuple(
+        (job.dropoff_lat, job.dropoff_lng)
+        for job in occupied_jobs
+        if job.dropoff_lat is not None and job.dropoff_lng is not None
+    )
+    last = nn_last_dropoff(dropoffs, origin_lat=origin_lat, origin_lng=origin_lng)
+    if last is None:
+        return str(restaurant_id), None, None
+    return str(restaurant_id), last[0], last[1]
 
 
 def _engine_settings(row: DeliveryProviderAssignmentSettings) -> EngineSettings:
@@ -1160,7 +1206,7 @@ def _driver_busy(
     )
     if not occupied_rows:
         return False
-    if case == "D":
+    if case in {"C", "D"}:
         return False
     return not _occupied_is_pre_free(driver, occupied_rows, settings_row)
 
