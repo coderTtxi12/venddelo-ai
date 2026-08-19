@@ -415,18 +415,6 @@ export function DispatchRecentRequests({
                       />
                     </div>
 
-                    {!isHistory && trackingUrl ? (
-                      <a
-                        className={styles.trackingLink}
-                        href={trackingUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <OpenInNewOutlinedIcon sx={{ fontSize: 16 }} aria-hidden />
-                        Abrir enlace de rastreo
-                      </a>
-                    ) : null}
-
                     <div className={styles.actions}>
                       {request.status === 'unassigned' ? (
                         <button
