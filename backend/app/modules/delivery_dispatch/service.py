@@ -1362,9 +1362,14 @@ class RiderDispatchService:
         if request.status != expected:
             raise ConflictError("No puedes cambiar el estado de este envío")
         request.status = new_status
+        now = datetime.now(UTC)
         if new_status == "picked_up":
+            request.picked_up_at = now
             complete_stop(self._session, driver.id, request.id, "restaurant")
+        elif new_status == "in_transit":
+            request.in_transit_at = now
         elif new_status == "delivered":
+            request.delivered_at = now
             complete_stop(self._session, driver.id, request.id, "dropoff")
         self._session.flush()
         self._session.refresh(request)
