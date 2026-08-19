@@ -371,6 +371,37 @@ class RiderHistoryPageDTO(BaseModel):
     active_holds: list[RiderHistoryHoldDTO] = Field(default_factory=list)
 
 
+class ProviderHistoryItemDTO(RiderHistoryItemDTO):
+    assigned_driver_id: uuid.UUID | None = None
+    assigned_driver_name: str | None = None
+    zone_id: uuid.UUID | None = None
+    zone_name: str | None = None
+    restaurant_lat: float | None = None
+    restaurant_lng: float | None = None
+    dropoff_lat: float
+    dropoff_lng: float
+    dropoff_maps_url: str | None = None
+    ready_at: datetime
+    search_at: datetime
+    created_at: datetime
+    cancelled_at: datetime | None = None
+    updated_at: datetime
+    dispatch_group_id: uuid.UUID | None = None
+    case_applied: str | None = None
+    credit_hold_status: str | None = None
+
+
+class ProviderHistoryPageDTO(BaseModel):
+    start: date
+    end: date
+    items: list[ProviderHistoryItemDTO]
+    total: int
+    delivered_count: int
+    cancelled_count: int
+    earnings_cents: int
+    has_more: bool
+
+
 class RiderOfferStopDTO(BaseModel):
     restaurant_name: str
     dropoff_address: str
