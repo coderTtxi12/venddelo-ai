@@ -29,8 +29,10 @@ function statusCopy(
 
 export default function ServiceStatusToggle() {
   const { canManagePartnerships } = useDeliveryProviderAccess();
-  const { selectedZoneId } = useDeliveryZone();
-  const { status, loading, saving, setManuallyEnabled } = useServiceStatus(selectedZoneId);
+  const { selectedZoneId, isAllZones, effectiveZoneId } = useDeliveryZone();
+  const { status, loading, saving, setManuallyEnabled } = useServiceStatus(effectiveZoneId);
+
+  if (isAllZones || selectedZoneId == null) return null;
 
   if (loading) {
     return (
