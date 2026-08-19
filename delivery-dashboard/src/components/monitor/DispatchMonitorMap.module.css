@@ -138,22 +138,37 @@
 
 .dropoffPinFocused,
 .restaurantPinFocused {
-  width: 0.92rem;
-  height: 0.92rem;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #ea580c 35%, transparent);
+  width: 1.05rem;
+  height: 1.05rem;
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 6px color-mix(in srgb, #ea580c 55%, transparent);
 }
 
 .requestLabelFocused {
-  background: #9a3412;
-  box-shadow: 0 0 0 2px #fff, 0 1px 6px rgba(15, 23, 42, 0.35);
+  font-size: 0.78rem;
+  padding: 0.2rem 0.55rem;
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 5px rgba(15, 23, 42, 0.35),
+    0 4px 12px rgba(15, 23, 42, 0.35);
 }
 
 .requestLabelPending {
   background: #ea580c;
 }
 
+.requestLabelDim,
 .pinDim {
-  opacity: 0.38;
+  opacity: 0.32;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .requestLabelFocused,
+  .dropoffPinFocused,
+  .restaurantPinFocused {
+    transition: none;
+  }
 }
 
 .stopPin {
@@ -279,6 +294,10 @@
   flex-direction: column;
   min-width: 0;
   gap: 0.05rem;
+}
+
+.businessOrder {
+  grid-column: 1 / -1;
 }
 
 .itineraryCopy strong {
