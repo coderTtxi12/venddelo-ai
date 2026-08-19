@@ -15,16 +15,20 @@ class RiderSlideToConfirm extends StatefulWidget {
     this.enabled = true,
     this.busy = false,
     this.color = AppColors.primary,
+    this.compact = false,
   });
 
   static const double height = 76;
   static const double thumbSize = 64;
+  static const double compactHeight = 52;
+  static const double compactThumbSize = 40;
 
   final String label;
   final VoidCallback? onConfirmed;
   final bool enabled;
   final bool busy;
   final Color color;
+  final bool compact;
 
   @override
   State<RiderSlideToConfirm> createState() => _RiderSlideToConfirmState();
@@ -41,6 +45,13 @@ class _RiderSlideToConfirmState extends State<RiderSlideToConfirm>
 
   bool get _interactive =>
       widget.enabled && !widget.busy && widget.onConfirmed != null;
+
+  double get _trackHeight =>
+      widget.compact ? RiderSlideToConfirm.compactHeight : RiderSlideToConfirm.height;
+
+  double get _thumbSize => widget.compact
+      ? RiderSlideToConfirm.compactThumbSize
+      : RiderSlideToConfirm.thumbSize;
 
   @override
   void initState() {
@@ -67,7 +78,7 @@ class _RiderSlideToConfirmState extends State<RiderSlideToConfirm>
   }
 
   double _maxDx(double width) =>
-      (width - RiderSlideToConfirm.thumbSize - _inset * 2).clamp(0, 400);
+      (width - _thumbSize - _inset * 2).clamp(0, 400);
 
   void _snapBack() {
     final start = _dx;
@@ -143,17 +154,22 @@ class _RiderSlideToConfirmState extends State<RiderSlideToConfirm>
             opacity: _interactive ? 1 : 0.55,
             child: Container(
               width: double.infinity,
-              height: RiderSlideToConfirm.height,
+              height: _trackHeight,
               decoration: BoxDecoration(
-                color: widget.color,
-                borderRadius: BorderRadius.circular(AppTheme.buttonRadius + 2),
+                color: widget.compact ? AppColors.background : widget.color,
+                borderRadius: BorderRadius.circular(
+                  widget.compact ? 14 : AppTheme.buttonRadius + 2,
+                ),
+                border: widget.compact
+                    ? Border.all(color: AppColors.border)
+                    : null,
               ),
               child: Stack(
                 alignment: Alignment.centerLeft,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(
-                      left: RiderSlideToConfirm.thumbSize + 14,
+                    padding: EdgeInsets.only(
+                      left: _thumbSize + 14,
                       right: 18,
                     ),
                     child: Opacity(
@@ -161,7 +177,11 @@ class _RiderSlideToConfirmState extends State<RiderSlideToConfirm>
                       child: _SlideLabelShine(
                         text: widget.busy ? 'Actualizando…' : widget.label,
                         enabled: _interactive && progress < 0.18,
-                        reduceMotion: reduceMotion,
+                        reduceMotion: reduceMotion || widget.compact,
+                        color: widget.compact
+                            ? AppColors.textMuted
+                            : Colors.white,
+                        fontSize: widget.compact ? 14 : 18,
                       ),
                     ),
                   ),
@@ -175,31 +195,39 @@ class _RiderSlideToConfirmState extends State<RiderSlideToConfirm>
                           _onDragUpdate(details, maxDx),
                       onHorizontalDragEnd: (_) => _onDragEnd(maxDx),
                       child: Container(
-                        width: RiderSlideToConfirm.thumbSize,
-                        height: RiderSlideToConfirm.thumbSize,
+                        width: _thumbSize,
+                        height: _thumbSize,
                         decoration: BoxDecoration(
                           color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: const [
+                          borderRadius: BorderRadius.circular(
+                            widget.compact ? 12 : 16,
+                          ),
+                          boxShadow: [
                             BoxShadow(
-                              color: Color(0x33000000),
-                              blurRadius: 10,
-                              offset: Offset(0, 2),
+                              color: Color(widget.compact ? 0x14000000 : 0x33000000),
+                              blurRadius: widget.compact ? 4 : 10,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
                         child: widget.busy
                             ? Padding(
-                                padding: const EdgeInsets.all(16),
+                                padding: EdgeInsets.all(widget.compact ? 10 : 16),
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2.6,
-                                  color: widget.color,
+                                  color: widget.compact
+                                      ? AppColors.textMuted
+                                      : widget.color,
                                 ),
                               )
                             : Icon(
                                 Icons.chevron_right_rounded,
-                                color: widget.color,
-                                size: reduceMotion ? 32 : 38,
+                                color: widget.compact
+                                    ? AppColors.textMuted
+                                    : widget.color,
+                                size: widget.compact
+                                    ? 22
+                                    : (reduceMotion ? 32 : 38),
                               ),
                       ),
                     ),
@@ -220,11 +248,15 @@ class _SlideLabelShine extends StatefulWidget {
     required this.text,
     required this.enabled,
     required this.reduceMotion,
+    this.color = Colors.white,
+    this.fontSize = 18,
   });
 
   final String text;
   final bool enabled;
   final bool reduceMotion;
+  final Color color;
+  final double fontSize;
 
   @override
   State<_SlideLabelShine> createState() => _SlideLabelShineState();
@@ -275,9 +307,9 @@ class _SlideLabelShineState extends State<_SlideLabelShine>
       widget.text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 18,
+      style: TextStyle(
+        color: widget.color,
+        fontSize: widget.fontSize,
         fontWeight: FontWeight.w800,
         letterSpacing: 0.15,
         height: 1.1,
