@@ -396,10 +396,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final peekHeight = (job == null ? 118.0 : 92.0) + bottomInset;
-    final expandedHeight = math.min(
-      MediaQuery.sizeOf(context).height * 0.72,
-      640.0,
-    ).clamp(peekHeight + 160, MediaQuery.sizeOf(context).height * 0.9);
+    final idleBannerExtra = (controller.showIosKillWarning ? 80.0 : 0.0) +
+        (controller.errorMessage != null ? 80.0 : 0.0) +
+        (controller.needsLocationSettings ? 52.0 : 0.0);
+    final expandedHeight = job == null
+        ? peekHeight + 168 + idleBannerExtra
+        : math.min(
+            MediaQuery.sizeOf(context).height * 0.72,
+            640.0,
+          ).clamp(peekHeight + 160, MediaQuery.sizeOf(context).height * 0.9);
 
     return Scaffold(
       backgroundColor: AppColors.background,
