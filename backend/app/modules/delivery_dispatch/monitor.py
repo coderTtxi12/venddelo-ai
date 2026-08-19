@@ -478,6 +478,9 @@ def build_dispatch_monitor_snapshot(
         restaurant_name = restaurant.name if restaurant is not None else "Restaurante"
         restaurant_lat = restaurant.latitude if restaurant is not None else None
         restaurant_lng = restaurant.longitude if restaurant is not None else None
+        restaurant_address = restaurant.address if restaurant is not None else None
+        restaurant_phone = restaurant.whatsapp_phone if restaurant is not None else None
+        restaurant_logo_path = restaurant.logo_path if restaurant is not None else None
         is_due_search = (
             request.status in _QUEUE_STATUSES and _as_utc(request.search_at) <= current
         )
@@ -521,7 +524,11 @@ def build_dispatch_monitor_snapshot(
                 status=request.status,
                 customer_name=request.customer_name,
                 customer_phone=request.customer_phone,
+                restaurant_id=request.restaurant_id,
                 restaurant_name=restaurant_name,
+                restaurant_address=restaurant_address,
+                restaurant_phone=restaurant_phone,
+                restaurant_logo_path=restaurant_logo_path,
                 restaurant_lat=restaurant_lat,
                 restaurant_lng=restaurant_lng,
                 dropoff_lat=request.dropoff_lat,
