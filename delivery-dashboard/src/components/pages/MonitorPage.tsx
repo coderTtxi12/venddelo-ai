@@ -15,7 +15,12 @@ import { PanelPageShell, type PanelPageStyles } from '@/components/pages/PanelPa
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { useAuth } from '@/hooks/useAuth';
-import { createMyManualDispatchOffer, getMyDispatchMonitor, updateDriverItinerary } from '@/lib/api/deliveryProviders';
+import {
+  createMyManualDispatchOffer,
+  getMyDispatchMonitor,
+  retryMyUnassignedDispatchRequest,
+  updateDriverItinerary,
+} from '@/lib/api/deliveryProviders';
 import type {
   DispatchMonitorCreditHold,
   DispatchMonitorDriver,
@@ -736,6 +741,7 @@ export default function MonitorPage() {
   const [assigningRequest, setAssigningRequest] = useState<DispatchMonitorRequest | null>(null);
   const [detailRequestId, setDetailRequestId] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
+  const [assignBusyKind, setAssignBusyKind] = useState<'system' | 'manual' | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [focusedRequestId, setFocusedRequestId] = useState<string | null>(null);
   const [focusedDriverId, setFocusedDriverId] = useState<string | null>(null);
@@ -924,12 +930,14 @@ export default function MonitorPage() {
   function handleOpenDetail(request: DispatchMonitorRequest) {
     setAssigningRequest(null);
     setAssignError(null);
+    setAssignBusyKind(null);
     setDetailRequestId(request.id);
   }
 
   function handleOpenAssign(request: DispatchMonitorRequest) {
     setDetailRequestId(null);
     setAssignError(null);
+    setAssignBusyKind(null);
     setAssigningRequest(request);
   }
 
@@ -946,6 +954,7 @@ export default function MonitorPage() {
   ) {
     if (!accessToken || !assigningRequest) return;
     setAssigning(true);
+    setAssignBusyKind('manual');
     setAssignError(null);
     try {
       await createMyManualDispatchOffer(accessToken, assigningRequest.id, driverId, itinerary);
@@ -955,6 +964,24 @@ export default function MonitorPage() {
       setAssignError(err instanceof Error ? err.message : 'No se pudo enviar la oferta');
     } finally {
       setAssigning(false);
+      setAssignBusyKind(null);
+    }
+  }
+
+  async function handleSystemRetry() {
+    if (!accessToken || !assigningRequest || assigningRequest.status !== 'unassigned') return;
+    setAssigning(true);
+    setAssignBusyKind('system');
+    setAssignError(null);
+    try {
+      await retryMyUnassignedDispatchRequest(accessToken, assigningRequest.id);
+      setAssigningRequest(null);
+      await loadSnapshot();
+    } catch (err) {
+      setAssignError(err instanceof Error ? err.message : 'No se pudo volver a buscar');
+    } finally {
+      setAssigning(false);
+      setAssignBusyKind(null);
     }
   }
 
@@ -1241,13 +1268,18 @@ export default function MonitorPage() {
         request={assigningRequest}
         drivers={snapshot?.drivers ?? []}
         submitting={assigning}
+        busyKind={assignBusyKind}
         error={assignError}
         onClose={() => {
           setAssigningRequest(null);
           setAssignError(null);
+          setAssignBusyKind(null);
         }}
         onAssign={(driverId, itinerary) => {
           void handleManualOffer(driverId, itinerary);
+        }}
+        onSystemAssign={() => {
+          void handleSystemRetry();
         }}
       />
     </PanelPageShell>
