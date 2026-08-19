@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -122,6 +122,7 @@ def record_assignment_event(
         next_attempt_at=next_attempt_at,
         case_applied=case_applied,
         driver_id=driver_id,
+        created_at=datetime.now(UTC),
     )
     session.add(row)
     return row
@@ -135,7 +136,10 @@ def list_assignment_events(
         session.scalars(
             select(DeliveryDispatchAssignmentEvent)
             .where(DeliveryDispatchAssignmentEvent.request_id == request_id)
-            .order_by(DeliveryDispatchAssignmentEvent.created_at.desc())
+            .order_by(
+                DeliveryDispatchAssignmentEvent.created_at.desc(),
+                DeliveryDispatchAssignmentEvent.id.desc(),
+            )
             .limit(LOG_LIMIT)
         )
     )
