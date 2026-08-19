@@ -16,7 +16,7 @@ import styles from './SettingsPage.module.css';
 
 export default function SchedulesPage() {
   const { accessToken } = useAuth();
-  const { selectedZoneId } = useDeliveryZone();
+  const { effectiveZoneId } = useDeliveryZone();
   const { canWriteProviderConfig, isOperator } = useDeliveryProviderAccess();
   const [schedules, setSchedules] = useState<DeliveryProviderSchedule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,12 +28,12 @@ export default function SchedulesPage() {
     let cancelled = false;
 
     async function loadSchedules() {
-      if (!accessToken || !selectedZoneId) return;
+      if (!accessToken || !effectiveZoneId) return;
       setLoading(true);
       setError(null);
 
       try {
-        const rows = await listMyDeliveryProviderSchedules(accessToken, selectedZoneId);
+        const rows = await listMyDeliveryProviderSchedules(accessToken, effectiveZoneId);
         if (!cancelled) setSchedules(rows);
       } catch (err) {
         console.error(err);
@@ -49,7 +49,7 @@ export default function SchedulesPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, selectedZoneId]);
+  }, [accessToken, effectiveZoneId]);
 
   const handleSaveSchedules = async (
     payload: Parameters<typeof setMyDeliveryProviderSchedules>[2],
@@ -58,7 +58,7 @@ export default function SchedulesPage() {
       setError('No hay sesión activa. Inicia sesión de nuevo.');
       return;
     }
-    if (!selectedZoneId) {
+    if (!effectiveZoneId) {
       setError('Selecciona una zona de reparto.');
       return;
     }
@@ -68,8 +68,8 @@ export default function SchedulesPage() {
     setSuccess(null);
 
     try {
-      await setMyDeliveryProviderSchedules(accessToken, selectedZoneId, payload);
-      const updated = await listMyDeliveryProviderSchedules(accessToken, selectedZoneId);
+      await setMyDeliveryProviderSchedules(accessToken, effectiveZoneId, payload);
+      const updated = await listMyDeliveryProviderSchedules(accessToken, effectiveZoneId);
       setSchedules(updated);
       setSuccess('Horarios guardados correctamente.');
     } catch (err) {
