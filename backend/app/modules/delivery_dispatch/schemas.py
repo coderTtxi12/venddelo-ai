@@ -21,6 +21,9 @@ class AssignmentSettingsDTO(BaseModel):
     max_extra_route_minutes: int
     max_pickup_detour_minutes: int
     max_destination_detour_minutes: int
+    max_extra_route_meters: int
+    max_pickup_detour_meters: int
+    max_destination_detour_meters: int
     max_active_packages_per_driver: int
     assignment_retry_seconds: int
     assignment_timeout_seconds: int
