@@ -1,5 +1,11 @@
 String formatMoneyCents(int cents) => '\$${(cents / 100).toStringAsFixed(2)}';
 
+String formatDayMonth(DateTime value) {
+  final day = value.day.toString().padLeft(2, '0');
+  final month = value.month.toString().padLeft(2, '0');
+  return '$day/$month';
+}
+
 String formatClosedAtLocal(DateTime value) {
   final local = value.toLocal();
   final day = local.day.toString().padLeft(2, '0');
