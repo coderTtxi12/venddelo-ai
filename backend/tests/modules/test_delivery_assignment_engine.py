@@ -316,12 +316,121 @@ def test_stale_gps_excluded_even_if_in_transit():
     assert result.offers[0].driver_id == "fresh"
 
 
-def test_case_c_groups_nearby_dropoffs_onto_one_driver():
-    current = _request("req-1", dropoff_lat=19.4326, dropoff_lng=-99.1332)
-    sibling = _request("req-2", dropoff_lat=19.4340, dropoff_lng=-99.1332)
-    nearby_m = geodesic_meters(19.4326, -99.1332, 19.4340, -99.1332)
+def test_case_c_hooks_assigned_rider_same_restaurant_last_dropoff():
+    last_lat, last_lng = 19.4340, -99.1332
+    request = _request("req-new", dropoff_lat=19.4345, dropoff_lng=-99.1332)
+    nearby_m = geodesic_meters(last_lat, last_lng, 19.4345, -99.1332)
     assert nearby_m <= 800
 
+    hooked = _driver(
+        "hooked",
+        last_lat=RESTAURANT_LAT,
+        last_lng=RESTAURANT_LNG,
+        active_request_status="assigned",
+        active_package_count=2,
+        occupied_job_count=2,
+        heading_restaurant_id="rest-1",
+        last_dropoff_lat=last_lat,
+        last_dropoff_lng=last_lng,
+        active_dropoff_lat=last_lat,
+        active_dropoff_lng=last_lng,
+    )
+    result = choose_assignments(
+        _context(
+            request,
+            (hooked,),
+            settings=_settings(high_demand_available_drivers_max=2),
+        )
+    )
+
+    assert result.high_demand is True
+    assert result.case == "C"
+    assert len(result.offers) == 1
+    assert result.offers[0].driver_id == "hooked"
+    assert result.offers[0].request_id == "req-new"
+    assert result.group_id is None
+
+
+def test_case_c_skips_when_last_dropoff_is_far():
+    last_lat, last_lng = 19.50, -99.20
+    request = _request("req-new", dropoff_lat=19.4326, dropoff_lng=-99.1332)
+    far_m = geodesic_meters(last_lat, last_lng, 19.4326, -99.1332)
+    assert far_m > 800
+
+    hooked = _driver(
+        "hooked",
+        last_lat=RESTAURANT_LAT,
+        last_lng=RESTAURANT_LNG,
+        active_request_status="assigned",
+        active_package_count=1,
+        heading_restaurant_id="rest-1",
+        last_dropoff_lat=last_lat,
+        last_dropoff_lng=last_lng,
+    )
+    idle = _driver("idle", last_lat=19.4330, last_lng=-99.1335)
+    result = choose_assignments(
+        _context(
+            request,
+            (hooked, idle),
+            settings=_settings(high_demand_available_drivers_max=2),
+        )
+    )
+
+    assert result.case == "E"
+    assert result.offers[0].driver_id == "idle"
+
+
+def test_case_c_skips_other_restaurant():
+    request = _request("req-new", dropoff_lat=19.4345, dropoff_lng=-99.1332)
+    hooked = _driver(
+        "hooked",
+        last_lat=RESTAURANT_LAT,
+        last_lng=RESTAURANT_LNG,
+        active_request_status="assigned",
+        active_package_count=1,
+        heading_restaurant_id="rest-other",
+        last_dropoff_lat=19.4340,
+        last_dropoff_lng=-99.1332,
+    )
+    result = choose_assignments(
+        _context(
+            request,
+            (hooked,),
+            settings=_settings(high_demand_available_drivers_max=2),
+        )
+    )
+
+    assert result.case != "C"
+
+
+def test_case_c_skips_when_rider_already_left_restaurant():
+    request = _request("req-new", dropoff_lat=19.4345, dropoff_lng=-99.1332)
+    left = _driver(
+        "left",
+        last_lat=19.4330,
+        last_lng=-99.1335,
+        active_request_status="picked_up",
+        active_package_count=1,
+        heading_restaurant_id=None,
+        last_dropoff_lat=19.4340,
+        last_dropoff_lng=-99.1332,
+        active_dropoff_lat=19.4340,
+        active_dropoff_lng=-99.1332,
+    )
+    result = choose_assignments(
+        _context(
+            request,
+            (left,),
+            settings=_settings(high_demand_available_drivers_max=2),
+        )
+    )
+
+    assert result.case == "D"
+
+
+def test_high_demand_two_due_nearby_uses_e_not_old_group_c():
+    current = _request("req-1", dropoff_lat=19.4326, dropoff_lng=-99.1332)
+    sibling = _request("req-2", dropoff_lat=19.4340, dropoff_lng=-99.1332)
     driver = _driver("only", last_lat=19.4330, last_lng=-99.1335)
     result = choose_assignments(
         _context(
@@ -333,12 +442,9 @@ def test_case_c_groups_nearby_dropoffs_onto_one_driver():
     )
 
     assert result.high_demand is True
-    assert result.case == "C"
-    assert len(result.offers) == 2
-    assert {offer.driver_id for offer in result.offers} == {"only"}
-    assert {offer.request_id for offer in result.offers} == {"req-1", "req-2"}
-    assert result.group_id is not None
-    assert all(offer.group_id == result.group_id for offer in result.offers)
+    assert result.case == "E"
+    assert len(result.offers) == 1
+    assert result.offers[0].request_id == "req-1"
 
 
 def test_case_c_without_free_rider_falls_through_to_d():
