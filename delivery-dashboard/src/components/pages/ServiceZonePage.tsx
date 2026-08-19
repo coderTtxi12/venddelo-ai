@@ -30,8 +30,8 @@ export default function ServiceZonePage() {
   const { canWriteProviderConfig, isOperator } = useDeliveryProviderAccess();
   const {
     zones,
-    selectedZoneId,
     selectedZone,
+    effectiveZoneId,
     createZone,
     updateZone,
     deleteZone,
@@ -70,7 +70,7 @@ export default function ServiceZonePage() {
     let cancelled = false;
 
     async function load() {
-      if (!accessToken || !selectedZoneId) {
+      if (!accessToken || !effectiveZoneId) {
         setLoading(false);
         return;
       }
@@ -80,7 +80,7 @@ export default function ServiceZonePage() {
       setSuccess(null);
 
       try {
-        const zone = await getMyDeliveryProviderZone(accessToken, selectedZoneId);
+        const zone = await getMyDeliveryProviderZone(accessToken, effectiveZoneId);
         if (cancelled) return;
 
         const nextForm = zoneFormFromApi(zone);
@@ -100,7 +100,7 @@ export default function ServiceZonePage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, selectedZoneId]);
+  }, [accessToken, effectiveZoneId]);
 
   const patchForm = useCallback((patch: Partial<ZoneFormState>) => {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -116,7 +116,7 @@ export default function ServiceZonePage() {
   );
 
   const handleSave = async () => {
-    if (!accessToken || !selectedZoneId) {
+    if (!accessToken || !effectiveZoneId) {
       setError('Selecciona una zona de reparto.');
       return;
     }
@@ -132,7 +132,7 @@ export default function ServiceZonePage() {
     setSuccess(null);
 
     try {
-      const updated = await updateZone(selectedZoneId, buildZoneWritePayload(form));
+      const updated = await updateZone(effectiveZoneId, buildZoneWritePayload(form));
       const nextForm = zoneFormFromApi(updated);
       setForm(nextForm);
       setInitialForm(nextForm);
@@ -150,14 +150,14 @@ export default function ServiceZonePage() {
   };
 
   const handleDeleteZone = async () => {
-    if (!selectedZoneId || deleteBlocked) return;
+    if (!effectiveZoneId || deleteBlocked) return;
 
     setDeleting(true);
     setError(null);
     setSuccess(null);
 
     try {
-      await deleteZone(selectedZoneId);
+      await deleteZone(effectiveZoneId);
       setDeleteDialogOpen(false);
       setSuccess('Zona eliminada correctamente.');
     } catch (err) {
@@ -274,7 +274,7 @@ export default function ServiceZonePage() {
               <button
                 type="button"
                 className={styles.primaryBtn}
-                disabled={loading || saving || !isDirty || !selectedZoneId}
+                disabled={loading || saving || !isDirty || !effectiveZoneId}
                 onClick={() => void handleSave()}
               >
                 {saving ? 'Guardando…' : 'Guardar cambios'}
@@ -285,7 +285,7 @@ export default function ServiceZonePage() {
       >
         <ZoneSwitcher onAddZone={openCreateDialog} />
 
-        {!selectedZoneId ? (
+        {!effectiveZoneId ? (
           <p className={styles.loading} role="status">
             Selecciona o crea una zona de reparto para continuar.
           </p>
