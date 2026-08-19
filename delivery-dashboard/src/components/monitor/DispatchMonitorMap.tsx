@@ -1,7 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DeliveryProviderZone, DispatchMonitorSnapshot, GeoJsonPolygon } from '@/lib/api/types';
+import {
+  buildDriverItinerary,
+  itineraryFitPoints,
+  itineraryLegs,
+  pickupBeforeDropoff,
+} from '@/lib/dispatch/driverItinerary';
 import { fetchRoadRoute } from '@/lib/dispatch/fetchRoadRoute';
 import { formatShortId } from '@/lib/dispatch/monitorCopy';
 import { motorcycleColorHex } from '@/lib/drivers/motorcycleColors';
@@ -14,6 +20,10 @@ type DispatchMonitorMapProps = {
   selectedZoneId: string | null;
   focusedRequestId?: string | null;
   focusedDriverId?: string | null;
+  onReorderItinerary?: (
+    driverId: string,
+    stops: Array<{ kind: 'restaurant' | 'dropoff'; request_id: string }>,
+  ) => void;
 };
 
 const ZONE_STYLE = {
@@ -102,6 +112,27 @@ const FOCUSED_ACTIVE_ROUTE_STYLE: google.maps.PolylineOptions = {
   zIndex: 9,
 };
 
+const NEXT_LEG_ROUTE_STYLE: google.maps.PolylineOptions = {
+  strokeColor: '#F97316',
+  strokeOpacity: 0,
+  strokeWeight: 3,
+  geodesic: true,
+  clickable: false,
+  zIndex: 8,
+  icons: [
+    {
+      icon: {
+        path: 'M 0,-1 0,1',
+        strokeOpacity: 0.95,
+        strokeColor: '#F97316',
+        scale: 3,
+      },
+      offset: '0',
+      repeat: '10px',
+    },
+  ],
+};
+
 function geoJsonToLatLngRing(polygon: GeoJsonPolygon): google.maps.LatLngLiteral[] {
   const source = polygon.coordinates?.[0] ?? [];
   return source
@@ -138,6 +169,20 @@ function createRequestLabel(shortId: string, pending: boolean, focused = false):
   el.textContent = formatShortId(shortId);
   el.setAttribute('aria-hidden', 'true');
   return el;
+}
+
+function createNumberedPin(kind: 'restaurant' | 'dropoff', sequence: number, current: boolean): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = styles.stopPin;
+  const badge = document.createElement('span');
+  badge.className = current ? `${styles.stopBadge} ${styles.stopBadgeNow}` : styles.stopBadge;
+  badge.textContent = String(sequence);
+  const pin = document.createElement('div');
+  pin.className = kind === 'restaurant' ? styles.restaurantPin : styles.dropoffPin;
+  pin.classList.add(styles.stopPinMark);
+  wrap.append(badge, pin);
+  wrap.setAttribute('aria-hidden', 'true');
+  return wrap;
 }
 
 function segmentLength(
@@ -245,6 +290,7 @@ export function DispatchMonitorMap({
   selectedZoneId,
   focusedRequestId = null,
   focusedDriverId = null,
+  onReorderItinerary,
 }: DispatchMonitorMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
@@ -255,6 +301,10 @@ export function DispatchMonitorMap({
   const lastFitKeyRef = useRef<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const itinerary = useMemo(
+    () => (snapshot && focusedDriverId ? buildDriverItinerary(snapshot, focusedDriverId) : null),
+    [focusedDriverId, snapshot],
+  );
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -382,6 +432,7 @@ export function DispatchMonitorMap({
         if (driver.location_stale) pin.classList.add(styles.driverPinStale);
         if (driver.credit_blocked) pin.classList.add(styles.driverPinBlocked);
         if (focused) pin.classList.add(styles.driverPinFocused);
+        if (focusedDriverId && !focused) pin.classList.add(styles.pinDim);
 
         const dot = document.createElement('span');
         dot.className = styles.driverDot;
@@ -404,54 +455,78 @@ export function DispatchMonitorMap({
         );
       }
 
-      for (const request of snapshot.requests) {
-        const focused = request.id === focusedRequestId;
-        const dropoff = { lat: request.dropoff_lat, lng: request.dropoff_lng };
-        points.push(dropoff);
+      if (itinerary) {
+        for (const stop of itinerary.stops) {
+          if (stop.kind !== 'restaurant' && stop.kind !== 'dropoff') continue;
+          const position = { lat: stop.lat, lng: stop.lng };
+          points.push(position);
+          const pin = createNumberedPin(stop.kind, stop.sequence ?? 0, stop.current);
+          pin.title = `${stop.sequence}. ${stop.action} · ${stop.title}`;
+          markersRef.current.push(
+            new AdvancedMarkerElement({
+              map,
+              position,
+              title: `${stop.sequence}. ${stop.action} · ${stop.title}`,
+              content: pin,
+              zIndex: stop.current ? 13 : 12,
+            }),
+          );
+        }
+      } else {
+        for (const request of snapshot.requests) {
+          const requestFocused = request.id === focusedRequestId;
+          const dropoff = { lat: request.dropoff_lat, lng: request.dropoff_lng };
+          points.push(dropoff);
 
-        const dropPin = document.createElement('div');
-        dropPin.className = focused ? `${styles.dropoffPin} ${styles.dropoffPinFocused}` : styles.dropoffPin;
-        dropPin.title = request.dropoff_address;
-
-        markersRef.current.push(
-          new AdvancedMarkerElement({
-            map,
-            position: dropoff,
-            title: request.customer_name,
-            content: dropPin,
-            zIndex: focused ? 12 : undefined,
-          }),
-        );
-
-        if (request.restaurant_lat != null && request.restaurant_lng != null) {
-          const restaurant = { lat: request.restaurant_lat, lng: request.restaurant_lng };
-          points.push(restaurant);
-
-          const restaurantPin = document.createElement('div');
-          restaurantPin.className = focused
-            ? `${styles.restaurantPin} ${styles.restaurantPinFocused}`
-            : styles.restaurantPin;
+          const dropPin = document.createElement('div');
+          dropPin.className = requestFocused
+            ? `${styles.dropoffPin} ${styles.dropoffPinFocused}`
+            : styles.dropoffPin;
+          dropPin.title = request.dropoff_address;
 
           markersRef.current.push(
             new AdvancedMarkerElement({
               map,
-              position: restaurant,
-              title: request.restaurant_name,
-              content: restaurantPin,
-              zIndex: focused ? 12 : undefined,
+              position: dropoff,
+              title: request.customer_name,
+              content: dropPin,
+              zIndex: requestFocused ? 12 : undefined,
             }),
           );
+
+          if (request.restaurant_lat != null && request.restaurant_lng != null) {
+            const restaurant = { lat: request.restaurant_lat, lng: request.restaurant_lng };
+            points.push(restaurant);
+
+            const restaurantPin = document.createElement('div');
+            restaurantPin.className = requestFocused
+              ? `${styles.restaurantPin} ${styles.restaurantPinFocused}`
+              : styles.restaurantPin;
+
+            markersRef.current.push(
+              new AdvancedMarkerElement({
+                map,
+                position: restaurant,
+                title: request.restaurant_name,
+                content: restaurantPin,
+                zIndex: requestFocused ? 12 : undefined,
+              }),
+            );
+          }
         }
       }
 
-      const pendingRequests = snapshot.requests.filter(
-        (request) =>
-          PENDING_REQUEST_STATUSES.has(request.status) &&
-          request.restaurant_lat != null &&
-          request.restaurant_lng != null,
-      );
+      const pendingRequests = itinerary
+        ? []
+        : snapshot.requests.filter(
+            (request) =>
+              PENDING_REQUEST_STATUSES.has(request.status) &&
+              request.restaurant_lat != null &&
+              request.restaurant_lng != null,
+          );
+      const activeRoutes = itinerary ? [] : snapshot.routes;
 
-      const [pendingRoadPaths, roadPaths] = await Promise.all([
+      const [pendingRoadPaths, roadPaths, itineraryRoadPaths] = await Promise.all([
         Promise.all(
           pendingRequests.map(async (request) => {
             const origin = {
@@ -467,7 +542,7 @@ export function DispatchMonitorMap({
           }),
         ),
         Promise.all(
-          snapshot.routes.map(async (route) => {
+          activeRoutes.map(async (route) => {
             const origin = { lat: route.origin_lat, lng: route.origin_lng };
             const destination = { lat: route.destination_lat, lng: route.destination_lng };
             const road = await fetchRoadRoute(origin, destination);
@@ -476,6 +551,17 @@ export function DispatchMonitorMap({
               path: road && road.length > 1 ? road : [origin, destination],
             };
           }),
+        ),
+        Promise.all(
+          itinerary
+            ? itineraryLegs(itinerary).map(async (leg) => {
+                const road = await fetchRoadRoute(leg.from, leg.to);
+                return {
+                  current: leg.current,
+                  path: road && road.length > 1 ? road : [leg.from, leg.to],
+                };
+              })
+            : [],
         ),
       ]);
 
@@ -523,13 +609,20 @@ export function DispatchMonitorMap({
         );
       }
 
+      for (const { current, path } of itineraryRoadPaths) {
+        points.push(...path);
+        polylinesRef.current.push(
+          new google.maps.Polyline({
+            map,
+            path,
+            ...(current ? FOCUSED_ACTIVE_ROUTE_STYLE : NEXT_LEG_ROUTE_STYLE),
+          }),
+        );
+      }
+
       const focusedDriver = focusedDriverId
         ? snapshot.drivers.find((row) => row.id === focusedDriverId) ?? null
         : null;
-      const focusedDriverPoint =
-        focusedDriver?.last_lat != null && focusedDriver.last_lng != null
-          ? [{ lat: focusedDriver.last_lat, lng: focusedDriver.last_lng }]
-          : [];
       const focusedRequest = focusedRequestId
         ? snapshot.requests.find((row) => row.id === focusedRequestId) ?? null
         : null;
@@ -546,18 +639,24 @@ export function DispatchMonitorMap({
             ? focusedPendingRoad.path
             : requestRoutePoints(focusedRequest, snapshot)
         : [];
+      const focusedDriverPoints = itinerary
+        ? [
+            ...itineraryFitPoints(itinerary),
+            ...itineraryRoadPaths.flatMap((row) => row.path),
+          ]
+        : [];
 
       let fitKey = `all:${snapshot.generated_at}`;
       let nextPoints: google.maps.LatLngLiteral[] | null = points;
       let padding = 56;
 
       if (focusedDriver) {
-        fitKey =
-          focusedDriverPoint.length > 0
-            ? `driver:${focusedDriver.id}:${focusedDriverPoint[0].lat},${focusedDriverPoint[0].lng}`
-            : `driver:${focusedDriver.id}:none`;
-        nextPoints = focusedDriverPoint.length > 0 ? focusedDriverPoint : null;
-        padding = 88;
+        const itineraryKey = itinerary
+          ? itinerary.stops.map((stop) => `${stop.kind}:${stop.requestId}`).join(',')
+          : 'none';
+        fitKey = `driver:${focusedDriver.id}:${itineraryKey}`;
+        nextPoints = focusedDriverPoints.length > 0 ? focusedDriverPoints : null;
+        padding = 96;
       } else if (focusedRequest) {
         fitKey = `request:${focusedRequest.id}`;
         nextPoints = focusedRequestPoints.length > 0 ? focusedRequestPoints : points;
@@ -579,7 +678,7 @@ export function DispatchMonitorMap({
     return () => {
       cancelled = true;
     };
-  }, [focusedDriverId, focusedRequestId, mapReady, snapshot, zones]);
+  }, [focusedDriverId, focusedRequestId, itinerary, mapReady, snapshot, zones]);
 
   if (mapError) {
     return (
@@ -589,5 +688,76 @@ export function DispatchMonitorMap({
     );
   }
 
-  return <div ref={mapRef} className={styles.map} aria-label="Mapa de operación" />;
+  return (
+    <div className={styles.mapWrap}>
+      <div ref={mapRef} className={styles.map} aria-label="Mapa de operación" />
+      {itinerary ? (
+        <aside className={styles.itineraryCard} aria-label={`Ruta de ${itinerary.driverName}`}>
+          <p className={styles.itineraryHeading}>
+            <span>{itinerary.driverName}</span>
+            <span className={styles.itineraryPlate}>{itinerary.plate}</span>
+          </p>
+          <p className={styles.itineraryKicker}>
+            Ruta fijada · arrastra para
+            intercalar paradas
+          </p>
+          {itinerary.stops.length === 0 ? (
+            <p className={styles.itineraryEmpty}>Sin pedidos en curso.</p>
+          ) : (
+            <ol className={styles.itineraryList}>
+              {itinerary.stops.map((stop, index) => (
+                <li
+                  key={stop.id}
+                  className={stop.current ? styles.itineraryStepNow : styles.itineraryStep}
+                  aria-current={stop.current ? 'step' : undefined}
+                  draggable={Boolean(onReorderItinerary)}
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData('text/plain', String(index));
+                    event.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onDragOver={(event) => {
+                    if (!onReorderItinerary) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                  }}
+                  onDrop={(event) => {
+                    if (!onReorderItinerary) return;
+                    event.preventDefault();
+                    const from = Number(event.dataTransfer.getData('text/plain'));
+                    if (Number.isNaN(from) || from === index) return;
+                    const next = [...itinerary.stops];
+                    const [moved] = next.splice(from, 1);
+                    next.splice(index, 0, moved);
+                    const payload = next
+                      .filter((item) => item.kind === 'restaurant' || item.kind === 'dropoff')
+                      .map((item) => ({
+                        kind: item.kind,
+                        request_id: item.requestId || '',
+                      }))
+                      .filter((item) => item.request_id);
+                    if (!pickupBeforeDropoff(payload)) return;
+                    onReorderItinerary(itinerary.driverId, payload);
+                  }}
+                >
+                  <span className={stop.current ? styles.itineraryIndexNow : styles.itineraryIndex}>
+                    {stop.sequence}
+                  </span>
+                  <span className={styles.itineraryCopy}>
+                    <strong>{stop.current ? `Ahora · ${stop.action}` : stop.action}</strong>
+                    <span>{stop.title}</span>
+                    {stop.shortId ? (
+                      <span className={styles.itineraryDetail}>{formatShortId(stop.shortId)}</span>
+                    ) : null}
+                    {stop.kind === 'dropoff' && stop.detail ? (
+                      <span className={styles.itineraryDetail}>{stop.detail}</span>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </aside>
+      ) : null}
+    </div>
+  );
 }
