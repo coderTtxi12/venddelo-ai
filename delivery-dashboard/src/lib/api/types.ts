@@ -501,3 +501,51 @@ export type DispatchMonitorSnapshot = {
   credit_holds: DispatchMonitorCreditHold[];
   routes: DispatchMonitorRoute[];
 };
+
+export type DispatchHistoryItem = {
+  id: string;
+  short_id: string;
+  status: 'delivered' | 'cancelled' | string;
+  closed_at: string;
+  restaurant_name: string;
+  restaurant_address?: string | null;
+  dropoff_address: string;
+  quoted_fee_cents: number;
+  payment_method: string;
+  collect_cents: number;
+  cash_denomination_cents?: number | null;
+  package_count: number;
+  package_size: string;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  notes?: string | null;
+  credit_hold_cents: number;
+  credit_hold_status?: string | null;
+  assigned_driver_id: string | null;
+  assigned_driver_name: string | null;
+  zone_id: string | null;
+  zone_name: string | null;
+  restaurant_lat: number | null;
+  restaurant_lng: number | null;
+  dropoff_lat: number;
+  dropoff_lng: number;
+  dropoff_maps_url?: string | null;
+  ready_at: string;
+  search_at: string;
+  created_at: string;
+  cancelled_at?: string | null;
+  updated_at: string;
+  dispatch_group_id?: string | null;
+  case_applied?: string | null;
+};
+
+export type DispatchHistoryPage = {
+  start: string;
+  end: string;
+  items: DispatchHistoryItem[];
+  total: number;
+  delivered_count: number;
+  cancelled_count: number;
+  earnings_cents: number;
+  has_more: boolean;
+};
