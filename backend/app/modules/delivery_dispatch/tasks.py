@@ -698,6 +698,7 @@ def _persist_dispatch_offer(
             select(DeliveryDispatchOffer.id).where(
                 DeliveryDispatchOffer.driver_id == driver.id,
                 DeliveryDispatchOffer.status == "offered",
+                DeliveryDispatchOffer.expires_at > datetime.now(UTC),
             )
         )
         is not None
@@ -857,6 +858,7 @@ def _build_context(
         session.scalars(
             select(DeliveryDispatchOffer.driver_id).where(
                 DeliveryDispatchOffer.status == "offered",
+                DeliveryDispatchOffer.expires_at > now,
             )
         ).all()
     )
