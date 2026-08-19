@@ -29,9 +29,9 @@ class EngineSettings:
     pre_free_eta_seconds: int = 60
     pre_free_speed_mps: float = 8.0
     near_destination_radius_meters: int = 800
-    max_extra_route_minutes: int = 8
-    max_pickup_detour_minutes: int = 8
-    max_destination_detour_minutes: int = 8
+    max_extra_route_meters: int = 3840
+    max_pickup_detour_meters: int = 1000
+    max_destination_detour_meters: int = 3840
     assignment_timeout_seconds: int = 900
 
 
