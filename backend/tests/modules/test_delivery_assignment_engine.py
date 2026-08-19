@@ -428,6 +428,37 @@ def test_case_c_skips_when_rider_already_left_restaurant():
     assert result.case == "D"
 
 
+def test_case_c_hooks_when_one_job_still_assigned_same_restaurant():
+    last_lat, last_lng = 19.4340, -99.1332
+    request = _request("req-new", dropoff_lat=19.4345, dropoff_lng=-99.1332)
+    nearby_m = geodesic_meters(last_lat, last_lng, 19.4345, -99.1332)
+    assert nearby_m <= 800
+
+    mixed = _driver(
+        "mixed",
+        last_lat=19.4330,
+        last_lng=-99.1335,
+        active_request_status="picked_up",
+        active_package_count=2,
+        occupied_job_count=2,
+        assigned_restaurant_ids=("rest-1",),
+        last_dropoff_lat=last_lat,
+        last_dropoff_lng=last_lng,
+        active_dropoff_lat=last_lat,
+        active_dropoff_lng=last_lng,
+    )
+    result = choose_assignments(
+        _context(
+            request,
+            (mixed,),
+            settings=_settings(high_demand_available_drivers_max=2),
+        )
+    )
+
+    assert result.case == "C"
+    assert result.offers[0].driver_id == "mixed"
+
+
 def test_high_demand_two_due_nearby_uses_e_not_old_group_c():
     current = _request("req-1", dropoff_lat=19.4326, dropoff_lng=-99.1332)
     sibling = _request("req-2", dropoff_lat=19.4340, dropoff_lng=-99.1332)
