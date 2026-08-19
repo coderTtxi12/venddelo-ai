@@ -26,6 +26,7 @@ from app.modules.delivery_dispatch.assignment_log import (
     offered_detail,
     offered_title,
     record_assignment_event,
+    rejected_title,
     searched_detail_from_context,
     timed_out_title,
 )
@@ -280,6 +281,18 @@ def reject_offer_and_search(
         *(request.cycle_rejected_driver_ids or []),
         offer.driver_id,
     ]
+    driver = session.get(DeliveryDriver, offer.driver_id)
+    driver_name = driver.first_name if driver else None
+    record_assignment_event(
+        session,
+        request,
+        kind="rejected",
+        tone="warn",
+        title=rejected_title(driver_name),
+        detail="Sigue buscando." if request.status == "searching" else None,
+        next_attempt_at=request.next_attempt_at if request.status == "searching" else None,
+        driver_id=offer.driver_id,
+    )
     former_members = _clear_dispatch_group(session, request)
     _timeout_unresumable_former_members(session, former_members, skip_id=request.id, now=now)
     _assign_or_retry(session, request, now)

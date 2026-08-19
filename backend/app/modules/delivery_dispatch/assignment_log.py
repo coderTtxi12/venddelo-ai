@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models.delivery import DeliveryDispatchAssignmentEvent, DeliveryDispatchRequest
@@ -124,3 +125,19 @@ def record_assignment_event(
     )
     session.add(row)
     return row
+
+
+def list_assignment_events(
+    session: Session,
+    request_id: uuid.UUID,
+) -> list[DeliveryDispatchAssignmentEvent]:
+    rows = list(
+        session.scalars(
+            select(DeliveryDispatchAssignmentEvent)
+            .where(DeliveryDispatchAssignmentEvent.request_id == request_id)
+            .order_by(DeliveryDispatchAssignmentEvent.created_at.desc())
+            .limit(LOG_LIMIT)
+        )
+    )
+    rows.reverse()
+    return rows

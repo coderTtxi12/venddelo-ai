@@ -8,6 +8,7 @@ from app.api.deps import get_synced_user
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.infra.storage.factory import build_storage
 from app.modules.delivery_dispatch.schemas import (
+    AssignmentLogDTO,
     AssignmentSettingsDTO,
     AssignmentSettingsUpdate,
     DeliveryDriverCreate,
@@ -116,6 +117,18 @@ def create_manual_offer(
     service: DeliveryDispatchService = Depends(_service),
 ) -> ManualOfferDTO:
     return service.create_manual_offer(user.id, request_id, data)
+
+
+@router.get(
+    "/me/dispatch-requests/{request_id}/assignment-log",
+    response_model=AssignmentLogDTO,
+)
+def get_assignment_log(
+    request_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryDispatchService = Depends(_service),
+) -> AssignmentLogDTO:
+    return service.get_assignment_log(user.id, request_id)
 
 
 @router.patch(

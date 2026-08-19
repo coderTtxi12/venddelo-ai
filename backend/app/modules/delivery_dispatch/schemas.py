@@ -602,3 +602,23 @@ class DispatchMonitorSnapshotDTO(BaseModel):
     offers: list[DispatchMonitorOfferDTO]
     credit_holds: list[DispatchMonitorCreditHoldDTO]
     routes: list[DispatchMonitorRouteDTO]
+
+
+class AssignmentLogEventDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    at: datetime
+    kind: str
+    tone: str
+    title: str
+    detail: str | None = None
+    next_attempt_at: datetime | None = None
+
+
+class AssignmentLogDTO(BaseModel):
+    request_id: uuid.UUID
+    last_search_at: datetime | None
+    next_attempt_at: datetime | None
+    assignment_timeout_at: datetime | None
+    events: list[AssignmentLogEventDTO]

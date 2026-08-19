@@ -35,6 +35,7 @@ from app.db.models.delivery import (
 from app.db.models.restaurant import Restaurant
 from app.infra.storage.factory import build_storage
 from app.modules.assistant.image_webp import WEBP_CONTENT_TYPE, convert_image_bytes_to_webp
+from app.modules.delivery_dispatch.assignment_log import list_assignment_events
 from app.modules.delivery_dispatch.geo import geodesic_meters
 from app.modules.delivery_dispatch.history import list_active_holds, list_dispatch_history
 from app.modules.delivery_dispatch.itinerary import (
@@ -62,6 +63,8 @@ from app.modules.delivery_dispatch.monitor_notify import (
 )
 from app.modules.delivery_dispatch.rider_route import group_offer_totals, order_offer_stops
 from app.modules.delivery_dispatch.schemas import (
+    AssignmentLogDTO,
+    AssignmentLogEventDTO,
     AssignmentSettingsDTO,
     AssignmentSettingsUpdate,
     DeliveryDriverCreate,
@@ -555,8 +558,7 @@ class DeliveryDispatchService:
             if not pickup_before_dropoff(planned):
                 raise ValidationError("No se puede entregar un pedido antes de recogerlo.")
             extra_score["itinerary"] = [
-                {"kind": item.kind, "request_id": str(item.request_id)}
-                for item in data.itinerary
+                {"kind": item.kind, "request_id": str(item.request_id)} for item in data.itinerary
             ]
 
         offer = persist_dispatch_offer(
@@ -584,6 +586,50 @@ class DeliveryDispatchService:
             short_id=request.short_id,
         )
 
+    def get_assignment_log(self, user_id: uuid.UUID, request_id: uuid.UUID) -> AssignmentLogDTO:
+        provider_id, _role = self._require_provider_with_role(user_id)
+        request = self._session.scalar(
+            select(DeliveryDispatchRequest).where(
+                DeliveryDispatchRequest.id == request_id,
+                DeliveryDispatchRequest.delivery_provider_id == provider_id,
+            )
+        )
+        if request is None:
+            raise NotFoundError("Solicitud de delivery no encontrada")
+        settings = self._session.scalar(
+            select(DeliveryProviderAssignmentSettings).where(
+                DeliveryProviderAssignmentSettings.delivery_provider_id == provider_id
+            )
+        )
+        timeout_at = None
+        if settings is not None:
+            timeout_at = request.search_at + timedelta(seconds=settings.assignment_timeout_seconds)
+        rows = list_assignment_events(self._session, request.id)
+        last_search_at = next(
+            (row.created_at for row in reversed(rows) if row.kind in {"searched", "offered"}),
+            None,
+        )
+        if last_search_at is None and request.status != "scheduled":
+            last_search_at = request.search_at
+        return AssignmentLogDTO(
+            request_id=request.id,
+            last_search_at=last_search_at,
+            next_attempt_at=request.next_attempt_at,
+            assignment_timeout_at=timeout_at,
+            events=[
+                AssignmentLogEventDTO(
+                    id=row.id,
+                    at=row.created_at,
+                    kind=row.kind,
+                    tone=row.tone,
+                    title=row.title,
+                    detail=row.detail,
+                    next_attempt_at=row.next_attempt_at,
+                )
+                for row in rows
+            ],
+        )
+
     def update_driver_itinerary(
         self,
         user_id: uuid.UUID,
@@ -602,8 +648,7 @@ class DeliveryDispatchService:
             raise NotFoundError("Repartidor no encontrado")
         current = set(load_plan(self._session, driver.id))
         incoming = [
-            ItineraryStop(kind=item.kind, request_id=str(item.request_id))
-            for item in data.stops
+            ItineraryStop(kind=item.kind, request_id=str(item.request_id)) for item in data.stops
         ]
         if set(incoming) != current:
             raise ConflictError("El itinerario cambió. Recarga el monitor.")
@@ -1177,9 +1222,7 @@ class RiderDispatchService:
         claim_drivers(self._session, user.id, user.email or "")
         driver = self._driver_for_user(user.id)
         if driver is None:
-            raise ForbiddenError(
-                "Tu correo no está dado de alta. Pide a Mexy que te registre."
-            )
+            raise ForbiddenError("Tu correo no está dado de alta. Pide a Mexy que te registre.")
         return self._to_profile(driver)
 
     def get_history(
@@ -1470,9 +1513,7 @@ class RiderDispatchService:
         hold = request.credit_hold
         if previous_id is not None and previous_id != new_driver.id:
             previous = self._session.scalar(
-                select(DeliveryDriver)
-                .where(DeliveryDriver.id == previous_id)
-                .with_for_update()
+                select(DeliveryDriver).where(DeliveryDriver.id == previous_id).with_for_update()
             )
             if hold is not None and hold.status == "held":
                 if previous is not None:
@@ -1520,9 +1561,7 @@ class RiderDispatchService:
         claim_drivers(self._session, user.id, user.email or "")
         driver = self._driver_for_user(user.id)
         if driver is None:
-            raise ForbiddenError(
-                "Tu correo no está dado de alta. Pide a Mexy que te registre."
-            )
+            raise ForbiddenError("Tu correo no está dado de alta. Pide a Mexy que te registre.")
         return driver
 
     def _driver_for_user(self, user_id: uuid.UUID) -> DeliveryDriver | None:
@@ -1540,9 +1579,9 @@ class RiderDispatchService:
 
     def _list_assignments(self, driver_id: uuid.UUID) -> list[RiderAssignmentDTO]:
         rows = self._session.execute(
-            select(DeliveryDispatchRequest, Restaurant).join(
-                Restaurant, Restaurant.id == DeliveryDispatchRequest.restaurant_id
-            ).where(
+            select(DeliveryDispatchRequest, Restaurant)
+            .join(Restaurant, Restaurant.id == DeliveryDispatchRequest.restaurant_id)
+            .where(
                 DeliveryDispatchRequest.assigned_driver_id == driver_id,
                 DeliveryDispatchRequest.status.in_(_ACTIVE_ASSIGNMENT_STATUSES),
             )
@@ -1566,9 +1605,7 @@ class RiderDispatchService:
         )
         return assignments
 
-    def _accepted_cases(
-        self, requests: list[DeliveryDispatchRequest]
-    ) -> dict[uuid.UUID, str]:
+    def _accepted_cases(self, requests: list[DeliveryDispatchRequest]) -> dict[uuid.UUID, str]:
         if not requests:
             return {}
         request_ids = [request.id for request in requests]
@@ -1582,9 +1619,7 @@ class RiderDispatchService:
         for offer in offers:
             current = latest.get(offer.request_id)
             offer_at = offer.responded_at or offer.created_at
-            current_at = (
-                current.responded_at or current.created_at if current is not None else None
-            )
+            current_at = current.responded_at or current.created_at if current is not None else None
             if current is None or (
                 offer_at is not None and (current_at is None or offer_at >= current_at)
             ):
