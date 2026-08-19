@@ -276,6 +276,9 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
     if (enabling) {
+      _lastDriveMoveAt = null;
+      _ignoreMapGestureUntil =
+          DateTime.now().add(const Duration(milliseconds: 1200));
       unawaited(_moveDriveCamera());
     } else {
       final position = widget.controller.currentPosition;
