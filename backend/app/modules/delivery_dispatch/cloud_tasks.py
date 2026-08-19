@@ -60,9 +60,11 @@ class GcpTaskBus:
     def enqueue(self, kind: str, eta: datetime, payload: dict) -> None:
         schedule = eta if eta.tzinfo is not None else eta.replace(tzinfo=UTC)
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        from google.cloud import tasks_v2
+
         task = {
             "http_request": {
-                "http_method": "POST",
+                "http_method": tasks_v2.HttpMethod.POST,
                 "url": self._handler_url,
                 "headers": {
                     "Content-Type": "application/json",
