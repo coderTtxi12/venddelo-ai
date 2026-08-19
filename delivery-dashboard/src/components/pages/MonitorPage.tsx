@@ -1,10 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import { AssignDriverDrawer } from '@/components/monitor/AssignDriverDrawer';
 import { DispatchMonitorMap } from '@/components/monitor/DispatchMonitorMap';
 import { RequestDetailDrawer } from '@/components/monitor/RequestDetailDrawer';
+import { DriverPhoneContact } from '@/components/drivers/DriverPhoneContact';
 import { DriverAvatar } from '@/components/drivers/DriverAvatar';
 import { DriverMetaTags } from '@/components/drivers/DriverMetaTags';
 import { PanelPageShell, type PanelPageStyles } from '@/components/pages/PanelPageShell';
@@ -110,11 +112,101 @@ function isStaleGps(driver: DispatchMonitorDriver): boolean {
   return driver.is_online && driver.location_stale;
 }
 
+function gpsAgeClass(driver: DispatchMonitorDriver): string {
+  if (driver.last_lat == null || driver.last_lng == null || driver.location_age_seconds == null) {
+    return styles.gpsMissing;
+  }
+  if (isStaleGps(driver) || driver.location_age_seconds >= 60) {
+    return styles.gpsStale;
+  }
+  return styles.gpsFresh;
+}
+
 function driverMatchesFilter(driver: DispatchMonitorDriver, filter: DriverFilter): boolean {
   if (filter === 'online') return driver.is_online;
   if (filter === 'offline') return !driver.is_online;
   if (filter === 'stale') return isStaleGps(driver);
   return true;
+}
+
+type TimeSort = 'desc' | 'asc';
+
+function timeMs(value: string | null | undefined): number {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function compareTime(
+  left: string | null | undefined,
+  right: string | null | undefined,
+  dir: TimeSort,
+): number {
+  const delta = timeMs(left) - timeMs(right);
+  return dir === 'desc' ? -delta : delta;
+}
+
+function requestRecency(request: DispatchMonitorRequest): string | undefined {
+  return request.created_at ?? request.search_at;
+}
+
+function MonitorPanel({
+  id,
+  title,
+  count,
+  collapsed,
+  onToggle,
+  sortDir,
+  onToggleSort,
+  children,
+}: {
+  id?: string;
+  title: string;
+  count?: number;
+  collapsed: boolean;
+  onToggle: () => void;
+  sortDir?: TimeSort;
+  onToggleSort?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section id={id} className={styles.panel}>
+      <div className={styles.panelHeader}>
+        <button
+          type="button"
+          className={styles.panelToggle}
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+        >
+          <ExpandMoreOutlinedIcon
+            className={collapsed ? styles.panelChevronCollapsed : styles.panelChevron}
+            fontSize="small"
+            aria-hidden
+          />
+          <h2 className={styles.panelTitle}>{title}</h2>
+          {count != null ? <span className={styles.panelCount}>{count}</span> : null}
+        </button>
+        {onToggleSort && sortDir ? (
+          <button
+            type="button"
+            className={styles.sortBtn}
+            onClick={onToggleSort}
+            aria-label={
+              sortDir === 'desc'
+                ? `${title}: más recientes primero; clic para más antiguos`
+                : `${title}: más antiguos primero; clic para más recientes`
+            }
+          >
+            <span className={styles.sortDir} aria-hidden>
+              <span className={sortDir === 'asc' ? styles.sortDirActive : styles.sortDirIdle}>↑</span>
+              <span className={sortDir === 'desc' ? styles.sortDirActive : styles.sortDirIdle}>↓</span>
+            </span>
+          </button>
+        ) : null}
+      </div>
+      {collapsed ? null : children}
+    </section>
+  );
 }
 
 function QueueList({
@@ -495,7 +587,9 @@ function DriversList({
                           {driver.registered_zone_name}
                         </span>
                       ) : null}
-                      <span className={styles.listMeta}>{gpsAgeLabel(driver.location_age_seconds)}</span>
+                      <span className={`${styles.gpsChip} ${gpsAgeClass(driver)}`}>
+                        {gpsAgeLabel(driver.location_age_seconds)}
+                      </span>
                     </div>
                   </div>
                 </button>
@@ -512,6 +606,13 @@ function DriversList({
                     {driver.credit_blocked ? <span className={styles.alertChip}>Sin crédito</span> : null}
                     {isStaleGps(driver) ? <span className={styles.warnChip}>GPS viejo</span> : null}
                   </div>
+                  <DriverPhoneContact
+                    phone={driver.phone}
+                    compact
+                    iconsOnly
+                    stopPropagation
+                    className={styles.asidePhone}
+                  />
                 </div>
               </li>
             );
@@ -556,7 +657,6 @@ function BusinessesList({
     <ul className={styles.list}>
       {businesses.map((business) => {
         const focused = focusedRestaurantId === business.id;
-        const liveCount = business.queueCount + business.activeCount + business.unassignedCount;
         return (
           <li
             key={business.id}
@@ -576,11 +676,22 @@ function BusinessesList({
                   {business.address ? (
                     <span className={styles.listAddress}>{business.address}</span>
                   ) : null}
-                  {business.phone ? <span className={styles.listMeta}>{business.phone}</span> : null}
-                  <span className={styles.listMeta}>
-                    {liveCount} pedido{liveCount === 1 ? '' : 's'} · {business.queueCount} en cola ·{' '}
-                    {business.activeCount} en curso
-                    {business.unassignedCount ? ` · ${business.unassignedCount} sin asignar` : ''}
+                  <span className={styles.queueMeta} aria-label="Pedidos del negocio">
+                    {business.queueCount > 0 ? (
+                      <span className={`${styles.queueTag} ${styles.statQueue}`}>
+                        {business.queueCount} en cola
+                      </span>
+                    ) : null}
+                    {business.activeCount > 0 ? (
+                      <span className={`${styles.queueTag} ${styles.statActive}`}>
+                        {business.activeCount} en curso
+                      </span>
+                    ) : null}
+                    {business.unassignedCount > 0 ? (
+                      <span className={`${styles.queueTag} ${styles.statUnassigned}`}>
+                        {business.unassignedCount} sin asignar
+                      </span>
+                    ) : null}
                   </span>
                   {colorByZone && business.zoneName ? (
                     <span className={styles.listMeta}>
@@ -592,17 +703,13 @@ function BusinessesList({
               </div>
             </button>
             <div className={styles.queueCardSide}>
-              <div className={styles.listAsideChips}>
-                {business.queueCount > 0 ? (
-                  <span className={styles.dueChip}>{business.queueCount} cola</span>
-                ) : null}
-                {business.activeCount > 0 ? (
-                  <span className={styles.chipOnline}>{business.activeCount} en curso</span>
-                ) : null}
-                {business.unassignedCount > 0 ? (
-                  <span className={styles.warnChip}>{business.unassignedCount} sin asignar</span>
-                ) : null}
-              </div>
+              <DriverPhoneContact
+                phone={business.phone}
+                compact
+                iconsOnly
+                stopPropagation
+                className={styles.asidePhone}
+              />
             </div>
           </li>
         );
@@ -628,6 +735,14 @@ export default function MonitorPage() {
   const [focusedDriverId, setFocusedDriverId] = useState<string | null>(null);
   const [focusedRestaurantId, setFocusedRestaurantId] = useState<string | null>(null);
   const [driverFilter, setDriverFilter] = useState<DriverFilter>('all');
+  const [timeSort, setTimeSort] = useState<Record<string, TimeSort>>({
+    queue: 'desc',
+    unassigned: 'desc',
+    active: 'desc',
+    offers: 'desc',
+    credit: 'desc',
+  });
+  const [collapsedPanels, setCollapsedPanels] = useState<Record<string, boolean>>({});
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [logNonce, setLogNonce] = useState(0);
 
@@ -704,6 +819,54 @@ export default function MonitorPage() {
     () => liveBusinessesFromRequests(snapshot?.requests ?? []),
     [snapshot],
   );
+
+  const sortedQueue = useMemo(
+    () =>
+      [...queueRequests].sort((a, b) =>
+        compareTime(requestRecency(a), requestRecency(b), timeSort.queue),
+      ),
+    [queueRequests, timeSort.queue],
+  );
+  const sortedUnassigned = useMemo(
+    () =>
+      [...unassignedRequests].sort((a, b) =>
+        compareTime(requestRecency(a), requestRecency(b), timeSort.unassigned),
+      ),
+    [timeSort.unassigned, unassignedRequests],
+  );
+  const sortedActive = useMemo(
+    () =>
+      [...activeRequests].sort((a, b) =>
+        compareTime(requestRecency(a), requestRecency(b), timeSort.active),
+      ),
+    [activeRequests, timeSort.active],
+  );
+  const sortedOffers = useMemo(
+    () =>
+      [...(snapshot?.offers ?? [])].sort((a, b) =>
+        compareTime(a.expires_at, b.expires_at, timeSort.offers),
+      ),
+    [snapshot?.offers, timeSort.offers],
+  );
+  const sortedCredit = useMemo(() => {
+    const recency = new Map(
+      (snapshot?.requests ?? []).map((row) => [row.id, requestRecency(row)]),
+    );
+    return [...(snapshot?.credit_holds ?? [])].sort((a, b) =>
+      compareTime(recency.get(a.request_id), recency.get(b.request_id), timeSort.credit),
+    );
+  }, [snapshot?.credit_holds, snapshot?.requests, timeSort.credit]);
+
+  function togglePanel(id: string) {
+    setCollapsedPanels((current) => ({ ...current, [id]: !current[id] }));
+  }
+
+  function toggleSort(id: string) {
+    setTimeSort((current) => ({
+      ...current,
+      [id]: current[id] === 'desc' ? 'asc' : 'desc',
+    }));
+  }
 
   const detailRequest = useMemo(
     () => (snapshot?.requests ?? []).find((row) => row.id === detailRequestId) ?? null,
@@ -937,10 +1100,16 @@ export default function MonitorPage() {
             </section>
 
             <aside className={styles.panels}>
-              <section className={styles.panel}>
-                <h2 className={styles.panelTitle}>Cola de pedidos</h2>
+              <MonitorPanel
+                title="Cola de pedidos"
+                count={sortedQueue.length}
+                collapsed={Boolean(collapsedPanels.queue)}
+                onToggle={() => togglePanel('queue')}
+                sortDir={timeSort.queue}
+                onToggleSort={() => toggleSort('queue')}
+              >
                 <QueueList
-                  requests={queueRequests}
+                  requests={sortedQueue}
                   canAssign={canManagePartnerships}
                   nowMs={nowMs}
                   focusedRequestId={focusedRequestId}
@@ -950,12 +1119,18 @@ export default function MonitorPage() {
                   colorByZone={isAllZones}
                   zoneIds={zoneIds}
                 />
-              </section>
+              </MonitorPanel>
 
-              <section className={styles.panel}>
-                <h2 className={styles.panelTitle}>Sin asignar</h2>
+              <MonitorPanel
+                title="Sin asignar"
+                count={sortedUnassigned.length}
+                collapsed={Boolean(collapsedPanels.unassigned)}
+                onToggle={() => togglePanel('unassigned')}
+                sortDir={timeSort.unassigned}
+                onToggleSort={() => toggleSort('unassigned')}
+              >
                 <QueueList
-                  requests={unassignedRequests}
+                  requests={sortedUnassigned}
                   canAssign={canManagePartnerships}
                   nowMs={nowMs}
                   emptyHint="Sin pedidos sin asignar."
@@ -966,12 +1141,18 @@ export default function MonitorPage() {
                   colorByZone={isAllZones}
                   zoneIds={zoneIds}
                 />
-              </section>
+              </MonitorPanel>
 
-              <section className={styles.panel}>
-                <h2 className={styles.panelTitle}>En curso</h2>
+              <MonitorPanel
+                title="En curso"
+                count={sortedActive.length}
+                collapsed={Boolean(collapsedPanels.active)}
+                onToggle={() => togglePanel('active')}
+                sortDir={timeSort.active}
+                onToggleSort={() => toggleSort('active')}
+              >
                 <ActiveList
-                  requests={activeRequests}
+                  requests={sortedActive}
                   canAssign={canManagePartnerships}
                   nowMs={nowMs}
                   focusedRequestId={focusedRequestId}
@@ -981,20 +1162,37 @@ export default function MonitorPage() {
                   colorByZone={isAllZones}
                   zoneIds={zoneIds}
                 />
-              </section>
+              </MonitorPanel>
 
-              <section className={styles.panel}>
-                <h2 className={styles.panelTitle}>Ofertas abiertas</h2>
-                <OffersList offers={snapshot?.offers ?? []} nowMs={nowMs} />
-              </section>
+              <MonitorPanel
+                title="Ofertas abiertas"
+                count={sortedOffers.length}
+                collapsed={Boolean(collapsedPanels.offers)}
+                onToggle={() => togglePanel('offers')}
+                sortDir={timeSort.offers}
+                onToggleSort={() => toggleSort('offers')}
+              >
+                <OffersList offers={sortedOffers} nowMs={nowMs} />
+              </MonitorPanel>
 
-              <section className={styles.panel}>
-                <h2 className={styles.panelTitle}>Crédito retenido (efectivo)</h2>
-                <CreditList holds={snapshot?.credit_holds ?? []} />
-              </section>
+              <MonitorPanel
+                title="Crédito retenido (efectivo)"
+                count={sortedCredit.length}
+                collapsed={Boolean(collapsedPanels.credit)}
+                onToggle={() => togglePanel('credit')}
+                sortDir={timeSort.credit}
+                onToggleSort={() => toggleSort('credit')}
+              >
+                <CreditList holds={sortedCredit} />
+              </MonitorPanel>
 
-              <section id="monitor-drivers" className={styles.panel}>
-                <h2 className={styles.panelTitle}>Repartidores</h2>
+              <MonitorPanel
+                id="monitor-drivers"
+                title="Repartidores"
+                count={(snapshot?.drivers ?? []).length}
+                collapsed={Boolean(collapsedPanels.drivers)}
+                onToggle={() => togglePanel('drivers')}
+              >
                 <DriversList
                   drivers={snapshot?.drivers ?? []}
                   maxPackages={metrics?.max_active_packages_per_driver ?? 3}
@@ -1005,10 +1203,14 @@ export default function MonitorPage() {
                   colorByZone={isAllZones}
                   zoneIds={zoneIds}
                 />
-              </section>
+              </MonitorPanel>
 
-              <section className={styles.panel}>
-                <h2 className={styles.panelTitle}>Negocios en operación</h2>
+              <MonitorPanel
+                title="Negocios en operación"
+                count={businesses.length}
+                collapsed={Boolean(collapsedPanels.businesses)}
+                onToggle={() => togglePanel('businesses')}
+              >
                 <BusinessesList
                   businesses={businesses}
                   focusedRestaurantId={focusedRestaurantId}
@@ -1016,7 +1218,7 @@ export default function MonitorPage() {
                   colorByZone={isAllZones}
                   zoneIds={zoneIds}
                 />
-              </section>
+              </MonitorPanel>
             </aside>
           </div>
         </>
