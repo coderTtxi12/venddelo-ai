@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from app.api.deps import get_auth
 from app.core.exceptions import UnauthorizedError
 from app.core.security import AuthPort
-from app.db.uow import SqlAlchemyUnitOfWork, get_uow
+from app.db.uow import SqlAlchemyUnitOfWork
 from app.infra.realtime.digital_menu_hub import get_digital_menu_realtime_hub
 
 router = APIRouter(tags=["digital-menu-realtime"])
@@ -19,7 +19,6 @@ async def digital_menu_preview_ws(
     restaurant_id: uuid.UUID,
     token: str = Query(...),
     auth: AuthPort = Depends(get_auth),
-    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
     if not token.strip():
         await websocket.close(code=4401)
@@ -31,17 +30,18 @@ async def digital_menu_preview_ws(
         await websocket.close(code=4401)
         return
 
-    restaurant = uow.restaurants.get(restaurant_id)
-    if restaurant is None:
-        await websocket.close(code=4404)
-        return
-    allowed = restaurant.owner_id == user.id
-    if not allowed:
-        found = uow.restaurants.get_for_user(user.id, restaurant_id=restaurant_id)
-        allowed = found is not None and found[1] in ("owner", "admin")
-    if not allowed:
-        await websocket.close(code=4403)
-        return
+    with SqlAlchemyUnitOfWork() as uow:
+        restaurant = uow.restaurants.get(restaurant_id)
+        if restaurant is None:
+            await websocket.close(code=4404)
+            return
+        allowed = restaurant.owner_id == user.id
+        if not allowed:
+            found = uow.restaurants.get_for_user(user.id, restaurant_id=restaurant_id)
+            allowed = found is not None and found[1] in ("owner", "admin")
+        if not allowed:
+            await websocket.close(code=4403)
+            return
 
     hub = get_digital_menu_realtime_hub()
     await hub.connect(restaurant_id, websocket)
@@ -49,4 +49,6 @@ async def digital_menu_preview_ws(
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
+        pass
+    finally:
         await hub.disconnect(restaurant_id, websocket)
