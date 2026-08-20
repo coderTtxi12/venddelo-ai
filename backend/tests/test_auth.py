@@ -154,3 +154,33 @@ def test_get_auth_reads_from_app_state():
         response = client.get("/probe")
         assert response.status_code == 200
         assert response.json()["same"] is True
+
+
+def test_get_auth_works_on_websocket():
+    from contextlib import asynccontextmanager
+
+    from fastapi import Depends, FastAPI, WebSocket
+    from fastapi.testclient import TestClient
+
+    from app.api.deps import get_auth
+    from app.infra.auth.supabase_jwt import build_supabase_jwt_auth
+
+    settings = Settings(supabase_jwt_secret=SECRET)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        app.state.auth = build_supabase_jwt_auth(settings)
+        yield
+        app.state.auth = None
+
+    mini = FastAPI(lifespan=lifespan)
+
+    @mini.websocket("/probe-ws")
+    async def probe_ws(websocket: WebSocket, auth=Depends(get_auth)):
+        await websocket.accept()
+        await websocket.send_json({"same": auth is mini.state.auth})
+        await websocket.close()
+
+    with TestClient(mini) as client:
+        with client.websocket_connect("/probe-ws") as ws:
+            assert ws.receive_json()["same"] is True
