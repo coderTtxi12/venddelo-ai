@@ -12,6 +12,8 @@ type UseDispatchMonitorSocketOptions = {
   onEvent: (event: DispatchMonitorSocketEvent) => void;
   onStatusChange?: (status: DispatchMonitorSocketStatus) => void;
   onReconnect?: () => void;
+  /** Debounce REST refetch triggered by WS events (ms). Default 400. */
+  eventDebounceMs?: number;
 };
 
 function buildDispatchMonitorSocketUrl(token: string): string {
@@ -27,6 +29,7 @@ export function useDispatchMonitorSocket(
   const onEventRef = useRef(options.onEvent);
   const onStatusChangeRef = useRef(options.onStatusChange);
   const onReconnectRef = useRef(options.onReconnect);
+  const debounceMs = options.eventDebounceMs ?? 400;
 
   useEffect(() => {
     onEventRef.current = options.onEvent;
@@ -43,10 +46,33 @@ export function useDispatchMonitorSocket(
     let cancelled = false;
     let socket: WebSocket | null = null;
     let retryTimer: number | null = null;
+    let eventTimer: number | null = null;
     let retryMs = 1_000;
     let hasConnectedOnce = false;
+    let inFlight = false;
+    let pending = false;
 
     onStatusChangeRef.current?.('connecting');
+
+    const flushEvent = () => {
+      if (cancelled || !pending || inFlight) return;
+      pending = false;
+      inFlight = true;
+      Promise.resolve(
+        onEventRef.current({ type: 'monitor.updated' }),
+      ).finally(() => {
+        inFlight = false;
+        if (pending) {
+          eventTimer = window.setTimeout(flushEvent, debounceMs);
+        }
+      });
+    };
+
+    const queueEvent = () => {
+      pending = true;
+      if (eventTimer != null) window.clearTimeout(eventTimer);
+      eventTimer = window.setTimeout(flushEvent, debounceMs);
+    };
 
     const connect = () => {
       if (cancelled) return;
@@ -69,7 +95,7 @@ export function useDispatchMonitorSocket(
         try {
           const payload = JSON.parse(String(message.data)) as DispatchMonitorSocketEvent;
           if (payload.type !== 'monitor.updated') return;
-          onEventRef.current(payload);
+          queueEvent();
         } catch (error) {
           console.warn('dispatch monitor ws parse error', error);
         }
@@ -90,8 +116,9 @@ export function useDispatchMonitorSocket(
     return () => {
       cancelled = true;
       if (retryTimer != null) window.clearTimeout(retryTimer);
+      if (eventTimer != null) window.clearTimeout(eventTimer);
       socket?.close();
       onStatusChangeRef.current?.('offline');
     };
-  }, [accessToken]);
+  }, [accessToken, debounceMs]);
 }
