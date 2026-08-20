@@ -1263,11 +1263,7 @@ class RiderDispatchService:
         self._session = session
 
     def get_me(self, user: UserDTO) -> RiderProfileDTO:
-        claim_drivers(self._session, user.id, user.email or "")
-        driver = self._driver_for_user(user.id)
-        if driver is None:
-            raise ForbiddenError("Tu correo no está dado de alta. Pide a Mexy que te registre.")
-        return self._to_profile(driver)
+        return self._to_profile(self._require_driver(user))
 
     def get_history(
         self,
