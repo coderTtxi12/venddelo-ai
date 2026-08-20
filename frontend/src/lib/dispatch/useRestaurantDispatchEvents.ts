@@ -119,7 +119,7 @@ export function useRestaurantDispatchEvents(
           if (cancelled || isFetchAbortError(error) || abort?.signal.aborted) return;
           if (
             error instanceof ApiError &&
-            (error.status === 401 || error.status === 403 || error.status === 404)
+            (error.httpStatus === 401 || error.httpStatus === 403 || error.httpStatus === 404)
           ) {
             stopRetry = true;
             onStatusChangeRef.current?.('offline');
