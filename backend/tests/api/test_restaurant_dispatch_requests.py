@@ -5,7 +5,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import sessionmaker
 
 from app.db.models.delivery import DeliveryDispatchRequest, DeliveryDriver
-from tests.api.test_api_v1 import AUTH, OWNER
+from tests.api.test_api_v1 import AUTH, OTHER, OWNER
 from tests.api.test_delivery_partnerships import (
     COVERED_LAT,
     COVERED_LNG,
@@ -187,15 +187,64 @@ def test_create_dispatch_publishes_restaurant_realtime_event(client, engine, mon
 
 
 @requires_db
-def test_restaurant_dispatch_ws_accepts_owner(client, engine):
-    _create_mexy_provider(client)
-    restaurant_id = _create_restaurant(client, subdomain="dispatch-owner-ws")
-    _activate_partnership(client, engine, restaurant_id)
+def test_dispatch_events_requires_bearer(client, engine):
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-sse-401")
+    response = client.get(f"/api/v1/restaurants/{restaurant_id}/dispatch/events")
+    assert response.status_code == 401
 
-    with client.websocket_connect(
-        f"/api/v1/ws/restaurants/{restaurant_id}/dispatch?token=valid-token"
-    ) as websocket:
-        websocket.send_text("ping")
+
+@requires_db
+def test_dispatch_events_forbidden_for_other_user(client, engine):
+    from app.api.deps import get_auth
+    from app.main import app
+    from tests.api.test_api_v1 import FakeAuth
+
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-sse-403")
+    app.dependency_overrides[get_auth] = lambda: FakeAuth(OTHER)
+    try:
+        response = client.get(
+            f"/api/v1/restaurants/{restaurant_id}/dispatch/events",
+            headers=AUTH,
+        )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides[get_auth] = lambda: FakeAuth(OWNER)
+
+
+@requires_db
+def test_dispatch_events_streams_published_event(client, engine):
+    import json
+    import threading
+    import time
+
+    from app.infra.realtime.restaurant_dispatch_hub import get_restaurant_dispatch_realtime_hub
+
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-sse-ok")
+    rid = uuid.UUID(restaurant_id)
+    hub = get_restaurant_dispatch_realtime_hub()
+
+    def publish_soon() -> None:
+        time.sleep(0.15)
+        hub.publish_sync(rid, {"type": "dispatch.updated"})
+
+    worker = threading.Thread(target=publish_soon)
+    worker.start()
+    with client.stream(
+        "GET",
+        f"/api/v1/restaurants/{restaurant_id}/dispatch/events",
+        headers=AUTH,
+    ) as response:
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/event-stream")
+        body = b""
+        for chunk in response.iter_bytes():
+            body += chunk
+            if b"event: dispatch.updated" in body:
+                break
+    worker.join(timeout=2)
+    text = body.decode("utf-8")
+    assert "event: dispatch.updated" in text
+    assert json.dumps({"type": "dispatch.updated"}) in text
 
 
 @requires_db
