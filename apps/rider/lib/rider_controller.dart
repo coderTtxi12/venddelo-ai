@@ -266,11 +266,57 @@ class RiderController extends ChangeNotifier {
     await _persistSessionToLocationTask();
     initLocationForegroundTask();
     await startLocationForegroundTask();
+    await _ensureRiderSocket();
+    _syncOfferPollWithSocket();
+    await refreshOffers();
+  }
+
+  Future<void> _ensureRiderSocket() async {
+    if (_socket != null) {
+      return;
+    }
+    _socket = RiderSocket(
+      apiBaseUrlProvider: () => _api.resolvedApiBaseUrl,
+      tokenProvider: () =>
+          Supabase.instance.client.auth.currentSession?.accessToken,
+      onEvent: (event) {
+        if (event['type'] != 'rider.updated') {
+          return;
+        }
+        unawaited(_onRiderSocketUpdated());
+      },
+      onStatusChange: (status) {
+        _socketStatus = status;
+        _syncOfferPollWithSocket();
+        _startMePoll();
+        if (status == RiderSocketStatus.live) {
+          unawaited(_onRiderSocketUpdated());
+        }
+      },
+    );
+    await _socket!.start();
+  }
+
+  Future<void> _onRiderSocketUpdated() async {
+    await _refreshMeQuietly();
+    if (profile?.isOnline == true) {
+      await refreshOffers();
+    }
+  }
+
+  void _syncOfferPollWithSocket() {
     _offerPoll?.cancel();
+    _offerPoll = null;
+    if (profile?.isOnline != true) {
+      return;
+    }
+    // Poll only as fallback when the websocket is not live.
+    if (_socketStatus == RiderSocketStatus.live) {
+      return;
+    }
     _offerPoll = Timer.periodic(const Duration(seconds: 5), (_) {
       unawaited(refreshOffers());
     });
-    await refreshOffers();
   }
 
   void _applyOffer(RiderOffer? next) {
@@ -298,6 +344,9 @@ class RiderController extends ChangeNotifier {
   Future<void> _stopOnlineServices() async {
     _offerPoll?.cancel();
     _offerPoll = null;
+    await _socket?.stop();
+    _socket = null;
+    _socketStatus = RiderSocketStatus.offline;
     await stopLocationForegroundTask();
   }
 
@@ -421,6 +470,8 @@ class RiderController extends ChangeNotifier {
   void dispose() {
     _offerPoll?.cancel();
     _mePoll?.cancel();
+    unawaited(_socket?.stop());
+    _socket = null;
     unawaited(stopOfferAlarm());
     unawaited(_fcmForeground?.cancel());
     unawaited(_fcmOpened?.cancel());
