@@ -95,7 +95,11 @@ class RiderController extends ChangeNotifier {
 
   void _startMePoll() {
     _mePoll?.cancel();
-    _mePoll = Timer.periodic(const Duration(seconds: 8), (_) {
+    // Slow fallback only — primary updates come from the rider websocket.
+    final interval = _socketStatus == RiderSocketStatus.live
+        ? const Duration(seconds: 60)
+        : const Duration(seconds: 8);
+    _mePoll = Timer.periodic(interval, (_) {
       unawaited(_refreshMeQuietly());
     });
   }
