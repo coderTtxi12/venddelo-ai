@@ -38,3 +38,16 @@ def test_public_tracking_ws_route_removed() -> None:
         if isinstance(route, WebSocketRoute) and "dispatch-tracking" in route.path
     ]
     assert ws_paths == []
+
+
+def test_restaurant_dispatch_ws_route_removed() -> None:
+    from app.main import app
+
+    ws_paths = [
+        route.path
+        for route in _iter_routes(app.routes)
+        if isinstance(route, WebSocketRoute)
+        and route.path.endswith("/dispatch")
+        and "/restaurants/" in route.path
+    ]
+    assert ws_paths == []
