@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import uuid
 
-from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
+from collections.abc import Iterator
+
+from fastapi import APIRouter, Depends, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
-from app.api.deps import get_auth, get_synced_user
-from app.core.exceptions import UnauthorizedError
-from app.core.security import AuthPort
+from app.api.deps import get_auth, get_current_user, get_synced_user
+from app.core.exceptions import ForbiddenError, NotFoundError, UnauthorizedError
+from app.core.security import AuthenticatedUser, AuthPort
 from app.db.models.delivery import DeliveryDriver
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.infra.realtime.dispatch_hub import get_dispatch_realtime_hub
@@ -20,6 +25,29 @@ from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRe
 from app.modules.users.schemas import UserDTO
 
 router = APIRouter(tags=["delivery-dispatch-realtime"])
+
+
+def _finish_uow_gen(uow_gen: Iterator[SqlAlchemyUnitOfWork]) -> None:
+    try:
+        next(uow_gen)
+    except StopIteration:
+        pass
+
+
+def _assert_can_read_restaurant_dispatch(
+    uow: SqlAlchemyUnitOfWork,
+    restaurant_id: uuid.UUID,
+    user: AuthenticatedUser,
+) -> None:
+    restaurant = uow.restaurants.get(restaurant_id)
+    if restaurant is None:
+        raise NotFoundError("Restaurant not found")
+    allowed = restaurant.owner_id == user.id
+    if not allowed:
+        found = uow.restaurants.get_for_user(user.id, restaurant_id=restaurant_id)
+        allowed = found is not None and found[1] in ("owner", "admin")
+    if not allowed:
+        raise ForbiddenError("You do not have access to this restaurant")
 
 
 def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeliveryDispatchService:
