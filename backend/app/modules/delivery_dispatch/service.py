@@ -1506,6 +1506,7 @@ class RiderDispatchService:
         self._session.flush()
         self._session.refresh(offer)
         notify_request_realtime(self._session, request)
+        notify_rider_updated(driver.id)
         return self._to_offer_dto(offer)
 
     def transition_assignment(
