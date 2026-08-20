@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
@@ -8,10 +9,11 @@ from sqlalchemy import select
 from app.api.deps import get_auth, get_synced_user
 from app.core.exceptions import UnauthorizedError
 from app.core.security import AuthPort
-from app.db.models.delivery import DeliveryDispatchRequest
+from app.db.models.delivery import DeliveryDispatchRequest, DeliveryDriver
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.infra.realtime.dispatch_hub import get_dispatch_realtime_hub
 from app.infra.realtime.restaurant_dispatch_hub import get_restaurant_dispatch_realtime_hub
+from app.infra.realtime.rider_hub import get_rider_realtime_hub
 from app.infra.realtime.tracking_hub import get_tracking_realtime_hub
 from app.infra.storage.factory import build_storage
 from app.modules.delivery_dispatch.schemas import DispatchMonitorSnapshotDTO
@@ -47,7 +49,6 @@ async def dispatch_monitor_ws(
     websocket: WebSocket,
     token: str = Query(...),
     auth: AuthPort = Depends(get_auth),
-    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
     if not token.strip():
         await websocket.close(code=4401)
@@ -59,19 +60,23 @@ async def dispatch_monitor_ws(
         await websocket.close(code=4401)
         return
 
-    found = SqlAlchemyDeliveryProviderRepository(uow.session).get_for_user(user.id)
-    if found is None:
-        await websocket.close(code=4403)
-        return
-    provider, _role = found
+    with SqlAlchemyUnitOfWork() as uow:
+        found = SqlAlchemyDeliveryProviderRepository(uow.session).get_for_user(user.id)
+        if found is None:
+            await websocket.close(code=4403)
+            return
+        provider, _role = found
+        provider_id = provider.id
 
     hub = get_dispatch_realtime_hub()
-    await hub.connect(provider.id, websocket)
+    await hub.connect(provider_id, websocket)
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        await hub.disconnect(provider.id, websocket)
+        pass
+    finally:
+        await hub.disconnect(provider_id, websocket)
 
 
 @router.websocket("/ws/restaurants/{restaurant_id}/dispatch")
@@ -80,7 +85,6 @@ async def restaurant_dispatch_ws(
     restaurant_id: uuid.UUID,
     token: str = Query(...),
     auth: AuthPort = Depends(get_auth),
-    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
     if not token.strip():
         await websocket.close(code=4401)
@@ -111,6 +115,8 @@ async def restaurant_dispatch_ws(
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
+        pass
+    finally:
         await hub.disconnect(restaurant_id, websocket)
 
 
@@ -118,35 +124,76 @@ async def restaurant_dispatch_ws(
 async def public_dispatch_tracking_ws(
     websocket: WebSocket,
     token: str,
-    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> None:
     cleaned = token.strip()
     if len(cleaned) < 32:
         await websocket.close(code=4404)
         return
 
-    found = uow.session.scalar(
-        select(DeliveryDispatchRequest.id).where(
-            DeliveryDispatchRequest.tracking_token == cleaned
+    snapshot_payload: dict[str, Any] | None = None
+    with SqlAlchemyUnitOfWork() as uow:
+        found = uow.session.scalar(
+            select(DeliveryDispatchRequest.id).where(
+                DeliveryDispatchRequest.tracking_token == cleaned
+            )
         )
-    )
-    if found is None:
-        await websocket.close(code=4404)
-        return
+        if found is None:
+            await websocket.close(code=4404)
+            return
 
-    hub = get_tracking_realtime_hub()
-    await hub.connect(cleaned, websocket)
-    try:
         service = RestaurantDispatchService(
             uow.session,
             SqlAlchemyDeliveryProviderRepository(uow.session),
             build_storage(),
         )
         snapshot = service.public_tracking(cleaned)
+        snapshot_payload = snapshot.model_dump(mode="json")
+
+    hub = get_tracking_realtime_hub()
+    await hub.connect(cleaned, websocket)
+    try:
         await websocket.send_json(
-            {"type": "tracking.updated", "tracking": snapshot.model_dump(mode="json")}
+            {"type": "tracking.updated", "tracking": snapshot_payload}
         )
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
+        pass
+    finally:
         await hub.disconnect(cleaned, websocket)
+
+
+@router.websocket("/ws/rider/me")
+async def rider_me_ws(
+    websocket: WebSocket,
+    token: str = Query(...),
+    auth: AuthPort = Depends(get_auth),
+) -> None:
+    if not token.strip():
+        await websocket.close(code=4401)
+        return
+
+    try:
+        user = auth.verify_token(token.strip())
+    except UnauthorizedError:
+        await websocket.close(code=4401)
+        return
+
+    with SqlAlchemyUnitOfWork() as uow:
+        driver = uow.session.scalar(
+            select(DeliveryDriver).where(DeliveryDriver.user_id == user.id)
+        )
+        if driver is None:
+            await websocket.close(code=4403)
+            return
+        driver_id = driver.id
+
+    hub = get_rider_realtime_hub()
+    await hub.connect(driver_id, websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await hub.disconnect(driver_id, websocket)
