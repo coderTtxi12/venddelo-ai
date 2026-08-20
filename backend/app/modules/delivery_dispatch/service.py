@@ -711,6 +711,7 @@ class DeliveryDispatchService:
         replace_plan(self._session, driver.id, incoming)
         self._session.flush()
         notify_dispatch_monitor_changed(provider_id)
+        notify_rider_updated(driver.id)
         return hydrate_itinerary(self._session, driver.id)
 
     def _upload_document(
@@ -1307,6 +1308,7 @@ class RiderDispatchService:
         self._session.flush()
         self._session.refresh(driver)
         notify_dispatch_monitor_changed(driver.delivery_provider_id)
+        notify_rider_updated(driver.id)
         return self._to_profile(driver)
 
     def update_location(
@@ -1314,15 +1316,14 @@ class RiderDispatchService:
         user: UserDTO,
         latitude: float,
         longitude: float,
-    ) -> RiderProfileDTO:
+    ) -> None:
+        """Persist GPS only — rider app ignores the body; keep this cheap for 15s pings."""
         driver = self._require_driver(user)
         driver.last_lat = latitude
         driver.last_lng = longitude
         driver.location_updated_at = datetime.now(UTC)
         self._session.flush()
-        self._session.refresh(driver)
         notify_driver_location_realtime(self._session, driver)
-        return self._to_profile(driver)
 
     def set_fcm_token(self, user: UserDTO, fcm_token: str) -> RiderProfileDTO:
         driver = self._require_driver(user)
@@ -1599,8 +1600,11 @@ class RiderDispatchService:
             driver.credit_held_cents += hold.amount_cents
 
     def _require_driver(self, user: UserDTO) -> DeliveryDriver:
-        claim_drivers(self._session, user.id, user.email or "")
         driver = self._driver_for_user(user.id)
+        if driver is None:
+            # Only claim unlinked rows once; skip on hot paths (location pings).
+            claim_drivers(self._session, user.id, user.email or "")
+            driver = self._driver_for_user(user.id)
         if driver is None:
             raise ForbiddenError("Tu correo no está dado de alta. Pide a Mexy que te registre.")
         return driver
