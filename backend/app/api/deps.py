@@ -2,21 +2,22 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import Depends, Header, Query
+from fastapi import Depends, Header, Query, Request
 
-from app.core.config import Settings, get_settings
 from app.core.exceptions import ForbiddenError, NotFoundError, UnauthorizedError
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, PaginationParams
 from app.core.security import AuthenticatedUser, AuthPort
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
-from app.infra.auth.supabase_jwt import SupabaseJwtAuth
 from app.modules.restaurants.schemas import RestaurantDTO
 from app.modules.users.schemas import UserDTO
 from app.modules.users.service import UserService
 
 
-def get_auth(settings: Settings = Depends(get_settings)) -> AuthPort:
-    return SupabaseJwtAuth(settings)
+def get_auth(request: Request) -> AuthPort:
+    auth = getattr(request.app.state, "auth", None)
+    if auth is None:
+        raise RuntimeError("Auth not initialized — application lifespan did not run")
+    return auth
 
 
 def get_current_user(
