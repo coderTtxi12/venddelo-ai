@@ -6,87 +6,64 @@ import uuid
 from collections import defaultdict
 from typing import Any
 
-from fastapi import WebSocket
-from starlette.websockets import WebSocketState
-
 logger = logging.getLogger(__name__)
 
 
 class RestaurantDispatchRealtimeHub:
-    """In-process WebSocket fan-out for restaurant-owner dispatch requests."""
+    """In-process SSE fan-out for restaurant-owner dispatch requests."""
 
     def __init__(self) -> None:
-        self._rooms: dict[str, set[WebSocket]] = defaultdict(set)
+        self._rooms: dict[str, set[asyncio.Queue[dict[str, Any]]]] = defaultdict(set)
         self._loop: asyncio.AbstractEventLoop | None = None
-        self._queue: asyncio.Queue[tuple[str, dict[str, Any]]] | None = None
-        self._worker_task: asyncio.Task[None] | None = None
 
     def bind_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         self._loop = loop
-        if self._queue is None:
-            self._queue = asyncio.Queue()
-        if self._worker_task is None or self._worker_task.done():
-            self._worker_task = loop.create_task(self._worker())
 
     async def shutdown(self) -> None:
-        if self._worker_task is not None:
-            self._worker_task.cancel()
-            try:
-                await self._worker_task
-            except asyncio.CancelledError:
-                pass
-        self._worker_task = None
-        self._queue = None
         self._loop = None
         self._rooms.clear()
-
-    async def _worker(self) -> None:
-        assert self._queue is not None
-        while True:
-            room, payload = await self._queue.get()
-            await self._broadcast(room, payload)
 
     def _room_key(self, restaurant_id: uuid.UUID) -> str:
         return f"restaurant:{restaurant_id}:dispatch"
 
-    async def connect(self, restaurant_id: uuid.UUID, websocket: WebSocket) -> None:
-        await websocket.accept()
-        self._rooms[self._room_key(restaurant_id)].add(websocket)
-        logger.info("restaurant dispatch ws connected restaurant_id=%s", restaurant_id)
+    def subscribe(self, restaurant_id: uuid.UUID) -> asyncio.Queue[dict[str, Any]]:
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=8)
+        self._rooms[self._room_key(restaurant_id)].add(queue)
+        logger.info("restaurant dispatch sse subscribed restaurant_id=%s", restaurant_id)
+        return queue
 
-    async def disconnect(self, restaurant_id: uuid.UUID, websocket: WebSocket) -> None:
+    def unsubscribe(
+        self,
+        restaurant_id: uuid.UUID,
+        queue: asyncio.Queue[dict[str, Any]],
+    ) -> None:
         room = self._room_key(restaurant_id)
-        self._rooms[room].discard(websocket)
+        self._rooms[room].discard(queue)
         if not self._rooms[room]:
             del self._rooms[room]
-        logger.info("restaurant dispatch ws disconnected restaurant_id=%s", restaurant_id)
+        logger.info("restaurant dispatch sse unsubscribed restaurant_id=%s", restaurant_id)
 
     def publish_sync(self, restaurant_id: uuid.UUID, payload: dict[str, Any]) -> None:
-        if self._loop is None or self._queue is None:
+        if self._loop is None:
             logger.debug(
-                "restaurant dispatch ws hub not started; dropping event restaurant_id=%s",
+                "restaurant dispatch sse hub not started; dropping event restaurant_id=%s",
                 restaurant_id,
             )
             return
         room = self._room_key(restaurant_id)
-        self._loop.call_soon_threadsafe(self._queue.put_nowait, (room, payload))
+        self._loop.call_soon_threadsafe(self._fanout, room, payload)
 
-    async def _broadcast(self, room: str, payload: dict[str, Any]) -> None:
-        sockets = list(self._rooms.get(room, set()))
-        if not sockets:
-            return
-        stale: list[WebSocket] = []
-        for socket in sockets:
-            if socket.client_state != WebSocketState.CONNECTED:
-                stale.append(socket)
-                continue
+    def _fanout(self, room: str, payload: dict[str, Any]) -> None:
+        for queue in list(self._rooms.get(room, ())):
+            if queue.full():
+                try:
+                    queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
             try:
-                await socket.send_json(payload)
-            except Exception:
-                logger.warning("restaurant dispatch ws send failed", exc_info=True)
-                stale.append(socket)
-        for socket in stale:
-            self._rooms[room].discard(socket)
+                queue.put_nowait(payload)
+            except asyncio.QueueFull:
+                pass
 
 
 _hub = RestaurantDispatchRealtimeHub()
