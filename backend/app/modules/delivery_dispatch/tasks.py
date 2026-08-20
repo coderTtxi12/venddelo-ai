@@ -43,7 +43,7 @@ from app.modules.delivery_dispatch.engine import (
     nn_last_dropoff,
 )
 from app.modules.delivery_dispatch.geo import geodesic_meters
-from app.modules.delivery_dispatch.monitor_notify import notify_request_realtime
+from app.modules.delivery_dispatch.monitor_notify import notify_request_realtime, notify_rider_updated
 from app.modules.delivery_dispatch.notify import notify_offer
 
 logger = logging.getLogger(__name__)
@@ -224,6 +224,7 @@ def handle_expire_offer(session: Session, offer_id: uuid.UUID, now: datetime) ->
         return
     offer.status = "expired"
     offer.responded_at = now
+    notify_rider_updated(offer.driver_id)
     restore_status = None
     if offer.case_applied == "M" and isinstance(offer.score_json, dict):
         restore_status = offer.score_json.get("restore_status")
