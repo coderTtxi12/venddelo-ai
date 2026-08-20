@@ -60,6 +60,7 @@ from app.modules.delivery_dispatch.monitor_notify import (
     notify_dispatch_monitor_changed,
     notify_driver_location_realtime,
     notify_request_realtime,
+    notify_rider_updated,
 )
 from app.modules.delivery_dispatch.rider_route import group_offer_totals, order_offer_stops
 from app.modules.delivery_dispatch.schemas import (
