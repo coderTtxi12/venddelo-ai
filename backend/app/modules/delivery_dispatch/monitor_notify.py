@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.db.models.delivery import DeliveryDispatchRequest, DeliveryDriver
 from app.infra.realtime.dispatch_hub import get_dispatch_realtime_hub
 from app.infra.realtime.restaurant_dispatch_hub import get_restaurant_dispatch_realtime_hub
+from app.infra.realtime.rider_hub import get_rider_realtime_hub
 from app.modules.delivery_dispatch.tracking_view import (
     emit_public_tracking_location,
     emit_public_tracking_snapshot,
