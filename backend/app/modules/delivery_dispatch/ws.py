@@ -92,17 +92,18 @@ async def restaurant_dispatch_ws(
         await websocket.close(code=4401)
         return
 
-    restaurant = uow.restaurants.get(restaurant_id)
-    if restaurant is None:
-        await websocket.close(code=4404)
-        return
-    allowed = restaurant.owner_id == user.id
-    if not allowed:
-        found = uow.restaurants.get_for_user(user.id, restaurant_id=restaurant_id)
-        allowed = found is not None and found[1] in ("owner", "admin")
-    if not allowed:
-        await websocket.close(code=4403)
-        return
+    with SqlAlchemyUnitOfWork() as uow:
+        restaurant = uow.restaurants.get(restaurant_id)
+        if restaurant is None:
+            await websocket.close(code=4404)
+            return
+        allowed = restaurant.owner_id == user.id
+        if not allowed:
+            found = uow.restaurants.get_for_user(user.id, restaurant_id=restaurant_id)
+            allowed = found is not None and found[1] in ("owner", "admin")
+        if not allowed:
+            await websocket.close(code=4403)
+            return
 
     hub = get_restaurant_dispatch_realtime_hub()
     await hub.connect(restaurant_id, websocket)
