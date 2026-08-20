@@ -383,7 +383,6 @@ export default function DeliveryPage() {
       return;
     }
 
-    const form = new FormData(event.currentTarget);
     const name = customerName.trim();
     const customerPhone = formatE164(
       findCountryByIso(phoneCountryIso).dialCode,
@@ -433,7 +432,7 @@ export default function DeliveryPage() {
         package_size: packageSize,
         package_count: Number(packageCount),
         prep_minutes: prepMinutes,
-        notes: String(form.get('notes') ?? '').trim() || null,
+        notes: notes.trim() || null,
       });
       setCreated(row);
       setCopiedTracking(false);
@@ -450,11 +449,11 @@ export default function DeliveryPage() {
       setCustomerName('');
       setPhoneCountryIso(DEFAULT_COUNTRY_ISO);
       setPhoneLocal('');
+      setNotes('');
       setFormExpanded(false);
       if (leadTimes[0] != null) {
         setPrepSelection(String(leadTimes[0]));
       }
-      event.currentTarget.reset();
     } catch (submitError) {
       setError(
         submitError instanceof ApiError
@@ -845,11 +844,12 @@ export default function DeliveryPage() {
             </label>
             <textarea
               id="driver-notes"
-              name="notes"
               className={styles.textarea}
               maxLength={500}
               rows={3}
               disabled={!courierAvailable}
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
             />
           </div>
 
