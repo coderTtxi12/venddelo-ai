@@ -16,6 +16,7 @@ import 'location_task.dart';
 import 'models.dart';
 import 'offer_push.dart';
 import 'rider_permissions.dart';
+import 'rider_socket.dart';
 
 class RiderController extends ChangeNotifier {
   RiderController({RiderApi? api, Future<bool> Function()? openAppSettingsImpl})
@@ -42,6 +43,8 @@ class RiderController extends ChangeNotifier {
 
   Timer? _offerPoll;
   Timer? _mePoll;
+  RiderSocket? _socket;
+  RiderSocketStatus _socketStatus = RiderSocketStatus.offline;
   StreamSubscription<RemoteMessage>? _fcmForeground;
   StreamSubscription<RemoteMessage>? _fcmOpened;
   StreamSubscription<String>? _fcmTokenRefresh;
@@ -61,6 +64,7 @@ class RiderController extends ChangeNotifier {
       await refreshMe();
       await _setupFcm();
       await startLiveLocation();
+      await _ensureRiderSocket();
       if (profile?.isOnline == true) {
         await _startOnlineServices();
       }
