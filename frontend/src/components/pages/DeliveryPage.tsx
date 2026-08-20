@@ -37,9 +37,9 @@ import { formatMoney } from '@/lib/currency';
 import { getDeliveryWeatherNotice } from '@/lib/digital-menu/checkout/deliveryWeatherNotice';
 import { usePublicDeliveryQuote } from '@/lib/digital-menu/checkout/usePublicDeliveryQuote';
 import {
-  useRestaurantDispatchSocket,
-  type RestaurantDispatchSocketStatus,
-} from '@/lib/dispatch/useRestaurantDispatchSocket';
+  useRestaurantDispatchEvents,
+  type RestaurantDispatchStreamStatus,
+} from '@/lib/dispatch/useRestaurantDispatchEvents';
 import { isActiveDeliveryPartnership } from '@/lib/fetchActiveDeliveryProviderConfig';
 import { DEFAULT_COUNTRY_ISO, findCountryByIso, formatE164 } from '@/lib/phone/countryDialCodes';
 import { publicMenuOrigin } from '@/lib/restaurantSubdomain';
@@ -62,7 +62,7 @@ function parsePesosToCents(input: string): number {
 }
 
 const LIVE_COPY: Record<
-  RestaurantDispatchSocketStatus,
+  RestaurantDispatchStreamStatus,
   { label: string; hint: string; tone: 'live' | 'pending' | 'muted' }
 > = {
   live: {
@@ -128,9 +128,10 @@ export default function DeliveryPage() {
   const [customerName, setCustomerName] = useState('');
   const [phoneCountryIso, setPhoneCountryIso] = useState(DEFAULT_COUNTRY_ISO);
   const [phoneLocal, setPhoneLocal] = useState('');
+  const [notes, setNotes] = useState('');
   const [formExpanded, setFormExpanded] = useState(true);
   const [copiedTracking, setCopiedTracking] = useState(false);
-  const [socketStatus, setSocketStatus] = useState<RestaurantDispatchSocketStatus>('offline');
+  const [socketStatus, setSocketStatus] = useState<RestaurantDispatchStreamStatus>('offline');
   const [listView, setListView] = useState<'active' | 'history'>('active');
   const didInitFormCollapse = useRef(false);
 
@@ -259,7 +260,7 @@ export default function DeliveryPage() {
     }
   }, [accessToken, selectedRestaurantId]);
 
-  useRestaurantDispatchSocket(selectedRestaurantId, accessToken, {
+  const { visibilityState } = useRestaurantDispatchEvents(selectedRestaurantId, accessToken, {
     onEvent: () => {
       void refreshRequests();
     },
@@ -269,14 +270,16 @@ export default function DeliveryPage() {
     },
   });
 
-  // Fallback poll only when websocket is not live.
+  // Fallback poll only when the tab is visible and SSE is not live.
   useEffect(() => {
-    if (!accessToken || !selectedRestaurantId || socketStatus === 'live') return;
+    if (!accessToken || !selectedRestaurantId) return;
+    if (visibilityState !== 'visible') return;
+    if (socketStatus === 'live') return;
     const timer = window.setInterval(() => {
       void refreshRequests();
     }, 20_000);
     return () => window.clearInterval(timer);
-  }, [accessToken, refreshRequests, selectedRestaurantId, socketStatus]);
+  }, [accessToken, refreshRequests, selectedRestaurantId, socketStatus, visibilityState]);
 
   useEffect(() => {
     if (loading || didInitFormCollapse.current) return;
