@@ -21,6 +21,13 @@ def notify_dispatch_monitor_changed(provider_id: uuid.UUID) -> None:
     )
 
 
+def notify_rider_updated(driver_id: uuid.UUID) -> None:
+    get_rider_realtime_hub().publish_sync(
+        driver_id,
+        {"type": "rider.updated"},
+    )
+
+
 def notify_request_realtime(session: Session, request: DeliveryDispatchRequest) -> None:
     notify_dispatch_monitor_changed(request.delivery_provider_id)
     get_restaurant_dispatch_realtime_hub().publish_sync(
@@ -28,6 +35,8 @@ def notify_request_realtime(session: Session, request: DeliveryDispatchRequest) 
         {"type": "dispatch.updated"},
     )
     emit_public_tracking_snapshot(session, request)
+    if request.assigned_driver_id is not None:
+        notify_rider_updated(request.assigned_driver_id)
 
 
 def notify_driver_location_realtime(session: Session, driver: DeliveryDriver) -> None:
