@@ -12,6 +12,8 @@ type UseRestaurantDispatchSocketOptions = {
   onEvent: (event: RestaurantDispatchSocketEvent) => void;
   onStatusChange?: (status: RestaurantDispatchSocketStatus) => void;
   onReconnect?: () => void;
+  /** Debounce REST refetch triggered by WS events (ms). Default 300. */
+  eventDebounceMs?: number;
 };
 
 function buildRestaurantDispatchSocketUrl(restaurantId: string, token: string): string {
@@ -28,6 +30,7 @@ export function useRestaurantDispatchSocket(
   const onEventRef = useRef(options.onEvent);
   const onStatusChangeRef = useRef(options.onStatusChange);
   const onReconnectRef = useRef(options.onReconnect);
+  const debounceMs = options.eventDebounceMs ?? 300;
 
   useEffect(() => {
     onEventRef.current = options.onEvent;
@@ -44,10 +47,32 @@ export function useRestaurantDispatchSocket(
     let cancelled = false;
     let socket: WebSocket | null = null;
     let retryTimer: number | null = null;
+    let eventTimer: number | null = null;
     let retryMs = 1_000;
     let hasConnectedOnce = false;
+    let inFlight = false;
+    let pendingEvent: RestaurantDispatchSocketEvent | null = null;
 
     onStatusChangeRef.current?.('connecting');
+
+    const flushEvent = () => {
+      if (cancelled || !pendingEvent || inFlight) return;
+      const event = pendingEvent;
+      pendingEvent = null;
+      inFlight = true;
+      Promise.resolve(onEventRef.current(event)).finally(() => {
+        inFlight = false;
+        if (pendingEvent) {
+          eventTimer = window.setTimeout(flushEvent, debounceMs);
+        }
+      });
+    };
+
+    const queueEvent = (event: RestaurantDispatchSocketEvent) => {
+      pendingEvent = event;
+      if (eventTimer != null) window.clearTimeout(eventTimer);
+      eventTimer = window.setTimeout(flushEvent, debounceMs);
+    };
 
     const connect = () => {
       if (cancelled) return;
@@ -70,7 +95,7 @@ export function useRestaurantDispatchSocket(
         try {
           const payload = JSON.parse(String(message.data)) as RestaurantDispatchSocketEvent;
           if (payload.type !== 'dispatch.updated') return;
-          onEventRef.current(payload);
+          queueEvent(payload);
         } catch (error) {
           console.warn('restaurant dispatch ws parse error', error);
         }
@@ -91,8 +116,9 @@ export function useRestaurantDispatchSocket(
     return () => {
       cancelled = true;
       if (retryTimer != null) window.clearTimeout(retryTimer);
+      if (eventTimer != null) window.clearTimeout(eventTimer);
       socket?.close();
       onStatusChangeRef.current?.('offline');
     };
-  }, [restaurantId, accessToken]);
+  }, [restaurantId, accessToken, debounceMs]);
 }
