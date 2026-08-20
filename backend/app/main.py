@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import re
 from contextlib import asynccontextmanager
 
@@ -9,14 +11,18 @@ from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.request_context import RequestIdMiddleware
+from app.infra.auth.supabase_jwt import build_supabase_jwt_auth, warm_jwks_cache
 from app.infra.llm.factory import build_llm_provider
 from app.infra.llm.tracing import flush_langsmith_traces, log_tracing_status
 from app.infra.realtime.digital_menu_hub import get_digital_menu_realtime_hub
 from app.infra.realtime.dispatch_hub import get_dispatch_realtime_hub
 from app.infra.realtime.order_hub import get_order_realtime_hub
 from app.infra.realtime.restaurant_dispatch_hub import get_restaurant_dispatch_realtime_hub
+from app.infra.realtime.rider_hub import get_rider_realtime_hub
 from app.infra.realtime.tracking_hub import get_tracking_realtime_hub
 from app.middleware.rate_limit import RateLimitMiddleware
+
+logger = logging.getLogger(__name__)
 
 
 def _menu_cors_origin_regex(menu_public_domain: str) -> str:
@@ -35,13 +41,23 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        import asyncio
-
         loop = asyncio.get_running_loop()
+        app.state.auth = build_supabase_jwt_auth(settings)
+        if settings.supabase_url:
+            try:
+                await asyncio.to_thread(warm_jwks_cache, app.state.auth)
+                logger.info("JWKS cache warmed for %s", settings.supabase_url)
+            except Exception:
+                logger.warning(
+                    "JWKS warm-up failed; will fetch on first ES256 token",
+                    exc_info=True,
+                )
+
         get_order_realtime_hub().bind_loop(loop)
         get_digital_menu_realtime_hub().bind_loop(loop)
         get_dispatch_realtime_hub().bind_loop(loop)
         get_restaurant_dispatch_realtime_hub().bind_loop(loop)
+        get_rider_realtime_hub().bind_loop(loop)
         get_tracking_realtime_hub().bind_loop(loop)
         from app.modules.delivery_dispatch.fcm import init_firebase
 
@@ -55,7 +71,9 @@ def create_app() -> FastAPI:
         await get_digital_menu_realtime_hub().shutdown()
         await get_dispatch_realtime_hub().shutdown()
         await get_restaurant_dispatch_realtime_hub().shutdown()
+        await get_rider_realtime_hub().shutdown()
         await get_tracking_realtime_hub().shutdown()
+        app.state.auth = None
 
     app = FastAPI(title="Vendelo AI API", version=settings.app_version, lifespan=lifespan)
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
