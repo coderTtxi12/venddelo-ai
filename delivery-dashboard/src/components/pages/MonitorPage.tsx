@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import ArrowDownwardOutlinedIcon from '@mui/icons-material/ArrowDownwardOutlined';
 import ArrowUpwardOutlinedIcon from '@mui/icons-material/ArrowUpwardOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
@@ -757,6 +757,8 @@ export default function MonitorPage() {
   const [collapsedPanels, setCollapsedPanels] = useState<Record<string, boolean>>({});
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [logNonce, setLogNonce] = useState(0);
+  const snapshotInFlightRef = useRef(false);
+  const snapshotQueuedRef = useRef(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -767,16 +769,25 @@ export default function MonitorPage() {
 
   const loadSnapshot = useCallback(async () => {
     if (!accessToken || zonesLoading) return;
+    if (snapshotInFlightRef.current) {
+      snapshotQueuedRef.current = true;
+      return;
+    }
+    snapshotInFlightRef.current = true;
     setError(null);
     try {
-      const data = await getMyDispatchMonitor(
-        accessToken,
-        isAllZones ? null : selectedZoneId,
-      );
-      setSnapshot(data);
+      do {
+        snapshotQueuedRef.current = false;
+        const data = await getMyDispatchMonitor(
+          accessToken,
+          isAllZones ? null : selectedZoneId,
+        );
+        setSnapshot(data);
+      } while (snapshotQueuedRef.current);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el monitor');
     } finally {
+      snapshotInFlightRef.current = false;
       setLoading(false);
     }
   }, [accessToken, isAllZones, selectedZoneId, zonesLoading]);
@@ -798,13 +809,14 @@ export default function MonitorPage() {
     },
   });
 
+  // Fallback poll only when the websocket is not live — avoids stacking DB load.
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken || connectionStatus === 'live') return;
     const timer = window.setInterval(() => {
       void loadSnapshot();
     }, 15_000);
     return () => window.clearInterval(timer);
-  }, [accessToken, loadSnapshot]);
+  }, [accessToken, connectionStatus, loadSnapshot]);
 
   const queueRequests = useMemo(
     () =>
