@@ -279,7 +279,7 @@ export function PublicTracking({ token }: { token: string }) {
     void refresh();
   }, [refresh]);
 
-  usePublicTrackingRealtime(token, tracking?.status ?? null, {
+  const { visibilityState } = usePublicTrackingRealtime(token, tracking?.status ?? null, {
     onStatusChange: setSocketStatus,
     onReconnect: () => {
       void refresh();
@@ -301,11 +301,11 @@ export function PublicTracking({ token }: { token: string }) {
 
   useEffect(() => {
     if (!showLive) return;
-    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+    if (visibilityState !== 'visible') return;
     if (socketStatus === 'live') return;
     const interval = window.setInterval(() => void refresh(), 20_000);
     return () => window.clearInterval(interval);
-  }, [refresh, showLive, socketStatus]);
+  }, [refresh, showLive, socketStatus, visibilityState]);
 
   if (error && !tracking) {
     return (

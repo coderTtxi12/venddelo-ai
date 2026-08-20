@@ -51,6 +51,8 @@ export function usePublicTrackingRealtime(
 
   const consume = shouldConsumeTrackingRealtime({ status, visibilityState });
 
+  const hasConnectedOnceRef = useRef(false);
+
   useEffect(() => {
     if (!token || !consume) {
       onStatusChangeRef.current?.('offline');
@@ -59,7 +61,6 @@ export function usePublicTrackingRealtime(
 
     const supabase = createClient();
     let cancelled = false;
-    let hasConnectedOnce = false;
     onStatusChangeRef.current?.('connecting');
 
     const channel = supabase.channel(trackingBroadcastTopic(token), {
@@ -85,13 +86,19 @@ export function usePublicTrackingRealtime(
       .subscribe((channelStatus) => {
         if (cancelled) return;
         if (channelStatus === 'SUBSCRIBED') {
-          if (hasConnectedOnce) onReconnectRef.current?.();
-          hasConnectedOnce = true;
+          if (hasConnectedOnceRef.current) onReconnectRef.current?.();
+          hasConnectedOnceRef.current = true;
           onStatusChangeRef.current?.('live');
           return;
         }
-        if (channelStatus === 'CHANNEL_ERROR' || channelStatus === 'TIMED_OUT') {
-          onStatusChangeRef.current?.(hasConnectedOnce ? 'reconnecting' : 'offline');
+        if (
+          channelStatus === 'CHANNEL_ERROR' ||
+          channelStatus === 'TIMED_OUT' ||
+          channelStatus === 'CLOSED'
+        ) {
+          onStatusChangeRef.current?.(
+            hasConnectedOnceRef.current ? 'reconnecting' : 'offline',
+          );
         }
       });
 
@@ -101,4 +108,6 @@ export function usePublicTrackingRealtime(
       onStatusChangeRef.current?.('offline');
     };
   }, [token, consume]);
+
+  return { visibilityState };
 }

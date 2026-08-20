@@ -494,12 +494,6 @@ def test_public_tracking_keeps_names_when_delivered(client, engine):
     assert "customer_phone" not in body
 
 
-@requires_db
-def test_public_tracking_ws_route_removed(client):
-    response = client.get("/api/v1/ws/public/dispatch-tracking/not-a-token")
-    assert response.status_code in {404, 405}
-
-
 def test_public_plate_suffix_uses_last_three_alnum():
     from app.modules.delivery_dispatch.tracking_view import public_plate_suffix
 

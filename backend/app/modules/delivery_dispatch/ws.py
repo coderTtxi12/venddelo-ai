@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import uuid
+
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
+from sqlalchemy import select
 
 from app.api.deps import get_auth, get_synced_user
 from app.core.exceptions import UnauthorizedError

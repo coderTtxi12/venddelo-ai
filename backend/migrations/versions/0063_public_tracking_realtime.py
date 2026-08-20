@@ -75,9 +75,26 @@ def upgrade() -> None:
             IF to_regprocedure('realtime.send(jsonb, text, text, boolean)') IS NULL THEN
                 RETURN;
             END IF;
-            PERFORM realtime.send(p_payload, p_event, p_topic, false);
+            BEGIN
+                PERFORM realtime.send(p_payload, p_event, p_topic, false);
+            EXCEPTION WHEN OTHERS THEN
+                RAISE WARNING 'tracking broadcast failed: %', SQLERRM;
+            END;
         END;
         $$;
+
+        DO $$
+        BEGIN
+            EXECUTE 'REVOKE EXECUTE ON FUNCTION public.tracking_realtime_send(text, text, jsonb) FROM PUBLIC';
+            BEGIN
+                EXECUTE 'REVOKE EXECUTE ON FUNCTION public.tracking_realtime_send(text, text, jsonb) FROM anon';
+            EXCEPTION WHEN undefined_object THEN NULL;
+            END;
+            BEGIN
+                EXECUTE 'REVOKE EXECUTE ON FUNCTION public.tracking_realtime_send(text, text, jsonb) FROM authenticated';
+            EXCEPTION WHEN undefined_object THEN NULL;
+            END;
+        END $$;
 
         CREATE OR REPLACE FUNCTION public.delivery_dispatch_requests_tracking_updated()
         RETURNS trigger

@@ -75,7 +75,11 @@ def test_request_status_update_broadcasts_updated(engine, client):
     with engine.begin() as conn:
         conn.execute(
             text(
-                "UPDATE delivery_dispatch_requests SET status = 'searching' WHERE id = CAST(:id AS uuid)"
+                """
+                UPDATE delivery_dispatch_requests
+                SET status = 'searching'
+                WHERE id = CAST(:id AS uuid)
+                """
             ),
             {"id": request_id},
         )
