@@ -105,45 +105,47 @@ async def dispatch_monitor_ws(
         await hub.disconnect(provider_id, websocket)
 
 
-@router.websocket("/ws/restaurants/{restaurant_id}/dispatch")
-async def restaurant_dispatch_ws(
-    websocket: WebSocket,
+@router.get("/restaurants/{restaurant_id}/dispatch/events")
+async def restaurant_dispatch_events(
+    request: Request,
     restaurant_id: uuid.UUID,
-    token: str = Query(...),
-    auth: AuthPort = Depends(get_auth),
-) -> None:
-    if not token.strip():
-        await websocket.close(code=4401)
-        return
-
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> StreamingResponse:
+    uow_dep = request.app.dependency_overrides.get(get_uow, get_uow)
+    uow_gen = uow_dep()
+    uow = next(uow_gen)
     try:
-        user = auth.verify_token(token.strip())
-    except UnauthorizedError:
-        await websocket.close(code=4401)
-        return
-
-    with SqlAlchemyUnitOfWork() as uow:
-        restaurant = uow.restaurants.get(restaurant_id)
-        if restaurant is None:
-            await websocket.close(code=4404)
-            return
-        allowed = restaurant.owner_id == user.id
-        if not allowed:
-            found = uow.restaurants.get_for_user(user.id, restaurant_id=restaurant_id)
-            allowed = found is not None and found[1] in ("owner", "admin")
-        if not allowed:
-            await websocket.close(code=4403)
-            return
+        _assert_can_read_restaurant_dispatch(uow, restaurant_id, user)
+    finally:
+        _finish_uow_gen(uow_gen)
 
     hub = get_restaurant_dispatch_realtime_hub()
-    await hub.connect(restaurant_id, websocket)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        pass
-    finally:
-        await hub.disconnect(restaurant_id, websocket)
+    queue = hub.subscribe(restaurant_id)
+
+    async def event_generator():
+        try:
+            while True:
+                try:
+                    payload = await asyncio.wait_for(queue.get(), timeout=15)
+                except TimeoutError:
+                    yield ": ping\n\n"
+                    continue
+                yield (
+                    "event: dispatch.updated\n"
+                    f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                )
+        finally:
+            hub.unsubscribe(restaurant_id, queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.websocket("/ws/rider/me")
