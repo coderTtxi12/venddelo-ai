@@ -19,7 +19,6 @@ from app.infra.realtime.dispatch_hub import get_dispatch_realtime_hub
 from app.infra.realtime.order_hub import get_order_realtime_hub
 from app.infra.realtime.restaurant_dispatch_hub import get_restaurant_dispatch_realtime_hub
 from app.infra.realtime.rider_hub import get_rider_realtime_hub
-from app.infra.realtime.tracking_hub import get_tracking_realtime_hub
 from app.middleware.rate_limit import RateLimitMiddleware
 
 logger = logging.getLogger(__name__)
@@ -58,7 +57,6 @@ def create_app() -> FastAPI:
         get_dispatch_realtime_hub().bind_loop(loop)
         get_restaurant_dispatch_realtime_hub().bind_loop(loop)
         get_rider_realtime_hub().bind_loop(loop)
-        get_tracking_realtime_hub().bind_loop(loop)
         from app.modules.delivery_dispatch.fcm import init_firebase
 
         init_firebase(
@@ -72,7 +70,6 @@ def create_app() -> FastAPI:
         await get_dispatch_realtime_hub().shutdown()
         await get_restaurant_dispatch_realtime_hub().shutdown()
         await get_rider_realtime_hub().shutdown()
-        await get_tracking_realtime_hub().shutdown()
         app.state.auth = None
 
     app = FastAPI(title="Vendelo AI API", version=settings.app_version, lifespan=lifespan)

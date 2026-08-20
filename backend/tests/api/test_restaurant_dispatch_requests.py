@@ -495,29 +495,9 @@ def test_public_tracking_keeps_names_when_delivered(client, engine):
 
 
 @requires_db
-def test_public_tracking_ws_sends_snapshot(client, engine):
-    _create_mexy_provider(client)
-    restaurant_id = _create_restaurant(client, subdomain="dispatch-ws-track")
-    _activate_partnership(client, engine, restaurant_id)
-    created = client.post(
-        "/api/v1/restaurants/me/dispatch-requests",
-        params={"restaurant_id": restaurant_id},
-        json=_dispatch_payload(),
-        headers=AUTH,
-    )
-    assert created.status_code == 201, created.text
-    token = created.json()["tracking_token"]
-
-    with client.websocket_connect(f"/api/v1/ws/public/dispatch-tracking/{token}") as websocket:
-        payload = websocket.receive_json()
-
-    assert payload["type"] == "tracking.updated"
-    assert payload["tracking"]["short_id"] == created.json()["short_id"]
-    assert payload["tracking"]["pickup"]["name"] == "Dispatch Bistro"
-    assert payload["tracking"]["restaurant_name"] == "Dispatch Bistro"
-    assert payload["tracking"]["customer_name"] == "María López"
-    assert "customer_phone" not in payload["tracking"]
-    assert "tracking_token" not in payload["tracking"]
+def test_public_tracking_ws_route_removed(client):
+    response = client.get("/api/v1/ws/public/dispatch-tracking/not-a-token")
+    assert response.status_code in {404, 405}
 
 
 def test_public_plate_suffix_uses_last_three_alnum():

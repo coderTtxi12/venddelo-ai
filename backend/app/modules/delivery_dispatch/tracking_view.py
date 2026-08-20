@@ -1,13 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from app.core.storage import StorageError, StoragePort
 from app.db.models.delivery import DeliveryDispatchRequest, DeliveryDriver
 from app.db.models.restaurant import Restaurant
-from app.infra.realtime.tracking_hub import get_tracking_realtime_hub
-from app.infra.storage.factory import build_storage
 from app.modules.delivery_dispatch.geo import geodesic_meters
 from app.modules.delivery_dispatch.schemas import (
     PublicDispatchTrackingDTO,
@@ -123,58 +118,3 @@ def build_public_tracking_dto(
             row.cash_denomination_cents if row.payment_method == "cash" else None
         ),
     )
-
-
-def emit_public_tracking_snapshot(
-    session: Session,
-    request: DeliveryDispatchRequest,
-    storage: StoragePort | None = None,
-) -> None:
-    driver = None
-    if request.assigned_driver_id is not None:
-        driver = session.get(DeliveryDriver, request.assigned_driver_id)
-    restaurant = session.get(Restaurant, request.restaurant_id)
-    dto = build_public_tracking_dto(
-        request,
-        driver=driver,
-        restaurant=restaurant,
-        storage=storage or build_storage(),
-    )
-    get_tracking_realtime_hub().publish_sync(
-        request.tracking_token,
-        {"type": "tracking.updated", "tracking": dto.model_dump(mode="json")},
-    )
-
-
-def emit_public_tracking_location(session: Session, driver: DeliveryDriver) -> None:
-    if driver.last_lat is None or driver.last_lng is None:
-        return
-    rows = list(
-        session.scalars(
-            select(DeliveryDispatchRequest).where(
-                DeliveryDispatchRequest.assigned_driver_id == driver.id,
-                DeliveryDispatchRequest.status.in_(tuple(LIVE_TRACKING_STATUSES)),
-            )
-        ).all()
-    )
-    for row in rows:
-        restaurant = session.get(Restaurant, row.restaurant_id)
-        pickup_lat = restaurant.latitude if restaurant is not None else None
-        pickup_lng = restaurant.longitude if restaurant is not None else None
-        get_tracking_realtime_hub().publish_sync(
-            row.tracking_token,
-            {
-                "type": "tracking.location",
-                "latitude": driver.last_lat,
-                "longitude": driver.last_lng,
-                "eta_seconds": tracking_eta_seconds(
-                    row.status,
-                    rider_lat=driver.last_lat,
-                    rider_lng=driver.last_lng,
-                    pickup_lat=pickup_lat,
-                    pickup_lng=pickup_lng,
-                    dropoff_lat=row.dropoff_lat,
-                    dropoff_lng=row.dropoff_lng,
-                ),
-            },
-        )

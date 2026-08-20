@@ -8,10 +8,6 @@ from app.db.models.delivery import DeliveryDispatchRequest, DeliveryDriver
 from app.infra.realtime.dispatch_hub import get_dispatch_realtime_hub
 from app.infra.realtime.restaurant_dispatch_hub import get_restaurant_dispatch_realtime_hub
 from app.infra.realtime.rider_hub import get_rider_realtime_hub
-from app.modules.delivery_dispatch.tracking_view import (
-    emit_public_tracking_location,
-    emit_public_tracking_snapshot,
-)
 
 
 def notify_dispatch_monitor_changed(provider_id: uuid.UUID) -> None:
@@ -34,11 +30,9 @@ def notify_request_realtime(session: Session, request: DeliveryDispatchRequest) 
         request.restaurant_id,
         {"type": "dispatch.updated"},
     )
-    emit_public_tracking_snapshot(session, request)
     if request.assigned_driver_id is not None:
         notify_rider_updated(request.assigned_driver_id)
 
 
 def notify_driver_location_realtime(session: Session, driver: DeliveryDriver) -> None:
     notify_dispatch_monitor_changed(driver.delivery_provider_id)
-    emit_public_tracking_location(session, driver)
