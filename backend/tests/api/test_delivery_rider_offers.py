@@ -152,7 +152,7 @@ def _setup_ready_rider(client, engine) -> tuple[str, str]:
         json={"latitude": COVERED_LAT, "longitude": COVERED_LNG},
         headers=AUTH,
     )
-    assert ping.status_code == 200, ping.text
+    assert ping.status_code == 204, ping.text
     return restaurant_id, driver_id
 
 
