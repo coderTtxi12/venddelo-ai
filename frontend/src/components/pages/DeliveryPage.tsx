@@ -232,17 +232,30 @@ export default function DeliveryPage() {
     }
   }, [accessToken, selectedRestaurantId]);
 
+  const refreshInFlightRef = useRef(false);
+  const refreshQueuedRef = useRef(false);
+
   const refreshRequests = useCallback(async () => {
     if (!accessToken || !selectedRestaurantId) return;
+    if (refreshInFlightRef.current) {
+      refreshQueuedRef.current = true;
+      return;
+    }
+    refreshInFlightRef.current = true;
     try {
-      const rows = await listDispatchRequests(accessToken, selectedRestaurantId);
-      setRequests(rows);
-      setCreated((current) => {
-        if (!current) return current;
-        return rows.find((item) => item.id === current.id) ?? current;
-      });
+      do {
+        refreshQueuedRef.current = false;
+        const rows = await listDispatchRequests(accessToken, selectedRestaurantId);
+        setRequests(rows);
+        setCreated((current) => {
+          if (!current) return current;
+          return rows.find((item) => item.id === current.id) ?? current;
+        });
+      } while (refreshQueuedRef.current);
     } catch {
       /* keep the current list until the next successful refresh */
+    } finally {
+      refreshInFlightRef.current = false;
     }
   }, [accessToken, selectedRestaurantId]);
 
@@ -255,6 +268,15 @@ export default function DeliveryPage() {
       void refreshRequests();
     },
   });
+
+  // Fallback poll only when websocket is not live.
+  useEffect(() => {
+    if (!accessToken || !selectedRestaurantId || socketStatus === 'live') return;
+    const timer = window.setInterval(() => {
+      void refreshRequests();
+    }, 20_000);
+    return () => window.clearInterval(timer);
+  }, [accessToken, refreshRequests, selectedRestaurantId, socketStatus]);
 
   useEffect(() => {
     if (loading || didInitFormCollapse.current) return;
