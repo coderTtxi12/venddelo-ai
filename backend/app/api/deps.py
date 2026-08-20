@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import Depends, Header, Query, Request
+from fastapi import Depends, Header, Query
+from starlette.requests import HTTPConnection
 
 from app.core.exceptions import ForbiddenError, NotFoundError, UnauthorizedError
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, PaginationParams
@@ -13,8 +14,13 @@ from app.modules.users.schemas import UserDTO
 from app.modules.users.service import UserService
 
 
-def get_auth(request: Request) -> AuthPort:
-    auth = getattr(request.app.state, "auth", None)
+def get_auth(connection: HTTPConnection) -> AuthPort:
+    """Read the process-wide JWT auth from app.state.
+
+    ``HTTPConnection`` is the shared base of HTTP ``Request`` and ``WebSocket``,
+    so the same dependency works for REST and realtime handshake.
+    """
+    auth = getattr(connection.app.state, "auth", None)
     if auth is None:
         raise RuntimeError("Auth not initialized — application lifespan did not run")
     return auth
