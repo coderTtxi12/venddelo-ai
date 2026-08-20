@@ -18,11 +18,11 @@ import {
 } from '@/lib/api/dispatch';
 import { ApiError } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
+import { applyTrackingLocation } from '@/lib/dispatch/publicTrackingRealtime';
 import {
-  usePublicTrackingSocket,
-  type PublicTrackingSocketEvent,
-  type PublicTrackingSocketStatus,
-} from '@/lib/dispatch/usePublicTrackingSocket';
+  usePublicTrackingRealtime,
+  type PublicTrackingRealtimeStatus,
+} from '@/lib/dispatch/usePublicTrackingRealtime';
 import { PublicTrackingMap } from './PublicTrackingMap';
 import styles from './PublicTracking.module.css';
 
@@ -259,7 +259,7 @@ export function PublicTracking({ token }: { token: string }) {
   const [tracking, setTracking] = useState<PublicDispatchTracking | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [socketStatus, setSocketStatus] = useState<PublicTrackingSocketStatus>('connecting');
+  const [socketStatus, setSocketStatus] = useState<PublicTrackingRealtimeStatus>('connecting');
 
   const refresh = useCallback(async () => {
     try {
@@ -279,37 +279,33 @@ export function PublicTracking({ token }: { token: string }) {
     void refresh();
   }, [refresh]);
 
-  usePublicTrackingSocket(token, {
+  usePublicTrackingRealtime(token, tracking?.status ?? null, {
     onStatusChange: setSocketStatus,
     onReconnect: () => {
       void refresh();
     },
-    onEvent: (event: PublicTrackingSocketEvent) => {
+    onEvent: (event) => {
       if (event.type === 'tracking.updated') {
-        setTracking(event.tracking);
-        setError(null);
+        void refresh();
         return;
       }
-      setTracking((current) => {
-        if (!current?.rider) return current;
-        return {
-          ...current,
-          eta_seconds: event.eta_seconds,
-          rider: {
-            ...current.rider,
-            latitude: event.latitude,
-            longitude: event.longitude,
-          },
-        };
-      });
+      setTracking((current) =>
+        current ? applyTrackingLocation(current, event) : current,
+      );
     },
   });
 
+  const liveStatus = tracking?.status ?? null;
+  const showLive =
+    liveStatus != null && liveStatus !== 'delivered' && liveStatus !== 'cancelled';
+
   useEffect(() => {
+    if (!showLive) return;
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
     if (socketStatus === 'live') return;
     const interval = window.setInterval(() => void refresh(), 20_000);
     return () => window.clearInterval(interval);
-  }, [refresh, socketStatus]);
+  }, [refresh, showLive, socketStatus]);
 
   if (error && !tracking) {
     return (
@@ -333,7 +329,6 @@ export function PublicTracking({ token }: { token: string }) {
 
   const copy = STATUS_COPY[tracking.status];
   const delivered = tracking.status === 'delivered';
-  const showLive = tracking.status !== 'delivered' && tracking.status !== 'cancelled';
   const restaurantName = tracking.restaurant_name ?? tracking.pickup?.name ?? null;
   const live = socketStatus === 'live';
   const telHref = !delivered && tracking.rider ? riderTelHref(tracking.rider.phone) : null;
