@@ -78,11 +78,118 @@ def upgrade() -> None:
             PERFORM realtime.send(p_payload, p_event, p_topic, false);
         END;
         $$;
+
+        CREATE OR REPLACE FUNCTION public.delivery_dispatch_requests_tracking_updated()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = public, realtime, pg_temp
+        AS $$
+        BEGIN
+            PERFORM public.tracking_realtime_send(
+                'tracking:' || NEW.tracking_token,
+                'updated',
+                '{}'::jsonb
+            );
+            RETURN NEW;
+        END;
+        $$;
+
+        DROP TRIGGER IF EXISTS delivery_dispatch_requests_tracking_updated
+            ON public.delivery_dispatch_requests;
+        CREATE TRIGGER delivery_dispatch_requests_tracking_updated
+        AFTER INSERT OR UPDATE OF
+            status,
+            assigned_driver_id,
+            customer_name,
+            dropoff_lat,
+            dropoff_lng,
+            dropoff_address,
+            payment_method,
+            collect_cents,
+            cash_denomination_cents,
+            package_count,
+            cancelled_at,
+            picked_up_at,
+            in_transit_at,
+            delivered_at
+        ON public.delivery_dispatch_requests
+        FOR EACH ROW
+        EXECUTE FUNCTION public.delivery_dispatch_requests_tracking_updated();
+
+        CREATE OR REPLACE FUNCTION public.delivery_drivers_tracking_location()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = public, realtime, pg_temp
+        AS $$
+        DECLARE
+            rec record;
+            pickup_lat double precision;
+            pickup_lng double precision;
+            eta integer;
+        BEGIN
+            IF NEW.last_lat IS NULL OR NEW.last_lng IS NULL THEN
+                RETURN NEW;
+            END IF;
+            FOR rec IN
+                SELECT r.tracking_token, r.status, r.dropoff_lat, r.dropoff_lng, r.restaurant_id
+                FROM public.delivery_dispatch_requests r
+                WHERE r.assigned_driver_id = NEW.id
+                  AND r.status IN ('assigned', 'picked_up', 'in_transit')
+            LOOP
+                SELECT rest.latitude, rest.longitude
+                  INTO pickup_lat, pickup_lng
+                FROM public.restaurants rest
+                WHERE rest.id = rec.restaurant_id;
+                eta := public.tracking_eta_seconds(
+                    rec.status,
+                    NEW.last_lat,
+                    NEW.last_lng,
+                    pickup_lat,
+                    pickup_lng,
+                    rec.dropoff_lat,
+                    rec.dropoff_lng
+                );
+                PERFORM public.tracking_realtime_send(
+                    'tracking:' || rec.tracking_token,
+                    'location',
+                    jsonb_build_object(
+                        'latitude', NEW.last_lat,
+                        'longitude', NEW.last_lng,
+                        'eta_seconds', eta
+                    )
+                );
+            END LOOP;
+            RETURN NEW;
+        END;
+        $$;
+
+        DROP TRIGGER IF EXISTS delivery_drivers_tracking_location
+            ON public.delivery_drivers;
+        CREATE TRIGGER delivery_drivers_tracking_location
+        AFTER UPDATE OF last_lat, last_lng
+        ON public.delivery_drivers
+        FOR EACH ROW
+        EXECUTE FUNCTION public.delivery_drivers_tracking_location();
         """
     )
 
 
 def downgrade() -> None:
+    op.execute(
+        "DROP TRIGGER IF EXISTS delivery_drivers_tracking_location ON public.delivery_drivers"
+    )
+    op.execute(
+        """
+        DROP TRIGGER IF EXISTS delivery_dispatch_requests_tracking_updated
+        ON public.delivery_dispatch_requests
+        """
+    )
+    op.execute("DROP FUNCTION IF EXISTS public.delivery_drivers_tracking_location()")
+    op.execute(
+        "DROP FUNCTION IF EXISTS public.delivery_dispatch_requests_tracking_updated()"
+    )
     op.execute("DROP FUNCTION IF EXISTS public.tracking_realtime_send(text, text, jsonb)")
     op.execute(
         """
