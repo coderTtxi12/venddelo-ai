@@ -62,13 +62,19 @@ def patch_rider_online(
     return service.set_online(user, data.is_online)
 
 
-@rider_router.post("/me/location", response_model=RiderProfileDTO)
+@rider_router.post(
+    "/me/location",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    response_model=None,
+)
 def post_rider_location(
     data: RiderLocationUpdate,
     user: UserDTO = Depends(get_synced_user),
     service: RiderDispatchService = Depends(_rider_service),
-) -> RiderProfileDTO:
-    return service.update_location(user, data.latitude, data.longitude)
+) -> Response:
+    service.update_location(user, data.latitude, data.longitude)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @rider_router.get("/me/offers", response_model=list[RiderOfferDTO])
