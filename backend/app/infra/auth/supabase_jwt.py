@@ -11,6 +11,43 @@ from app.core.config import Settings
 from app.core.exceptions import UnauthorizedError
 from app.core.security import AuthenticatedUser, AuthPort
 
+logger = logging.getLogger(__name__)
+
+# Supabase edge caches JWKS ~10 min; keep in-process cache ≤20 min per their docs.
+JWKS_CACHE_LIFESPAN_SECONDS = 600
+
+
+def jwks_url_for_supabase(supabase_url: str) -> str:
+    return supabase_url.rstrip("/") + "/auth/v1/.well-known/jwks.json"
+
+
+def build_jwks_client(supabase_url: str) -> PyJWKClient:
+    return PyJWKClient(
+        jwks_url_for_supabase(supabase_url),
+        cache_keys=True,
+        cache_jwk_set=True,
+        lifespan=JWKS_CACHE_LIFESPAN_SECONDS,
+    )
+
+
+def build_supabase_jwt_auth(
+    settings: Settings,
+    *,
+    jwks_client: PyJWKClient | None = None,
+) -> SupabaseJwtAuth:
+    client = jwks_client
+    if client is None and settings.supabase_url:
+        client = build_jwks_client(settings.supabase_url)
+    return SupabaseJwtAuth(settings, jwks_client=client)
+
+
+def warm_jwks_cache(auth: SupabaseJwtAuth) -> None:
+    """Prefetch JWKS once (startup / cold start). Safe to skip on failure."""
+    client = auth.jwks_client
+    if client is None:
+        return
+    client.get_jwk_set()
+
 
 def _profile_from_payload(payload: dict) -> tuple[str | None, str | None]:
     meta = payload.get("user_metadata") or {}
@@ -32,13 +69,19 @@ def _role_from_payload(payload: dict) -> str | None:
 
 
 class SupabaseJwtAuth(AuthPort):
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        jwks_client: PyJWKClient | None = None,
+    ) -> None:
         self._secret = settings.supabase_jwt_secret
         self._audience = settings.jwt_audience
-        self._jwks_client: PyJWKClient | None = None
-        if settings.supabase_url:
-            jwks_url = settings.supabase_url.rstrip("/") + "/auth/v1/.well-known/jwks.json"
-            self._jwks_client = PyJWKClient(jwks_url, cache_keys=True)
+        self._jwks_client = jwks_client
+
+    @property
+    def jwks_client(self) -> PyJWKClient | None:
+        return self._jwks_client
 
     def verify_token(self, token: str) -> AuthenticatedUser:
         payload = self._decode_payload(token)
