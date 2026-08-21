@@ -146,6 +146,9 @@ export function RequestDeliveryForm({
 
   useEffect(() => {
     onSubmittingChange?.(submitting);
+    return () => {
+      onSubmittingChange?.(false);
+    };
   }, [onSubmittingChange, submitting]);
 
   useEffect(() => {
