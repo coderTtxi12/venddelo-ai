@@ -38,11 +38,12 @@ import {
 } from '@/lib/orders/orderStatus';
 import { useKitchenOrderProducts } from '@/lib/orders/useKitchenOrderProducts';
 import { useKitchenOrdersInfiniteScroll } from '@/lib/orders/useKitchenOrdersInfiniteScroll';
+import { OrderDispatchDrawer } from '@/components/dispatch/OrderDispatchDrawer';
 import { OrderCancelDialog } from '@/components/orders/OrderCancelDialog';
+import { kitchenConfirmOpensDispatch } from '@/lib/orders/kitchenDispatch';
 import { KitchenLiveIndicator } from '@/components/orders/KitchenLiveIndicator';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import {
-  buildOrderAcceptedWhatsAppMessage,
   buildOrderCancelledWhatsAppMessage,
   openCustomerWhatsAppMessage,
   type KitchenCancelReason,
@@ -551,6 +552,7 @@ export function KitchenOrdersView() {
   const [updating, setUpdating] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [dispatchOrder, setDispatchOrder] = useState<Order | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [isMobile, setIsMobile] = useState(false);
 
@@ -659,14 +661,11 @@ export function KitchenOrdersView() {
     if (!selectedOrder) return;
     const next = ORDER_STATUS_META[selectedOrder.status].nextStatus;
     if (!next) return;
-    const updated = await patchOrder(selectedOrder.id, next);
-    if (!updated) return;
-    if (next === 'confirmed') {
-      openCustomerWhatsAppMessage(
-        updated.customer_phone,
-        buildOrderAcceptedWhatsAppMessage(updated),
-      );
+    if (next === 'confirmed' && kitchenConfirmOpensDispatch(selectedOrder)) {
+      setDispatchOrder(selectedOrder);
+      return;
     }
+    await patchOrder(selectedOrder.id, next);
   };
 
   const handleCancelRequest = () => {
@@ -850,6 +849,19 @@ export function KitchenOrdersView() {
         onClose={() => setCancelDialogOpen(false)}
         onConfirm={(reason) => void handleCancelConfirm(reason)}
       />
+
+      {accessToken && restaurantId ? (
+        <OrderDispatchDrawer
+          open={dispatchOrder != null}
+          order={dispatchOrder}
+          accessToken={accessToken}
+          restaurantId={restaurantId}
+          onClose={() => setDispatchOrder(null)}
+          onOrderConfirmed={(updated) => {
+            replaceOrder(updated);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
