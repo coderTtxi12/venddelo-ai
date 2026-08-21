@@ -490,8 +490,10 @@ def build_dispatch_monitor_snapshot(
             requests_in_progress += 1
 
         assigned_name = None
+        assigned_plate = None
         if request.assigned_driver is not None:
             assigned_name = _driver_name(request.assigned_driver)
+            assigned_plate = request.assigned_driver.plate
 
         last_assigned_name = assigned_name or last_accepted_names.get(request.id)
         if last_assigned_name is None:
@@ -545,6 +547,7 @@ def build_dispatch_monitor_snapshot(
                 is_due_search=is_due_search,
                 assigned_driver_id=request.assigned_driver_id,
                 assigned_driver_name=assigned_name,
+                assigned_driver_plate=assigned_plate,
                 last_assigned_driver_name=last_assigned_name,
                 dispatch_group_id=request.dispatch_group_id,
                 zone_id=request.zone_id,
