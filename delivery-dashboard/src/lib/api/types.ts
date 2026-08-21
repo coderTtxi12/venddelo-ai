@@ -431,6 +431,7 @@ export type DispatchMonitorRequest = {
   is_due_search: boolean;
   assigned_driver_id: string | null;
   assigned_driver_name: string | null;
+  assigned_driver_plate?: string | null;
   last_assigned_driver_name?: string | null;
   dispatch_group_id: string | null;
   zone_id?: string | null;
