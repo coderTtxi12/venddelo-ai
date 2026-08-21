@@ -344,6 +344,7 @@ function ActiveList({
   zoneIds = [],
 }: {
   requests: DispatchMonitorRequest[];
+  driversById: Map<string, DispatchMonitorDriver>;
   canAssign: boolean;
   onAssign: (request: DispatchMonitorRequest) => void;
   onDetail: (request: DispatchMonitorRequest) => void;
@@ -361,6 +362,7 @@ function ActiveList({
       {requests.map((request) => {
         const scheduler = requestSchedulerLine(request, nowMs);
         const focused = focusedRequestId === request.id;
+        const plate = assignedRiderPlate(request, driversById);
         return (
           <li
             key={request.id}
@@ -377,7 +379,18 @@ function ActiveList({
                 {request.customer_name}
               </span>
               <span className={styles.listMeta}>
-                {request.assigned_driver_name ?? 'Sin repartidor'} · {request.restaurant_name}
+                {request.assigned_driver_name ? (
+                  <>
+                    <span className={styles.assignedRiderName}>{request.assigned_driver_name}</span>
+                    {plate ? (
+                      <span className={styles.assignedRiderPlate}>{plate}</span>
+                    ) : null}
+                    {' · '}
+                  </>
+                ) : (
+                  'Sin repartidor · '
+                )}
+                {request.restaurant_name}
                 {colorByZone && request.zone_name ? (
                   <>
                     {' · '}
