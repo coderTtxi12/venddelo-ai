@@ -321,8 +321,19 @@ function QueueList({
   );
 }
 
+function assignedRiderPlate(
+  request: DispatchMonitorRequest,
+  driversById: Map<string, DispatchMonitorDriver>,
+): string | null {
+  const fromRequest = request.assigned_driver_plate?.trim();
+  if (fromRequest) return fromRequest;
+  if (!request.assigned_driver_id) return null;
+  return driversById.get(request.assigned_driver_id)?.plate?.trim() || null;
+}
+
 function ActiveList({
   requests,
+  driversById,
   canAssign,
   onAssign,
   onDetail,
