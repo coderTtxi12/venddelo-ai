@@ -552,6 +552,7 @@ class DispatchMonitorRequestDTO(BaseModel):
     is_due_search: bool
     assigned_driver_id: uuid.UUID | None = None
     assigned_driver_name: str | None = None
+    assigned_driver_plate: str | None = None
     last_assigned_driver_name: str | None = None
     dispatch_group_id: uuid.UUID | None = None
     zone_id: uuid.UUID | None = None
