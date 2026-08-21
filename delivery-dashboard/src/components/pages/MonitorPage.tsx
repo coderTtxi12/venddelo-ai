@@ -1229,6 +1229,7 @@ export default function MonitorPage() {
               >
                 <ActiveList
                   requests={sortedActive}
+                  driversById={driversById}
                   canAssign={canManagePartnerships}
                   nowMs={nowMs}
                   focusedRequestId={focusedRequestId}
