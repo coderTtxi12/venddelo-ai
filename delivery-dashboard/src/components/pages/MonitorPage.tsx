@@ -889,6 +889,13 @@ export default function MonitorPage() {
       ),
     [activeRequests, timeSort.active],
   );
+  const driversById = useMemo(() => {
+    const map = new Map<string, DispatchMonitorDriver>();
+    for (const driver of snapshot?.drivers ?? []) {
+      map.set(driver.id, driver);
+    }
+    return map;
+  }, [snapshot?.drivers]);
   const sortedOffers = useMemo(
     () =>
       [...(snapshot?.offers ?? [])].sort((a, b) =>
