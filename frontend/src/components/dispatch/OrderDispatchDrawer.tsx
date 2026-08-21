@@ -62,10 +62,12 @@ export function OrderDispatchDrawer({
     [order],
   );
 
+  const canClose = created != null || (!submitting && !confirming);
+
   const tryClose = useCallback(() => {
-    if (submitting || confirming) return;
+    if (!canClose) return;
     onClose();
-  }, [confirming, onClose, submitting]);
+  }, [canClose, onClose]);
 
   useEffect(() => {
     if (!open) return;
