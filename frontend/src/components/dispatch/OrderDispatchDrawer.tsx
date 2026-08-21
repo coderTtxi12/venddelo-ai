@@ -195,7 +195,7 @@ export function OrderDispatchDrawer({
             type="button"
             className={styles.closeBtn}
             onClick={tryClose}
-            disabled={submitting || confirming}
+            disabled={!canClose}
             aria-label="Cerrar"
           >
             ×
