@@ -1,17 +1,13 @@
 'use client';
 
-import CheckOutlinedIcon from '@mui/icons-material/CheckOutlined';
-import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
-import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
-import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
 import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DeliveryLocationValue } from '@/components/digital-menu/CheckoutDeliveryAddressPicker';
 import { DispatchDeliveryAddressPicker } from '@/components/dispatch/DispatchDeliveryAddressPicker';
 import { DispatchRecentRequests } from '@/components/dispatch/DispatchRecentRequests';
+import { DispatchRequestSuccess } from '@/components/dispatch/DispatchRequestSuccess';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
 import { FormSelect } from '@/components/ui/FormSelect';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -42,7 +38,6 @@ import {
 } from '@/lib/dispatch/useRestaurantDispatchEvents';
 import { isActiveDeliveryPartnership } from '@/lib/fetchActiveDeliveryProviderConfig';
 import { DEFAULT_COUNTRY_ISO, findCountryByIso, formatE164 } from '@/lib/phone/countryDialCodes';
-import { publicMenuOrigin } from '@/lib/restaurantSubdomain';
 import { syncRestaurantDeliveryPartnership } from '@/lib/syncDeliveryPartnership';
 import styles from './DeliveryPage.module.css';
 
@@ -87,15 +82,6 @@ const LIVE_COPY: Record<
   },
 };
 
-function shareTrackingWhatsApp(shortId: string, url: string) {
-  const text = `Rastrea tu entrega ${shortId}\n${url}`;
-  window.open(
-    `https://wa.me/?text=${encodeURIComponent(text)}`,
-    '_blank',
-    'noopener,noreferrer',
-  );
-}
-
 export default function DeliveryPage() {
   const { accessToken, loading: authLoading } = useAuth();
   const { selectedRestaurantId, loading: accessLoading } = useRestaurantAccess();
@@ -130,7 +116,6 @@ export default function DeliveryPage() {
   const [phoneLocal, setPhoneLocal] = useState('');
   const [notes, setNotes] = useState('');
   const [formExpanded, setFormExpanded] = useState(true);
-  const [copiedTracking, setCopiedTracking] = useState(false);
   const [socketStatus, setSocketStatus] = useState<RestaurantDispatchStreamStatus>('offline');
   const [listView, setListView] = useState<'active' | 'history'>('active');
   const didInitFormCollapse = useRef(false);
@@ -296,14 +281,6 @@ export default function DeliveryPage() {
     return () => window.cancelAnimationFrame(frame);
   }, [accessLoading, accessToken, authLoading, load, selectedRestaurantId]);
 
-  const trackingUrl = useMemo(
-    () =>
-      created && subdomain
-        ? `${publicMenuOrigin(subdomain)}/rastreo/${created.tracking_token}`
-        : null,
-    [created, subdomain],
-  );
-
   const activeRequests = useMemo(
     () => requests.filter((item) => !isDispatchHistoryStatus(item.status)),
     [requests],
@@ -312,7 +289,6 @@ export default function DeliveryPage() {
     () => requests.filter((item) => isDispatchHistoryStatus(item.status)),
     [requests],
   );
-  const createdIsOpen = created != null && !isDispatchHistoryStatus(created.status);
   const liveCopy = LIVE_COPY[socketStatus];
   const liveDotClass =
     liveCopy.tone === 'live'
@@ -333,7 +309,11 @@ export default function DeliveryPage() {
   const packageSizeOptions = useMemo(
     () => [
       { value: 'normal', label: 'Normal' },
-      { value: 'grande', label: 'Grande' },
+      {
+        value: 'grande',
+        label: 'Grande',
+        description: 'Solo paquetes del tamaño de una caja de pizza',
+      },
     ],
     [],
   );
@@ -435,7 +415,6 @@ export default function DeliveryPage() {
         notes: notes.trim() || null,
       });
       setCreated(row);
-      setCopiedTracking(false);
       setRequests((current) => [row, ...current]);
       setLocation(EMPTY_LOCATION);
       setMapsUrl(null);
@@ -501,17 +480,6 @@ export default function DeliveryPage() {
       if (ok) setConfirm(null);
     } finally {
       setConfirming(false);
-    }
-  }
-
-  async function copyCreatedTracking() {
-    if (!trackingUrl) return;
-    try {
-      await navigator.clipboard.writeText(trackingUrl);
-      setCopiedTracking(true);
-      window.setTimeout(() => setCopiedTracking(false), 2000);
-    } catch {
-      window.prompt('Copia el enlace de rastreo', trackingUrl);
     }
   }
 
@@ -864,76 +832,12 @@ export default function DeliveryPage() {
         </div>
       </section>
 
-      {createdIsOpen && trackingUrl ? (
-        <section className={styles.success} aria-live="polite">
-          <div className={styles.successMark} aria-hidden>
-            <CheckOutlinedIcon fontSize="small" />
-          </div>
-          <div className={styles.successBody}>
-            <div className={styles.successHeading}>
-              <h2>Pedido {formatDispatchShortId(created.short_id)} solicitado</h2>
-              <button
-                type="button"
-                className={styles.successDismiss}
-                aria-label="Cerrar aviso"
-                onClick={() => setCreated(null)}
-              >
-                <CloseOutlinedIcon sx={{ fontSize: 18 }} />
-              </button>
-            </div>
-            <p className={styles.successMeta}>
-              Búsqueda{' '}
-              {new Date(created.search_at).toLocaleString('es-MX', {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              })}
-            </p>
-            <p className={styles.successCosts}>
-              {created.payment_method === 'transfer' ? (
-                <span>Envío {formatMoney(created.quoted_fee_cents / 100, 'MXN')}</span>
-              ) : (
-                <>
-                  <span>Restaurante {formatMoney(created.collect_cents / 100, 'MXN')}</span>
-                  <span aria-hidden>·</span>
-                  <span>Envío {formatMoney(created.quoted_fee_cents / 100, 'MXN')}</span>
-                </>
-              )}
-            </p>
-            <div className={styles.successActions}>
-              <button
-                type="button"
-                className={styles.successAction}
-                onClick={() => void copyCreatedTracking()}
-              >
-                {copiedTracking ? (
-                  <CheckOutlinedIcon fontSize="small" />
-                ) : (
-                  <ContentCopyOutlinedIcon fontSize="small" />
-                )}
-                {copiedTracking ? 'Enlace copiado' : 'Copiar rastreo'}
-              </button>
-              <button
-                type="button"
-                className={`${styles.successAction} ${styles.successWhatsApp}`}
-                onClick={() =>
-                  shareTrackingWhatsApp(formatDispatchShortId(created.short_id), trackingUrl)
-                }
-              >
-                <WhatsAppIcon fontSize="small" />
-                WhatsApp
-              </button>
-              <a
-                className={styles.successAction}
-                href={trackingUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <OpenInNewOutlinedIcon sx={{ fontSize: 16 }} aria-hidden />
-                Abrir rastreo
-              </a>
-            </div>
-          </div>
-        </section>
+      {created && subdomain ? (
+        <DispatchRequestSuccess
+          request={created}
+          subdomain={subdomain}
+          onDismiss={() => setCreated(null)}
+        />
       ) : null}
 
       <div className={styles.listTabs} role="tablist" aria-label="Solicitudes de delivery">
