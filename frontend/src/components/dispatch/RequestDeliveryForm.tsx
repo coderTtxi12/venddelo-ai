@@ -56,6 +56,7 @@ export function RequestDeliveryForm({
   submitLabel = 'Solicitar repartidor',
   resetOnSuccess = true,
   onCreated,
+  onSubmittingChange,
 }: {
   accessToken: string;
   restaurantId: string;
@@ -67,6 +68,7 @@ export function RequestDeliveryForm({
   submitLabel?: string;
   resetOnSuccess?: boolean;
   onCreated: (request: DispatchRequest) => void | Promise<void>;
+  onSubmittingChange?: (submitting: boolean) => void;
 }) {
   const [location, setLocation] = useState<DeliveryLocationValue>(() =>
     valuesToLocation(initialValues),
@@ -141,6 +143,10 @@ export function RequestDeliveryForm({
     },
     [accessToken, restaurantId],
   );
+
+  useEffect(() => {
+    onSubmittingChange?.(submitting);
+  }, [onSubmittingChange, submitting]);
 
   useEffect(() => {
     setPrepSelection((current) => {

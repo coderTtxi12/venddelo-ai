@@ -5,7 +5,7 @@ import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   formatDispatchShortId,
   isDispatchHistoryStatus,
@@ -35,6 +35,10 @@ export function DispatchRequestSuccess({
 }) {
   const [copiedTracking, setCopiedTracking] = useState(false);
   const trackingUrl = `${publicMenuOrigin(subdomain)}/rastreo/${request.tracking_token}`;
+
+  useEffect(() => {
+    setCopiedTracking(false);
+  }, [request.id, request.short_id]);
   const isOpen = !isDispatchHistoryStatus(request.status);
 
   const searchLabel = useMemo(
