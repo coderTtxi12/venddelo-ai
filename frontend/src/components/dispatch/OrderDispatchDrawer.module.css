@@ -58,6 +58,11 @@
   min-height: 44px;
 }
 
+.closeBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .body {
   padding: 1rem;
   overflow: auto;
