@@ -253,6 +253,16 @@
   padding: 2rem;
 }
 
+.serviceAlert {
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fef2f2;
+  padding: 0.75rem 0.9rem;
+  color: #b91c1c;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
 @media (max-width: 760px) {
   .listTab {
     min-height: 44px;

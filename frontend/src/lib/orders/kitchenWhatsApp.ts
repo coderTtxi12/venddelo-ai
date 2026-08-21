@@ -14,15 +14,6 @@ export function buildOrderGoogleMapsUrl(order: Order): string | null {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
-export function buildOrderAcceptedWhatsAppMessage(order: Order): string {
-  const ref = formatOrderDisplayId(order);
-  return [
-    `¡Hola ${order.customer_name}! 👋`,
-    `Tu pedido #${ref} fue *aceptado* y ya lo estamos preparando. 🍳`,
-    '¡Gracias por tu preferencia!',
-  ].join('\n');
-}
-
 export function buildOrderCancelledWhatsAppMessage(order: Order, reason: string): string {
   const ref = formatOrderDisplayId(order);
   return [

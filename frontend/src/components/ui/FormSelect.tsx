@@ -8,6 +8,7 @@ import styles from './FormSelect.module.css';
 export type FormSelectOption = {
   value: string;
   label: string;
+  description?: string;
   disabled?: boolean;
 };
 
@@ -19,6 +20,7 @@ type FormSelectProps = {
   disabled?: boolean;
   placeholder?: string;
   'aria-labelledby'?: string;
+  'aria-describedby'?: string;
 };
 
 export function FormSelect({
@@ -29,6 +31,7 @@ export function FormSelect({
   disabled = false,
   placeholder = 'Selecciona una opción',
   'aria-labelledby': ariaLabelledBy,
+  'aria-describedby': ariaDescribedBy,
 }: FormSelectProps) {
   const listId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -136,6 +139,7 @@ export function FormSelect({
         aria-expanded={open}
         aria-controls={listId}
         aria-labelledby={ariaLabelledBy}
+        aria-describedby={ariaDescribedBy}
         onClick={() => {
           if (disabled) return;
           setOpen((prev) => !prev);
@@ -182,7 +186,12 @@ export function FormSelect({
                     selectValue(option.value);
                   }}
                 >
-                  <span className={styles.optionLabel}>{option.label}</span>
+                  <span className={styles.optionCopy}>
+                    <span className={styles.optionLabel}>{option.label}</span>
+                    {option.description ? (
+                      <span className={styles.optionDescription}>{option.description}</span>
+                    ) : null}
+                  </span>
                   {selected ? <CheckOutlinedIcon sx={{ fontSize: 16 }} aria-hidden /> : null}
                 </button>
               </li>

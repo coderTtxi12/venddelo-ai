@@ -303,6 +303,12 @@ export default function DeliveryPage() {
 
       {error ? <div className={styles.error} role="alert">{error}</div> : null}
 
+      {!courierAvailable ? (
+        <div className={styles.serviceAlert} role="alert">
+          {courierReason ?? 'El servicio de reparto de Mexy no está disponible en este momento.'}
+        </div>
+      ) : null}
+
       <section
         className={`${styles.formSection} ${formExpanded ? styles.formSectionOpen : ''}`}
         aria-labelledby="new-delivery-title"
@@ -359,6 +365,7 @@ export default function DeliveryPage() {
 
       {created && subdomain ? (
         <DispatchRequestSuccess
+          key={created.short_id}
           request={created}
           subdomain={subdomain}
           onDismiss={() => setCreated(null)}

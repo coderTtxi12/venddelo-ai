@@ -94,11 +94,26 @@
   cursor: pointer;
 }
 
+.optionCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
 .optionLabel {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.optionDescription {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: normal;
 }
 
 .optionActive {
