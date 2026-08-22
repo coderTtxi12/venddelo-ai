@@ -91,6 +91,7 @@ class OrderDTO(BaseModel):
     cancellation_reason: str | None = None
     idempotency_key: str | None = None
     note: str | None = None
+    kds_cleared_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     items: list[OrderItemDTO] = []
