@@ -5,7 +5,14 @@ from fastapi import APIRouter, Depends, Query
 from app.api.deps import pagination_params, require_owned_restaurant
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
-from app.modules.orders.schemas import OrderDTO, OrderStatusSummaryDTO, OrderStatusUpdate
+from app.modules.orders.schemas import (
+    KitchenBoardClearResult,
+    OrderBulkStatusResult,
+    OrderBulkStatusUpdate,
+    OrderDTO,
+    OrderStatusSummaryDTO,
+    OrderStatusUpdate,
+)
 from app.modules.orders.service import OrderService
 from app.modules.restaurants.schemas import RestaurantDTO
 
@@ -29,8 +36,9 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> OrderService:
 def order_status_summary(
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: OrderService = Depends(_service),
+    board: str = Query(default="kitchen"),
 ) -> OrderStatusSummaryDTO:
-    return service.get_status_summary(restaurant.id)
+    return service.get_status_summary(restaurant.id, board=board)
 
 
 @router.get(
@@ -41,10 +49,45 @@ def list_orders(
     params: PaginationParams = Depends(pagination_params),
     status: str | None = Query(default=None),
     view: str | None = Query(default=None),
+    board: str = Query(default="kitchen"),
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: OrderService = Depends(_service),
 ) -> CursorPage[OrderDTO]:
-    return service.list_for_restaurant(restaurant.id, params, status=status, view=view)
+    return service.list_for_restaurant(
+        restaurant.id,
+        params,
+        status=status,
+        view=view,
+        board=board,
+    )
+
+
+@router.post(
+    "/restaurants/{restaurant_id}/orders/bulk-status",
+    response_model=OrderBulkStatusResult,
+)
+def update_orders_status_bulk(
+    body: OrderBulkStatusUpdate,
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: OrderService = Depends(_service),
+) -> OrderBulkStatusResult:
+    return service.update_status_bulk(
+        restaurant.id,
+        body.order_ids,
+        body.status,
+        body.cancellation_reason,
+    )
+
+
+@router.post(
+    "/restaurants/{restaurant_id}/orders/kds-clear",
+    response_model=KitchenBoardClearResult,
+)
+def clear_kitchen_closed_orders(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: OrderService = Depends(_service),
+) -> KitchenBoardClearResult:
+    return KitchenBoardClearResult(cleared_count=service.clear_closed_from_kds(restaurant.id))
 
 
 @router.get(
