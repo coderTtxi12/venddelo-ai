@@ -34,6 +34,10 @@ import {
 } from '@/lib/orders/orderStatus';
 import { sortOrdersNewestFirst } from '@/lib/orders/orderDisplay';
 import {
+  applyKitchenBoardCleared,
+  applyKitchenBoardClearedToSummary,
+} from '@/lib/orders/kitchenBoard';
+import {
   applyKitchenOrderSocketEvent,
   type KitchenSocketConnectionStatus,
   useKitchenOrdersSocket,
@@ -59,6 +63,7 @@ type RestaurantOrdersContextValue = {
   refreshOrders: () => void;
   loadMoreOrders: () => void;
   replaceOrder: (order: Order) => void;
+  applyBoardCleared: () => void;
 };
 
 const RestaurantOrdersContext = createContext<RestaurantOrdersContextValue | null>(null);
@@ -295,6 +300,11 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
       if (selectedRestaurantId) {
         invalidateKitchenOrdersCache(selectedRestaurantId);
       }
+      if (event.type === 'kitchen.board_cleared') {
+        setStatusSummary((summary) => applyKitchenBoardClearedToSummary(summary));
+        setOrders((current) => applyKitchenBoardCleared(current));
+        return;
+      }
       setOrders((current) => {
         alertNewOrder(event, current);
         const previous = current.find((order) => order.id === event.order.id) ?? null;
@@ -340,7 +350,7 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
         const next = sortOrdersNewestFirst(
           current.map((row) => (row.id === order.id ? order : row)),
         );
-        if (!matchesOrderStatusFilter(order.status, kitchenFilterRef.current)) {
+        if (order.kds_cleared_at || !matchesOrderStatusFilter(order.status, kitchenFilterRef.current)) {
           return next.filter((row) => row.id !== order.id);
         }
         return next;
@@ -348,6 +358,14 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
     },
     [commitSummaryTransition, selectedRestaurantId],
   );
+
+  const applyBoardCleared = useCallback(() => {
+    if (selectedRestaurantId) {
+      invalidateKitchenOrdersCache(selectedRestaurantId);
+    }
+    setStatusSummary((summary) => applyKitchenBoardClearedToSummary(summary));
+    setOrders((current) => applyKitchenBoardCleared(current));
+  }, [selectedRestaurantId]);
 
   useEffect(() => {
     if (!selectedRestaurantId) return;
@@ -377,6 +395,7 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
         void loadMoreOrders();
       },
       replaceOrder,
+      applyBoardCleared,
     }),
     [
       selectedRestaurantId,
@@ -397,6 +416,7 @@ export function RestaurantOrdersProvider({ children }: { children: ReactNode }) 
       refreshOrders,
       loadMoreOrders,
       replaceOrder,
+      applyBoardCleared,
     ],
   );
 
