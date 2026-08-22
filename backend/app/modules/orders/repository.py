@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from app.core.pagination import CursorPage, PaginationParams
 from app.modules.orders.schemas import OrderCreate, OrderDTO, OrderStatusSummaryDTO
@@ -22,10 +23,16 @@ class OrderRepository(ABC):
         *,
         status: str | None = None,
         view: str | None = None,
+        board: str = "kitchen",
     ) -> CursorPage[OrderDTO]: ...
 
     @abstractmethod
-    def status_summary(self, restaurant_id: uuid.UUID) -> OrderStatusSummaryDTO: ...
+    def status_summary(
+        self,
+        restaurant_id: uuid.UUID,
+        *,
+        board: str = "kitchen",
+    ) -> OrderStatusSummaryDTO: ...
 
     @abstractmethod
     def update_status(
