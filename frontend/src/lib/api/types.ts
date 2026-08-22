@@ -312,6 +312,7 @@ export type Order = {
   cancellation_reason: string | null;
   idempotency_key: string | null;
   note: string | null;
+  kds_cleared_at: string | null;
   created_at: string;
   updated_at: string;
   items: OrderItem[];
