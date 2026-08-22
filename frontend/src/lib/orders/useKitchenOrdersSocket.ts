@@ -12,7 +12,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api/v1
 
 export type KitchenOrderSocketEvent =
   | { type: 'order.created'; order: Order }
-  | { type: 'order.updated'; order: Order };
+  | { type: 'order.updated'; order: Order }
+  | { type: 'kitchen.board_cleared'; cleared_count: number };
 
 export type KitchenSocketConnectionStatus = 'connecting' | 'live' | 'reconnecting' | 'offline';
 
@@ -33,8 +34,14 @@ export function applyKitchenOrderSocketEvent(
   event: KitchenOrderSocketEvent,
   filter?: OrderStatusFilter,
 ): Order[] {
+  if (event.type === 'kitchen.board_cleared') {
+    return current.filter((order) => order.status !== 'delivered' && order.status !== 'cancelled');
+  }
   const incoming = event.order;
   const without = current.filter((order) => order.id !== incoming.id);
+  if (incoming.kds_cleared_at) {
+    return without;
+  }
   if (filter && !matchesOrderStatusFilter(incoming.status, filter)) {
     return without;
   }
@@ -90,7 +97,13 @@ export function useKitchenOrdersSocket(
       socket.onmessage = (message) => {
         try {
           const payload = JSON.parse(String(message.data)) as KitchenOrderSocketEvent;
-          if (payload.type !== 'order.created' && payload.type !== 'order.updated') return;
+          if (
+            payload.type !== 'order.created' &&
+            payload.type !== 'order.updated' &&
+            payload.type !== 'kitchen.board_cleared'
+          ) {
+            return;
+          }
           onEventRef.current(payload);
         } catch (error) {
           console.warn('kitchen orders ws parse error', error);
