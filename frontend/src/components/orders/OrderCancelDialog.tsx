@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import CloseIcon from '@mui/icons-material/Close';
 import styles from './OrderCancelDialog.module.css';
 import { KITCHEN_CANCEL_REASONS, type KitchenCancelReason } from '@/lib/orders/kitchenWhatsApp';
@@ -17,10 +18,31 @@ export function OrderCancelDialog({
   onConfirm: (reason: KitchenCancelReason) => void;
   confirming: boolean;
 }) {
+  const [selectedReason, setSelectedReason] = useState<KitchenCancelReason | null>(null);
+
+  useEffect(() => {
+    if (!open) setSelectedReason(null);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape' && !confirming) onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [confirming, onClose, open]);
+
   if (!open) return null;
 
   return (
-    <div className={styles.overlay} role="presentation" onClick={onClose}>
+    <div
+      className={styles.overlay}
+      role="presentation"
+      onClick={() => {
+        if (!confirming) onClose();
+      }}
+    >
       <div
         className={styles.dialog}
         role="dialog"
