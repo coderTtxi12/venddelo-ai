@@ -86,9 +86,67 @@
   background: color-mix(in srgb, var(--order-pending, #dc2626) 6%, var(--color-surface));
 }
 
+.reasonBtnSelected,
+.reasonBtnSelected:hover:not(:disabled) {
+  border-color: var(--order-pending, #dc2626);
+  background: color-mix(in srgb, var(--order-pending, #dc2626) 10%, var(--color-surface));
+  color: var(--color-text);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--order-pending, #dc2626) 35%, transparent);
+}
+
 .reasonBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.reasonBtn:focus-visible,
+.closeBtn:focus-visible,
+.confirmBtn:focus-visible {
+  outline: 2px solid var(--order-pending, #dc2626);
+  outline-offset: 2px;
+}
+
+.confirmFooter {
+  margin-top: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.confirmHint {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.confirmBtn {
+  min-height: 48px;
+  border: none;
+  border-radius: 12px;
+  background: #b91c1c;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.75rem 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.confirmBtn:hover:not(:disabled) {
+  background: #991b1b;
+}
+
+.confirmBtn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reasonBtn,
+  .confirmBtn {
+    transition: none;
+  }
 }
 
 @media (min-width: 768px) {
