@@ -57,3 +57,31 @@ export function updateRestaurantOrderStatus(
     },
   });
 }
+
+export function updateRestaurantOrdersStatusBulk(
+  token: string,
+  restaurantId: string,
+  orderIds: string[],
+  status: OrderStatus,
+  cancellationReason?: string | null,
+) {
+  return apiRequest<{ items: Order[]; updated_count: number }>(
+    `/restaurants/${restaurantId}/orders/bulk-status`,
+    {
+      method: 'POST',
+      token,
+      body: {
+        order_ids: orderIds,
+        status,
+        cancellation_reason: cancellationReason ?? undefined,
+      },
+    },
+  );
+}
+
+export function clearKitchenClosedOrders(token: string, restaurantId: string) {
+  return apiRequest<{ cleared_count: number }>(`/restaurants/${restaurantId}/orders/kds-clear`, {
+    method: 'POST',
+    token,
+  });
+}
