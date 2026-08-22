@@ -4,6 +4,7 @@ import type { CursorPage, Order, OrderStatus, OrderStatusSummary } from './types
 export type KitchenOrdersListQuery = {
   status?: OrderStatus;
   view?: 'active' | 'archive';
+  board?: 'kitchen' | 'history';
 };
 
 export function listRestaurantOrders(
@@ -17,13 +18,21 @@ export function listRestaurantOrders(
   if (cursor) params.set('cursor', cursor);
   if (query?.status) params.set('status', query.status);
   if (query?.view) params.set('view', query.view);
+  if (query?.board) params.set('board', query.board);
   return apiRequest<CursorPage<Order>>(`/restaurants/${restaurantId}/orders?${params}`, {
     token,
   });
 }
 
-export function getRestaurantOrderSummary(token: string, restaurantId: string) {
-  return apiRequest<OrderStatusSummary>(`/restaurants/${restaurantId}/orders/summary`, {
+export function getRestaurantOrderSummary(
+  token: string,
+  restaurantId: string,
+  board?: 'kitchen' | 'history',
+) {
+  const params = new URLSearchParams();
+  if (board) params.set('board', board);
+  const suffix = params.size ? `?${params}` : '';
+  return apiRequest<OrderStatusSummary>(`/restaurants/${restaurantId}/orders/summary${suffix}`, {
     token,
   });
 }
