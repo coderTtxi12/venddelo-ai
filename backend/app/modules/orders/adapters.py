@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
-from sqlalchemy import func, select, tuple_
+from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.pagination import (
@@ -47,6 +48,7 @@ class SqlAlchemyOrderRepository(OrderRepository):
         *,
         status: str | None = None,
         view: str | None = None,
+        board: str = "kitchen",
     ) -> CursorPage[OrderDTO]:
         stmt = (
             select(Order)
@@ -55,12 +57,18 @@ class SqlAlchemyOrderRepository(OrderRepository):
             .order_by(Order.created_at.desc(), Order.id.desc())
             .limit(params.limit + 1)
         )
-        if status is not None:
-            stmt = stmt.where(Order.status == status)
-        elif view == "active":
-            stmt = stmt.where(Order.status.in_(ACTIVE_ORDER_STATUSES))
-        elif view == "archive":
+        if board == "history":
             stmt = stmt.where(Order.status.in_(ARCHIVE_ORDER_STATUSES))
+            if status is not None:
+                stmt = stmt.where(Order.status == status)
+        else:
+            stmt = stmt.where(Order.kds_cleared_at.is_(None))
+            if status is not None:
+                stmt = stmt.where(Order.status == status)
+            elif view == "active":
+                stmt = stmt.where(Order.status.in_(ACTIVE_ORDER_STATUSES))
+            elif view == "archive":
+                stmt = stmt.where(Order.status.in_(ARCHIVE_ORDER_STATUSES))
         if params.cursor:
             created_at, last_id = decode_keyset_cursor(params.cursor)
             stmt = stmt.where(tuple_(Order.created_at, Order.id) < (created_at, last_id))
@@ -74,12 +82,18 @@ class SqlAlchemyOrderRepository(OrderRepository):
             has_more=has_more,
         )
 
-    def status_summary(self, restaurant_id: uuid.UUID) -> OrderStatusSummaryDTO:
-        rows = self._session.execute(
-            select(Order.status, func.count())
-            .where(Order.restaurant_id == restaurant_id)
-            .group_by(Order.status)
-        ).all()
+    def status_summary(
+        self,
+        restaurant_id: uuid.UUID,
+        *,
+        board: str = "kitchen",
+    ) -> OrderStatusSummaryDTO:
+        stmt = select(Order.status, func.count()).where(Order.restaurant_id == restaurant_id)
+        if board == "history":
+            stmt = stmt.where(Order.status.in_(ARCHIVE_ORDER_STATUSES))
+        else:
+            stmt = stmt.where(Order.kds_cleared_at.is_(None))
+        rows = self._session.execute(stmt.group_by(Order.status)).all()
         counts = {status: count for status, count in rows}
         pending = int(counts.get("pending", 0))
         confirmed = int(counts.get("confirmed", 0))
