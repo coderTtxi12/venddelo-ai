@@ -73,6 +73,14 @@ const STATIC_ITEMS: Omit<DashboardSearchItem, 'score'>[] = [
     href: '/orders',
   },
   {
+    id: 'page:history',
+    kind: 'page',
+    title: 'Historial',
+    subtitle: 'Pedidos entregados y cancelados',
+    keywords: ['historial', 'history', 'cerrados', 'entregados', 'cancelados', 'turno', 'cocina'],
+    href: '/history',
+  },
+  {
     id: 'page:products',
     kind: 'page',
     title: 'Productos',
