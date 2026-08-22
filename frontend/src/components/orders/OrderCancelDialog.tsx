@@ -57,26 +57,59 @@ export function OrderCancelDialog({
             </h2>
             <p className={styles.subtitle}>{orderLabel}</p>
           </div>
-          <button type="button" className={styles.closeBtn} aria-label="Cerrar" onClick={onClose}>
+          <button
+            type="button"
+            className={styles.closeBtn}
+            aria-label="Cerrar"
+            disabled={confirming}
+            onClick={onClose}
+          >
             <CloseIcon fontSize="small" />
           </button>
         </header>
 
-        <p className={styles.prompt}>Elige el motivo para el cliente:</p>
+        <p className={styles.prompt} id="cancel-reason-prompt">
+          Elige el motivo. Revisa y confirma para no cancelar por error.
+        </p>
 
-        <div className={styles.reasonList}>
-          {KITCHEN_CANCEL_REASONS.map((reason) => (
-            <button
-              key={reason}
-              type="button"
-              className={styles.reasonBtn}
-              disabled={confirming}
-              onClick={() => onConfirm(reason)}
-            >
-              {reason}
-            </button>
-          ))}
+        <div
+          className={styles.reasonList}
+          role="radiogroup"
+          aria-labelledby="cancel-reason-prompt"
+        >
+          {KITCHEN_CANCEL_REASONS.map((reason) => {
+            const selected = selectedReason === reason;
+            return (
+              <button
+                key={reason}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                className={`${styles.reasonBtn}${selected ? ` ${styles.reasonBtnSelected}` : ''}`}
+                disabled={confirming}
+                onClick={() => setSelectedReason(reason)}
+              >
+                {reason}
+              </button>
+            );
+          })}
         </div>
+
+        {selectedReason ? (
+          <div className={styles.confirmFooter}>
+            <p className={styles.confirmHint}>
+              El pedido se cancelará por «{selectedReason}». Esta acción no se puede deshacer.
+            </p>
+            <button
+              type="button"
+              className={styles.confirmBtn}
+              disabled={confirming}
+              onClick={() => onConfirm(selectedReason)}
+            >
+              {confirming ? 'Cancelando…' : 'Confirmar cancelación'}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
