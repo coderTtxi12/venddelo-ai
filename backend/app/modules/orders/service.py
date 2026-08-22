@@ -291,6 +291,43 @@ class OrderService:
         self._publish_order_event(restaurant_id, "order.updated", dto)
         return dto
 
+    def update_status_bulk(
+        self,
+        restaurant_id: uuid.UUID,
+        order_ids: list[uuid.UUID],
+        status: str,
+        cancellation_reason: str | None = None,
+    ) -> OrderBulkStatusResult:
+        unique_ids = list(dict.fromkeys(order_ids))
+        if not unique_ids:
+            raise ValidationError("order_ids is required")
+        if len(unique_ids) > KITCHEN_BULK_STATUS_LIMIT:
+            raise ValidationError(f"Cannot update more than {KITCHEN_BULK_STATUS_LIMIT} orders")
+        orders = [self.get(restaurant_id, order_id) for order_id in unique_ids]
+        for order in orders:
+            allowed = _STATUS_TRANSITIONS.get(order.status, set())
+            if status not in allowed:
+                raise ValidationError(f"Cannot transition from {order.status} to {status}")
+        if status == "cancelled":
+            reason = (cancellation_reason or "").strip()
+            if not reason:
+                raise ValidationError("cancellation_reason is required when cancelling an order")
+            cancellation_reason = reason
+        updated = [
+            self.update_status(restaurant_id, order.id, status, cancellation_reason)
+            for order in orders
+        ]
+        return OrderBulkStatusResult(items=updated, updated_count=len(updated))
+
+    def clear_closed_from_kds(self, restaurant_id: uuid.UUID) -> int:
+        cleared_count = self._orders.clear_closed_from_kds(restaurant_id)
+        if cleared_count:
+            get_order_realtime_hub().publish_sync(
+                restaurant_id,
+                {"type": "kitchen.board_cleared", "cleared_count": cleared_count},
+            )
+        return cleared_count
+
     def _validate_payment_method(
         self,
         restaurant: RestaurantDTO,
