@@ -130,6 +130,24 @@ class SqlAlchemyOrderRepository(OrderRepository):
         self._session.flush()
         return OrderDTO.model_validate(obj)
 
+    def clear_closed_from_kds(
+        self,
+        restaurant_id: uuid.UUID,
+        *,
+        cleared_at: datetime | None = None,
+    ) -> int:
+        stamped = cleared_at or datetime.now(UTC)
+        result = self._session.execute(
+            update(Order)
+            .where(
+                Order.restaurant_id == restaurant_id,
+                Order.status.in_(ARCHIVE_ORDER_STATUSES),
+                Order.kds_cleared_at.is_(None),
+            )
+            .values(kds_cleared_at=stamped)
+        )
+        return int(result.rowcount or 0)
+
     def get_by_idempotency_key(self, restaurant_id: uuid.UUID, key: str) -> OrderDTO | None:
         obj = self._session.scalar(
             select(Order).where(
