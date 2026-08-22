@@ -1,8 +1,10 @@
 import uuid
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
+    DateTime,
     Float,
     ForeignKey,
     Index,
@@ -57,6 +59,9 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=True,
     )
     cash_denomination_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    kds_cleared_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order", cascade="all, delete-orphan"
@@ -73,6 +78,7 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="order_status_allowed",
         ),
         Index("ix_orders_listing", "restaurant_id", "status", "created_at"),
+        Index("ix_orders_kds_cleared_at", "restaurant_id", "kds_cleared_at"),
     )
 
 
