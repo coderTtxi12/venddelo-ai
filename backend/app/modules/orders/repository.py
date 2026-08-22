@@ -44,4 +44,12 @@ class OrderRepository(ABC):
     ) -> OrderDTO | None: ...
 
     @abstractmethod
+    def clear_closed_from_kds(
+        self,
+        restaurant_id: uuid.UUID,
+        *,
+        cleared_at: datetime | None = None,
+    ) -> int: ...
+
+    @abstractmethod
     def get_by_idempotency_key(self, restaurant_id: uuid.UUID, key: str) -> OrderDTO | None: ...
