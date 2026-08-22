@@ -33,6 +33,7 @@ function baseOrder(overrides: Partial<Order> = {}): Order {
     cancellation_reason: null,
     idempotency_key: null,
     note: null,
+    kds_cleared_at: null,
     created_at: '2026-08-20T12:00:00Z',
     updated_at: '2026-08-20T12:00:00Z',
     items: [],
