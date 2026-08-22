@@ -152,3 +152,47 @@ def test_get_by_idempotency_key(session):
     repo.add(_order(r.id, idempotency_key="abc"))
     assert repo.get_by_idempotency_key(r.id, "abc") is not None
     assert repo.get_by_idempotency_key(r.id, "missing") is None
+
+
+@requires_db
+def test_kitchen_list_and_summary_hide_cleared_closed_orders(session):
+    r = _restaurant(session, "ord-kds-1")
+    repo = SqlAlchemyOrderRepository(session)
+    repo.add(_order(r.id, status="pending"))
+    delivered = repo.add(_order(r.id, status="delivered"))
+    repo.add(_order(r.id, status="cancelled"))
+
+    cleared = repo.clear_closed_from_kds(r.id)
+    assert cleared == 2
+    assert repo.get(delivered.id).kds_cleared_at is not None
+
+    kitchen = repo.list_by_restaurant(r.id, PaginationParams(limit=10), board="kitchen")
+    history = repo.list_by_restaurant(r.id, PaginationParams(limit=10), board="history")
+    summary = repo.status_summary(r.id, board="kitchen")
+    history_summary = repo.status_summary(r.id, board="history")
+
+    assert [item.status for item in kitchen.items] == ["pending"]
+    assert {item.status for item in history.items} == {"delivered", "cancelled"}
+    assert summary.pending == 1
+    assert summary.delivered == 0
+    assert summary.cancelled == 0
+    assert summary.active == 1
+    assert summary.total == 1
+    assert history_summary.delivered == 1
+    assert history_summary.cancelled == 1
+    assert history_summary.total == 2
+    assert history_summary.active == 0
+
+
+@requires_db
+def test_clear_closed_from_kds_skips_active_and_already_cleared(session):
+    r = _restaurant(session, "ord-kds-2")
+    repo = SqlAlchemyOrderRepository(session)
+    repo.add(_order(r.id, status="preparing"))
+    repo.add(_order(r.id, status="delivered"))
+
+    assert repo.clear_closed_from_kds(r.id) == 1
+    assert repo.clear_closed_from_kds(r.id) == 0
+
+    kitchen = repo.list_by_restaurant(r.id, PaginationParams(limit=10), board="kitchen")
+    assert [item.status for item in kitchen.items] == ["preparing"]
