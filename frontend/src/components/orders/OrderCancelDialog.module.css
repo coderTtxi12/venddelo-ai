@@ -78,7 +78,7 @@
   text-align: left;
   padding: 0.75rem 0.9rem;
   cursor: pointer;
-  transition: border-color 0.18s ease, background 0.18s ease;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
 .reasonBtn:hover:not(:disabled) {
