@@ -122,6 +122,21 @@ class OrderStatusUpdate(BaseModel):
     cancellation_reason: str | None = None
 
 
+class OrderBulkStatusUpdate(BaseModel):
+    order_ids: list[uuid.UUID]
+    status: str
+    cancellation_reason: str | None = None
+
+
+class OrderBulkStatusResult(BaseModel):
+    items: list[OrderDTO]
+    updated_count: int
+
+
+class KitchenBoardClearResult(BaseModel):
+    cleared_count: int
+
+
 class OrderStatusSummaryDTO(BaseModel):
     pending: int = 0
     confirmed: int = 0
