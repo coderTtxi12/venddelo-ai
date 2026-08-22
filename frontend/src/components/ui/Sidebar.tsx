@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
+import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
@@ -34,6 +35,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Órdenes', path: '/orders', icon: <ShoppingBagOutlinedIcon fontSize="small" /> },
+  { label: 'Historial', path: '/history', icon: <HistoryOutlinedIcon fontSize="small" /> },
   { label: 'Productos', path: '/products', icon: <Inventory2OutlinedIcon fontSize="small" /> },
   { label: 'Menú Digital', path: '/digital-menu', icon: <QrCode2OutlinedIcon fontSize="small" /> },
   { label: 'Horario', path: '/hours', icon: <AccessTimeOutlinedIcon fontSize="small" /> },
