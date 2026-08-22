@@ -1,5 +1,4 @@
 import type { Order } from '@/lib/api/types';
-import { formatOrderDisplayId } from '@/lib/orders/orderDisplay';
 
 export function buildOrderGoogleMapsUrl(order: Order): string | null {
   if (order.type !== 'delivery') return null;
@@ -12,34 +11,6 @@ export function buildOrderGoogleMapsUrl(order: Order): string | null {
   if (!address) return null;
 
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-}
-
-export function buildOrderCancelledWhatsAppMessage(order: Order, reason: string): string {
-  const ref = formatOrderDisplayId(order);
-  return [
-    `Hola ${order.customer_name}, lamentamos informarte que tu pedido #${ref} no pudo ser aceptado. 😔`,
-    `Motivo: ${reason}`,
-    'Si tienes dudas, escríbenos por aquí. ¡Gracias por tu comprensión!',
-  ].join('\n');
-}
-
-import { isLegacyWhatsAppPendingPhone } from '@/lib/digital-menu/checkout/customerPhone';
-
-/** Opens WhatsApp in a new tab with a prefilled customer message. */
-export function openCustomerWhatsAppMessage(phone: string | null | undefined, message: string): void {
-  const digits = phone?.replace(/\D/g, '') ?? '';
-  const hasCustomerPhone = digits.length >= 10 && !isLegacyWhatsAppPendingPhone(phone ?? '');
-  const url = hasCustomerPhone
-    ? `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
-    : `https://wa.me/?text=${encodeURIComponent(message)}`;
-
-  const link = document.createElement('a');
-  link.href = url;
-  link.target = '_blank';
-  link.rel = 'noopener noreferrer';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
 }
 
 export const KITCHEN_CANCEL_REASONS = [
