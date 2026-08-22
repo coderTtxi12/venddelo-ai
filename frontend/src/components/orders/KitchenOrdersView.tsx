@@ -43,11 +43,7 @@ import { OrderCancelDialog } from '@/components/orders/OrderCancelDialog';
 import { kitchenConfirmOpensDispatch } from '@/lib/orders/kitchenDispatch';
 import { KitchenLiveIndicator } from '@/components/orders/KitchenLiveIndicator';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
-import {
-  buildOrderCancelledWhatsAppMessage,
-  openCustomerWhatsAppMessage,
-  type KitchenCancelReason,
-} from '@/lib/orders/kitchenWhatsApp';
+import { type KitchenCancelReason } from '@/lib/orders/kitchenWhatsApp';
 import { formatOrderCustomerPhone } from '@/lib/digital-menu/checkout/customerPhone';
 import styles from './OrdersKitchen.module.css';
 
@@ -678,10 +674,6 @@ export function KitchenOrdersView() {
     const updated = await patchOrder(selectedOrder.id, 'cancelled', reason);
     if (!updated) return;
     setCancelDialogOpen(false);
-    openCustomerWhatsAppMessage(
-      updated.customer_phone,
-      buildOrderCancelledWhatsAppMessage(updated, reason),
-    );
   };
 
   if (loading) {
