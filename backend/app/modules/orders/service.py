@@ -10,10 +10,16 @@ from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.core.idempotency import IdempotencyRepository
 from app.core.pagination import CursorPage, PaginationParams
 from app.modules.menu.repository import MenuRepository
-from app.modules.orders.constants import KITCHEN_ORDER_VIEWS
+from app.modules.orders.constants import (
+    ARCHIVE_ORDER_STATUSES,
+    KITCHEN_BULK_STATUS_LIMIT,
+    KITCHEN_ORDER_BOARDS,
+    KITCHEN_ORDER_VIEWS,
+)
 from app.modules.orders.repository import OrderRepository
 from app.modules.orders.schemas import (
     AppliedDiscountSnapshot,
+    OrderBulkStatusResult,
     OrderCreate,
     OrderDTO,
     OrderItemCreate,
@@ -222,20 +228,36 @@ class OrderService:
         *,
         status: str | None = None,
         view: str | None = None,
+        board: str = "kitchen",
     ) -> CursorPage[OrderDTO]:
+        if board not in KITCHEN_ORDER_BOARDS:
+            raise ValidationError(f"Unsupported board: {board}")
         if status is not None and view is not None:
             raise ValidationError("Use either status or view, not both")
         if view is not None and view not in KITCHEN_ORDER_VIEWS:
             raise ValidationError(f"Unsupported view: {view}")
+        if board == "history":
+            if view == "active":
+                raise ValidationError("History only includes closed orders")
+            if status is not None and status not in ARCHIVE_ORDER_STATUSES:
+                raise ValidationError("History only includes delivered or cancelled orders")
         return self._orders.list_by_restaurant(
             restaurant_id,
             params,
             status=status,
             view=view,
+            board=board,
         )
 
-    def get_status_summary(self, restaurant_id: uuid.UUID) -> OrderStatusSummaryDTO:
-        return self._orders.status_summary(restaurant_id)
+    def get_status_summary(
+        self,
+        restaurant_id: uuid.UUID,
+        *,
+        board: str = "kitchen",
+    ) -> OrderStatusSummaryDTO:
+        if board not in KITCHEN_ORDER_BOARDS:
+            raise ValidationError(f"Unsupported board: {board}")
+        return self._orders.status_summary(restaurant_id, board=board)
 
     def get(self, restaurant_id: uuid.UUID, order_id: uuid.UUID) -> OrderDTO:
         dto = self._orders.get(order_id)
