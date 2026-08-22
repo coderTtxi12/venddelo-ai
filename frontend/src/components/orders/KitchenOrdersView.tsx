@@ -4,10 +4,16 @@ import { useEffect, useMemo, useState } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlined';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
+import CheckBoxOutlinedIcon from '@mui/icons-material/CheckBoxOutlined';
+import DoneAllOutlinedIcon from '@mui/icons-material/DoneAllOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
-import { updateRestaurantOrderStatus } from '@/lib/api/orders';
+import {
+  clearKitchenClosedOrders,
+  updateRestaurantOrderStatus,
+  updateRestaurantOrdersStatusBulk,
+} from '@/lib/api/orders';
 import type { Order, OrderItem, OrderStatus, Product, Promotion } from '@/lib/api/types';
 import {
   countOrderItems,
@@ -40,10 +46,15 @@ import { useKitchenOrderProducts } from '@/lib/orders/useKitchenOrderProducts';
 import { useKitchenOrdersInfiniteScroll } from '@/lib/orders/useKitchenOrdersInfiniteScroll';
 import { OrderDispatchDrawer } from '@/components/dispatch/OrderDispatchDrawer';
 import { OrderCancelDialog } from '@/components/orders/OrderCancelDialog';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { kitchenConfirmOpensDispatch } from '@/lib/orders/kitchenDispatch';
 import { KitchenLiveIndicator } from '@/components/orders/KitchenLiveIndicator';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { type KitchenCancelReason } from '@/lib/orders/kitchenWhatsApp';
+import {
+  kitchenBulkActions,
+  kitchenClosedCount,
+} from '@/lib/orders/kitchenBoard';
 import { formatOrderCustomerPhone } from '@/lib/digital-menu/checkout/customerPhone';
 import styles from './OrdersKitchen.module.css';
 
@@ -158,13 +169,19 @@ function OrderTypeIcon({ type }: { type: Order['type'] }) {
 function OrderTicketCard({
   order,
   selected,
+  checked,
+  selectable,
   now,
   onSelect,
+  onToggleSelect,
 }: {
   order: Order;
   selected: boolean;
+  checked: boolean;
+  selectable: boolean;
   now: number;
   onSelect: (orderId: string) => void;
+  onToggleSelect: (orderId: string) => void;
 }) {
   const itemCount = countOrderItems(order.items);
   const previewItems = order.items
@@ -174,14 +191,26 @@ function OrderTicketCard({
   const moreItems = order.items.length > 2 ? ` +${order.items.length - 2}` : '';
 
   return (
-    <button
-      type="button"
-      className={`${styles.ticket} ${selected ? styles.ticketSelected : ''} ${
-        order.status === 'pending' ? styles.ticketPending : ''
-      }`}
-      onClick={() => onSelect(order.id)}
-      aria-current={selected ? 'true' : undefined}
-    >
+    <div className={`${styles.ticketRow} ${selected ? styles.ticketRowCurrent : ''}`}>
+      {selectable ? (
+        <button
+          type="button"
+          className={`${styles.ticketCheck} ${checked ? styles.ticketCheckOn : ''}`}
+          aria-pressed={checked}
+          aria-label={checked ? `Quitar pedido ${formatOrderDisplayId(order)}` : `Seleccionar pedido ${formatOrderDisplayId(order)}`}
+          onClick={() => onToggleSelect(order.id)}
+        >
+          <span className={styles.ticketCheckMark} aria-hidden />
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className={`${styles.ticket} ${selected ? styles.ticketSelected : ''} ${
+          order.status === 'pending' ? styles.ticketPending : ''
+        }`}
+        onClick={() => onSelect(order.id)}
+        aria-current={selected ? 'true' : undefined}
+      >
       <div className={styles.ticketTop}>
         <span className={styles.ticketId}>#{formatOrderDisplayId(order)}</span>
         <span className={styles.ticketTime}>{formatOrderElapsed(order.created_at, now)}</span>
@@ -198,7 +227,8 @@ function OrderTicketCard({
         {itemCount === 1 ? '1 artículo' : `${itemCount} artículos`} · {formatCents(order.total_cents)}
         {previewItems ? ` · ${previewItems}${moreItems}` : ''}
       </p>
-    </button>
+      </button>
+    </div>
   );
 }
 
@@ -542,12 +572,18 @@ export function KitchenOrdersView() {
     refreshOrders,
     loadMoreOrders,
     replaceOrder,
+    applyBoardCleared,
   } = useRestaurantOrders();
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelTargetIds, setCancelTargetIds] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [multiSelectOpen, setMultiSelectOpen] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [dispatchOrder, setDispatchOrder] = useState<Order | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [isMobile, setIsMobile] = useState(false);
@@ -594,6 +630,15 @@ export function KitchenOrdersView() {
     () => orders.find((order) => order.id === selectedOrderId) ?? null,
     [orders, selectedOrderId],
   );
+
+  const bulkActions = kitchenBulkActions(kitchenFilter);
+  const closedCount = kitchenClosedCount(filterCounts);
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+    setMultiSelectOpen(false);
+  }, [kitchenFilter]);
 
   const { productsById, isLoading: productsLoading } = useKitchenOrderProducts(
     accessToken,
@@ -666,15 +711,122 @@ export function KitchenOrdersView() {
 
   const handleCancelRequest = () => {
     if (!selectedOrder) return;
+    setCancelTargetIds([selectedOrder.id]);
     setCancelDialogOpen(true);
   };
 
-  const handleCancelConfirm = async (reason: KitchenCancelReason) => {
-    if (!selectedOrder) return;
-    const updated = await patchOrder(selectedOrder.id, 'cancelled', reason);
-    if (!updated) return;
-    setCancelDialogOpen(false);
+  const applyUpdatedOrders = (updated: Order[]) => {
+    updated.forEach((order) => replaceOrder(order));
+    setSelectedIds([]);
   };
+
+  const handleCancelConfirm = async (reason: KitchenCancelReason) => {
+    const ids = cancelTargetIds.length > 0 ? cancelTargetIds : selectedOrder ? [selectedOrder.id] : [];
+    if (!ids.length) return;
+    if (ids.length === 1) {
+      const updated = await patchOrder(ids[0], 'cancelled', reason);
+      if (!updated) return;
+      setCancelDialogOpen(false);
+      setCancelTargetIds([]);
+      setSelectedIds((current) => current.filter((id) => id !== ids[0]));
+      return;
+    }
+    if (!accessToken || !restaurantId) return;
+    setUpdating(true);
+    setActionError(null);
+    try {
+      const result = await updateRestaurantOrdersStatusBulk(
+        accessToken,
+        restaurantId,
+        ids,
+        'cancelled',
+        reason,
+      );
+      applyUpdatedOrders(result.items);
+      setCancelDialogOpen(false);
+      setCancelTargetIds([]);
+    } catch (error) {
+      console.error(error);
+      setActionError('No se pudieron cancelar los pedidos.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleBulkAdvance = async () => {
+    if (!accessToken || !restaurantId || !bulkActions.advanceStatus || selectedIds.length === 0) {
+      return;
+    }
+    setUpdating(true);
+    setActionError(null);
+    try {
+      const result = await updateRestaurantOrdersStatusBulk(
+        accessToken,
+        restaurantId,
+        selectedIds,
+        bulkActions.advanceStatus,
+      );
+      applyUpdatedOrders(result.items);
+    } catch (error) {
+      console.error(error);
+      setActionError('No se pudieron actualizar los pedidos.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleClearBoard = async () => {
+    if (!accessToken || !restaurantId) return;
+    setClearing(true);
+    setActionError(null);
+    try {
+      await clearKitchenClosedOrders(accessToken, restaurantId);
+      applyBoardCleared();
+      setClearConfirmOpen(false);
+    } catch (error) {
+      console.error(error);
+      setActionError('No se pudo limpiar la pantalla de cocina.');
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  const toggleSelected = (orderId: string) => {
+    setSelectedIds((current) =>
+      current.includes(orderId) ? current.filter((id) => id !== orderId) : [...current, orderId],
+    );
+  };
+
+  const enterMultiSelect = () => {
+    setMultiSelectOpen(true);
+  };
+
+  const exitMultiSelect = () => {
+    setMultiSelectOpen(false);
+    setSelectedIds([]);
+  };
+
+  const toggleMultiSelect = () => {
+    if (multiSelectOpen) {
+      exitMultiSelect();
+      return;
+    }
+    enterMultiSelect();
+  };
+
+  const toggleSelectAllVisible = () => {
+    if (orders.length === 0) return;
+    enterMultiSelect();
+    const allSelected = multiSelectOpen && orders.every((order) => selectedIdSet.has(order.id));
+    setSelectedIds(allSelected ? [] : orders.map((order) => order.id));
+  };
+
+  const cancelDialogLabel =
+    cancelTargetIds.length > 1
+      ? `${cancelTargetIds.length} pedidos`
+      : selectedOrder
+        ? `Pedido #${formatOrderDisplayId(selectedOrder)}`
+        : '';
 
   if (loading) {
     return (
@@ -709,6 +861,14 @@ export function KitchenOrdersView() {
           <p className={styles.subtitle}>{headerSubtitle}</p>
         </div>
         <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.refreshBtn}
+            disabled={clearing || closedCount === 0}
+            onClick={() => setClearConfirmOpen(true)}
+          >
+            Limpiar pantalla
+          </button>
           <KitchenLiveIndicator status={socketStatus} />
         </div>
       </header>
@@ -768,13 +928,38 @@ export function KitchenOrdersView() {
       <div className={`${styles.board} ${isMobile && selectedOrder ? styles.boardMobileDetail : ''}`}>
         <section className={styles.listPanel} aria-label="Lista de pedidos">
           <div className={styles.listHeader}>
-            <h2 className={styles.listTitle}>
-              <ShoppingBagOutlinedIcon sx={{ fontSize: 18, verticalAlign: 'text-bottom', mr: 0.5 }} />
-              {listPanelTitle}
-            </h2>
-            <span className={styles.listCount}>
-              {orders.length === 1 ? '1 pedido' : `${orders.length} pedidos`}
-            </span>
+            <div className={styles.listHeaderTop}>
+              <h2 className={styles.listTitle}>
+                <ShoppingBagOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
+                {listPanelTitle}
+              </h2>
+              <span className={styles.listCount}>
+                {orders.length === 1 ? '1 pedido' : `${orders.length} pedidos`}
+              </span>
+            </div>
+            {bulkActions.canSelect && orders.length > 0 ? (
+              <div className={styles.listHeaderActions}>
+                <button
+                  type="button"
+                  className={`${styles.listActionBtn}${multiSelectOpen ? ` ${styles.listActionBtnActive}` : ''}`}
+                  aria-pressed={multiSelectOpen}
+                  onClick={toggleMultiSelect}
+                >
+                  <CheckBoxOutlinedIcon sx={{ fontSize: 16 }} aria-hidden />
+                  Multiseleccionar
+                </button>
+                <button
+                  type="button"
+                  className={styles.listActionBtn}
+                  onClick={toggleSelectAllVisible}
+                >
+                  <DoneAllOutlinedIcon sx={{ fontSize: 16 }} aria-hidden />
+                  {multiSelectOpen && orders.every((order) => selectedIdSet.has(order.id))
+                    ? 'Quitar selección'
+                    : 'Seleccionar visibles'}
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className={styles.listScroll}>
@@ -789,8 +974,11 @@ export function KitchenOrdersView() {
                   key={order.id}
                   order={order}
                   selected={order.id === selectedOrderId}
+                  checked={selectedIdSet.has(order.id)}
+                  selectable={bulkActions.canSelect && multiSelectOpen}
                   now={now}
                   onSelect={setSelectedOrderId}
+                  onToggleSelect={toggleSelected}
                 />
               ))
             )}
@@ -799,6 +987,41 @@ export function KitchenOrdersView() {
             ) : null}
             <div ref={loadMoreSentinelRef} aria-hidden className={styles.loadMoreSentinel} />
           </div>
+
+          {bulkActions.canSelect && selectedIds.length > 0 ? (
+            <div className={styles.bulkBar} role="toolbar" aria-label="Acciones de pedidos seleccionados">
+              <p className={styles.bulkCount}>
+                {selectedIds.length === 1
+                  ? '1 pedido seleccionado'
+                  : `${selectedIds.length} pedidos seleccionados`}
+              </p>
+              <div className={styles.bulkActions}>
+                {bulkActions.advanceLabel && bulkActions.advanceStatus ? (
+                  <button
+                    type="button"
+                    className={styles.actionPrimary}
+                    disabled={updating}
+                    onClick={() => void handleBulkAdvance()}
+                  >
+                    {updating ? 'Actualizando…' : bulkActions.advanceLabel}
+                  </button>
+                ) : null}
+                {bulkActions.canCancel ? (
+                  <button
+                    type="button"
+                    className={styles.actionDanger}
+                    disabled={updating}
+                    onClick={() => {
+                      setCancelTargetIds(selectedIds);
+                      setCancelDialogOpen(true);
+                    }}
+                  >
+                    Cancelar pedidos
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </section>
 
         {!isMobile ? (
@@ -836,10 +1059,32 @@ export function KitchenOrdersView() {
 
       <OrderCancelDialog
         open={cancelDialogOpen}
-        orderLabel={selectedOrder ? `Pedido #${formatOrderDisplayId(selectedOrder)}` : ''}
+        orderLabel={cancelDialogLabel}
         confirming={updating}
-        onClose={() => setCancelDialogOpen(false)}
+        onClose={() => {
+          if (updating) return;
+          setCancelDialogOpen(false);
+          setCancelTargetIds([]);
+        }}
         onConfirm={(reason) => void handleCancelConfirm(reason)}
+      />
+
+      <ConfirmDialog
+        open={clearConfirmOpen}
+        title="¿Limpiar pantalla de cocina?"
+        description={
+          closedCount === 1
+            ? 'Se ocultará 1 pedido entregado o cancelado. No se elimina: lo verás en Historial. Los pedidos activos se quedan.'
+            : `Se ocultarán ${closedCount} pedidos entregados o cancelados. No se eliminan: los verás en Historial. Los pedidos activos se quedan.`
+        }
+        confirmLabel="Limpiar pantalla"
+        cancelLabel="Seguir en cocina"
+        variant="primary"
+        loading={clearing}
+        onConfirm={() => void handleClearBoard()}
+        onCancel={() => {
+          if (!clearing) setClearConfirmOpen(false);
+        }}
       />
 
       {accessToken && restaurantId ? (
