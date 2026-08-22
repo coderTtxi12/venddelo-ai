@@ -49,6 +49,11 @@
   justify-content: center;
 }
 
+.closeBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .prompt {
   margin-top: 0.85rem;
   font-size: 0.92rem;
