@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
 import MailOutlineOutlinedIcon from '@mui/icons-material/MailOutlineOutlined';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
@@ -1260,6 +1261,23 @@ export default function SettingsPage() {
             />
           )}
         </div>
+      </section>
+
+      <section className={styles.legalPanel} aria-labelledby="settings-legal">
+        <h2 id="settings-legal" className={styles.legalTitle}>
+          Legal
+        </h2>
+        <nav className={styles.legalNav} aria-label="Documentos legales">
+          <Link href="/terminos" className={styles.legalLink}>
+            Términos y Condiciones
+          </Link>
+          <span className={styles.legalSep} aria-hidden>
+            ·
+          </span>
+          <Link href="/privacidad" className={styles.legalLink}>
+            Política de Privacidad
+          </Link>
+        </nav>
       </section>
     </div>
   );
