@@ -52,3 +52,12 @@ test('parses dispatch.updated and ignores ping', () => {
   assert.equal(parseRestaurantDispatchSseBlock('event: heartbeat\ndata: {}'), null);
   assert.equal(parseRestaurantDispatchSseBlock('not json'), null);
 });
+
+test('parses delivery.service.updated', () => {
+  assert.deepEqual(
+    parseRestaurantDispatchSseBlock(
+      'event: delivery.service.updated\ndata: {"type":"delivery.service.updated"}',
+    ),
+    { type: 'delivery.service.updated' },
+  );
+});
