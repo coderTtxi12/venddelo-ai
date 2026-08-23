@@ -125,6 +125,30 @@ def _accepted_cases(
     return cases
 
 
+def _delivered_rider_card_fields(
+    status: str, driver: DeliveryDriver | None
+) -> dict[str, str | None]:
+    if status != "delivered" or driver is None:
+        return {
+            "assigned_driver_first_name": None,
+            "assigned_driver_last_name": None,
+            "assigned_driver_phone": None,
+            "assigned_driver_plate": None,
+            "assigned_driver_motorcycle_color": None,
+            "assigned_driver_compartment_size": None,
+            "assigned_driver_profile_photo_path": None,
+        }
+    return {
+        "assigned_driver_first_name": driver.first_name,
+        "assigned_driver_last_name": driver.last_name,
+        "assigned_driver_phone": driver.phone,
+        "assigned_driver_plate": driver.plate,
+        "assigned_driver_motorcycle_color": driver.motorcycle_color,
+        "assigned_driver_compartment_size": driver.compartment_size,
+        "assigned_driver_profile_photo_path": driver.profile_photo_path,
+    }
+
+
 def _to_provider_item(
     request: DeliveryDispatchRequest,
     restaurant: Restaurant | None,
@@ -142,6 +166,7 @@ def _to_provider_item(
         **base.model_dump(),
         assigned_driver_id=request.assigned_driver_id,
         assigned_driver_name=driver_name,
+        **_delivered_rider_card_fields(request.status, driver),
         zone_id=request.zone_id,
         zone_name=zone.name if zone is not None else None,
         restaurant_id=request.restaurant_id,
