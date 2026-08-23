@@ -90,6 +90,7 @@ def build_public_tracking_dto(
     rider = build_tracking_rider_dto(driver, storage)
 
     show_collect = row.payment_method in {"cash", "card_terminal"}
+    customer_total_cents = row.collect_cents + max(0, row.quoted_fee_cents)
     return PublicDispatchTrackingDTO(
         status=row.status,
         short_id=row.short_id,
@@ -113,7 +114,7 @@ def build_public_tracking_dto(
         ),
         package_count=row.package_count,
         payment_method=row.payment_method,
-        collect_cents=row.collect_cents if show_collect else None,
+        collect_cents=customer_total_cents if show_collect else None,
         cash_denomination_cents=(
             row.cash_denomination_cents if row.payment_method == "cash" else None
         ),
