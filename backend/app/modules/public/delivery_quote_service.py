@@ -191,19 +191,40 @@ class PublicDeliveryQuoteService:
             schedules = list(self._repo.list_schedules(zone_id))
 
         timezone = self._repo.get_provider_timezone(provider_id)
+        resolved_at = now or datetime.now(UTC)
         service_status = resolve_service_status(
             manually_enabled=self._repo.get_service_manually_enabled(zone_id),
             schedules=schedules,
             timezone=timezone,
-            now=now,
+            now=resolved_at,
         )
+        weather_mode: DeliveryWeatherMode = self._repo.get_weather_mode(zone_id)  # type: ignore[assignment]
         if not service_status.service_active:
+            reason = _service_reason(
+                service_status.status_reason,
+                next_change_at=service_status.next_change_at,
+                timezone=service_status.timezone,
+                now=resolved_at,
+            )
+            if weather_mode == "intense":
+                reason = f"{reason} Además, las entregas están suspendidas por lluvia intensa."
             return ResolvedDeliveryService(
                 available=False,
-                reason=_service_reason(service_status.status_reason),
+                reason=reason,
                 partnership_status=status,
                 provider_name=partnership.provider_name,
                 provider_id=provider_id,
+                weather_mode=weather_mode,
+            )
+
+        if weather_mode == "intense":
+            return ResolvedDeliveryService(
+                available=False,
+                reason=f"{_UNAVAILABLE_HEADLINE} Servicio suspendido por lluvia intensa.",
+                partnership_status=status,
+                provider_name=partnership.provider_name,
+                provider_id=provider_id,
+                weather_mode=weather_mode,
             )
 
         if restaurant.latitude is None or restaurant.longitude is None:
@@ -213,6 +234,7 @@ class PublicDeliveryQuoteService:
                 partnership_status=status,
                 provider_name=partnership.provider_name,
                 provider_id=provider_id,
+                weather_mode=weather_mode,
             )
 
         return ResolvedDeliveryService(
@@ -221,6 +243,7 @@ class PublicDeliveryQuoteService:
             partnership_status=status,
             provider_name=partnership.provider_name,
             provider_id=provider_id,
+            weather_mode=weather_mode,
         )
 
     def quote_delivery(
@@ -246,6 +269,7 @@ class PublicDeliveryQuoteService:
                 distance_km=None,
                 provider_name=provider_name,
                 partnership_status=status,
+                weather_mode=service.weather_mode,
             )
 
         provider_id = service.provider_id
