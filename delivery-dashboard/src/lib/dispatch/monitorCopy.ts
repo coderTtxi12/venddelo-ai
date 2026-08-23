@@ -240,11 +240,21 @@ export function requestPackageLine(request: DispatchMonitorRequest): string {
   return `${countLabel} · ${size}`;
 }
 
+export function customerCollectCents(request: {
+  collect_cents: number;
+  quoted_fee_cents?: number | null;
+}): number {
+  return Math.max(0, request.collect_cents) + Math.max(0, request.quoted_fee_cents ?? 0);
+}
+
 export function requestMoneyLine(request: DispatchMonitorRequest): string {
   const fee = request.quoted_fee_cents ?? 0;
   const parts = [paymentLabel(request.payment_method)];
-  if (request.payment_method !== 'transfer' && request.collect_cents > 0) {
-    parts.push(`cobra ${formatMoney(request.collect_cents)}`);
+  if (request.payment_method !== 'transfer') {
+    const total = customerCollectCents(request);
+    if (total > 0) {
+      parts.push(`cobra ${formatMoney(total)}`);
+    }
   }
   if (fee > 0) {
     parts.push(`envío ${formatMoney(fee)}`);
