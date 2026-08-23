@@ -88,6 +88,7 @@ class PublicDeliveryServiceDTO(BaseModel):
     reason: str | None = None
     partnership_status: Literal["none", "pending", "active", "suspended"] = "none"
     provider_name: str | None = None
+    weather_mode: Literal["none", "light", "heavy", "intense"] = "none"
 
 
 class PublicCheckoutConfigDTO(BaseModel):
