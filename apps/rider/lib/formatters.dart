@@ -1,5 +1,34 @@
 String formatMoneyCents(int cents) => '\$${(cents / 100).toStringAsFixed(2)}';
 
+/// Restaurant share + delivery fee: what the customer pays in cash.
+int customerTotalCents(int collectCents, int quotedFeeCents) {
+  final restaurant = collectCents < 0 ? 0 : collectCents;
+  final fee = quotedFeeCents < 0 ? 0 : quotedFeeCents;
+  return restaurant + fee;
+}
+
+bool showsRiderCashCollect(String paymentMethod, int collectCents) {
+  return paymentMethod == 'cash' ||
+      (paymentMethod == 'mixed' && collectCents > 0);
+}
+
+/// Cash and terminal: the rider charges the customer this total.
+bool showsRiderCustomerCollect(String paymentMethod, int collectCents) {
+  return paymentMethod == 'card_terminal' ||
+      showsRiderCashCollect(paymentMethod, collectCents);
+}
+
+enum RiderCashFocus { none, restaurant, collect }
+
+/// Before pickup the rider pays the restaurant first; after pickup they collect.
+RiderCashFocus riderCashFocusForStatus(String status) {
+  return switch (status) {
+    'assigned' => RiderCashFocus.restaurant,
+    'picked_up' || 'in_transit' => RiderCashFocus.collect,
+    _ => RiderCashFocus.none,
+  };
+}
+
 String formatDayMonth(DateTime value) {
   final day = value.day.toString().padLeft(2, '0');
   final month = value.month.toString().padLeft(2, '0');
