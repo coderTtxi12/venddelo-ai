@@ -415,6 +415,7 @@ export type DispatchMonitorRequest = {
   restaurant_address?: string | null;
   restaurant_phone?: string | null;
   restaurant_logo_path?: string | null;
+  restaurant_subdomain?: string | null;
   restaurant_lat: number | null;
   restaurant_lng: number | null;
   dropoff_lat: number;
@@ -447,6 +448,7 @@ export type DispatchMonitorRequest = {
   cycle_rejected_count?: number;
   cycle_silent_count?: number;
   created_at?: string | null;
+  tracking_token?: string | null;
   timeline?: DispatchMonitorTimelineEvent[];
 };
 
@@ -500,6 +502,12 @@ export type DispatchMonitorRoute = {
   zone_id?: string | null;
 };
 
+export type DispatchMonitorZoneWeather = {
+  zone_id: string;
+  zone_name: string;
+  weather_mode: DeliveryWeatherMode;
+};
+
 export type DispatchMonitorSnapshot = {
   generated_at: string;
   metrics: DispatchMonitorMetrics;
@@ -508,6 +516,7 @@ export type DispatchMonitorSnapshot = {
   offers: DispatchMonitorOffer[];
   credit_holds: DispatchMonitorCreditHold[];
   routes: DispatchMonitorRoute[];
+  weather_modes?: DispatchMonitorZoneWeather[];
 };
 
 export type DispatchHistoryItem = {
@@ -532,6 +541,13 @@ export type DispatchHistoryItem = {
   credit_hold_status?: string | null;
   assigned_driver_id: string | null;
   assigned_driver_name: string | null;
+  assigned_driver_first_name?: string | null;
+  assigned_driver_last_name?: string | null;
+  assigned_driver_phone?: string | null;
+  assigned_driver_plate?: string | null;
+  assigned_driver_motorcycle_color?: string | null;
+  assigned_driver_compartment_size?: string | null;
+  assigned_driver_profile_photo_path?: string | null;
   zone_id: string | null;
   zone_name: string | null;
   restaurant_lat: number | null;
