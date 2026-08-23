@@ -130,8 +130,9 @@ async def restaurant_dispatch_events(
                 except TimeoutError:
                     yield ": ping\n\n"
                     continue
+                event_name = str(payload.get("type") or "dispatch.updated")
                 yield (
-                    "event: dispatch.updated\n"
+                    f"event: {event_name}\n"
                     f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
                 )
         finally:
