@@ -226,6 +226,9 @@ def test_provider_history_lists_company_rows_and_filters_driver(client, engine):
     assert [row["id"] for row in body["items"]] == [request_id]
     assert body["items"][0]["assigned_driver_id"] == driver_id
     assert body["items"][0]["assigned_driver_name"]
+    assert body["items"][0]["assigned_driver_phone"]
+    assert body["items"][0]["assigned_driver_plate"]
+    assert body["items"][0]["assigned_driver_first_name"]
     assert body["items"][0]["zone_id"]
     assert "dropoff_lat" in body["items"][0]
     kinds = [event["kind"] for event in body["items"][0]["timeline"]]
@@ -290,3 +293,29 @@ def test_provider_history_zone_filter_and_non_member(client, engine):
     _as_owner()
     denied = client.get("/api/v1/delivery-providers/me/dispatch-history", headers=AUTH)
     assert denied.status_code in {403, 404}
+
+
+@requires_db
+def test_provider_history_omits_rider_card_fields_when_cancelled(client, engine):
+    restaurant_id, driver_id = _setup_ready_rider(client, engine)
+    request_id, offer_id = _create_and_offer(client, engine, restaurant_id)
+    _as_rider()
+    accepted = client.post(f"/api/v1/rider/me/offers/{offer_id}/accept", headers=AUTH)
+    assert accepted.status_code == 200
+    _as_owner()
+    assert client.post(
+        f"/api/v1/restaurants/me/dispatch-requests/{request_id}/cancel",
+        headers=AUTH,
+    ).status_code == 200
+
+    _as_mexy()
+    listed = client.get("/api/v1/delivery-providers/me/dispatch-history", headers=AUTH)
+    assert listed.status_code == 200, listed.text
+    item = listed.json()["items"][0]
+    assert item["id"] == request_id
+    assert item["status"] == "cancelled"
+    assert item["assigned_driver_id"] == driver_id
+    assert item["assigned_driver_name"]
+    assert item["assigned_driver_phone"] is None
+    assert item["assigned_driver_plate"] is None
+    assert item["assigned_driver_first_name"] is None
