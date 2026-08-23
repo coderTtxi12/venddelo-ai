@@ -126,6 +126,16 @@ export default function DeliveryPage() {
   const refreshInFlightRef = useRef(false);
   const refreshQueuedRef = useRef(false);
 
+  const refreshDeliveryService = useCallback(async () => {
+    if (!subdomain) return;
+    try {
+      const checkoutConfig = await getPublicCheckoutConfig(subdomain);
+      setDeliveryService(checkoutConfig.delivery_service);
+    } catch {
+      /* keep the current service notice until the next successful refresh */
+    }
+  }, [subdomain]);
+
   const refreshRequests = useCallback(async () => {
     if (!accessToken || !selectedRestaurantId) return;
     if (refreshInFlightRef.current) {
@@ -151,12 +161,17 @@ export default function DeliveryPage() {
   }, [accessToken, selectedRestaurantId]);
 
   const { visibilityState } = useRestaurantDispatchEvents(selectedRestaurantId, accessToken, {
-    onEvent: () => {
+    onEvent: (event) => {
+      if (event.type === 'delivery.service.updated') {
+        void refreshDeliveryService();
+        return;
+      }
       void refreshRequests();
     },
     onStatusChange: setSocketStatus,
     onReconnect: () => {
       void refreshRequests();
+      void refreshDeliveryService();
     },
   });
 
@@ -167,9 +182,17 @@ export default function DeliveryPage() {
     if (socketStatus === 'live') return;
     const timer = window.setInterval(() => {
       void refreshRequests();
+      void refreshDeliveryService();
     }, 20_000);
     return () => window.clearInterval(timer);
-  }, [accessToken, refreshRequests, selectedRestaurantId, socketStatus, visibilityState]);
+  }, [
+    accessToken,
+    refreshDeliveryService,
+    refreshRequests,
+    selectedRestaurantId,
+    socketStatus,
+    visibilityState,
+  ]);
 
   useEffect(() => {
     if (loading || didInitFormCollapse.current) return;
@@ -347,6 +370,7 @@ export default function DeliveryPage() {
               subdomain={subdomain}
               courierAvailable={courierAvailable}
               courierReason={courierReason}
+              showUnavailableAlert={false}
               leadTimes={leadTimes}
               submitLabel="Solicitar repartidor"
               resetOnSuccess
