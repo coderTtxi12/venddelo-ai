@@ -162,3 +162,41 @@
   cursor: not-allowed;
   transform: none;
 }
+
+.googleButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.legalNotice {
+  margin: 1.15rem auto 0;
+  max-width: 380px;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  text-align: center;
+  color: #475569;
+}
+
+.legalNotice a {
+  color: var(--color-primary);
+  font-weight: 600;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+
+.legalNotice a:hover {
+  color: var(--color-primary-hover);
+}
+
+.legalNotice a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .legalNotice a {
+    transition: none;
+  }
+}
