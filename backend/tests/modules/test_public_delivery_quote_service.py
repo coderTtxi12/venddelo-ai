@@ -7,7 +7,11 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderScheduleDTO,
     RestaurantDeliveryPartnershipDTO,
 )
-from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
+from app.modules.public.delivery_quote_service import (
+    PublicDeliveryQuoteService,
+    _format_resume_when,
+    _service_reason,
+)
 from app.modules.restaurants.schemas import RestaurantDTO
 
 
@@ -242,3 +246,109 @@ def test_resolve_delivery_service_blocks_when_partnership_has_no_zone():
 
     assert resolved.available is False
     assert resolved.partnership_status == "active"
+
+
+def _active_service_repo(*, manually_enabled: bool) -> MagicMock:
+    repo = _active_outside_quote_repo()
+    repo.get_service_manually_enabled.return_value = manually_enabled
+    repo.list_schedules.return_value = [
+        _schedule_slot(0, "09:00:00", "21:00:00", "regular"),
+    ]
+    return repo
+
+
+def test_service_reason_explains_manual_off():
+    assert _service_reason("manual_off") == (
+        "El servicio de reparto no está disponible en este momento. "
+        "Mexy pausó las entregas temporalmente."
+    )
+
+
+def test_service_reason_explains_outside_schedule_with_resume_time():
+    now = datetime(2026, 6, 22, 7, 0, tzinfo=UTC)
+    next_change = datetime(2026, 6, 22, 15, 0, tzinfo=UTC)
+
+    reason = _service_reason(
+        "outside_schedule",
+        next_change_at=next_change,
+        timezone="America/Mexico_City",
+        now=now,
+    )
+
+    assert reason.startswith("El servicio de reparto no está disponible en este momento.")
+    assert "fuera del horario de operación" in reason
+    assert "hoy a las 9:00 a.m." in reason
+
+
+def test_format_resume_when_uses_tomorrow_and_weekday():
+    timezone = "America/Mexico_City"
+    sunday_night = datetime(2026, 6, 22, 5, 0, tzinfo=UTC)
+    monday_open = datetime(2026, 6, 22, 15, 0, tzinfo=UTC)
+    wednesday_open = datetime(2026, 6, 24, 15, 0, tzinfo=UTC)
+
+    assert (
+        _format_resume_when(monday_open, timezone=timezone, now=sunday_night)
+        == "mañana a las 9:00 a.m."
+    )
+    assert (
+        _format_resume_when(wednesday_open, timezone=timezone, now=sunday_night)
+        == "el miércoles a las 9:00 a.m."
+    )
+
+
+def test_format_resume_when_uses_pm_and_singular_article():
+    timezone = "America/Mexico_City"
+    now = datetime(2026, 6, 22, 16, 0, tzinfo=UTC)
+    evening = datetime(2026, 6, 23, 3, 0, tzinfo=UTC)
+    one_pm = datetime(2026, 6, 22, 19, 0, tzinfo=UTC)
+
+    assert _format_resume_when(evening, timezone=timezone, now=now) == "hoy a las 9:00 p.m."
+    assert _format_resume_when(one_pm, timezone=timezone, now=now) == "hoy a la 1:00 p.m."
+
+
+def test_resolve_delivery_service_explains_manual_off():
+    repo = _active_service_repo(manually_enabled=False)
+    service = PublicDeliveryQuoteService(repo)
+    now = datetime(2026, 6, 22, 18, 0, tzinfo=UTC)
+
+    resolved = service.resolve_delivery_service(_restaurant(), now=now)
+
+    assert resolved.available is False
+    assert "pausó las entregas" in (resolved.reason or "")
+
+
+def test_resolve_delivery_service_blocks_intense_weather():
+    repo = _active_service_repo(manually_enabled=True)
+    repo.get_weather_mode.return_value = "intense"
+    service = PublicDeliveryQuoteService(repo)
+    now = datetime(2026, 6, 22, 18, 0, tzinfo=UTC)
+
+    resolved = service.resolve_delivery_service(_restaurant(), now=now)
+
+    assert resolved.available is False
+    assert resolved.weather_mode == "intense"
+    assert "lluvia intensa" in (resolved.reason or "").lower()
+
+
+def test_resolve_delivery_service_exposes_light_weather_when_open():
+    repo = _active_service_repo(manually_enabled=True)
+    repo.get_weather_mode.return_value = "light"
+    service = PublicDeliveryQuoteService(repo)
+    now = datetime(2026, 6, 22, 18, 0, tzinfo=UTC)
+
+    resolved = service.resolve_delivery_service(_restaurant(), now=now)
+
+    assert resolved.available is True
+    assert resolved.weather_mode == "light"
+
+
+def test_resolve_delivery_service_explains_outside_schedule():
+    repo = _active_service_repo(manually_enabled=True)
+    service = PublicDeliveryQuoteService(repo)
+    now = datetime(2026, 6, 22, 5, 0, tzinfo=UTC)
+
+    resolved = service.resolve_delivery_service(_restaurant(), now=now)
+
+    assert resolved.available is False
+    assert "fuera del horario de operación" in (resolved.reason or "")
+    assert "Reanuda" in (resolved.reason or "")
