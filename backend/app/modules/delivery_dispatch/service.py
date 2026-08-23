@@ -975,7 +975,10 @@ class RestaurantDispatchService:
         self._active_partnership(restaurant.id)
         rows = self._session.scalars(
             select(DeliveryDispatchRequest)
-            .options(selectinload(DeliveryDispatchRequest.assigned_driver))
+            .options(
+                selectinload(DeliveryDispatchRequest.assigned_driver),
+                selectinload(DeliveryDispatchRequest.credit_hold),
+            )
             .where(DeliveryDispatchRequest.restaurant_id == restaurant.id)
             .order_by(DeliveryDispatchRequest.created_at.desc())
         ).all()
@@ -1137,7 +1140,10 @@ class RestaurantDispatchService:
     ) -> DeliveryDispatchRequest:
         row = self._session.scalar(
             select(DeliveryDispatchRequest)
-            .options(selectinload(DeliveryDispatchRequest.assigned_driver))
+            .options(
+                selectinload(DeliveryDispatchRequest.assigned_driver),
+                selectinload(DeliveryDispatchRequest.credit_hold),
+            )
             .where(
                 DeliveryDispatchRequest.id == request_id,
                 DeliveryDispatchRequest.restaurant_id == restaurant_id,
