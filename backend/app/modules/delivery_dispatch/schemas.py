@@ -538,6 +538,7 @@ class DispatchMonitorRequestDTO(BaseModel):
     restaurant_address: str | None = None
     restaurant_phone: str | None = None
     restaurant_logo_path: str | None = None
+    restaurant_subdomain: str | None = None
     restaurant_lat: float | None = None
     restaurant_lng: float | None = None
     dropoff_lat: float
