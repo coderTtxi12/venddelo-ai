@@ -10,7 +10,12 @@ import {
 } from '@/lib/dispatch/driverItinerary';
 import { liveBusinessesFromRequests } from '@/lib/dispatch/liveBusinesses';
 import { fetchRoadRoute } from '@/lib/dispatch/fetchRoadRoute';
-import { formatShortId, requestStatusLabel } from '@/lib/dispatch/monitorCopy';
+import {
+  formatShortId,
+  requestMoneyLine,
+  requestPackageLine,
+  requestStatusLabel,
+} from '@/lib/dispatch/monitorCopy';
 import { ALL_ZONES_ID, zoneColorForId, type ZoneColor } from '@/lib/dispatch/zoneColors';
 import { motorcycleColorHex } from '@/lib/drivers/motorcycleColors';
 import { getGoogleMapsMapId, loadGoogleMaps } from '@/lib/loadGoogleMaps';
@@ -375,6 +380,13 @@ export function DispatchMonitorMap({
           null
         : null,
     [focusedRestaurantId, snapshot],
+  );
+  const focusedRequest = useMemo(
+    () =>
+      snapshot && focusedRequestId
+        ? snapshot.requests.find((row) => row.id === focusedRequestId) ?? null
+        : null,
+    [focusedRequestId, snapshot],
   );
   const colorByZone = selectedZoneId === ALL_ZONES_ID;
   const zoneIds = useMemo(() => zones.map((zone) => zone.id), [zones]);
@@ -950,6 +962,60 @@ export function DispatchMonitorMap({
               ))}
             </ol>
           )}
+        </aside>
+      ) : focusedRequest ? (
+        <aside
+          className={styles.itineraryCard}
+          aria-label={`Pedido ${formatShortId(focusedRequest.short_id)}`}
+        >
+          <p className={styles.itineraryHeading}>
+            <span>{formatShortId(focusedRequest.short_id)}</span>
+            <span className={styles.itineraryPlate}>
+              {requestStatusLabel(focusedRequest.status)}
+            </span>
+          </p>
+          <p className={styles.itineraryKicker}>{focusedRequest.customer_name}</p>
+          <dl className={styles.requestFacts}>
+            <div>
+              <dt>Recoger</dt>
+              <dd>
+                {focusedRequest.restaurant_name}
+                {focusedRequest.restaurant_address ? (
+                  <span className={styles.itineraryDetail}>{focusedRequest.restaurant_address}</span>
+                ) : null}
+              </dd>
+            </div>
+            <div>
+              <dt>Entregar</dt>
+              <dd>{focusedRequest.dropoff_address}</dd>
+            </div>
+            <div>
+              <dt>Rider</dt>
+              <dd>
+                {focusedRequest.assigned_driver_name
+                  ? `${focusedRequest.assigned_driver_name}${
+                      focusedRequest.assigned_driver_plate
+                        ? ` · ${focusedRequest.assigned_driver_plate}`
+                        : ''
+                    }`
+                  : 'Sin asignar'}
+              </dd>
+            </div>
+            <div>
+              <dt>Pago</dt>
+              <dd>{requestMoneyLine(focusedRequest)}</dd>
+            </div>
+            <div>
+              <dt>Paquete</dt>
+              <dd>{requestPackageLine(focusedRequest)}</dd>
+            </div>
+            {focusedRequest.notes ? (
+              <div>
+                <dt>Notas</dt>
+                <dd>{focusedRequest.notes}</dd>
+              </div>
+            ) : null}
+          </dl>
         </aside>
       ) : focusedBusiness ? (
         <aside className={styles.itineraryCard} aria-label={`Negocio ${focusedBusiness.name}`}>
