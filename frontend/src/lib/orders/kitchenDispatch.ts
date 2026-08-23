@@ -39,7 +39,7 @@ export function centsToPesosInput(cents: number): string {
 export function orderToDispatchFormValues(order: Order): KitchenDispatchFormValues {
   const { address, references } = splitDeliveryAddress(order.delivery_address);
   const phone = parseE164Phone(order.customer_phone);
-  const restaurantCents = buildOrderTotalsBreakdown(order).restaurantSubtotalCents;
+  const breakdown = buildOrderTotalsBreakdown(order);
   return {
     customerName: order.customer_name,
     phoneCountryIso: phone.countryIso,
@@ -49,7 +49,7 @@ export function orderToDispatchFormValues(order: Order): KitchenDispatchFormValu
     longitude: order.delivery_longitude,
     addressReferences: references,
     paymentMethod: order.payment_method,
-    collectAmount: centsToPesosInput(restaurantCents),
+    collectAmount: centsToPesosInput(breakdown.totalCents),
     cashDenomination:
       order.payment_method === 'cash' && order.cash_denomination_cents != null
         ? centsToPesosInput(order.cash_denomination_cents)

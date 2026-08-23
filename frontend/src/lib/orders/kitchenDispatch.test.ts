@@ -60,7 +60,7 @@ test('centsToPesosInput converts centavos to input pesos', () => {
   assert.equal(centsToPesosInput(15050), '150.5');
 });
 
-test('orderToDispatchFormValues prefills delivery cash order without shipping fee', () => {
+test('orderToDispatchFormValues prefills the customer total including shipping', () => {
   const values = orderToDispatchFormValues(baseOrder());
   assert.equal(values.customerName, 'María López');
   assert.equal(values.phoneCountryIso, 'MX');
@@ -70,7 +70,7 @@ test('orderToDispatchFormValues prefills delivery cash order without shipping fe
   assert.equal(values.latitude, 19.4326);
   assert.equal(values.longitude, -99.1332);
   assert.equal(values.paymentMethod, 'cash');
-  assert.equal(values.collectAmount, '180');
+  assert.equal(values.collectAmount, '225');
   assert.equal(values.cashDenomination, '500');
 });
 
@@ -79,7 +79,7 @@ test('orderToDispatchFormValues omits collect denomination for transfer', () => 
     baseOrder({ payment_method: 'transfer', cash_denomination_cents: null }),
   );
   assert.equal(values.paymentMethod, 'transfer');
-  assert.equal(values.collectAmount, '180');
+  assert.equal(values.collectAmount, '225');
   assert.equal(values.cashDenomination, '');
 });
 

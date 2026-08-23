@@ -49,6 +49,8 @@ export type DispatchRequest = {
   created_at: string;
   updated_at: string;
   rider?: DispatchAssignedRider | null;
+  credit_hold_status: 'held' | 'released' | null;
+  credit_hold_cents: number;
 };
 
 export type DispatchLeadTime = {
@@ -128,7 +130,7 @@ function restaurantQuery(restaurantId: string): string {
 export function listDispatchRequests(token: string, restaurantId: string) {
   return apiRequest<DispatchRequest[]>(
     `/restaurants/me/dispatch-requests?${restaurantQuery(restaurantId)}`,
-    { token },
+    { token, cache: 'no-store' },
   );
 }
 
