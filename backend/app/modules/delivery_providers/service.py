@@ -7,6 +7,9 @@ import uuid
 
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.core.storage import StoragePort
+from app.infra.realtime.restaurant_dispatch_hub import (
+    notify_restaurants_delivery_service_updated,
+)
 from app.modules.delivery_providers.availability import resolve_service_status
 from app.modules.delivery_providers.pricing import (
     config_from_json,
@@ -460,6 +463,15 @@ class DeliveryProviderService:
             weather_mode=quote.weather_mode,
             is_night=quote.is_night,
         )
+
+    def _notify_zone_delivery_service(
+        self, provider_id: uuid.UUID, zone_id: uuid.UUID
+    ) -> None:
+        restaurant_ids = [
+            row.restaurant.id
+            for row in self._repo.list_active_partnership_requests(provider_id, zone_id)
+        ]
+        notify_restaurants_delivery_service_updated(restaurant_ids)
 
     def _require_provider(self, user_id: uuid.UUID) -> DeliveryProviderDTO:
         found = self._repo.get_for_user(user_id)
