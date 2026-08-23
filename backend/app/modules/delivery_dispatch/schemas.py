@@ -293,7 +293,7 @@ class PublicDispatchTrackingDTO(BaseModel):
     eta_seconds: int | None = None
     package_count: int
     payment_method: str
-    collect_cents: int | None = None
+    collect_cents: int | None = None  # total del cliente (restaurante + envío)
     cash_denomination_cents: int | None = None
 
 
@@ -396,6 +396,13 @@ class DispatchMonitorTimelineEventDTO(BaseModel):
 class ProviderHistoryItemDTO(RiderHistoryItemDTO):
     assigned_driver_id: uuid.UUID | None = None
     assigned_driver_name: str | None = None
+    assigned_driver_first_name: str | None = None
+    assigned_driver_last_name: str | None = None
+    assigned_driver_phone: str | None = None
+    assigned_driver_plate: str | None = None
+    assigned_driver_motorcycle_color: str | None = None
+    assigned_driver_compartment_size: str | None = None
+    assigned_driver_profile_photo_path: str | None = None
     zone_id: uuid.UUID | None = None
     zone_name: str | None = None
     restaurant_id: uuid.UUID
@@ -571,6 +578,7 @@ class DispatchMonitorRequestDTO(BaseModel):
     cycle_rejected_count: int = 0
     cycle_silent_count: int = 0
     created_at: datetime | None = None
+    tracking_token: str
     timeline: list[DispatchMonitorTimelineEventDTO] = Field(default_factory=list)
 
 
