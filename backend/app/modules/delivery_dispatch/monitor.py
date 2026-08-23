@@ -37,6 +37,7 @@ from app.modules.delivery_dispatch.schemas import (
     DispatchMonitorSearchBlockerDTO,
     DispatchMonitorSnapshotDTO,
     DispatchMonitorTimelineEventDTO,
+    DispatchMonitorZoneWeatherDTO,
 )
 from app.modules.delivery_dispatch.timeline import (
     TimelineOffer,
@@ -245,14 +246,23 @@ def build_dispatch_monitor_snapshot(
     settings = _engine_settings(settings_row) if settings_row is not None else EngineSettings()
     staleness_seconds = settings.driver_location_staleness_seconds
 
-    zone_names: dict[uuid.UUID, str] = {
-        row.id: row.name
-        for row in session.scalars(
+    zone_rows = list(
+        session.scalars(
             select(DeliveryProviderZone).where(
                 DeliveryProviderZone.delivery_provider_id == provider_id
             )
         ).all()
-    }
+    )
+    zone_names: dict[uuid.UUID, str] = {row.id: row.name for row in zone_rows}
+    weather_modes = [
+        DispatchMonitorZoneWeatherDTO(
+            zone_id=row.id,
+            zone_name=row.name,
+            weather_mode=row.weather_mode,
+        )
+        for row in zone_rows
+        if zone_id is None or row.id == zone_id
+    ]
 
     drivers = list(
         session.scalars(
