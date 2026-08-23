@@ -1197,6 +1197,8 @@ class RestaurantDispatchService:
         collect_cents: int,
         cash_denomination_cents: int | None,
     ) -> None:
+        if payment_method in {"cash", "card_terminal"} and collect_cents <= 0:
+            raise ValidationError("El monto que recibe el restaurante debe ser mayor a cero.")
         if payment_method == "cash" and cash_denomination_cents is None:
             raise ValidationError("Indica con qué billete o moneda pagará el cliente")
         if (
