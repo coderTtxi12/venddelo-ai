@@ -6,7 +6,7 @@ type DriverMetaTagsProps = {
   plate: string;
   motorcycleColor: string;
   compartmentSize: string;
-  creditAvailableCents: number;
+  creditAvailableCents?: number;
   className?: string;
 };
 
@@ -35,7 +35,9 @@ export function DriverMetaTags({
       <span className={styles.driverMetaTag} title={`Compartimento: ${compartment}`}>
         {compartment}
       </span>
-      <span className={styles.driverMetaCredit}>{formatMoney(creditAvailableCents)} disp.</span>
+      {creditAvailableCents != null ? (
+        <span className={styles.driverMetaCredit}>{formatMoney(creditAvailableCents)} disp.</span>
+      ) : null}
     </div>
   );
 }
