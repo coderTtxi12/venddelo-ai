@@ -193,6 +193,131 @@
   color: var(--color-primary);
 }
 
+.collectCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.collectHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.collectCard .collectLabel {
+  display: block;
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 750;
+  color: var(--color-text);
+}
+
+.collectBadge {
+  flex-shrink: 0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  color: var(--color-primary);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.collectInputRow {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 48px;
+  padding: 0 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-text) 3%, var(--color-surface));
+}
+
+.collectInputRow:focus-within {
+  border-color: var(--color-primary);
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.collectPrefix,
+.collectSuffix {
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.collectInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 46px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 1.2rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.collectInput:focus {
+  outline: none;
+}
+
+.collectInput:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.collectHint {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.collectBreakdown {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.collectRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.collectRow dt {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.collectRow dd {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.collectAlert {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #9a3412;
+}
+
 @media (max-width: 760px) {
   .grid,
   .gridTwo,

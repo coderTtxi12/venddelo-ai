@@ -15,6 +15,10 @@ import {
 } from '@/lib/api/dispatch';
 import { ApiError } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
+import {
+  isValidRestaurantCollect,
+  restaurantCollectFromCustomerTotal,
+} from '@/lib/dispatch/collectTotal';
 import { getDeliveryWeatherNotice } from '@/lib/digital-menu/checkout/deliveryWeatherNotice';
 import { usePublicDeliveryQuote } from '@/lib/digital-menu/checkout/usePublicDeliveryQuote';
 import type { KitchenDispatchFormValues } from '@/lib/orders/kitchenDispatch';
@@ -89,7 +93,7 @@ export function RequestDeliveryForm({
     leadTimes[0] != null ? String(leadTimes[0]) : PREP_CUSTOM_VALUE,
   );
   const [customPrepMinutes, setCustomPrepMinutes] = useState('');
-  const [collectAmount, setCollectAmount] = useState(initialValues?.collectAmount ?? '0');
+  const [collectAmount, setCollectAmount] = useState(initialValues?.collectAmount ?? '');
   const [cashDenomination, setCashDenomination] = useState(
     initialValues?.cashDenomination ?? '',
   );
@@ -219,12 +223,24 @@ export function RequestDeliveryForm({
     !deliveryQuoteLoading &&
     !deliveryQuoteError;
 
+  const deliveryFeeCents = deliveryQuoteReady ? deliveryQuote.delivery_fee_cents : null;
+  const customerTotalCents =
+    paymentMethod === 'transfer' ? null : parsePesosToCents(collectAmount);
+  const restaurantCollectCents =
+    customerTotalCents != null && deliveryFeeCents != null
+      ? restaurantCollectFromCustomerTotal(customerTotalCents, deliveryFeeCents)
+      : null;
+  const collectValid =
+    paymentMethod === 'transfer' ||
+    (restaurantCollectCents != null && isValidRestaurantCollect(restaurantCollectCents));
+
   const canRequestRider =
     courierAvailable &&
     location.latitude != null &&
     location.longitude != null &&
     location.address.trim().length > 0 &&
     deliveryQuoteReady &&
+    collectValid &&
     prepValid &&
     Number(packageCount) >= 1 &&
     !submitting;
@@ -259,19 +275,24 @@ export function RequestDeliveryForm({
     let collectCents = 0;
     let cashDenominationCents: number | null = null;
 
+    if (paymentMethod !== 'transfer') {
+      if (restaurantCollectCents == null || !isValidRestaurantCollect(restaurantCollectCents)) {
+        setError('El total a cobrar debe ser mayor al costo de envío.');
+        return;
+      }
+      collectCents = restaurantCollectCents;
+    }
+
     if (paymentMethod === 'cash') {
-      collectCents = parsePesosToCents(collectAmount);
       cashDenominationCents = parsePesosToCents(cashDenomination);
       if (!cashDenomination.trim()) {
         setError('Indica con qué billete o moneda pagará el cliente.');
         return;
       }
-      if (cashDenominationCents < collectCents) {
-        setError('La denominación debe cubrir el monto a cobrar.');
+      if (customerTotalCents != null && cashDenominationCents < customerTotalCents) {
+        setError('La denominación debe cubrir el total a cobrar.');
         return;
       }
-    } else if (paymentMethod === 'card_terminal') {
-      collectCents = parsePesosToCents(collectAmount);
     }
 
     setSubmitting(true);
@@ -300,7 +321,7 @@ export function RequestDeliveryForm({
         setPaymentMethod('cash');
         setPackageSize('normal');
         setPackageCount('1');
-        setCollectAmount('0');
+        setCollectAmount('');
         setCashDenomination('');
         setCustomPrepMinutes('');
         setCustomerName('');
@@ -420,7 +441,7 @@ export function RequestDeliveryForm({
         </div>
       ) : null}
 
-      <div className={styles.gridThree}>
+      <div className={styles.gridTwo}>
         <div className={styles.field}>
           <span className={styles.label} id="payment-method-label">
             Forma de pago
@@ -437,26 +458,6 @@ export function RequestDeliveryForm({
           />
         </div>
 
-        {paymentMethod !== 'transfer' ? (
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="collect-amount">
-              Monto del restaurante
-            </label>
-            <input
-              id="collect-amount"
-              className={styles.input}
-              type="number"
-              min="0"
-              step="0.01"
-              required
-              value={collectAmount}
-              onChange={(event) => setCollectAmount(event.target.value)}
-              disabled={!courierAvailable}
-            />
-            <p className={styles.fieldHint}>Sin incluir el costo de envío.</p>
-          </div>
-        ) : null}
-
         {paymentMethod === 'cash' ? (
           <div className={styles.field}>
             <label className={styles.label} htmlFor="cash-denomination">
@@ -466,7 +467,7 @@ export function RequestDeliveryForm({
               id="cash-denomination"
               className={styles.input}
               type="number"
-              min="0"
+              min="0.01"
               step="0.01"
               required
               value={cashDenomination}
@@ -476,6 +477,71 @@ export function RequestDeliveryForm({
           </div>
         ) : null}
       </div>
+
+      {paymentMethod !== 'transfer' ? (
+        <div className={styles.collectCard}>
+          <div className={styles.collectHeader}>
+            <label className={styles.collectLabel} htmlFor="collect-amount">
+              Total a cobrar
+            </label>
+            <span className={styles.collectBadge}>Incluye envío</span>
+          </div>
+          <div className={styles.collectInputRow}>
+            <span className={styles.collectPrefix} aria-hidden>
+              $
+            </span>
+            <input
+              id="collect-amount"
+              className={styles.collectInput}
+              type="number"
+              min="0.01"
+              step="0.01"
+              required
+              inputMode="decimal"
+              placeholder="0.00"
+              value={collectAmount}
+              onChange={(event) => setCollectAmount(event.target.value)}
+              disabled={!courierAvailable}
+              aria-describedby="collect-amount-hint collect-amount-breakdown"
+            />
+            <span className={styles.collectSuffix} aria-hidden>
+              MXN
+            </span>
+          </div>
+          <p id="collect-amount-hint" className={styles.collectHint}>
+            Es lo que pagará el cliente, ya con envío. Si absorbes el envío o una parte,
+            contémplalo en este total.
+          </p>
+          {deliveryFeeCents != null ? (
+            <dl id="collect-amount-breakdown" className={styles.collectBreakdown}>
+              <div className={styles.collectRow}>
+                <dt>Envío</dt>
+                <dd>{formatMoney(deliveryFeeCents / 100, 'MXN')}</dd>
+              </div>
+              <div className={styles.collectRow}>
+                <dt>Tu negocio recibe</dt>
+                <dd>
+                  {restaurantCollectCents != null && restaurantCollectCents > 0
+                    ? formatMoney(restaurantCollectCents / 100, 'MXN')
+                    : '—'}
+                </dd>
+              </div>
+            </dl>
+          ) : (
+            <p className={styles.collectHint}>
+              Confirma la dirección para desglosar el envío y lo que recibe tu negocio.
+            </p>
+          )}
+          {customerTotalCents != null &&
+          customerTotalCents > 0 &&
+          deliveryFeeCents != null &&
+          !collectValid ? (
+            <p className={styles.collectAlert} role="alert">
+              El total debe ser mayor al envío para que tu negocio reciba un monto.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className={styles.gridThree}>
         <div className={styles.field}>
