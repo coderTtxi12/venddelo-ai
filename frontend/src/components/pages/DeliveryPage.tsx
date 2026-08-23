@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CourierUnavailableAlert } from '@/components/dispatch/CourierUnavailableAlert';
 import { DispatchRecentRequests } from '@/components/dispatch/DispatchRecentRequests';
 import { DispatchRequestSuccess } from '@/components/dispatch/DispatchRequestSuccess';
+import { DispatchRiderCreditPanel } from '@/components/dispatch/DispatchRiderCreditPanel';
 import { RequestDeliveryForm } from '@/components/dispatch/RequestDeliveryForm';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
@@ -24,6 +25,10 @@ import { getPublicCheckoutConfig, type PublicDeliveryService } from '@/lib/api/p
 import { ApiError } from '@/lib/api/types';
 import { getRestaurant } from '@/lib/api/restaurants';
 import { formatMoney } from '@/lib/currency';
+import {
+  mergeDispatchRequestLists,
+  patchRequestsFromDispatchEvent,
+} from '@/lib/dispatch/restaurantDispatchSse';
 import {
   useRestaurantDispatchEvents,
   type RestaurantDispatchStreamStatus,
@@ -147,10 +152,12 @@ export default function DeliveryPage() {
       do {
         refreshQueuedRef.current = false;
         const rows = await listDispatchRequests(accessToken, selectedRestaurantId);
-        setRequests(rows);
+        setRequests((current) => mergeDispatchRequestLists(current, rows));
         setCreated((current) => {
           if (!current) return current;
-          return rows.find((item) => item.id === current.id) ?? current;
+          const updated = rows.find((item) => item.id === current.id);
+          if (!updated) return current;
+          return mergeDispatchRequestLists([current], [updated])[0] ?? current;
         });
       } while (refreshQueuedRef.current);
     } catch {
@@ -163,10 +170,13 @@ export default function DeliveryPage() {
   const { visibilityState } = useRestaurantDispatchEvents(selectedRestaurantId, accessToken, {
     onEvent: (event) => {
       if (event.type === 'delivery.service.updated') {
-        void refreshDeliveryService();
-        return;
+        return refreshDeliveryService();
       }
-      void refreshRequests();
+      setRequests((current) => patchRequestsFromDispatchEvent(current, event));
+      setCreated((current) =>
+        current ? patchRequestsFromDispatchEvent([current], event)[0] ?? current : current,
+      );
+      return refreshRequests();
     },
     onStatusChange: setSocketStatus,
     onReconnect: () => {
@@ -175,11 +185,11 @@ export default function DeliveryPage() {
     },
   });
 
-  // Fallback poll only when the tab is visible and SSE is not live.
+  // Keep a visible-tab poll even while SSE is live. Assignment can land on
+  // another process, and a missed event would otherwise freeze Activos.
   useEffect(() => {
     if (!accessToken || !selectedRestaurantId) return;
     if (visibilityState !== 'visible') return;
-    if (socketStatus === 'live') return;
     const timer = window.setInterval(() => {
       void refreshRequests();
       void refreshDeliveryService();
@@ -190,7 +200,6 @@ export default function DeliveryPage() {
     refreshDeliveryService,
     refreshRequests,
     selectedRestaurantId,
-    socketStatus,
     visibilityState,
   ]);
 
@@ -392,6 +401,13 @@ export default function DeliveryPage() {
           onDismiss={() => setCreated(null)}
         />
       ) : null}
+
+      <DispatchRiderCreditPanel
+        requests={requests}
+        subdomain={subdomain}
+        busy={confirming}
+        onConfirmCash={(request) => setConfirm({ kind: 'cash', request, step: 1 })}
+      />
 
       <div className={styles.listTabs} role="tablist" aria-label="Solicitudes de delivery">
         <button
