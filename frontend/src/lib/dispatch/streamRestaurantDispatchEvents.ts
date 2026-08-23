@@ -25,6 +25,7 @@ export async function streamRestaurantDispatchEvents(options: StreamOptions): Pr
           Accept: 'text/event-stream',
           Authorization: `Bearer ${options.accessToken}`,
         },
+        cache: 'no-store',
         signal: options.signal,
       },
     );
