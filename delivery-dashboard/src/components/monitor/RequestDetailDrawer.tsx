@@ -2,10 +2,12 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { DispatchRequestLogSections } from '@/components/monitor/DispatchRequestLogSections';
+import { DriverAvatar } from '@/components/drivers/DriverAvatar';
+import { DriverMetaTags } from '@/components/drivers/DriverMetaTags';
 import { DriverPhoneContact } from '@/components/drivers/DriverPhoneContact';
 import { RightDrawer } from '@/components/ui/RightDrawer';
 import { getAssignmentLog } from '@/lib/api/deliveryProviders';
-import type { AssignmentLog, DispatchMonitorRequest } from '@/lib/api/types';
+import type { AssignmentLog, DispatchMonitorDriver, DispatchMonitorRequest } from '@/lib/api/types';
 import {
   ASSIGNMENT_LOG_ERROR,
   assignmentSchedulerLines,
@@ -18,12 +20,14 @@ import {
   requestPackageLine,
   requestStatusLabel,
 } from '@/lib/dispatch/monitorCopy';
+import { publicTrackingUrl } from '@/lib/dispatch/publicTrackingUrl';
 import { formatMoney } from '@/lib/pricing/tariffUtils';
 import styles from './RequestDetailDrawer.module.css';
 
 type RequestDetailDrawerProps = {
   open: boolean;
   request: DispatchMonitorRequest | null;
+  driver?: DispatchMonitorDriver | null;
   accessToken: string | null;
   refreshNonce: number;
   onClose: () => void;
@@ -56,6 +60,7 @@ function ExternalLink({ href, children }: { href: string; children: string }) {
 export function RequestDetailDrawer({
   open,
   request,
+  driver = null,
   accessToken,
   refreshNonce,
   onClose,
@@ -102,6 +107,9 @@ export function RequestDetailDrawer({
     };
   }, [open, request?.id, accessToken, refreshNonce]);
 
+  const trackingUrl = request
+    ? publicTrackingUrl(request.tracking_token, request.restaurant_subdomain)
+    : null;
   const visibleLog = request && log?.request_id === request.id ? log : null;
   const cashDenom = request ? requestCashDenominationLine(request) : null;
   const blockers = request ? blockersSummary(request.search_blockers) : null;
@@ -115,11 +123,14 @@ export function RequestDetailDrawer({
   const restaurantMaps = request
     ? mapsSearchUrl(request.restaurant_lat, request.restaurant_lng)
     : null;
+  const deliveryCents = request?.quoted_fee_cents ?? 0;
+  const restaurantCents = request?.collect_cents ?? 0;
+  const customerTotalCents = restaurantCents + deliveryCents;
   const changeCents =
     request?.payment_method === 'cash' &&
     request.cash_denomination_cents != null &&
-    request.cash_denomination_cents > request.collect_cents
-      ? request.cash_denomination_cents - request.collect_cents
+    request.cash_denomination_cents > customerTotalCents
+      ? request.cash_denomination_cents - customerTotalCents
       : null;
   const timeline = request?.timeline ?? [];
   const schedulerLog: AssignmentLog | null =
@@ -159,6 +170,11 @@ export function RequestDetailDrawer({
               Solicitud del restaurante
             </h3>
             <dl className={styles.list}>
+              {trackingUrl ? (
+                <DetailRow label="Rastreo">
+                  <ExternalLink href={trackingUrl}>Abrir rastreo</ExternalLink>
+                </DetailRow>
+              ) : null}
               <DetailRow label="Cliente">{request.customer_name}</DetailRow>
               <DetailRow label="Celular">
                 {request.customer_phone ? (
@@ -190,7 +206,12 @@ export function RequestDetailDrawer({
               <DetailRow label="Pago">{paymentLabel(request.payment_method)}</DetailRow>
               {request.payment_method !== 'transfer' ? (
                 <DetailRow label="Cobrar">
-                  {request.collect_cents > 0 ? formatMoney(request.collect_cents) : 'Sin cobro'}
+                  {customerTotalCents > 0 ? formatMoney(customerTotalCents) : 'Sin cobro'}
+                </DetailRow>
+              ) : null}
+              {request.payment_method !== 'transfer' ? (
+                <DetailRow label="Monto restaurante">
+                  {restaurantCents > 0 ? formatMoney(restaurantCents) : 'Sin cobro'}
                 </DetailRow>
               ) : null}
               {cashDenom ? <DetailRow label="Paga con">{cashDenom.replace(/^Pagará con /, '')}</DetailRow> : null}
@@ -198,12 +219,51 @@ export function RequestDetailDrawer({
                 <DetailRow label="Cambio">{formatMoney(changeCents)}</DetailRow>
               ) : null}
               <DetailRow label="Envío">
-                {(request.quoted_fee_cents ?? 0) > 0 ? formatMoney(request.quoted_fee_cents ?? 0) : null}
+                {deliveryCents > 0 ? formatMoney(deliveryCents) : null}
               </DetailRow>
               <DetailRow label="Paquete">{requestPackageLine(request)}</DetailRow>
               <DetailRow label="Notas">{request.notes?.trim() || null}</DetailRow>
             </dl>
           </section>
+
+          {request.assigned_driver_id ? (
+            <section className={styles.section} aria-labelledby="request-detail-repa">
+              <h3 id="request-detail-repa" className={styles.heading}>
+                Repartidor
+              </h3>
+              {driver ? (
+                <div className={styles.riderCard}>
+                  <DriverAvatar
+                    firstName={driver.first_name}
+                    lastName={driver.last_name}
+                    profilePhotoPath={driver.profile_photo_path}
+                    size="md"
+                  />
+                  <div className={styles.riderBody}>
+                    <p className={styles.riderName}>
+                      {driver.first_name} {driver.last_name}
+                    </p>
+                    <DriverMetaTags
+                      plate={driver.plate}
+                      motorcycleColor={driver.motorcycle_color}
+                      compartmentSize={driver.compartment_size}
+                      creditAvailableCents={driver.credit_available_cents}
+                    />
+                    <p className={styles.riderMeta}>
+                      {driver.is_online ? 'En línea' : 'Offline'}
+                      {driver.registered_zone_name ? ` · ${driver.registered_zone_name}` : ''}
+                    </p>
+                    <DriverPhoneContact phone={driver.phone} compact />
+                  </div>
+                </div>
+              ) : (
+                <p className={styles.riderFallback}>
+                  {request.assigned_driver_name ?? 'Repartidor asignado'}
+                  {request.assigned_driver_plate ? ` · ${request.assigned_driver_plate}` : ''}
+                </p>
+              )}
+            </section>
+          ) : null}
 
           <DispatchRequestLogSections
             timeline={timeline}
