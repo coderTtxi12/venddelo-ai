@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { DriverAvatar } from '@/components/drivers/DriverAvatar';
+import { DriverMetaTags } from '@/components/drivers/DriverMetaTags';
 import { DriverPhoneContact } from '@/components/drivers/DriverPhoneContact';
 import { DispatchRequestLogSections } from '@/components/monitor/DispatchRequestLogSections';
 import { RightDrawer } from '@/components/ui/RightDrawer';
@@ -10,6 +12,7 @@ import {
   ASSIGNMENT_LOG_ERROR,
   assignmentSchedulerLines,
   caseLabel,
+  customerCollectCents,
   formatCoords,
   formatDateTime,
   formatShortId,
@@ -127,6 +130,18 @@ export function HistoryDetailDrawer({
   const schedulerLines = item
     ? assignmentSchedulerLines(visibleLog, item.status, Date.now())
     : [];
+  const deliveryCents = item?.quoted_fee_cents ?? 0;
+  const restaurantCents = item?.collect_cents ?? 0;
+  const customerTotalCents = item ? customerCollectCents(item) : 0;
+  const changeCents =
+    item?.payment_method === 'cash' &&
+    item.cash_denomination_cents != null &&
+    item.cash_denomination_cents > customerTotalCents
+      ? item.cash_denomination_cents - customerTotalCents
+      : null;
+  const deliveredRider =
+    item?.status === 'delivered' &&
+    (item.assigned_driver_id != null || Boolean(item.assigned_driver_name));
 
   return (
     <RightDrawer
@@ -171,13 +186,26 @@ export function HistoryDetailDrawer({
                   dropoffCoords
                 )}
               </DetailRow>
-              <DetailRow label="Repartidor">{item.assigned_driver_name}</DetailRow>
               <DetailRow label="Pago">{paymentLabel(item.payment_method)}</DetailRow>
               {item.payment_method !== 'transfer' ? (
-                <DetailRow label="Cobro">{formatMoney(item.collect_cents)}</DetailRow>
+                <DetailRow label="Cobrar">
+                  {customerTotalCents > 0 ? formatMoney(customerTotalCents) : 'Sin cobro'}
+                </DetailRow>
               ) : null}
-              <DetailRow label="Billete">{cashDenom}</DetailRow>
-              <DetailRow label="Tarifa">{formatMoney(item.quoted_fee_cents)}</DetailRow>
+              {item.payment_method !== 'transfer' ? (
+                <DetailRow label="Monto restaurante">
+                  {restaurantCents > 0 ? formatMoney(restaurantCents) : 'Sin cobro'}
+                </DetailRow>
+              ) : null}
+              {cashDenom ? (
+                <DetailRow label="Paga con">{cashDenom.replace(/^Pagará con /, '')}</DetailRow>
+              ) : null}
+              {changeCents != null ? (
+                <DetailRow label="Cambio">{formatMoney(changeCents)}</DetailRow>
+              ) : null}
+              <DetailRow label="Envío">
+                {deliveryCents > 0 ? formatMoney(deliveryCents) : null}
+              </DetailRow>
               <DetailRow label="Paquetes">{packageLine(item)}</DetailRow>
               <DetailRow label="Notas">{item.notes}</DetailRow>
               <DetailRow label="Caso">{caseLabel(item.case_applied)}</DetailRow>
@@ -193,6 +221,40 @@ export function HistoryDetailDrawer({
               </DetailRow>
             </dl>
           </section>
+
+          {deliveredRider ? (
+            <section className={styles.section} aria-labelledby="history-detail-repa">
+              <h3 id="history-detail-repa" className={styles.heading}>
+                Repartidor
+              </h3>
+              {item.assigned_driver_first_name || item.assigned_driver_plate ? (
+                <div className={styles.riderCard}>
+                  <DriverAvatar
+                    firstName={item.assigned_driver_first_name ?? ''}
+                    lastName={item.assigned_driver_last_name ?? ''}
+                    profilePhotoPath={item.assigned_driver_profile_photo_path}
+                    size="md"
+                  />
+                  <div className={styles.riderBody}>
+                    <p className={styles.riderName}>
+                      {item.assigned_driver_name ??
+                        `${item.assigned_driver_first_name ?? ''} ${item.assigned_driver_last_name ?? ''}`.trim()}
+                    </p>
+                    <DriverMetaTags
+                      plate={item.assigned_driver_plate ?? ''}
+                      motorcycleColor={item.assigned_driver_motorcycle_color ?? ''}
+                      compartmentSize={item.assigned_driver_compartment_size ?? 'normal'}
+                    />
+                    <DriverPhoneContact phone={item.assigned_driver_phone} compact />
+                  </div>
+                </div>
+              ) : (
+                <p className={styles.riderFallback}>
+                  {item.assigned_driver_name ?? 'Repartidor'}
+                </p>
+              )}
+            </section>
+          ) : null}
 
           <DispatchRequestLogSections
             timeline={item.timeline ?? []}

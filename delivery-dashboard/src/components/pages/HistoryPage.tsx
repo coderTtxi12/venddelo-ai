@@ -11,7 +11,13 @@ import { listActivePartnerships } from '@/lib/api/partnerships';
 import { ApiError } from '@/lib/api/types';
 import type { DeliveryDriver, DeliveryPartnershipRequest, DispatchHistoryItem } from '@/lib/api/types';
 import { historyDateRange, type HistoryPeriod } from '@/lib/dispatch/historyPeriod';
-import { formatDateTime, formatShortId, paymentLabel, requestStatusLabel } from '@/lib/dispatch/monitorCopy';
+import {
+  customerCollectCents,
+  formatDateTime,
+  formatShortId,
+  paymentLabel,
+  requestStatusLabel,
+} from '@/lib/dispatch/monitorCopy';
 import { formatMoney } from '@/lib/pricing/tariffUtils';
 import panelStyles from './PartnershipsPage.module.css';
 import styles from './HistoryPage.module.css';
@@ -338,7 +344,9 @@ export default function HistoryPage() {
                     <td>{item.zone_name || '—'}</td>
                     <td>{paymentLabel(item.payment_method)}</td>
                     <td>
-                      {item.payment_method === 'transfer' ? '—' : formatMoney(item.collect_cents)}
+                      {item.payment_method === 'transfer'
+                        ? '—'
+                        : formatMoney(customerCollectCents(item))}
                     </td>
                     <td>{formatMoney(item.quoted_fee_cents)}</td>
                     <td>{packageLine(item)}</td>
@@ -372,7 +380,11 @@ export default function HistoryPage() {
                     {formatDateTime(item.closed_at)} · {item.assigned_driver_name || 'Sin repartidor'}
                   </p>
                   <p className={styles.cardMeta}>
-                    {paymentLabel(item.payment_method)} · tarifa {formatMoney(item.quoted_fee_cents)}
+                    {paymentLabel(item.payment_method)}
+                    {item.payment_method !== 'transfer'
+                      ? ` · cobro ${formatMoney(customerCollectCents(item))}`
+                      : ''}
+                    {' · '}tarifa {formatMoney(item.quoted_fee_cents)}
                   </p>
                 </button>
               </li>
