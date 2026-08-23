@@ -301,12 +301,25 @@ def test_accept_cash_creates_hold_and_confirm_releases(client, engine):
         assert hold.amount_cents == 25000
 
     _as_owner()
+    listed = client.get(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        headers=AUTH,
+    )
+    assert listed.status_code == 200, listed.text
+    listed_row = next(item for item in listed.json() if item["id"] == str(request_id))
+    assert listed_row["status"] == "assigned"
+    assert listed_row["credit_hold_status"] == "held"
+    assert listed_row["credit_hold_cents"] == 25000
+
     confirmed = client.post(
         f"/api/v1/restaurants/me/dispatch-requests/{request_id}/confirm-rider-cash",
         params={"restaurant_id": restaurant_id},
         headers=AUTH,
     )
     assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["credit_hold_status"] == "released"
+    assert confirmed.json()["credit_hold_cents"] == 25000
 
     with factory() as session:
         driver = session.get(DeliveryDriver, uuid.UUID(driver_id))

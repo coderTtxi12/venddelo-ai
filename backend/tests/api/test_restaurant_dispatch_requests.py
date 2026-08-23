@@ -379,7 +379,7 @@ def test_cancel_and_public_tracking_hide_private_fields(client, engine):
     assert body["rider"] is None
     assert body["package_count"] == 1
     assert body["payment_method"] == "cash"
-    assert body["collect_cents"] == 25000
+    assert body["collect_cents"] == created["collect_cents"] + created["quoted_fee_cents"]
     assert body["cash_denomination_cents"] == 50000
     assert body["pickup"]["name"] == "Dispatch Bistro"
     assert body["pickup"]["latitude"] == COVERED_LAT

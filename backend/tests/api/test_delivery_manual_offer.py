@@ -200,6 +200,7 @@ def test_manual_reassign_keeps_current_rider_until_accept(client, engine):
         assert row.status == "assigned"
         assert row.assigned_driver_id == driver_ids[0]
         assert row.tracking_token == token
+        customer_total_cents = row.collect_cents + row.quoted_fee_cents
 
     tracking = client.get(f"/api/v1/public/dispatch-tracking/{token}")
     assert tracking.status_code == 200, tracking.text
@@ -224,7 +225,7 @@ def test_manual_reassign_keeps_current_rider_until_accept(client, engine):
     assert tracking.json()["customer_name"] == "María López"
     assert tracking.json()["package_count"] == 1
     assert tracking.json()["payment_method"] == "cash"
-    assert tracking.json()["collect_cents"] == 25000
+    assert tracking.json()["collect_cents"] == customer_total_cents
     assert tracking.json()["cash_denomination_cents"] == 50000
 
     _as_rider_b()

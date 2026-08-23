@@ -376,6 +376,20 @@ def test_delivery_provider_pricing_defaults_and_simulate(client):
     assert weather.status_code == 200
     assert weather.json()["weather_mode"] == "heavy"
 
+    monitor = client.get(
+        f"/api/v1/delivery-providers/me/dispatch-monitor?zone_id={zone_id}",
+        headers=AUTH,
+    )
+    assert monitor.status_code == 200, monitor.text
+    weather_modes = monitor.json()["weather_modes"]
+    assert weather_modes == [
+        {
+            "zone_id": zone_id,
+            "zone_name": weather_modes[0]["zone_name"],
+            "weather_mode": "heavy",
+        }
+    ]
+
 
 @requires_db
 def test_delivery_provider_payment_methods_defaults_and_update(client):
