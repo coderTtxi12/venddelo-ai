@@ -491,6 +491,7 @@ def build_dispatch_monitor_snapshot(
         restaurant_address = restaurant.address if restaurant is not None else None
         restaurant_phone = restaurant.whatsapp_phone if restaurant is not None else None
         restaurant_logo_path = restaurant.logo_path if restaurant is not None else None
+        restaurant_subdomain = restaurant.subdomain if restaurant is not None else None
         is_due_search = (
             request.status in _QUEUE_STATUSES and _as_utc(request.search_at) <= current
         )
@@ -541,6 +542,7 @@ def build_dispatch_monitor_snapshot(
                 restaurant_address=restaurant_address,
                 restaurant_phone=restaurant_phone,
                 restaurant_logo_path=restaurant_logo_path,
+                restaurant_subdomain=restaurant_subdomain,
                 restaurant_lat=restaurant_lat,
                 restaurant_lng=restaurant_lng,
                 dropoff_lat=request.dropoff_lat,
@@ -573,6 +575,7 @@ def build_dispatch_monitor_snapshot(
                 cycle_rejected_count=len(request.cycle_rejected_driver_ids),
                 cycle_silent_count=len(request.cycle_silent_driver_ids),
                 created_at=request.created_at,
+                tracking_token=request.tracking_token,
                 timeline=_timeline_events(
                     request,
                     timeout_at=timeout_at,
@@ -734,4 +737,5 @@ def build_dispatch_monitor_snapshot(
         offers=offer_dtos,
         credit_holds=hold_dtos,
         routes=routes,
+        weather_modes=weather_modes,
     )
