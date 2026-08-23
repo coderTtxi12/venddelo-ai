@@ -266,6 +266,8 @@ class DispatchRequestDTO(BaseModel):
     created_at: datetime
     updated_at: datetime
     rider: TrackingRiderDTO | None = None
+    credit_hold_status: Literal["held", "released"] | None = None
+    credit_hold_cents: int = 0
 
 
 class TrackingDropoffDTO(BaseModel):
