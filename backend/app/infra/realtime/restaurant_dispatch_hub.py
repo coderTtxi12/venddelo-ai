@@ -4,6 +4,7 @@ import asyncio
 import logging
 import uuid
 from collections import defaultdict
+from collections.abc import Iterable
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -71,3 +72,11 @@ _hub = RestaurantDispatchRealtimeHub()
 
 def get_restaurant_dispatch_realtime_hub() -> RestaurantDispatchRealtimeHub:
     return _hub
+
+
+def notify_restaurants_delivery_service_updated(
+    restaurant_ids: Iterable[uuid.UUID],
+) -> None:
+    hub = get_restaurant_dispatch_realtime_hub()
+    for restaurant_id in restaurant_ids:
+        hub.publish_sync(restaurant_id, {"type": "delivery.service.updated"})
