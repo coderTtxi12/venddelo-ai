@@ -3,6 +3,7 @@
 import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CourierUnavailableAlert } from '@/components/dispatch/CourierUnavailableAlert';
 import { DispatchRecentRequests } from '@/components/dispatch/DispatchRecentRequests';
 import { DispatchRequestSuccess } from '@/components/dispatch/DispatchRequestSuccess';
 import { RequestDeliveryForm } from '@/components/dispatch/RequestDeliveryForm';
@@ -303,11 +304,7 @@ export default function DeliveryPage() {
 
       {error ? <div className={styles.error} role="alert">{error}</div> : null}
 
-      {!courierAvailable ? (
-        <div className={styles.serviceAlert} role="alert">
-          {courierReason ?? 'El servicio de reparto de Mexy no está disponible en este momento.'}
-        </div>
-      ) : null}
+      <CourierUnavailableAlert service={deliveryService} />
 
       <section
         className={`${styles.formSection} ${formExpanded ? styles.formSectionOpen : ''}`}
