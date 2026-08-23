@@ -266,6 +266,7 @@ class DeliveryProviderService:
         self._repo.assert_zone_on_provider(provider.id, zone_id)
         self._validate_schedules(schedules)
         self._repo.set_schedules(zone_id, schedules)
+        self._notify_zone_delivery_service(provider.id, zone_id)
 
     def list_payment_methods(self, user_id: uuid.UUID) -> list[DeliveryProviderPaymentMethodDTO]:
         provider = self._require_provider(user_id)
@@ -332,7 +333,9 @@ class DeliveryProviderService:
             self._repo.seed_default_schedules(provider.id, zone_id)
             schedules = list(self._repo.list_schedules(zone_id))
         self._repo.set_service_manually_enabled(zone_id, data.manually_enabled)
-        return self._build_service_status(zone_id, schedules, provider.id)
+        status = self._build_service_status(zone_id, schedules, provider.id)
+        self._notify_zone_delivery_service(provider.id, zone_id)
+        return status
 
     def _provider_schedules_for_zone(
         self, user_id: uuid.UUID, zone_id: uuid.UUID
@@ -422,6 +425,7 @@ class DeliveryProviderService:
         require_manage_weather(member_role)
         self._repo.assert_zone_on_provider(provider.id, zone_id)
         self._repo.set_weather_mode(zone_id, data.weather_mode)
+        self._notify_zone_delivery_service(provider.id, zone_id)
         return self.get_pricing(user_id, zone_id)
 
     def simulate_pricing(
