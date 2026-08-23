@@ -103,6 +103,23 @@ class RiderProfile {
     return available < 0 ? 0 : available;
   }
 
+  RiderProfile copyWith({int? creditLimitCents, int? creditHeldCents}) {
+    return RiderProfile(
+      id: id,
+      firstName: firstName,
+      lastName: lastName,
+      isOnline: isOnline,
+      assignments: assignments,
+      itinerary: itinerary,
+      creditLimitCents: creditLimitCents ?? this.creditLimitCents,
+      creditHeldCents: creditHeldCents ?? this.creditHeldCents,
+      profilePhotoPath: profilePhotoPath,
+      plate: plate,
+      motorcycleBrand: motorcycleBrand,
+      motorcycleColor: motorcycleColor,
+    );
+  }
+
   factory RiderProfile.fromJson(Map<String, dynamic> json) {
     final raw = json['assignments'] as List<dynamic>? ?? const [];
     final rawItinerary = json['itinerary'] as List<dynamic>? ?? const [];
@@ -121,10 +138,28 @@ class RiderProfile {
           .map((item) => RiderAssignment.fromJson(item as Map<String, dynamic>))
           .toList(),
       itinerary: rawItinerary
-          .map((item) => PersistedItineraryStop.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) =>
+                PersistedItineraryStop.fromJson(item as Map<String, dynamic>),
+          )
           .toList(),
     );
   }
+}
+
+RiderProfile applyRiderCreditFromEvent(
+  RiderProfile profile,
+  Map<String, dynamic> event,
+) {
+  final held = event['credit_held_cents'];
+  final limit = event['credit_limit_cents'];
+  if (held is! num && limit is! num) {
+    return profile;
+  }
+  return profile.copyWith(
+    creditHeldCents: held is num ? held.toInt() : null,
+    creditLimitCents: limit is num ? limit.toInt() : null,
+  );
 }
 
 class PersistedItineraryStop {
@@ -400,7 +435,9 @@ class RiderHistoryPage {
       start: json['start'] as String,
       end: json['end'] as String,
       items: rawItems
-          .map((item) => RiderHistoryItem.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) => RiderHistoryItem.fromJson(item as Map<String, dynamic>),
+          )
           .toList(),
       total: _asInt(json['total']) ?? 0,
       deliveredCount: _asInt(json['delivered_count']) ?? 0,
@@ -411,7 +448,9 @@ class RiderHistoryPage {
       creditHeldCents: _asInt(json['credit_held_cents']) ?? 0,
       creditAvailableCents: _asInt(json['credit_available_cents']) ?? 0,
       activeHolds: rawHolds
-          .map((item) => RiderHistoryHold.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) => RiderHistoryHold.fromJson(item as Map<String, dynamic>),
+          )
           .toList(),
     );
   }

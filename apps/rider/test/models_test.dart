@@ -39,6 +39,34 @@ void main() {
     expect(paymentLabel('mixed'), 'Mixto');
   });
 
+  test('customerTotalCents adds restaurant collect and delivery fee', () {
+    expect(customerTotalCents(25000, 4500), 29500);
+    expect(customerTotalCents(0, 4500), 4500);
+    expect(customerTotalCents(15000, 0), 15000);
+  });
+
+  test('showsRiderCashCollect is cash or mixed with restaurant amount', () {
+    expect(showsRiderCashCollect('cash', 15000), isTrue);
+    expect(showsRiderCashCollect('mixed', 8000), isTrue);
+    expect(showsRiderCashCollect('mixed', 0), isFalse);
+    expect(showsRiderCashCollect('transfer', 15000), isFalse);
+    expect(showsRiderCashCollect('card_terminal', 15000), isFalse);
+  });
+
+  test('showsRiderCustomerCollect includes terminal charges', () {
+    expect(showsRiderCustomerCollect('card_terminal', 15000), isTrue);
+    expect(showsRiderCustomerCollect('card_terminal', 0), isTrue);
+    expect(showsRiderCustomerCollect('cash', 15000), isTrue);
+    expect(showsRiderCustomerCollect('transfer', 15000), isFalse);
+  });
+
+  test('riderCashFocusForStatus follows pickup then dropoff', () {
+    expect(riderCashFocusForStatus('assigned'), RiderCashFocus.restaurant);
+    expect(riderCashFocusForStatus('picked_up'), RiderCashFocus.collect);
+    expect(riderCashFocusForStatus('in_transit'), RiderCashFocus.collect);
+    expect(riderCashFocusForStatus('delivered'), RiderCashFocus.none);
+  });
+
   test('RiderProfile.fromJson exposes available credit', () {
     final profile = RiderProfile.fromJson({
       'id': 'd1',
@@ -54,6 +82,13 @@ void main() {
     expect(profile.creditHeldCents, 15000);
     expect(profile.creditAvailableCents, 35000);
     expect(formatMoneyCents(profile.creditAvailableCents), r'$350.00');
+    expect(
+      applyRiderCreditFromEvent(profile, {
+        'type': 'rider.updated',
+        'credit_held_cents': 0,
+      }).creditAvailableCents,
+      50000,
+    );
     expect(profile.itinerary, isEmpty);
     expect(profile.plate, isEmpty);
   });
