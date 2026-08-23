@@ -142,9 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
           position: pins[index].position,
           anchor: MonitorMapStyle.pinAnchor,
           zIndexInt: pins[index].current ? 3 : 2,
-          infoWindow: InfoWindow(
-            title: pins[index].label,
-          ),
+          infoWindow: InfoWindow(title: pins[index].label),
           icon: pins[index].kind == 'restaurant'
               ? _restaurantIcon ??
                     BitmapDescriptor.defaultMarkerWithHue(
@@ -221,7 +219,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     _routeQueryKey = queryKey;
     await selectedRouteStore.load(jobKey);
-    final result = await fetchRiderRoutes(origin: origin, destination: destination);
+    final result = await fetchRiderRoutes(
+      origin: origin,
+      destination: destination,
+    );
     if (!mounted || queryKey != _routeQueryKey) {
       return;
     }
@@ -277,15 +278,14 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     if (enabling) {
       _lastDriveMoveAt = null;
-      _ignoreMapGestureUntil =
-          DateTime.now().add(const Duration(milliseconds: 1200));
+      _ignoreMapGestureUntil = DateTime.now().add(
+        const Duration(milliseconds: 1200),
+      );
       unawaited(_moveDriveCamera());
     } else {
       final position = widget.controller.currentPosition;
       if (position != null) {
-        unawaited(
-          _mapController.flatten(target: latLngFromPosition(position)),
-        );
+        unawaited(_mapController.flatten(target: latLngFromPosition(position)));
       }
     }
   }
@@ -407,15 +407,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final peekHeight = (job == null ? 118.0 : 92.0) + bottomInset;
-    final idleBannerExtra = (controller.showIosKillWarning ? 80.0 : 0.0) +
+    final idleBannerExtra =
+        (controller.showIosKillWarning ? 80.0 : 0.0) +
         (controller.errorMessage != null ? 80.0 : 0.0) +
         (controller.needsLocationSettings ? 52.0 : 0.0);
     final expandedHeight = job == null
         ? peekHeight + 168 + idleBannerExtra
-        : math.min(
-            MediaQuery.sizeOf(context).height * 0.72,
-            640.0,
-          ).clamp(peekHeight + 160, MediaQuery.sizeOf(context).height * 0.9);
+        : math
+              .min(MediaQuery.sizeOf(context).height * 0.72, 640.0)
+              .clamp(peekHeight + 160, MediaQuery.sizeOf(context).height * 0.9);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -497,7 +497,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.only(right: 8),
                         child: _RouteChip(
                           label: routes[i].label ?? 'Ruta ${i + 1}',
-                          detail: '${routes[i].etaLabel} · ${routes[i].distanceLabel}',
+                          detail:
+                              '${routes[i].etaLabel} · ${routes[i].distanceLabel}',
                           selected: i == _selectedRoute,
                           onTap: () => _selectRoute(i),
                         ),
@@ -529,7 +530,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: _overview
                       ? Icons.near_me_rounded
                       : Icons.threed_rotation_rounded,
-                  tooltip: _overview ? 'Salir de vista completa' : 'Ver toda la ruta',
+                  tooltip: _overview
+                      ? 'Salir de vista completa'
+                      : 'Ver toda la ruta',
                   highlighted: _overview,
                   onPressed: selectedRoute == null && destination == null
                       ? _recenter
@@ -648,9 +651,8 @@ class _CreditChip extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               'Crédito ${formatMoneyCents(availableCents)}',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: Theme.of(context).textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -660,10 +662,7 @@ class _CreditChip extends StatelessWidget {
 }
 
 class _ProfileIconButton extends StatelessWidget {
-  const _ProfileIconButton({
-    required this.name,
-    required this.onPressed,
-  });
+  const _ProfileIconButton({required this.name, required this.onPressed});
 
   final String name;
   final VoidCallback onPressed;
@@ -695,9 +694,9 @@ class _ProfileIconButton extends StatelessWidget {
               child: Text(
                 initial,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.cta,
-                    ),
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.cta,
+                ),
               ),
             ),
           ),
@@ -815,7 +814,9 @@ class _HomeBottomSheet extends StatelessWidget {
   void _expandIfPeeked() {
     final current = sheetController.value ?? peekHeight;
     if (current <= peekHeight + 28) {
-      unawaited(sheetController.animateTo(SheetOffset.absolute(expandedHeight)));
+      unawaited(
+        sheetController.animateTo(SheetOffset.absolute(expandedHeight)),
+      );
     }
   }
 
@@ -857,7 +858,8 @@ class _HomeBottomSheet extends StatelessWidget {
                 onTap: _expandIfPeeked,
                 child: Semantics(
                   button: true,
-                  label: 'Mostrar detalles. $peekTitle${peekSubtitle == null ? '' : '. $peekSubtitle'}',
+                  label:
+                      'Mostrar detalles. $peekTitle${peekSubtitle == null ? '' : '. $peekSubtitle'}',
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
                     child: Column(
@@ -882,7 +884,9 @@ class _HomeBottomSheet extends StatelessWidget {
                                 children: [
                                   Text(
                                     peekTitle,
-                                    style: Theme.of(context).textTheme.titleMedium,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium,
                                   ),
                                   if (peekSubtitle != null) ...[
                                     const SizedBox(height: 2),
@@ -890,8 +894,12 @@ class _HomeBottomSheet extends StatelessWidget {
                                       peekSubtitle,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context).textTheme.bodyMedium
-                                          ?.copyWith(color: AppColors.textMuted),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: AppColors.textMuted,
+                                          ),
                                     ),
                                   ],
                                 ],
@@ -918,8 +926,7 @@ class _HomeBottomSheet extends StatelessWidget {
                   children: [
                     if (controller.showIosKillWarning) ...[
                       const RiderInfoBanner(
-                        message:
-                            'Si cierras la app deslizándola hacia arriba, el GPS se detiene y no recibirás ofertas.',
+                        message: 'Si cierras la app deslizándola hacia arriba, el GPS se detiene y no recibirás ofertas.',
                       ),
                       const SizedBox(height: 10),
                     ],
@@ -955,8 +962,7 @@ class _HomeBottomSheet extends StatelessWidget {
                   children: [
                     if (controller.showIosKillWarning) ...[
                       const RiderInfoBanner(
-                        message:
-                            'Si cierras la app deslizándola hacia arriba, el GPS se detiene y no recibirás ofertas.',
+                        message: 'Si cierras la app deslizándola hacia arriba, el GPS se detiene y no recibirás ofertas.',
                       ),
                       const SizedBox(height: 10),
                     ],
@@ -1039,7 +1045,8 @@ class _RouteFlow extends StatelessWidget {
       return const SizedBox.shrink();
     }
     return Semantics(
-      label: 'Ruta prevista, ${stops.length} paradas. Ahora: ${stops.first.action} ${stops.first.title}',
+      label:
+          'Ruta prevista, ${stops.length} paradas. Ahora: ${stops.first.action} ${stops.first.title}',
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         decoration: BoxDecoration(
@@ -1060,9 +1067,8 @@ class _RouteFlow extends StatelessWidget {
             ),
             Text(
               'Te guiamos al paso actual. El resto es la ruta prevista.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.textMuted,
-              ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: AppColors.textMuted),
             ),
             const SizedBox(height: 10),
             for (var index = 0; index < stops.length; index++) ...[
@@ -1092,10 +1098,7 @@ class _RouteFlowStep extends StatelessWidget {
           width: 24,
           height: 24,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: badgeColor,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: badgeColor, shape: BoxShape.circle),
           child: Text(
             '${stop.sequence}',
             style: const TextStyle(
@@ -1118,10 +1121,7 @@ class _RouteFlowStep extends StatelessWidget {
                   letterSpacing: 0.2,
                 ),
               ),
-              Text(
-                stop.title,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
+              Text(stop.title, style: Theme.of(context).textTheme.titleSmall),
               if (stop.detail != null &&
                   stop.detail!.trim().isNotEmpty &&
                   stop.detail != stop.title)
@@ -1129,9 +1129,8 @@ class _RouteFlowStep extends StatelessWidget {
                   stop.detail!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textMuted,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: AppColors.textMuted),
                 ),
             ],
           ),
@@ -1160,10 +1159,8 @@ class _JobCard extends StatelessWidget {
         if (formatShortId(assignment.shortId).isNotEmpty) ...[
           Text(
             formatShortId(assignment.shortId),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.6,
-            ),
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.6),
           ),
           const SizedBox(height: 10),
         ],
@@ -1219,10 +1216,7 @@ class _JobCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  notes,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
+                Text(notes, style: Theme.of(context).textTheme.bodyLarge),
               ],
             ),
           ),
@@ -1239,13 +1233,25 @@ class _JobDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final collect = assignment.collectCents;
+    final collect = assignment.collectCents ?? 0;
     final denomination = assignment.cashDenominationCents;
-    final fee = assignment.quotedFeeCents;
+    final fee = assignment.quotedFeeCents ?? 0;
     final payment = assignment.paymentMethod;
+    final cashCollect = showsRiderCashCollect(payment, collect);
+    final customerCollect = showsRiderCustomerCollect(payment, collect);
+    final customerTotal = customerTotalCents(collect, fee);
+    final cashFocus = riderCashFocusForStatus(assignment.status);
+    final focusCollect =
+        customerCollect &&
+        cashFocus == RiderCashFocus.collect &&
+        customerTotal > 0;
+    final focusRestaurant =
+        cashCollect && cashFocus == RiderCashFocus.restaurant && collect > 0;
 
+    const inset = 14.0;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+      clipBehavior: Clip.antiAlias,
+      padding: const EdgeInsets.only(top: 12, bottom: 6),
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(16),
@@ -1253,20 +1259,42 @@ class _JobDetails extends StatelessWidget {
       child: Column(
         children: [
           if (payment.isNotEmpty)
-            RiderMetaRow(label: 'Pago', value: paymentLabel(payment)),
-          if (collect != null && collect > 0)
-            RiderMetaRow(label: 'Cobrar', value: formatMoneyCents(collect)),
+            RiderMetaRow(
+              label: 'Pago',
+              value: paymentLabel(payment),
+              horizontalInset: inset,
+            ),
+          if (customerCollect && customerTotal > 0)
+            RiderMetaRow(
+              label: 'Cobrar',
+              value: formatMoneyCents(customerTotal),
+              emphasized: focusCollect,
+              horizontalInset: inset,
+            ),
           if (payment == 'cash' && denomination != null)
             RiderMetaRow(
               label: 'Pagará con',
               value: formatMoneyCents(denomination),
+              horizontalInset: inset,
             ),
-          if (fee != null && fee > 0)
-            RiderMetaRow(label: 'Envío', value: formatMoneyCents(fee)),
+          if (cashCollect && collect > 0)
+            RiderMetaRow(
+              label: 'Restaurante',
+              value: formatMoneyCents(collect),
+              emphasized: focusRestaurant,
+              horizontalInset: inset,
+            ),
+          if (fee > 0)
+            RiderMetaRow(
+              label: 'Envío',
+              value: formatMoneyCents(fee),
+              horizontalInset: inset,
+            ),
           RiderMetaRow(
             label: 'Paquetes',
             value:
                 '${packageCountLabel(assignment.packageCount)} · ${packageSizeLabel(assignment.packageSize)}',
+            horizontalInset: inset,
           ),
         ],
       ),
@@ -1303,9 +1331,8 @@ class _CustomerContactCard extends StatelessWidget {
           children: [
             Text(
               'Cliente',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
@@ -1479,8 +1506,7 @@ class _DestinationMapsCardState extends State<_DestinationMapsCard> {
                         tooltip: _expanded
                             ? 'Contraer dirección'
                             : 'Mostrar dirección completa',
-                        onPressed: () =>
-                            setState(() => _expanded = !_expanded),
+                        onPressed: () => setState(() => _expanded = !_expanded),
                         icon: Icon(
                           _expanded
                               ? Icons.expand_less_rounded

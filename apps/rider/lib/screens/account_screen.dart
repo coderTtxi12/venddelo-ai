@@ -104,8 +104,16 @@ class _AccountScreenState extends State<AccountScreen> {
       if (picked == null) return;
       setState(() {
         _period = HistoryPeriod.custom;
-        _customStart = DateTime(picked.start.year, picked.start.month, picked.start.day);
-        _customEnd = DateTime(picked.end.year, picked.end.month, picked.end.day);
+        _customStart = DateTime(
+          picked.start.year,
+          picked.start.month,
+          picked.start.day,
+        );
+        _customEnd = DateTime(
+          picked.end.year,
+          picked.end.month,
+          picked.end.day,
+        );
       });
       await _load();
       return;
@@ -167,7 +175,8 @@ class _AccountScreenState extends State<AccountScreen> {
                     earningsCents: page?.earningsCents ?? 0,
                     deliveredCount: page?.deliveredCount ?? 0,
                     cancelledCount: page?.cancelledCount ?? 0,
-                    availableCents: page?.creditAvailableCents ??
+                    availableCents:
+                        page?.creditAvailableCents ??
                         profile?.creditAvailableCents ??
                         0,
                     heldCents:
@@ -270,7 +279,8 @@ class _HistoryHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rangeLabel = period == HistoryPeriod.custom &&
+    final rangeLabel =
+        period == HistoryPeriod.custom &&
             customStart != null &&
             customEnd != null
         ? '${formatDayMonth(customStart!)} – ${formatDayMonth(customEnd!)}'
@@ -332,9 +342,8 @@ class _HistoryHeader extends StatelessWidget {
         const SizedBox(height: 18),
         Text(
           'Entregas',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+          style: Theme.of(context).textTheme.titleSmall
+              ?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 10),
       ],
@@ -370,9 +379,9 @@ class _EarningsHero extends StatelessWidget {
           Text(
             'Ganancias · $rangeLabel',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.78),
-                  fontWeight: FontWeight.w600,
-                ),
+              color: Colors.white.withValues(alpha: 0.78),
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 8),
           if (loading)
@@ -381,18 +390,18 @@ class _EarningsHero extends StatelessWidget {
             Text(
               formatMoneyCents(earningsCents),
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           const SizedBox(height: 8),
           Text(
             summary,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.78),
-                  fontWeight: FontWeight.w600,
-                ),
+              color: Colors.white.withValues(alpha: 0.78),
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -433,10 +442,10 @@ class _CreditCard extends StatelessWidget {
           Text(
             'Crédito',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textMuted,
-                  letterSpacing: 0.3,
-                ),
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMuted,
+              letterSpacing: 0.3,
+            ),
           ),
           const SizedBox(height: 10),
           Row(
@@ -479,9 +488,8 @@ class _CreditCard extends StatelessWidget {
             const SizedBox(height: 14),
             Text(
               'Holds activos',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(context).textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             for (final hold in holds)
@@ -511,9 +519,8 @@ class _CreditCard extends StatelessWidget {
                             hold.restaurantName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           if (formatShortId(hold.shortId).isNotEmpty)
                             Text(
@@ -526,9 +533,9 @@ class _CreditCard extends StatelessWidget {
                     Text(
                       formatMoneyCents(hold.amountCents),
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
+                        fontWeight: FontWeight.w800,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ],
                 ),
@@ -559,9 +566,9 @@ class _CreditStat extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 4),
         FittedBox(
@@ -570,10 +577,10 @@ class _CreditStat extends StatelessWidget {
           child: Text(
             value,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: emphasis ? AppColors.cta : AppColors.textPrimary,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+              fontWeight: FontWeight.w800,
+              color: emphasis ? AppColors.cta : AppColors.textPrimary,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
         ),
       ],
@@ -617,9 +624,9 @@ class _PeriodChip extends StatelessWidget {
             child: Text(
               label,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: selected ? Colors.white : AppColors.textSecondary,
-                  ),
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : AppColors.textSecondary,
+              ),
             ),
           ),
         ),
@@ -680,9 +687,7 @@ class _HistoryCard extends StatelessWidget {
                           if (shortId.isNotEmpty) ...[
                             Text(
                               shortId,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelLarge
+                              style: Theme.of(context).textTheme.labelLarge
                                   ?.copyWith(fontWeight: FontWeight.w800),
                             ),
                             const SizedBox(width: 8),
@@ -691,9 +696,7 @@ class _HistoryCard extends StatelessWidget {
                             child: Text(
                               formatClosedAtLocal(item.closedAt),
                               textAlign: TextAlign.right,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelMedium
+                              style: Theme.of(context).textTheme.labelMedium
                                   ?.copyWith(color: AppColors.textMuted),
                             ),
                           ),
@@ -704,18 +707,16 @@ class _HistoryCard extends StatelessWidget {
                         item.restaurantName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style: Theme.of(context).textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         item.dropoffAddress,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(color: AppColors.textSecondary),
                       ),
                       const SizedBox(height: 10),
                       Wrap(
@@ -725,9 +726,7 @@ class _HistoryCard extends StatelessWidget {
                         children: [
                           Text(
                             formatMoneyCents(item.quotedFeeCents),
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
+                            style: Theme.of(context).textTheme.titleSmall
                                 ?.copyWith(
                                   fontWeight: FontWeight.w800,
                                   fontFeatures: const [
@@ -782,10 +781,8 @@ class _StatusPill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
+        style: Theme.of(context).textTheme.labelMedium
+            ?.copyWith(fontWeight: FontWeight.w700, color: color),
       ),
     );
   }
@@ -823,9 +820,8 @@ class _HistoryEmptyState extends StatelessWidget {
           Text(
             historyEmptyMessage,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(context).textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 6),
           Text(
@@ -935,9 +931,7 @@ class _SkeletonLine extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: dark
-            ? Colors.white.withValues(alpha: 0.18)
-            : AppColors.border,
+        color: dark ? Colors.white.withValues(alpha: 0.18) : AppColors.border,
         borderRadius: BorderRadius.circular(rounded),
       ),
     );
@@ -972,9 +966,8 @@ class _HistoryDetailSheet extends StatelessWidget {
                       formatShortId(item.shortId).isEmpty
                           ? item.restaurantName
                           : '${formatShortId(item.shortId)} · ${item.restaurantName}',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                      style: Theme.of(context).textTheme.titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w800),
                     ),
                   ),
                 ],
@@ -1010,14 +1003,15 @@ class _HistoryDetailSheet extends StatelessWidget {
                     Text(
                       'Envío',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textMuted,
-                          ),
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textMuted,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       formatMoneyCents(item.quotedFeeCents),
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
                             fontWeight: FontWeight.w800,
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
@@ -1035,20 +1029,37 @@ class _HistoryDetailSheet extends StatelessWidget {
                   item.customerName!.trim().isNotEmpty)
                 RiderMetaRow(label: 'Cliente', value: item.customerName!),
               if (phone != null && phone.isNotEmpty)
-                RiderMetaRow(label: 'Teléfono', value: historyMaskedPhone(phone)),
+                RiderMetaRow(
+                  label: 'Teléfono',
+                  value: historyMaskedPhone(phone),
+                ),
               RiderMetaRow(
                 label: 'Entrega',
                 value: historyMaskedDropoff(item.dropoffAddress),
               ),
-              if (item.paymentMethod != 'transfer')
+              if (showsRiderCustomerCollect(
+                item.paymentMethod,
+                item.collectCents,
+              ))
                 RiderMetaRow(
                   label: 'Cobrar',
-                  value: formatMoneyCents(item.collectCents),
+                  value: formatMoneyCents(
+                    customerTotalCents(item.collectCents, item.quotedFeeCents),
+                  ),
                 ),
               if (item.cashDenominationCents != null)
                 RiderMetaRow(
                   label: 'Billete',
                   value: formatMoneyCents(item.cashDenominationCents!),
+                ),
+              if (showsRiderCashCollect(
+                    item.paymentMethod,
+                    item.collectCents,
+                  ) &&
+                  item.collectCents > 0)
+                RiderMetaRow(
+                  label: 'Restaurante',
+                  value: formatMoneyCents(item.collectCents),
                 ),
               RiderMetaRow(
                 label: 'Paquetes',
