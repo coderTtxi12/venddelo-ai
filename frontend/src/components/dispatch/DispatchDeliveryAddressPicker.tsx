@@ -13,7 +13,7 @@ import {
   loadGoogleMapsPlaces,
   reverseGeocodeCoordinates,
 } from '@/lib/loadGoogleMapsPlaces';
-import { mapNeedsNewInstance } from '@/lib/maps/googleMapInstance';
+import { mapNeedsNewInstance, triggerGoogleMapResize } from '@/lib/maps/googleMapInstance';
 import { looksLikeMapsUrl, normalizeMapsUrlInput, parseMapsUrl } from '@/lib/maps/parseMapsUrl';
 import styles from './DispatchDeliveryAddressPicker.module.css';
 
@@ -374,7 +374,7 @@ export function DispatchDeliveryAddressPicker({
           if (map) {
             window.requestAnimationFrame(() => {
               if (cancelled) return;
-              google.maps.event.trigger(map, 'resize');
+              triggerGoogleMapResize(map);
               map.setCenter(position);
             });
           }
