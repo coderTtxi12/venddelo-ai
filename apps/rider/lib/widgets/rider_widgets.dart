@@ -61,10 +61,7 @@ class RiderSecondaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        child: Text(label),
-      ),
+      child: OutlinedButton(onPressed: onPressed, child: Text(label)),
     );
   }
 }
@@ -88,10 +85,8 @@ class RiderErrorBanner extends StatelessWidget {
         ),
         child: Text(
           message,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: AppColors.danger,
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(context).textTheme.bodyLarge
+              ?.copyWith(color: AppColors.danger, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -115,10 +110,8 @@ class RiderInfoBanner extends StatelessWidget {
       ),
       child: Text(
         message,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: AppColors.cta,
-              fontWeight: FontWeight.w600,
-            ),
+        style: Theme.of(context).textTheme.bodyLarge
+            ?.copyWith(color: AppColors.cta, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -171,9 +164,9 @@ class RiderOnlineToggle extends StatelessWidget {
                     Text(
                       statusLabel,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppColors.textPrimary,
-                            letterSpacing: 0.4,
-                          ),
+                        color: AppColors.textPrimary,
+                        letterSpacing: 0.4,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -185,10 +178,7 @@ class RiderOnlineToggle extends StatelessWidget {
                   ],
                 ),
               ),
-              Switch(
-                value: isOnline,
-                onChanged: enabled ? onChanged : null,
-              ),
+              Switch(value: isOnline, onChanged: enabled ? onChanged : null),
             ],
           ),
         ),
@@ -217,10 +207,7 @@ class RiderStatusCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (leading != null) ...[
-              leading!,
-              const SizedBox(width: 16),
-            ],
+            if (leading != null) ...[leading!, const SizedBox(width: 16)],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -239,37 +226,69 @@ class RiderStatusCard extends StatelessWidget {
 }
 
 class RiderMetaRow extends StatelessWidget {
-  const RiderMetaRow({super.key, required this.label, required this.value});
+  const RiderMetaRow({
+    super.key,
+    required this.label,
+    required this.value,
+    this.emphasized = false,
+    this.horizontalInset = 0,
+  });
 
   final String label;
   final String value;
+  final bool emphasized;
+  final double horizontalInset;
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final row = Row(
+      crossAxisAlignment: emphasized
+          ? CrossAxisAlignment.baseline
+          : CrossAxisAlignment.start,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        SizedBox(
+          width: 110,
+          child: Text(
+            label,
+            style: textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: emphasized ? AppColors.textPrimary : AppColors.textMuted,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: (emphasized ? textTheme.titleLarge : textTheme.bodyLarge)
+                ?.copyWith(
+                  fontWeight: emphasized ? FontWeight.w800 : FontWeight.w600,
+                  color: emphasized ? AppColors.cta : AppColors.textPrimary,
+                  fontFeatures: emphasized
+                      ? const [FontFeature.tabularFigures()]
+                      : null,
+                ),
+          ),
+        ),
+      ],
+    );
+
+    if (!emphasized) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(horizontalInset, 0, horizontalInset, 8),
+        child: row,
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textMuted,
-                  ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-          ),
-        ],
+      child: ColoredBox(
+        color: AppColors.cta.withValues(alpha: 0.07),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(horizontalInset, 8, horizontalInset, 8),
+          child: row,
+        ),
       ),
     );
   }

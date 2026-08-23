@@ -166,8 +166,20 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
           _PayoutHero(
             feeLabel: formatMoneyCents(offer.quotedFeeCents),
             distanceLabel: formatDistanceMeters(offer.distanceMeters),
-            collectLabel: offer.paymentMethod == 'cash' ||
-                    (offer.paymentMethod == 'mixed' && offer.collectCents > 0)
+            collectLabel:
+                showsRiderCustomerCollect(
+                  offer.paymentMethod,
+                  offer.collectCents,
+                )
+                ? formatMoneyCents(
+                    customerTotalCents(
+                      offer.collectCents,
+                      offer.quotedFeeCents,
+                    ),
+                  )
+                : null,
+            restaurantPayLabel:
+                showsRiderCashCollect(offer.paymentMethod, offer.collectCents)
                 ? formatMoneyCents(offer.collectCents)
                 : null,
           ),
@@ -190,11 +202,13 @@ class _PayoutHero extends StatelessWidget {
     required this.feeLabel,
     required this.distanceLabel,
     this.collectLabel,
+    this.restaurantPayLabel,
   });
 
   final String feeLabel;
   final String distanceLabel;
   final String? collectLabel;
+  final String? restaurantPayLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -226,16 +240,25 @@ class _PayoutHero extends StatelessWidget {
                 label: 'Distancia',
                 value: distanceLabel,
               ),
-              if (collectLabel != null) ...[
+              if (restaurantPayLabel != null) ...[
                 const SizedBox(width: 10),
                 _MiniStat(
-                  icon: Icons.payments_rounded,
-                  label: 'Cobrar',
-                  value: collectLabel!,
+                  icon: Icons.storefront_rounded,
+                  label: 'Restaurante',
+                  value: restaurantPayLabel!,
                 ),
               ],
             ],
           ),
+          if (collectLabel != null) ...[
+            const SizedBox(height: 10),
+            _MiniStat(
+              icon: Icons.payments_rounded,
+              label: 'Cobrar',
+              value: collectLabel!,
+              expanded: false,
+            ),
+          ],
         ],
       ),
     );
@@ -247,43 +270,47 @@ class _MiniStat extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.expanded = true,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: AppColors.textPrimary),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  Text(label, style: Theme.of(context).textTheme.bodySmall),
-                ],
-              ),
+    final card = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.textPrimary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                Text(label, style: Theme.of(context).textTheme.bodySmall),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+    if (!expanded) {
+      return card;
+    }
+    return Expanded(child: card);
   }
 }
 

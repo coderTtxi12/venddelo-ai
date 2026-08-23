@@ -76,14 +76,14 @@ void main() {
     expect(find.text('Costo de envío'), findsOneWidget);
     expect(find.text('\$45.00'), findsOneWidget);
     expect(find.text('Cobrar'), findsOneWidget);
+    expect(find.text('\$195.00'), findsOneWidget);
+    expect(find.text('Restaurante'), findsOneWidget);
     expect(find.text('\$150.00'), findsOneWidget);
     expect(find.text('Desliza para aceptar'), findsOneWidget);
     expect(find.text('Desliza para rechazar'), findsNothing);
   });
 
-  testWidgets('offer sheet hides collect for transfer and terminal', (
-    tester,
-  ) async {
+  testWidgets('offer sheet hides collect for transfer', (tester) async {
     await _pumpSheet(
       tester,
       offer: RiderOffer(
@@ -102,10 +102,15 @@ void main() {
     );
 
     expect(find.text('Cobrar'), findsNothing);
+    expect(find.text('Restaurante'), findsNothing);
     expect(find.text('Transferencia'), findsOneWidget);
     expect(find.text('Costo de envío'), findsOneWidget);
     expect(find.text('\$45.00'), findsOneWidget);
+  });
 
+  testWidgets('offer sheet shows collect for terminal without restaurant pay', (
+    tester,
+  ) async {
     await _pumpSheet(
       tester,
       offer: RiderOffer(
@@ -116,14 +121,16 @@ void main() {
         expiresAt: DateTime.now().toUtc().add(const Duration(seconds: 45)),
         restaurantName: 'Tacos',
         dropoffAddress: 'Calle 1',
-        collectCents: 0,
+        collectCents: 15000,
         quotedFeeCents: 4500,
         paymentMethod: 'card_terminal',
         packageCount: 1,
       ),
     );
 
-    expect(find.text('Cobrar'), findsNothing);
+    expect(find.text('Cobrar'), findsOneWidget);
+    expect(find.text('\$195.00'), findsOneWidget);
+    expect(find.text('Restaurante'), findsNothing);
     expect(find.text('Terminal'), findsOneWidget);
   });
 
@@ -183,7 +190,10 @@ void main() {
     final geometry = offerMapGeometry(_offer());
     expect(geometry.polylines, hasLength(1));
     expect(geometry.markers, hasLength(2));
-    expect(geometry.polylines.first.patterns, MonitorMapStyle.pendingRoutePatterns);
+    expect(
+      geometry.polylines.first.patterns,
+      MonitorMapStyle.pendingRoutePatterns,
+    );
     expect(geometry.polylines.first.color, MonitorMapStyle.pendingRoute);
     expect(geometry.markers.map((marker) => marker.anchor), [
       MonitorMapStyle.pinAnchor,
