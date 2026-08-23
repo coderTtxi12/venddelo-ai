@@ -7,6 +7,7 @@ import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import { AssignDriverDrawer } from '@/components/monitor/AssignDriverDrawer';
 import { DispatchMonitorMap } from '@/components/monitor/DispatchMonitorMap';
+import { MonitorWeatherBar } from '@/components/monitor/MonitorWeatherBar';
 import { RequestDetailDrawer } from '@/components/monitor/RequestDetailDrawer';
 import { DriverPhoneContact } from '@/components/drivers/DriverPhoneContact';
 import { DriverAvatar } from '@/components/drivers/DriverAvatar';
@@ -20,13 +21,16 @@ import {
   getMyDispatchMonitor,
   retryMyUnassignedDispatchRequest,
   updateDriverItinerary,
+  updateMyDeliveryProviderWeatherMode,
 } from '@/lib/api/deliveryProviders';
 import type {
+  DeliveryWeatherMode,
   DispatchMonitorCreditHold,
   DispatchMonitorDriver,
   DispatchMonitorOffer,
   DispatchMonitorRequest,
   DispatchMonitorSnapshot,
+  DispatchMonitorZoneWeather,
 } from '@/lib/api/types';
 import {
   blockersSummary,
@@ -44,6 +48,7 @@ import {
   requestSchedulerLine,
   requestStatusLabel,
 } from '@/lib/dispatch/monitorCopy';
+import { publicTrackingUrl } from '@/lib/dispatch/publicTrackingUrl';
 import {
   useDispatchMonitorSocket,
   type DispatchMonitorSocketStatus,
@@ -308,6 +313,7 @@ function QueueList({
               >
                 Detalle
               </button>
+              <RequestTrackLink request={request} />
               {canAssign ? (
                 <button type="button" className={styles.assignButton} onClick={() => onAssign(request)}>
                   Asignar
@@ -318,6 +324,22 @@ function QueueList({
         );
       })}
     </ul>
+  );
+}
+
+function RequestTrackLink({ request }: { request: DispatchMonitorRequest }) {
+  const url = publicTrackingUrl(request.tracking_token, request.restaurant_subdomain);
+  if (!url) return null;
+  return (
+    <a
+      className={styles.trackButton}
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Rastrear ${formatShortId(request.short_id)}`}
+    >
+      Rastrear
+    </a>
   );
 }
 
@@ -416,6 +438,7 @@ function ActiveList({
               >
                 Detalle
               </button>
+              <RequestTrackLink request={request} />
               {canAssign ? (
                 <button type="button" className={styles.assignButton} onClick={() => onAssign(request)}>
                   Asignar
@@ -755,8 +778,8 @@ function BusinessesList({
 
 export default function MonitorPage() {
   const { accessToken } = useAuth();
-  const { canManagePartnerships } = useDeliveryProviderAccess();
-  const { selectedZoneId, zones, isAllZones, loading: zonesLoading } = useDeliveryZone();
+  const { canManagePartnerships, canManageWeather } = useDeliveryProviderAccess();
+  const { selectedZoneId, zones, isAllZones, loading: zonesLoading, refreshZones } = useDeliveryZone();
   const zoneIds = useMemo(() => zones.map((zone) => zone.id), [zones]);
   const [snapshot, setSnapshot] = useState<DispatchMonitorSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -783,6 +806,7 @@ export default function MonitorPage() {
   const [logNonce, setLogNonce] = useState(0);
   const snapshotInFlightRef = useRef(false);
   const snapshotQueuedRef = useRef(false);
+  const [weatherSaving, setWeatherSaving] = useState(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -867,6 +891,18 @@ export default function MonitorPage() {
     () => liveBusinessesFromRequests(snapshot?.requests ?? []),
     [snapshot],
   );
+  const weatherZones = useMemo<DispatchMonitorZoneWeather[]>(() => {
+    if (snapshot?.weather_modes?.length) {
+      return snapshot.weather_modes;
+    }
+    return zones
+      .filter((zone) => isAllZones || zone.id === selectedZoneId)
+      .map((zone) => ({
+        zone_id: zone.id,
+        zone_name: zone.name,
+        weather_mode: zone.weather_mode,
+      }));
+  }, [isAllZones, selectedZoneId, snapshot?.weather_modes, zones]);
 
   const sortedQueue = useMemo(
     () =>
@@ -927,6 +963,11 @@ export default function MonitorPage() {
     () => (snapshot?.requests ?? []).find((row) => row.id === detailRequestId) ?? null,
     [detailRequestId, snapshot],
   );
+  const detailDriver = useMemo(() => {
+    const driverId = detailRequest?.assigned_driver_id;
+    if (!driverId) return null;
+    return driversById.get(driverId) ?? null;
+  }, [detailRequest?.assigned_driver_id, driversById]);
 
   useEffect(() => {
     if (!detailRequestId) return;
@@ -1041,6 +1082,29 @@ export default function MonitorPage() {
     }
   }
 
+  async function handleWeatherChange(zoneId: string, mode: DeliveryWeatherMode) {
+    if (!accessToken || weatherSaving) return;
+    setWeatherSaving(true);
+    setSnapshot((current) => {
+      if (!current?.weather_modes) return current;
+      return {
+        ...current,
+        weather_modes: current.weather_modes.map((row) =>
+          row.zone_id === zoneId ? { ...row, weather_mode: mode } : row,
+        ),
+      };
+    });
+    try {
+      await updateMyDeliveryProviderWeatherMode(accessToken, zoneId, { weather_mode: mode });
+      await Promise.all([loadSnapshot(), refreshZones()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar el clima operativo');
+      await loadSnapshot();
+    } finally {
+      setWeatherSaving(false);
+    }
+  }
+
   return (
     <PanelPageShell
       title="Monitor"
@@ -1075,6 +1139,12 @@ export default function MonitorPage() {
         <div className={styles.loading}>Cargando monitor…</div>
       ) : (
         <>
+          <MonitorWeatherBar
+            zones={weatherZones}
+            canEdit={canManageWeather}
+            busy={weatherSaving}
+            onChange={(zoneId, mode) => void handleWeatherChange(zoneId, mode)}
+          />
           <section className={styles.metricsRow} aria-label="Indicadores">
             <MetricCard
               label="En línea"
@@ -1303,6 +1373,7 @@ export default function MonitorPage() {
       <RequestDetailDrawer
         open={detailRequest !== null}
         request={detailRequest}
+        driver={detailDriver}
         accessToken={accessToken}
         refreshNonce={logNonce}
         onClose={() => setDetailRequestId(null)}

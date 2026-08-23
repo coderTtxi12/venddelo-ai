@@ -16,7 +16,10 @@
 
 .liveBadge {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
+  flex-shrink: 0;
+  max-width: 100%;
   gap: 0.4rem;
   padding: 0.35rem 0.7rem;
   border-radius: 999px;
@@ -785,7 +788,31 @@
   background: color-mix(in srgb, var(--color-text) 4%, transparent);
 }
 
+.trackButton {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border: 1px solid color-mix(in srgb, #2563eb 32%, var(--color-border));
+  background: transparent;
+  color: #1d4ed8;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+
+.trackButton:hover {
+  border-color: #2563eb;
+  background: color-mix(in srgb, #2563eb 8%, transparent);
+}
+
 .detailButton:focus-visible,
+.trackButton:focus-visible,
 .assignButton:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
@@ -816,6 +843,7 @@
 @media (prefers-reduced-motion: reduce) {
   .assignButton,
   .detailButton,
+  .trackButton,
   .liveBadge,
   .queueCard,
   .metricCardClickable,
