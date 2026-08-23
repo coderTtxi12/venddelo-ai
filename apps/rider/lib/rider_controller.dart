@@ -283,6 +283,7 @@ class RiderController extends ChangeNotifier {
         if (event['type'] != 'rider.updated') {
           return;
         }
+        _applyCreditFromSocket(event);
         unawaited(_onRiderSocketUpdated());
       },
       onStatusChange: (status) {
@@ -295,6 +296,19 @@ class RiderController extends ChangeNotifier {
       },
     );
     await _socket!.start();
+  }
+
+  void _applyCreditFromSocket(Map<String, dynamic> event) {
+    final current = profile;
+    if (current == null) {
+      return;
+    }
+    final next = applyRiderCreditFromEvent(current, event);
+    if (identical(next, current)) {
+      return;
+    }
+    profile = next;
+    notifyListeners();
   }
 
   Future<void> _onRiderSocketUpdated() async {
