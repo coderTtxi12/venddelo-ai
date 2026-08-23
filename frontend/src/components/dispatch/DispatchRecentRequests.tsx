@@ -8,13 +8,17 @@ import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
 import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { useState } from 'react';
-import { DispatchCostBreakdown } from '@/components/dispatch/DispatchCostBreakdown';
+import {
+  customerTotalCents,
+  DispatchCostBreakdown,
+} from '@/components/dispatch/DispatchCostBreakdown';
 import {
   formatDispatchShortId,
   type DispatchAssignedRider,
   type DispatchRequest,
   type DispatchStatus,
 } from '@/lib/api/dispatch';
+import { hasHeldRiderCredit, wasRiderCreditReleased } from '@/lib/dispatch/riderCreditDebt';
 import {
   motorcycleColorHex,
   riderTelHref,
@@ -74,7 +78,7 @@ export function canCancelDispatch(request: DispatchRequest): boolean {
 }
 
 export function canConfirmRiderCash(request: DispatchRequest): boolean {
-  return request.payment_method === 'cash' && CASH_CONFIRMABLE.has(request.status);
+  return hasHeldRiderCredit(request) && CASH_CONFIRMABLE.has(request.status);
 }
 
 function riderAlreadyAssigned(request: DispatchRequest): boolean {
@@ -174,7 +178,7 @@ export function DispatchRecentRequests({
         <p>
           {isHistory
             ? 'Entregas y cancelaciones.'
-            : 'Estado, rastreo y detalle de cada entrega en curso.'}
+            : 'Rastreo y detalle de cada entrega en curso.'}
         </p>
       </header>
       <ul className={styles.list}>
@@ -214,24 +218,36 @@ export function DispatchRecentRequests({
                         </span>
                         <span className={styles.requestAddress}>{request.dropoff_address}</span>
                         <span className={styles.requestMeta}>
-                          <span className={`${styles.statusChip} ${statusTone(request.status)}`}>
-                            {STATUS_LABELS[request.status]}
-                          </span>
+                          {isHistory ? (
+                            <span className={`${styles.statusChip} ${statusTone(request.status)}`}>
+                              {STATUS_LABELS[request.status]}
+                            </span>
+                          ) : null}
                           <span className={styles.costPair}>
                             {request.payment_method !== 'transfer' ? (
                               <span className={styles.costChip}>
-                                Restaurante {money(request.collect_cents)}
+                                Total {money(customerTotalCents(request.collect_cents, request.quoted_fee_cents))}
                               </span>
                             ) : null}
                             <span className={`${styles.costChip} ${styles.costChipDelivery}`}>
                               Envío {money(request.quoted_fee_cents)}
                             </span>
+                            {request.payment_method !== 'transfer' ? (
+                              <span className={styles.costChip}>
+                                Recibes {money(request.collect_cents)}
+                              </span>
+                            ) : null}
                           </span>
                           <span>{paymentLabel(request.payment_method)}</span>
                           {rider ? (
                             <span className={styles.riderHint}>
                               {rider.first_name}
                               {rider.plate_suffix ? ` · ···${rider.plate_suffix}` : ''}
+                            </span>
+                          ) : null}
+                          {wasRiderCreditReleased(request) ? (
+                            <span className={`${styles.statusChip} ${styles.chipDone}`}>
+                              Abonado al rider
                             </span>
                           ) : null}
                         </span>
@@ -244,6 +260,17 @@ export function DispatchRecentRequests({
                       </span>
                     </button>
                     <div className={styles.quickActions}>
+                      {canConfirmRiderCash(request) ? (
+                        <button
+                          type="button"
+                          className={styles.creditButton}
+                          disabled={busy}
+                          onClick={() => onConfirmCash(request)}
+                        >
+                          <CheckOutlinedIcon fontSize="small" />
+                          <span>Liberar crédito</span>
+                        </button>
+                      ) : null}
                       {!isHistory && trackingUrl ? (
                         <>
                           <button
@@ -429,12 +456,18 @@ export function DispatchRecentRequests({
                       {canConfirmRiderCash(request) ? (
                         <button
                           type="button"
-                          className={styles.secondaryButton}
+                          className={styles.creditButton}
                           disabled={busy}
                           onClick={() => onConfirmCash(request)}
                         >
-                          Rider ya me pagó
+                          Liberar crédito
                         </button>
+                      ) : null}
+                      {wasRiderCreditReleased(request) ? (
+                        <p className={styles.settledNote} role="status">
+                          <CheckOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
+                          Ya se le abonó al rider
+                        </p>
                       ) : null}
                       {canCancelDispatch(request) ? (
                         <button

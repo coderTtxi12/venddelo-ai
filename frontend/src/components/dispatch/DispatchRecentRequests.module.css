@@ -220,6 +220,7 @@
 
 .iconButton,
 .secondaryButton,
+.creditButton,
 .dangerButton {
   display: inline-flex;
   align-items: center;
@@ -250,6 +251,7 @@
 
 .iconButton:focus-visible,
 .secondaryButton:focus-visible,
+.creditButton:focus-visible,
 .dangerButton:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
@@ -275,8 +277,20 @@
   color: #075e54;
 }
 
+.creditButton {
+  border-color: color-mix(in srgb, #047857 28%, var(--color-border));
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.creditButton:hover:not(:disabled) {
+  border-color: #047857;
+  background: #d1fae5;
+}
+
 .iconButton:disabled,
 .secondaryButton:disabled,
+.creditButton:disabled,
 .dangerButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -481,8 +495,23 @@
 .actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.45rem;
   margin-top: 0.95rem;
+}
+
+.settledNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  min-height: 40px;
+  padding: 0.35rem 0.7rem;
+  border-radius: 11px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.8rem;
+  font-weight: 650;
 }
 
 .empty {
@@ -501,6 +530,7 @@
 @media (max-width: 760px) {
   .iconButton,
   .secondaryButton,
+  .creditButton,
   .dangerButton,
   .riderAction {
     min-height: 44px;
@@ -513,6 +543,7 @@
   .chevron,
   .iconButton,
   .secondaryButton,
+  .creditButton,
   .dangerButton,
   .riderAction {
     transition: none;

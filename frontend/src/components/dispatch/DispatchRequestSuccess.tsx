@@ -85,9 +85,13 @@ export function DispatchRequestSuccess({
             <span>Envío {formatMoney(request.quoted_fee_cents / 100, 'MXN')}</span>
           ) : (
             <>
-              <span>Restaurante {formatMoney(request.collect_cents / 100, 'MXN')}</span>
+              <span>
+                Total {formatMoney((request.collect_cents + request.quoted_fee_cents) / 100, 'MXN')}
+              </span>
               <span aria-hidden>·</span>
               <span>Envío {formatMoney(request.quoted_fee_cents / 100, 'MXN')}</span>
+              <span aria-hidden>·</span>
+              <span>Recibes {formatMoney(request.collect_cents / 100, 'MXN')}</span>
             </>
           )}
         </p>

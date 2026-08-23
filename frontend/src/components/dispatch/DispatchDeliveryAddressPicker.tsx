@@ -13,6 +13,7 @@ import {
   loadGoogleMapsPlaces,
   reverseGeocodeCoordinates,
 } from '@/lib/loadGoogleMapsPlaces';
+import { mapNeedsNewInstance } from '@/lib/maps/googleMapInstance';
 import { looksLikeMapsUrl, normalizeMapsUrlInput, parseMapsUrl } from '@/lib/maps/parseMapsUrl';
 import styles from './DispatchDeliveryAddressPicker.module.css';
 
@@ -74,6 +75,18 @@ export function DispatchDeliveryAddressPicker({
 
   const hasCoords = value.latitude != null && value.longitude != null;
   const apiKeyMissing = !getGoogleMapsApiKey();
+
+  const disposeMap = useCallback(() => {
+    dragEndListenerRef.current?.remove();
+    dragEndListenerRef.current = null;
+    mapClickListenerRef.current?.remove();
+    mapClickListenerRef.current = null;
+    if (markerRef.current) {
+      markerRef.current.map = null;
+    }
+    markerRef.current = null;
+    mapRef.current = null;
+  }, []);
 
   const showLocationError =
     showValidation &&
@@ -285,12 +298,21 @@ export function DispatchDeliveryAddressPicker({
   }, [disabled, apiKeyMissing, handlePlaceSelected]);
 
   useEffect(() => {
+    if (value.latitude == null && value.longitude == null && !value.address.trim()) {
+      setSearchText('');
+      setInputError(null);
+    }
+  }, [value.address, value.latitude, value.longitude]);
+
+  useEffect(() => {
     if (!hasCoords || value.latitude == null || value.longitude == null) {
+      disposeMap();
       setMapState('idle');
       return;
     }
 
     if (apiKeyMissing) {
+      disposeMap();
       setMapState('error');
       return;
     }
@@ -304,14 +326,17 @@ export function DispatchDeliveryAddressPicker({
         if (cancelled || !mapContainerRef.current) return;
 
         const position = { lat: value.latitude!, lng: value.longitude! };
+        const container = mapContainerRef.current;
 
-        if (!mapRef.current) {
+        if (mapNeedsNewInstance(mapRef.current, container)) {
+          disposeMap();
           const { Map } = (await google.maps.importLibrary('maps')) as google.maps.MapsLibrary;
           const { AdvancedMarkerElement } = (await google.maps.importLibrary(
             'marker',
           )) as google.maps.MarkerLibrary;
+          if (cancelled || mapContainerRef.current !== container) return;
 
-          mapRef.current = new Map(mapContainerRef.current, {
+          mapRef.current = new Map(container, {
             center: position,
             zoom: DEFAULT_ZOOM,
             mapId: getGoogleMapsMapId(),
@@ -338,12 +363,22 @@ export function DispatchDeliveryAddressPicker({
           if (markerRef.current) {
             markerRef.current.position = position;
           }
-          mapRef.current.panTo(position);
-          mapRef.current.setZoom(DEFAULT_ZOOM);
+          mapRef.current?.panTo(position);
+          mapRef.current?.setZoom(DEFAULT_ZOOM);
           skipDragEmitRef.current = false;
         }
 
-        if (!cancelled) setMapState('ready');
+        if (!cancelled) {
+          setMapState('ready');
+          const map = mapRef.current;
+          if (map) {
+            window.requestAnimationFrame(() => {
+              if (cancelled) return;
+              google.maps.event.trigger(map, 'resize');
+              map.setCenter(position);
+            });
+          }
+        }
       } catch (error) {
         console.error(error);
         if (!cancelled) setMapState('error');
@@ -355,6 +390,7 @@ export function DispatchDeliveryAddressPicker({
     };
   }, [
     apiKeyMissing,
+    disposeMap,
     emitMarkerPosition,
     handleMapPoiClick,
     hasCoords,
@@ -364,17 +400,9 @@ export function DispatchDeliveryAddressPicker({
 
   useEffect(() => {
     return () => {
-      dragEndListenerRef.current?.remove();
-      dragEndListenerRef.current = null;
-      mapClickListenerRef.current?.remove();
-      mapClickListenerRef.current = null;
-      if (markerRef.current) {
-        markerRef.current.map = null;
-      }
-      markerRef.current = null;
-      mapRef.current = null;
+      disposeMap();
     };
-  }, []);
+  }, [disposeMap]);
 
   if (apiKeyMissing) {
     return (

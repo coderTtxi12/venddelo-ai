@@ -18,6 +18,10 @@ function pesos(cents: number): string {
   return formatMoney(cents / 100, 'MXN');
 }
 
+export function customerTotalCents(restaurantCents: number, deliveryCents: number): number {
+  return Math.max(0, restaurantCents) + Math.max(0, deliveryCents);
+}
+
 export function DispatchCostBreakdown({
   restaurantCents,
   deliveryCents,
@@ -26,7 +30,7 @@ export function DispatchCostBreakdown({
   weatherNotice,
 }: DispatchCostBreakdownProps) {
   const restaurantPaid = paymentMethod === 'transfer' || restaurantCents <= 0;
-  const totalCents = Math.max(0, restaurantCents) + Math.max(0, deliveryCents);
+  const totalCents = customerTotalCents(restaurantCents, deliveryCents);
 
   return (
     <div className={styles.card} role="status">
@@ -34,23 +38,28 @@ export function DispatchCostBreakdown({
       <dl className={styles.rows}>
         <div className={styles.row}>
           <dt>
-            <StorefrontOutlinedIcon className={styles.icon} aria-hidden />
-            Restaurante
-          </dt>
-          <dd>{restaurantPaid ? 'Sin cobro' : pesos(restaurantCents)}</dd>
-        </div>
-        <div className={styles.row}>
-          <dt>
             <DeliveryDiningOutlinedIcon className={styles.icon} aria-hidden />
             Envío
           </dt>
           <dd>{pesos(deliveryCents)}</dd>
         </div>
-        <div className={`${styles.row} ${styles.total}`}>
-          <dt>Suma</dt>
-          <dd>{pesos(totalCents)}</dd>
+        <div className={styles.row}>
+          <dt>
+            <StorefrontOutlinedIcon className={styles.icon} aria-hidden />
+            Tu negocio recibe
+          </dt>
+          <dd>{restaurantPaid ? 'Sin cobro' : pesos(restaurantCents)}</dd>
         </div>
+        {paymentMethod !== 'transfer' ? (
+          <div className={`${styles.row} ${styles.total}`}>
+            <dt>Total a cobrar</dt>
+            <dd>{pesos(totalCents)}</dd>
+          </div>
+        ) : null}
       </dl>
+      {paymentMethod !== 'transfer' ? (
+        <p className={styles.hint}>El total incluye el envío.</p>
+      ) : null}
       {hint ? <p className={styles.hint}>{hint}</p> : null}
       {weatherNotice}
     </div>
