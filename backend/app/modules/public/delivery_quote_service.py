@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from app.core.config import get_settings
 from app.infra.maps.google_distance_matrix import DistanceMatrixError, fetch_driving_distance_km
@@ -31,6 +32,7 @@ class ResolvedDeliveryService:
     partnership_status: PartnershipStatus
     provider_name: str | None
     provider_id: uuid.UUID | None
+    weather_mode: DeliveryWeatherMode = "none"
 
 
 @dataclass(frozen=True)
@@ -69,12 +71,68 @@ def _partnership_reason(status: PartnershipStatus) -> str:
     return "El servicio de reparto no está disponible."
 
 
-def _service_reason(status_reason: str) -> str:
+_UNAVAILABLE_HEADLINE = "El servicio de reparto no está disponible en este momento."
+_WEEKDAY_NAMES = (
+    "lunes",
+    "martes",
+    "miércoles",
+    "jueves",
+    "viernes",
+    "sábado",
+    "domingo",
+)
+
+
+def _format_clock(value: datetime) -> tuple[str, str]:
+    hour24 = value.hour
+    suffix = "a.m." if hour24 < 12 else "p.m."
+    hour12 = hour24 % 12
+    if hour12 == 0:
+        hour12 = 12
+    article = "la" if hour12 == 1 else "las"
+    return article, f"{hour12}:{value.minute:02d} {suffix}"
+
+
+def _format_resume_when(
+    next_change_at: datetime | None,
+    *,
+    timezone: str,
+    now: datetime,
+) -> str | None:
+    if next_change_at is None:
+        return None
+
+    tz = ZoneInfo(timezone)
+    local_now = now.astimezone(tz)
+    local_next = next_change_at.astimezone(tz)
+    article, clock = _format_clock(local_next)
+
+    if local_next.date() == local_now.date():
+        return f"hoy a {article} {clock}"
+    if local_next.date() == local_now.date() + timedelta(days=1):
+        return f"mañana a {article} {clock}"
+    return f"el {_WEEKDAY_NAMES[local_next.weekday()]} a {article} {clock}"
+
+
+def _service_reason(
+    status_reason: str,
+    *,
+    next_change_at: datetime | None = None,
+    timezone: str = "America/Mexico_City",
+    now: datetime | None = None,
+) -> str:
     if status_reason == "manual_off":
-        return "El servicio de reparto no está disponible en este momento."
+        return f"{_UNAVAILABLE_HEADLINE} Mexy pausó las entregas temporalmente."
     if status_reason == "outside_schedule":
-        return "El servicio de reparto no está disponible en este momento."
-    return "El servicio de reparto no está disponible en este momento."
+        when = _format_resume_when(
+            next_change_at,
+            timezone=timezone,
+            now=now or datetime.now(UTC),
+        )
+        if when:
+            return f"{_UNAVAILABLE_HEADLINE} Está fuera del horario de operación. Reanuda {when}"
+        return f"{_UNAVAILABLE_HEADLINE} Está fuera del horario de operación."
+    return _UNAVAILABLE_HEADLINE
 
 
 class PublicDeliveryQuoteService:
