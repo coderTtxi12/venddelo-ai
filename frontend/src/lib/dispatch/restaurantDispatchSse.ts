@@ -119,13 +119,13 @@ export function patchRequestsFromDispatchEvent<T extends { id: string; status: s
   requests: T[],
   event: RestaurantDispatchSseEvent,
 ): T[] {
-  if (event.type !== 'dispatch.updated' || !event.requestId || !event.status) {
-    return requests;
-  }
-  if (!DISPATCH_STATUSES.has(event.status)) return requests;
+  if (event.type !== 'dispatch.updated') return requests;
+  const requestId = event.requestId;
+  const status = event.status;
+  if (!requestId || !status || !DISPATCH_STATUSES.has(status)) return requests;
   return requests.map((item) =>
-    item.id === event.requestId
-      ? { ...item, status: mergeDispatchStatus(item.status, event.status) as T['status'] }
+    item.id === requestId
+      ? { ...item, status: mergeDispatchStatus(item.status, status) as T['status'] }
       : item,
   );
 }
