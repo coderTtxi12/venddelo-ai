@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import styles from './LoginPage.module.css';
 
@@ -69,6 +70,12 @@ export default function LoginPage() {
             </svg>
             {busy ? 'Verificando acceso…' : 'Continuar con Google'}
           </button>
+
+          <p className={styles.legalNotice}>
+            Al continuar con Google aceptas los{' '}
+            <Link href="/terminos">Términos y Condiciones</Link> y la{' '}
+            <Link href="/privacidad">Política de Privacidad</Link>.
+          </p>
         </div>
       </div>
     </div>
