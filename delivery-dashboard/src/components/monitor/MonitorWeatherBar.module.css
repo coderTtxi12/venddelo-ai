@@ -1,0 +1,110 @@
+.bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 0.75rem;
+}
+
+.zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.55rem;
+  min-width: 0;
+}
+
+.zoneName {
+  margin: 0;
+  flex: 0 0 auto;
+  font-size: 0.74rem;
+  font-weight: 750;
+  color: var(--color-text-secondary);
+}
+
+.saving {
+  font-weight: 600;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.button {
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.buttonActive {
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.buttonDanger {
+  border-color: color-mix(in srgb, #dc2626 28%, var(--color-border));
+  color: #991b1b;
+}
+
+.buttonDanger.buttonActive {
+  background: #fef2f2;
+  border-color: #dc2626;
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.hint {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #991b1b;
+}
+
+@media (max-width: 640px) {
+  .button {
+    min-height: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+}
