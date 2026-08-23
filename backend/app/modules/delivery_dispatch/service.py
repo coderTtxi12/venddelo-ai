@@ -1222,12 +1222,15 @@ class RestaurantDispatchService:
         driver = row.assigned_driver
         if driver is None and row.assigned_driver_id is not None:
             driver = self._session.get(DeliveryDriver, row.assigned_driver_id)
+        hold = row.credit_hold
         return dto.model_copy(
             update={
                 "rider": build_tracking_rider_dto(
                     driver,
                     self._storage or build_storage(),
-                )
+                ),
+                "credit_hold_status": hold.status if hold is not None else None,
+                "credit_hold_cents": hold.amount_cents if hold is not None else 0,
             }
         )
 
