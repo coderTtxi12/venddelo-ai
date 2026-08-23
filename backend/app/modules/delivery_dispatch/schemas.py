@@ -616,6 +616,12 @@ class DispatchMonitorRouteDTO(BaseModel):
     zone_id: uuid.UUID | None = None
 
 
+class DispatchMonitorZoneWeatherDTO(BaseModel):
+    zone_id: uuid.UUID
+    zone_name: str
+    weather_mode: str
+
+
 class DispatchMonitorSnapshotDTO(BaseModel):
     generated_at: datetime
     metrics: DispatchMonitorMetricsDTO
@@ -624,6 +630,7 @@ class DispatchMonitorSnapshotDTO(BaseModel):
     offers: list[DispatchMonitorOfferDTO]
     credit_holds: list[DispatchMonitorCreditHoldDTO]
     routes: list[DispatchMonitorRouteDTO]
+    weather_modes: list[DispatchMonitorZoneWeatherDTO] = Field(default_factory=list)
 
 
 class AssignmentLogEventDTO(BaseModel):
