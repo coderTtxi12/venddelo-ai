@@ -3,6 +3,7 @@
 import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DeliveryLocationValue } from '@/components/digital-menu/CheckoutDeliveryAddressPicker';
+import { CourierUnavailableAlert } from '@/components/dispatch/CourierUnavailableAlert';
 import { DispatchDeliveryAddressPicker } from '@/components/dispatch/DispatchDeliveryAddressPicker';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
 import { FormSelect } from '@/components/ui/FormSelect';
@@ -51,6 +52,7 @@ export function RequestDeliveryForm({
   subdomain,
   courierAvailable,
   courierReason,
+  showUnavailableAlert = true,
   leadTimes,
   initialValues = null,
   submitLabel = 'Solicitar repartidor',
@@ -63,6 +65,7 @@ export function RequestDeliveryForm({
   subdomain: string;
   courierAvailable: boolean;
   courierReason: string | null;
+  showUnavailableAlert?: boolean;
   leadTimes: number[];
   initialValues?: KitchenDispatchFormValues | null;
   submitLabel?: string;
@@ -319,10 +322,8 @@ export function RequestDeliveryForm({
 
   return (
     <form className={styles.form} onSubmit={submit}>
-      {!courierAvailable ? (
-        <div className={styles.serviceAlert} role="alert">
-          {courierReason ?? 'El servicio de reparto de Mexy no está disponible en este momento.'}
-        </div>
+      {!courierAvailable && showUnavailableAlert ? (
+        <CourierUnavailableAlert reason={courierReason} />
       ) : null}
 
       {error ? <div className={styles.error} role="alert">{error}</div> : null}
