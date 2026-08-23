@@ -78,11 +78,14 @@ export type PublicCheckoutPaymentMethod = {
   service_type: RestaurantServiceType;
 };
 
+export type DeliveryWeatherMode = 'none' | 'light' | 'heavy' | 'intense';
+
 export type PublicDeliveryService = {
   available: boolean;
   reason: string | null;
   partnership_status: 'none' | 'pending' | 'active' | 'suspended';
   provider_name: string | null;
+  weather_mode: DeliveryWeatherMode;
 };
 
 export type PublicCheckoutConfig = {
@@ -102,8 +105,6 @@ export type PublicDeliveryQuote = {
   partnership_status: 'none' | 'pending' | 'active' | 'suspended';
   weather_mode: DeliveryWeatherMode;
 };
-
-export type DeliveryWeatherMode = 'none' | 'light' | 'heavy' | 'intense';
 
 export type PublicDeliveryQuoteInput = {
   latitude: number;
