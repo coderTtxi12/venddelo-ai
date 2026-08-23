@@ -1,4 +1,11 @@
-export type RestaurantDispatchSseEvent = { type: 'dispatch.updated' };
+export type RestaurantDispatchSseEvent =
+  | { type: 'dispatch.updated' }
+  | { type: 'delivery.service.updated' };
+
+const KNOWN_EVENT_TYPES = new Set<RestaurantDispatchSseEvent['type']>([
+  'dispatch.updated',
+  'delivery.service.updated',
+]);
 
 export function shouldOpenRestaurantDispatchSse(input: {
   restaurantId: string | null;
@@ -27,12 +34,16 @@ export function parseRestaurantDispatchSseBlock(
     }
   }
   if (dataLines.length === 0) return null;
-  if (eventName !== 'dispatch.updated' && eventName !== 'message') return null;
+  if (eventName !== 'message' && !KNOWN_EVENT_TYPES.has(eventName as RestaurantDispatchSseEvent['type'])) {
+    return null;
+  }
 
   try {
     const payload = JSON.parse(dataLines.join('\n')) as { type?: string };
-    if (payload.type !== 'dispatch.updated') return null;
-    return { type: 'dispatch.updated' };
+    if (payload.type === 'dispatch.updated' || payload.type === 'delivery.service.updated') {
+      return { type: payload.type };
+    }
+    return null;
   } catch {
     return null;
   }
