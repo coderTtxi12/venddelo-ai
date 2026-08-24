@@ -673,7 +673,7 @@ function DriversList({
                     {driver.open_offer_id ? <span className={styles.dueChip}>Oferta</span> : null}
                     {driver.is_pre_free ? <span className={styles.chipOnline}>Pre-libre</span> : null}
                     {driver.credit_blocked ? <span className={styles.alertChip}>Sin crédito</span> : null}
-                    {isStaleGps(driver) ? <span className={styles.warnChip}>GPS viejo</span> : null}
+                    {isStaleGps(driver, nowMs) ? <span className={styles.warnChip}>GPS viejo</span> : null}
                   </div>
                   <DriverPhoneContact
                     phone={driver.phone}
