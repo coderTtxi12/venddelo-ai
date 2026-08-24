@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { DashboardRestaurantHours } from '@/components/settings/DashboardRestaurantHours';
 import { DeliveryPartnershipStatus } from '@/components/settings/DeliveryPartnershipStatus';
@@ -18,6 +17,7 @@ import type {
   RestaurantSchedule,
 } from '@/lib/api/types';
 import { fetchActiveDeliveryProviderConfig } from '@/lib/fetchActiveDeliveryProviderConfig';
+import { shouldShowRestaurantHoursEditor } from '@/lib/restaurantScheduleHours';
 import { syncRestaurantDeliveryPartnership } from '@/lib/syncDeliveryPartnership';
 import styles from './HoursPage.module.css';
 
@@ -114,9 +114,6 @@ export default function HoursPage() {
     };
   }, [accessToken, accessLoading, authLoading, selectedRestaurantId]);
 
-  const hasScheduleContent =
-    restaurant?.takeout_enabled || restaurant?.delivery_enabled;
-
   async function saveSchedules(payload: Parameters<typeof setRestaurantSchedules>[2]) {
     if (!accessToken || !restaurantId) return;
     await setRestaurantSchedules(accessToken, restaurantId, payload);
@@ -140,6 +137,12 @@ export default function HoursPage() {
     );
   }
 
+  const showTakeoutEditor = shouldShowRestaurantHoursEditor({
+    takeoutEnabled: restaurant.takeout_enabled,
+    deliveryEnabled: restaurant.delivery_enabled,
+    scheduleCount: schedules.length,
+  });
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -152,52 +155,42 @@ export default function HoursPage() {
       </div>
 
       <section className={styles.panel} aria-label="Horarios de servicio">
-        {!hasScheduleContent ? (
-          <p className={styles.empty}>
-            Habilita recoger en tienda o entrega a domicilio en{' '}
-            <Link href="/settings" className={styles.settingsLink}>
-              Configuración
-            </Link>{' '}
-            para ver los horarios.
-          </p>
-        ) : (
-          <div className={styles.hoursWrap}>
-            {restaurant.takeout_enabled ? (
-              <div className={styles.takeoutBlock}>
+        <div className={styles.hoursWrap}>
+          {showTakeoutEditor ? (
+            <div className={styles.takeoutBlock}>
+              <DashboardRestaurantHours
+                section="takeout"
+                schedules={schedules}
+                takeoutEnabled={restaurant.takeout_enabled}
+                deliveryEnabled={restaurant.delivery_enabled}
+                onSave={saveSchedules}
+              />
+            </div>
+          ) : null}
+
+          {restaurant.delivery_enabled ? (
+            <div
+              className={
+                showTakeoutEditor ? styles.deliveryBlock : styles.deliveryBlockOnly
+              }
+            >
+              <DeliveryPartnershipStatus
+                partnership={deliveryPartnership}
+                deliveryEnabled={restaurant.delivery_enabled}
+              />
+              <div className={styles.deliveryHoursEmbed}>
                 <DashboardRestaurantHours
-                  section="takeout"
+                  section="delivery"
                   schedules={schedules}
                   takeoutEnabled={restaurant.takeout_enabled}
                   deliveryEnabled={restaurant.delivery_enabled}
-                  onSave={saveSchedules}
+                  deliveryProviderSchedules={deliveryProviderSchedules}
+                  deliveryPartnershipActive={deliveryPartnership?.status === 'active'}
                 />
               </div>
-            ) : null}
-
-            {restaurant.delivery_enabled ? (
-              <div
-                className={
-                  restaurant.takeout_enabled ? styles.deliveryBlock : styles.deliveryBlockOnly
-                }
-              >
-                <DeliveryPartnershipStatus
-                  partnership={deliveryPartnership}
-                  deliveryEnabled={restaurant.delivery_enabled}
-                />
-                <div className={styles.deliveryHoursEmbed}>
-                  <DashboardRestaurantHours
-                    section="delivery"
-                    schedules={schedules}
-                    takeoutEnabled={restaurant.takeout_enabled}
-                    deliveryEnabled={restaurant.delivery_enabled}
-                    deliveryProviderSchedules={deliveryProviderSchedules}
-                    deliveryPartnershipActive={deliveryPartnership?.status === 'active'}
-                  />
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
+            </div>
+          ) : null}
+        </div>
       </section>
     </div>
   );
