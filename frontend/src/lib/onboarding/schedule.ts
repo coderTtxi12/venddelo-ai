@@ -46,10 +46,18 @@ export function normalizeOnboardingScheduleDrafts(
     {
       serviceType: 'takeout',
       label: ONBOARDING_SCHEDULE_LABEL,
-      days: source.days.map((day) => ({
-        ...day,
-        slots: day.slots.length > 0 ? day.slots : [createOnboardingDefaultSlot()],
-      })),
+      days: source.days.map((day) => {
+        const isClosed = Boolean(day.isClosed) || day.slots.length === 0;
+        return {
+          ...day,
+          isClosed,
+          slots: isClosed
+            ? []
+            : day.slots.length > 0
+              ? day.slots
+              : [createOnboardingDefaultSlot()],
+        };
+      }),
     },
   ];
 }
