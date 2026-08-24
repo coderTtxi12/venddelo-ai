@@ -70,6 +70,34 @@ describe('validateSocialLinksForEnable', () => {
       }),
     ).toBe('Activa al menos una red con su enlace o WhatsApp configurado.');
   });
+
+  it('validates Facebook even while the live-menu master is off', () => {
+    expect(
+      validateSocialLinksForEnable({
+        enabled: false,
+        facebookEnabled: true,
+        instagramEnabled: false,
+        whatsappEnabled: false,
+        facebook_url: '',
+        instagram_url: '',
+        whatsappConfigured: false,
+      }),
+    ).toBe('Agrega un enlace válido de Facebook o desactiva Facebook.');
+  });
+
+  it('allows configuring a channel before showing networks on the live menu', () => {
+    expect(
+      validateSocialLinksForEnable({
+        enabled: false,
+        facebookEnabled: true,
+        instagramEnabled: false,
+        whatsappEnabled: false,
+        facebook_url: 'https://facebook.com/tunegocio',
+        instagram_url: '',
+        whatsappConfigured: false,
+      }),
+    ).toBeNull();
+  });
 });
 
 describe('placement helpers', () => {
