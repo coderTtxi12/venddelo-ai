@@ -742,7 +742,6 @@ export default function SettingsPage() {
     }
   };
 
-  const hasScheduleContent = takeoutEnabled || deliveryEnabled;
   const deliveryPartnershipActive = isActiveDeliveryPartnership(deliveryPartnership);
 
   const logoUrl = storagePublicUrl(restaurant?.logo_path ?? null);
@@ -1241,25 +1240,19 @@ export default function SettingsPage() {
           cambios de horario se guardan aparte.
         </p>
         <div className={styles.hoursWrap}>
-          {!hasScheduleContent ? (
-            <p className={styles.empty}>
-              Habilita recoger en tienda o entrega a domicilio para ver los horarios.
-            </p>
-          ) : (
-            <DashboardRestaurantHours
-              schedules={schedules}
-              takeoutEnabled={takeoutEnabled}
-              deliveryEnabled={deliveryEnabled}
-              deliveryProviderSchedules={deliveryProviderSchedules}
-              deliveryPartnershipActive={deliveryPartnershipActive}
-              onSave={async (payload) => {
-                if (!accessToken || !restaurantId) return;
-                await setRestaurantSchedules(accessToken, restaurantId, payload);
-                const updated = await listRestaurantSchedules(accessToken, restaurantId);
-                setSchedules(updated);
-              }}
-            />
-          )}
+          <DashboardRestaurantHours
+            schedules={schedules}
+            takeoutEnabled={takeoutEnabled}
+            deliveryEnabled={deliveryEnabled}
+            deliveryProviderSchedules={deliveryProviderSchedules}
+            deliveryPartnershipActive={deliveryPartnershipActive}
+            onSave={async (payload) => {
+              if (!accessToken || !restaurantId) return;
+              await setRestaurantSchedules(accessToken, restaurantId, payload);
+              const updated = await listRestaurantSchedules(accessToken, restaurantId);
+              setSchedules(updated);
+            }}
+          />
         </div>
       </section>
 
