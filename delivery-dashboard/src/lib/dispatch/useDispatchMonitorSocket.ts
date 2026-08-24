@@ -1,15 +1,21 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import {
+  parseDispatchMonitorSocketEvent,
+  type DispatchMonitorSocketEvent,
+  type DriverLocationEvent,
+} from './applyDriverLocation';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api/v1';
 
-export type DispatchMonitorSocketEvent = { type: 'monitor.updated' };
+export type { DispatchMonitorSocketEvent, DriverLocationEvent };
 
 export type DispatchMonitorSocketStatus = 'connecting' | 'live' | 'reconnecting' | 'offline';
 
 type UseDispatchMonitorSocketOptions = {
-  onEvent: (event: DispatchMonitorSocketEvent) => void;
+  onEvent: (event: Extract<DispatchMonitorSocketEvent, { type: 'monitor.updated' }>) => void;
+  onLocationEvent?: (event: DriverLocationEvent) => void;
   onStatusChange?: (status: DispatchMonitorSocketStatus) => void;
   onReconnect?: () => void;
   /** Debounce REST refetch triggered by WS events (ms). Default 400. */
@@ -27,12 +33,14 @@ export function useDispatchMonitorSocket(
   options: UseDispatchMonitorSocketOptions,
 ) {
   const onEventRef = useRef(options.onEvent);
+  const onLocationEventRef = useRef(options.onLocationEvent);
   const onStatusChangeRef = useRef(options.onStatusChange);
   const onReconnectRef = useRef(options.onReconnect);
   const debounceMs = options.eventDebounceMs ?? 400;
 
   useEffect(() => {
     onEventRef.current = options.onEvent;
+    onLocationEventRef.current = options.onLocationEvent;
     onStatusChangeRef.current = options.onStatusChange;
     onReconnectRef.current = options.onReconnect;
   });
@@ -93,8 +101,12 @@ export function useDispatchMonitorSocket(
 
       socket.onmessage = (message) => {
         try {
-          const payload = JSON.parse(String(message.data)) as DispatchMonitorSocketEvent;
-          if (payload.type !== 'monitor.updated') return;
+          const payload = parseDispatchMonitorSocketEvent(JSON.parse(String(message.data)));
+          if (payload == null) return;
+          if (payload.type === 'driver.location') {
+            onLocationEventRef.current?.(payload);
+            return;
+          }
           queueEvent();
         } catch (error) {
           console.warn('dispatch monitor ws parse error', error);
