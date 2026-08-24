@@ -245,6 +245,8 @@
 .formPanel {
   border-top: 1px solid var(--color-border);
   padding: 0 1.25rem 1.25rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .formPanel[hidden] {
