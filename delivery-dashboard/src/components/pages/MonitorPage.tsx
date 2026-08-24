@@ -121,24 +121,32 @@ function MetricCard({
 
 type DriverFilter = 'all' | 'online' | 'stale' | 'offline';
 
-function isStaleGps(driver: DispatchMonitorDriver): boolean {
-  return driver.is_online && driver.location_stale;
+function isStaleGps(driver: DispatchMonitorDriver, nowMs: number): boolean {
+  if (!driver.is_online) return false;
+  const age = driverLocationAgeSeconds(driver, nowMs);
+  if (age == null) return driver.location_stale;
+  return driver.location_stale || age > 90;
 }
 
-function gpsAgeClass(driver: DispatchMonitorDriver): string {
-  if (driver.last_lat == null || driver.last_lng == null || driver.location_age_seconds == null) {
+function gpsAgeClass(driver: DispatchMonitorDriver, nowMs: number): string {
+  const age = driverLocationAgeSeconds(driver, nowMs);
+  if (driver.last_lat == null || driver.last_lng == null || age == null) {
     return styles.gpsMissing;
   }
-  if (isStaleGps(driver) || driver.location_age_seconds >= 60) {
+  if (isStaleGps(driver, nowMs) || age >= 60) {
     return styles.gpsStale;
   }
   return styles.gpsFresh;
 }
 
-function driverMatchesFilter(driver: DispatchMonitorDriver, filter: DriverFilter): boolean {
+function driverMatchesFilter(
+  driver: DispatchMonitorDriver,
+  filter: DriverFilter,
+  nowMs: number,
+): boolean {
   if (filter === 'online') return driver.is_online;
   if (filter === 'offline') return !driver.is_online;
-  if (filter === 'stale') return isStaleGps(driver);
+  if (filter === 'stale') return isStaleGps(driver, nowMs);
   return true;
 }
 
@@ -518,6 +526,7 @@ function DriversList({
   onFocus,
   colorByZone = false,
   zoneIds = [],
+  nowMs,
 }: {
   drivers: DispatchMonitorDriver[];
   maxPackages: number;
@@ -527,17 +536,18 @@ function DriversList({
   onFocus: (driver: DispatchMonitorDriver) => void;
   colorByZone?: boolean;
   zoneIds?: string[];
+  nowMs: number;
 }) {
   const counts = {
     all: drivers.length,
     online: drivers.filter((driver) => driver.is_online).length,
-    stale: drivers.filter(isStaleGps).length,
+    stale: drivers.filter((driver) => isStaleGps(driver, nowMs)).length,
     offline: drivers.filter((driver) => !driver.is_online).length,
   };
-  const filtered = drivers.filter((driver) => driverMatchesFilter(driver, filter));
+  const filtered = drivers.filter((driver) => driverMatchesFilter(driver, filter, nowMs));
   const sorted = [...filtered].sort((a, b) => {
     if (filter === 'stale') {
-      return (b.location_age_seconds ?? 0) - (a.location_age_seconds ?? 0);
+      return (driverLocationAgeSeconds(b, nowMs) ?? 0) - (driverLocationAgeSeconds(a, nowMs) ?? 0);
     }
     return Number(b.is_online) - Number(a.is_online);
   });
@@ -646,8 +656,8 @@ function DriversList({
                           {driver.registered_zone_name}
                         </span>
                       ) : null}
-                      <span className={`${styles.gpsChip} ${gpsAgeClass(driver)}`}>
-                        {gpsAgeLabel(driver.location_age_seconds)}
+                      <span className={`${styles.gpsChip} ${gpsAgeClass(driver, nowMs)}`}>
+                        {gpsAgeLabel(driverLocationAgeSeconds(driver, nowMs))}
                       </span>
                     </div>
                   </div>
