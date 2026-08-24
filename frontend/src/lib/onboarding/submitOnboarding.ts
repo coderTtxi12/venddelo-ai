@@ -65,9 +65,7 @@ export async function submitOnboarding(
     takeoutEnabled: data.takeoutEnabled,
     deliveryEnabled: data.deliveryEnabled,
   });
-  if (schedulePayload.length > 0) {
-    await setRestaurantSchedules(token, restaurantId, schedulePayload);
-  }
+  await setRestaurantSchedules(token, restaurantId, schedulePayload);
 
   await setRestaurantPaymentMethods(token, restaurantId, matrixToPaymentCreates(data.paymentMatrix));
 
