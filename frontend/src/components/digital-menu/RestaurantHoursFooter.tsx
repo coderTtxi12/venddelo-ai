@@ -10,6 +10,7 @@ import {
   buildScheduleDrafts,
   createDefaultSlot,
   scheduleDraftsToCreatePayload,
+  toggleDayClosed,
   type DayScheduleDraft,
   type ServiceScheduleDraft,
   validateScheduleDrafts,
@@ -35,11 +36,7 @@ function DayScheduleEditor({
   onChange: (next: DayScheduleDraft) => void;
 }) {
   const toggleClosed = () => {
-    if (day.isClosed) {
-      onChange({ ...day, isClosed: false, slots: [createDefaultSlot()] });
-      return;
-    }
-    onChange({ ...day, isClosed: true, slots: [] });
+    onChange(toggleDayClosed(day));
   };
 
   const updateSlot = (index: number, field: 'opensAt' | 'closesAt', value: string) => {
@@ -198,18 +195,24 @@ export function RestaurantHoursFooter({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const saveInFlightRef = useRef(false);
+  const dirtyRef = useRef(false);
   const [expandedBlocks, setExpandedBlocks] = useState<Record<RestaurantServiceType, boolean>>({
     takeout: true,
     delivery: true,
   });
 
   useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
+
+  useEffect(() => {
+    if (dirtyRef.current) return;
     setDrafts(buildScheduleDrafts(schedules, serviceTypes));
-    setDirty(false);
     setError(null);
   }, [schedules, serviceTypes]);
 
   const updateBlock = useCallback((serviceType: ServiceScheduleDraft['serviceType'], days: DayScheduleDraft[]) => {
+    dirtyRef.current = true;
     setDrafts((current) =>
       current.map((block) => (block.serviceType === serviceType ? { ...block, days } : block)),
     );
@@ -238,6 +241,7 @@ export function RestaurantHoursFooter({
     try {
       setError(null);
       await onSave(scheduleDraftsToCreatePayload(drafts));
+      dirtyRef.current = false;
       setDirty(false);
     } catch (err) {
       console.error(err);
