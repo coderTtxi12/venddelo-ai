@@ -72,7 +72,19 @@ def notify_request_realtime(session: Session, request: DeliveryDispatchRequest) 
 
 
 def notify_driver_location_realtime(session: Session, driver: DeliveryDriver) -> None:
-    notify_dispatch_monitor_changed(driver.delivery_provider_id)
+    at = driver.location_updated_at
+    payload = {
+        "type": "driver.location",
+        "driver_id": str(driver.id),
+        "last_lat": driver.last_lat,
+        "last_lng": driver.last_lng,
+        "location_updated_at": at.isoformat() if at is not None else None,
+    }
+
+    def publish() -> None:
+        get_dispatch_realtime_hub().publish_sync(driver.delivery_provider_id, payload)
+
+    _publish_after_commit(session, publish)
 
 
 def _publish_after_commit(session: Session | None, hook: Callable[[], None]) -> None:
