@@ -146,13 +146,17 @@
 }
 
 .formSection {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: 14px;
   background: var(--color-surface);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .formSectionOpen {
+  z-index: 3;
   border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
 }
 
