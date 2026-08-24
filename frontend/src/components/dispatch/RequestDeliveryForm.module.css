@@ -323,11 +323,62 @@
   color: #9a3412;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .grid,
-  .gridTwo,
   .gridThree {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .form {
+    gap: 0.95rem;
+  }
+
+  .gridTwo {
+    grid-template-columns: 1fr;
+  }
+
+  .field :global(button) {
+    min-height: 44px;
+  }
+
+  .input,
+  .textarea {
+    font-size: 1rem;
+    min-height: 44px;
+  }
+
+  .primaryButton {
+    width: 100%;
+    justify-self: stretch;
+    min-height: 48px;
+  }
+
+  .collectHeader {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .collectCard {
+    padding: 0.85rem;
+  }
+
+  .collectInput {
+    font-size: 1.15rem;
+  }
+
+  .label {
+    line-height: 1.35;
+  }
+
+  .error,
+  .quoteAlert,
+  .feeHint,
+  .weatherNotice,
+  .weightNotice,
+  .collectHint {
+    overflow-wrap: anywhere;
   }
 }
 
