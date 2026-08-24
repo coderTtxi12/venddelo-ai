@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -126,5 +127,38 @@ def test_notify_request_realtime_sends_released_credit(monkeypatch):
             "type": "rider.updated",
             "credit_limit_cents": 50000,
             "credit_held_cents": 0,
+        }
+    ]
+
+
+def test_notify_driver_location_publishes_location_not_monitor_updated(monkeypatch):
+    published: list[dict] = []
+    monkeypatch.setattr(
+        monitor_notify.get_dispatch_realtime_hub(),
+        "publish_sync",
+        lambda provider_id, payload: published.append({"provider_id": provider_id, **payload}),
+    )
+
+    provider_id = uuid.uuid4()
+    driver_id = uuid.uuid4()
+    at = datetime(2026, 8, 24, 22, 0, tzinfo=UTC)
+    driver = SimpleNamespace(
+        id=driver_id,
+        delivery_provider_id=provider_id,
+        last_lat=19.43,
+        last_lng=-99.13,
+        location_updated_at=at,
+    )
+
+    monitor_notify.notify_driver_location_realtime(SimpleNamespace(), driver)
+
+    assert published == [
+        {
+            "provider_id": provider_id,
+            "type": "driver.location",
+            "driver_id": str(driver_id),
+            "last_lat": 19.43,
+            "last_lng": -99.13,
+            "location_updated_at": at.isoformat(),
         }
     ]
