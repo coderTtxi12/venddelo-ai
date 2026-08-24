@@ -1,6 +1,8 @@
 .form {
   display: grid;
   gap: 1.1rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .grid {
@@ -25,6 +27,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .label {
@@ -41,7 +44,9 @@
 .input,
 .textarea {
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
+  min-width: 0;
   min-height: 44px;
   border: 1px solid var(--color-border);
   border-radius: 10px;
