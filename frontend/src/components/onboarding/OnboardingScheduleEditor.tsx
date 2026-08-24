@@ -8,8 +8,8 @@ import type {
   DayScheduleDraft,
   ServiceScheduleDraft,
 } from '@/lib/restaurantScheduleHours';
+import { toggleDayClosed, validateScheduleDrafts } from '@/lib/restaurantScheduleHours';
 import { createOnboardingDefaultSlot, normalizeOnboardingScheduleDrafts, ONBOARDING_SCHEDULE_LABEL } from '@/lib/onboarding/schedule';
-import { validateScheduleDrafts } from '@/lib/restaurantScheduleHours';
 import hoursStyles from '@/components/digital-menu/RestaurantHoursFooter.module.css';
 import styles from './OnboardingScheduleEditor.module.css';
 
@@ -27,11 +27,7 @@ function DayScheduleEditor({
   onChange: (next: DayScheduleDraft) => void;
 }) {
   const toggleClosed = () => {
-    if (day.isClosed) {
-      onChange({ ...day, isClosed: false, slots: [createOnboardingDefaultSlot()] });
-      return;
-    }
-    onChange({ ...day, isClosed: true, slots: [] });
+    onChange(toggleDayClosed(day, createOnboardingDefaultSlot));
   };
 
   const updateSlot = (index: number, field: 'opensAt' | 'closesAt', value: string) => {
