@@ -102,6 +102,18 @@ export function hasAnyConfiguredHours(schedules: RestaurantSchedule[]): boolean 
   return schedules.length > 0;
 }
 
+/**
+ * Operating hours stay on /hours even with zero saved rows (all days closed)
+ * or with takeout orders disabled — otherwise the editor never mounts.
+ */
+export function shouldShowRestaurantHoursEditor(_input: {
+  takeoutEnabled: boolean;
+  deliveryEnabled?: boolean;
+  scheduleCount?: number;
+}): boolean {
+  return true;
+}
+
 export type ScheduleSlotDraft = {
   opensAt: string;
   closesAt: string;
