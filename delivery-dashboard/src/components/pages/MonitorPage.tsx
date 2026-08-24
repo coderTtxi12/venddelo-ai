@@ -861,6 +861,11 @@ export default function MonitorPage() {
       void loadSnapshot();
       setLogNonce((value) => value + 1);
     },
+    onLocationEvent: (event) => {
+      setSnapshot((current) =>
+        current ? applyDriverLocationToSnapshot(current, event, Date.now()) : current,
+      );
+    },
     onStatusChange: setConnectionStatus,
     onReconnect: () => {
       void loadSnapshot();
@@ -1360,6 +1365,7 @@ export default function MonitorPage() {
                   onFocus={handleFocusDriver}
                   colorByZone={isAllZones}
                   zoneIds={zoneIds}
+                  nowMs={nowMs}
                 />
               </MonitorPanel>
 
