@@ -67,6 +67,7 @@ export function DigitalMenuSocialLinksPanel({
   }, [config.instagramUrl]);
 
   const panelDisabled = !config.enabled || saving;
+  const channelsLocked = saving;
 
   const nextConfig = (patch: Partial<DigitalMenuSocialLinksConfig>): DigitalMenuSocialLinksConfig => ({
     ...config,
@@ -137,9 +138,9 @@ export function DigitalMenuSocialLinksPanel({
           </h2>
         </div>
         <p className={styles.panelHint}>
-          Elige qué redes mostrar y dónde aparecen en tu menú en vivo. WhatsApp usa el número de
-          pedidos de Configuración. “Sobre la portada” funciona mejor para destacar; el final del
-          menú es la opción más discreta.
+          Agrega el enlace de cada red y actívala. Luego enciende “Mostrar redes en el menú en vivo”.
+          WhatsApp usa el número de pedidos de Configuración. “Sobre la portada” funciona mejor para
+          destacar; el final del menú es la opción más discreta.
         </p>
       </div>
 
@@ -180,7 +181,7 @@ export function DigitalMenuSocialLinksPanel({
             <input
               type="checkbox"
               checked={config.facebookEnabled}
-              disabled={panelDisabled}
+              disabled={channelsLocked}
               onChange={(event) => validateAndPersist({ facebookEnabled: event.target.checked })}
             />
             <span>Facebook</span>
@@ -189,7 +190,7 @@ export function DigitalMenuSocialLinksPanel({
             id="dm-facebook-url"
             className={`${styles.textInput} ${facebookError ? styles.textInputError : ''}`.trim()}
             value={facebookDraft}
-            disabled={panelDisabled || !config.facebookEnabled}
+            disabled={channelsLocked}
             placeholder="https://facebook.com/tunegocio"
             onChange={(event) => {
               setFacebookDraft(event.target.value);
@@ -205,7 +206,7 @@ export function DigitalMenuSocialLinksPanel({
             <input
               type="checkbox"
               checked={config.instagramEnabled}
-              disabled={panelDisabled}
+              disabled={channelsLocked}
               onChange={(event) => validateAndPersist({ instagramEnabled: event.target.checked })}
             />
             <span>Instagram</span>
@@ -214,7 +215,7 @@ export function DigitalMenuSocialLinksPanel({
             id="dm-instagram-url"
             className={`${styles.textInput} ${instagramError ? styles.textInputError : ''}`.trim()}
             value={instagramDraft}
-            disabled={panelDisabled || !config.instagramEnabled}
+            disabled={channelsLocked}
             placeholder="https://instagram.com/tunegocio"
             onChange={(event) => {
               setInstagramDraft(event.target.value);
@@ -230,7 +231,7 @@ export function DigitalMenuSocialLinksPanel({
             <input
               type="checkbox"
               checked={config.whatsappEnabled}
-              disabled={panelDisabled}
+              disabled={channelsLocked}
               onChange={(event) => validateAndPersist({ whatsappEnabled: event.target.checked })}
             />
             <span>WhatsApp</span>
