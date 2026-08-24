@@ -250,6 +250,16 @@ export function createDefaultSlot(): ScheduleSlotDraft {
   return { ...DEFAULT_SLOT };
 }
 
+export function toggleDayClosed(
+  day: DayScheduleDraft,
+  createSlot: () => ScheduleSlotDraft = createDefaultSlot,
+): DayScheduleDraft {
+  if (day.isClosed) {
+    return { ...day, isClosed: false, slots: [createSlot()] };
+  }
+  return { ...day, isClosed: true, slots: [] };
+}
+
 function timeToMinutes(time: string): number {
   const [hours, minutes] = time.split(':').map((part) => parseInt(part, 10));
   return hours! * 60 + minutes!;
