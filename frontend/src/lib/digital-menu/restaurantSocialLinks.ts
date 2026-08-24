@@ -119,15 +119,10 @@ export function validateSocialLinksForEnable(input: {
   instagram_url: string;
   whatsappConfigured: boolean;
 }): string | null {
-  if (!input.enabled) return null;
-
   const facebook = input.facebookEnabled ? normalizeSocialUrl(input.facebook_url) : null;
   const instagram = input.instagramEnabled ? normalizeSocialUrl(input.instagram_url) : null;
   const whatsapp = input.whatsappEnabled && input.whatsappConfigured;
 
-  if (!facebook && !instagram && !whatsapp) {
-    return 'Activa al menos una red con su enlace o WhatsApp configurado.';
-  }
   if (input.facebookEnabled && !facebook) {
     return 'Agrega un enlace válido de Facebook o desactiva Facebook.';
   }
@@ -136,6 +131,10 @@ export function validateSocialLinksForEnable(input: {
   }
   if (input.whatsappEnabled && !input.whatsappConfigured) {
     return 'Configura WhatsApp de pedidos en Configuración o desactiva WhatsApp.';
+  }
+  if (!input.enabled) return null;
+  if (!facebook && !instagram && !whatsapp) {
+    return 'Activa al menos una red con su enlace o WhatsApp configurado.';
   }
   return null;
 }
