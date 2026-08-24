@@ -25,7 +25,6 @@ type DashboardRestaurantHoursProps = {
 
 export function DashboardRestaurantHours({
   schedules,
-  takeoutEnabled,
   deliveryEnabled,
   section = 'both',
   saving = false,
@@ -34,7 +33,7 @@ export function DashboardRestaurantHours({
   deliveryPartnershipActive = false,
 }: DashboardRestaurantHoursProps) {
   const showTakeout =
-    (section === 'takeout' || section === 'both') && takeoutEnabled && onSave != null;
+    (section === 'takeout' || section === 'both') && onSave != null;
   const showDelivery = (section === 'delivery' || section === 'both') && deliveryEnabled;
 
   if (!showTakeout && !showDelivery) return null;
