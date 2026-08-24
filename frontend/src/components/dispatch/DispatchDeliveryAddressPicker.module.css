@@ -265,3 +265,37 @@
   font-size: 0.76rem;
   color: #b91c1c;
 }
+
+@media (max-width: 760px) {
+  .searchShell {
+    min-height: 44px;
+  }
+
+  .searchInput {
+    font-size: 1rem;
+  }
+
+  .mapShell {
+    min-height: 200px;
+  }
+
+  .mapCanvas {
+    height: 200px;
+  }
+
+  .hint,
+  .selectedAddress,
+  .precisionText,
+  .error,
+  .fieldError {
+    overflow-wrap: anywhere;
+  }
+
+  .linkRow {
+    flex-direction: column;
+  }
+
+  .linkButton {
+    width: 100%;
+  }
+}
