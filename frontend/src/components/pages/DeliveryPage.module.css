@@ -224,6 +224,7 @@
   font-size: 0.8rem;
   color: var(--color-text-secondary);
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .formChevron {
@@ -266,6 +267,30 @@
 }
 
 @media (max-width: 760px) {
+  .formToggle {
+    padding: 0.85rem 1rem;
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+
+  .formToggleLead {
+    gap: 0.6rem;
+  }
+
+  .formTitle {
+    font-size: 1rem;
+    line-height: 1.3;
+  }
+
+  .formPanel {
+    padding: 0 1rem 1rem;
+  }
+
+  .formSubtitle {
+    margin: 0.85rem 0;
+    font-size: 0.84rem;
+  }
+
   .listTab {
     min-height: 44px;
   }
