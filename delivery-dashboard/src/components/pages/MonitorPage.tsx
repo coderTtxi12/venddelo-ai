@@ -48,6 +48,7 @@ import {
   requestSchedulerLine,
   requestStatusLabel,
 } from '@/lib/dispatch/monitorCopy';
+import { applyDriverLocationToSnapshot, driverLocationAgeSeconds } from '@/lib/dispatch/applyDriverLocation';
 import { publicTrackingUrl } from '@/lib/dispatch/publicTrackingUrl';
 import {
   useDispatchMonitorSocket,
