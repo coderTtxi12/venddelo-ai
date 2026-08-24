@@ -168,12 +168,18 @@
   gap: 0.75rem;
   padding: 1rem 1.25rem;
   border: none;
+  border-radius: 14px;
   background: transparent;
   cursor: pointer;
   text-align: left;
   min-height: 44px;
   color: inherit;
+  touch-action: manipulation;
   transition: background 0.2s ease;
+}
+
+.formSectionOpen .formToggle {
+  border-radius: 14px 14px 0 0;
 }
 
 .formToggle:hover {
@@ -187,6 +193,7 @@
 
 .formToggleMain {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 0.2rem;
   min-width: 0;
@@ -195,6 +202,7 @@
 .formToggleLead {
   display: flex;
   align-items: flex-start;
+  flex: 1;
   gap: 0.75rem;
   min-width: 0;
 }
