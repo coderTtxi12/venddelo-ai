@@ -5,18 +5,18 @@ import uuid
 
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.core.pagination import CursorPage, PaginationParams
+from app.modules.restaurants.platform_admin import is_platform_restaurant_admin
 from app.modules.restaurants.repository import RestaurantRepository
 from app.modules.restaurants.schemas import (
     PaymentMethodCreate,
     PaymentMethodDTO,
+    RestaurantAccessListResponse,
     RestaurantAdminInviteCreate,
     RestaurantAdminInviteDTO,
-    RestaurantAccessItem,
-    RestaurantAccessListResponse,
     RestaurantCreate,
     RestaurantDTO,
-    RestaurantMeResponse,
     RestaurantMemberDTO,
+    RestaurantMeResponse,
     RestaurantSelectRequest,
     RestaurantUpdate,
     ScheduleCreate,
