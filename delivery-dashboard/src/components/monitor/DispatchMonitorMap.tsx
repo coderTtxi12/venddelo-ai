@@ -686,18 +686,38 @@ export function DispatchMonitorMap({
         ),
         Promise.all(
           activeRoutes.map(async (route) => {
-            const origin = { lat: route.origin_lat, lng: route.origin_lng };
+            const driver = snapshot.drivers.find((row) => row.id === route.driver_id);
             const destination = { lat: route.destination_lat, lng: route.destination_lng };
-            const road = await fetchRoadRoute(origin, destination);
+            const rider =
+              driver?.last_lat != null && driver.last_lng != null
+                ? { lat: driver.last_lat, lng: driver.last_lng }
+                : { lat: route.origin_lat, lng: route.origin_lng };
+            const full = await fetchStableRoadPath(
+              `${route.request_id}:${route.status}:${destination.lat}:${destination.lng}`,
+              rider,
+              destination,
+            );
             return {
               route,
-              path: road && road.length > 1 ? road : [origin, destination],
+              path: remainingPathFrom(full, rider),
             };
           }),
         ),
         Promise.all(
           itinerary
-            ? itineraryLegs(itinerary).map(async (leg) => {
+            ? itineraryLegs(itinerary).map(async (leg, index) => {
+                if (index === 0 && itinerary.origin) {
+                  const rider = { lat: itinerary.origin.lat, lng: itinerary.origin.lng };
+                  const full = await fetchStableRoadPath(
+                    `${itinerary.driverId}:${leg.to.lat}:${leg.to.lng}`,
+                    rider,
+                    leg.to,
+                  );
+                  return {
+                    current: leg.current,
+                    path: remainingPathFrom(full, rider),
+                  };
+                }
                 const road = await fetchRoadRoute(leg.from, leg.to);
                 return {
                   current: leg.current,
