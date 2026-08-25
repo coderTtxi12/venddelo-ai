@@ -44,7 +44,9 @@ def _assert_can_read_restaurant_dispatch(
         raise NotFoundError("Restaurant not found")
     allowed = restaurant.owner_id == user.id
     if not allowed:
-        found = uow.restaurants.get_for_user(user.id, restaurant_id=restaurant_id)
+        found = uow.restaurants.get_for_user(
+            user.id, restaurant_id=restaurant_id, email=user.email
+        )
         allowed = found is not None and found[1] in ("owner", "admin")
     if not allowed:
         raise ForbiddenError("You do not have access to this restaurant")
