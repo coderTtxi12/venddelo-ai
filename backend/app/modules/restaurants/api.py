@@ -182,7 +182,7 @@ def select_my_restaurant(
     user: UserDTO = Depends(get_synced_user),
     service: RestaurantService = Depends(_service),
 ) -> RestaurantMeResponse:
-    return service.select_restaurant(user.id, data)
+    return service.select_restaurant(user.id, data, email=user.email)
 
 
 @router.get("/me/admin-invites", response_model=list[RestaurantAdminInviteDTO])
