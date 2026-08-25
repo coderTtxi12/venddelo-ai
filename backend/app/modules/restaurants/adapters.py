@@ -167,9 +167,13 @@ class SqlAlchemyRestaurantRepository(RestaurantRepository):
         user_id: uuid.UUID,
         *,
         restaurant_id: uuid.UUID | None = None,
+        email: str | None = None,
     ) -> tuple[RestaurantDTO, str] | None:
         if restaurant_id is not None:
-            return self._get_membership_at_restaurant(user_id, restaurant_id)
+            found = self._get_membership_at_restaurant(user_id, restaurant_id)
+            if found is not None:
+                return found
+            return self._platform_admin_restaurant(user_id, restaurant_id, email=email)
 
         owned = self._session.scalar(
             select(Restaurant)
