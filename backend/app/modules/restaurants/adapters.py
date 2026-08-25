@@ -196,23 +196,23 @@ class SqlAlchemyRestaurantRepository(RestaurantRepository):
                 Restaurant.is_active.is_(True),
             )
         ).all()
-        if not rows:
-            return None
+        if rows:
+            with_last_access = [
+                (restaurant, member)
+                for restaurant, member in rows
+                if member.last_accessed_at is not None
+            ]
+            if with_last_access:
+                restaurant, member = max(
+                    with_last_access,
+                    key=lambda item: item[1].last_accessed_at or datetime.min.replace(tzinfo=UTC),
+                )
+                return RestaurantDTO.model_validate(restaurant), member.member_role
 
-        with_last_access = [
-            (restaurant, member)
-            for restaurant, member in rows
-            if member.last_accessed_at is not None
-        ]
-        if with_last_access:
-            restaurant, member = max(
-                with_last_access,
-                key=lambda item: item[1].last_accessed_at or datetime.min.replace(tzinfo=UTC),
-            )
+            restaurant, member = min(rows, key=lambda item: item[1].created_at)
             return RestaurantDTO.model_validate(restaurant), member.member_role
 
-        restaurant, member = min(rows, key=lambda item: item[1].created_at)
-        return RestaurantDTO.model_validate(restaurant), member.member_role
+        return self._platform_admin_restaurant(user_id, None, email=email)
 
     def _get_membership_at_restaurant(
         self,
