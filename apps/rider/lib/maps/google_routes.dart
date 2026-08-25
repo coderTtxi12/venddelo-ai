@@ -45,7 +45,56 @@ class RiderRouteResult {
 
 double _quantize(double value) => (value * 1000).round() / 1000;
 
-final Map<String, Future<RiderRouteResult?>> _cache = {};
+final Map<String, Future<RiderRouteResult>> _cache = {};
+
+String previewRouteQueryKey({
+  required String jobKey,
+  required LatLng destination,
+}) {
+  return [
+    jobKey,
+    _quantize(destination.latitude),
+    _quantize(destination.longitude),
+  ].join(',');
+}
+
+RiderRouteOption straightLinePreview({
+  required LatLng origin,
+  required LatLng destination,
+}) {
+  return RiderRouteOption(
+    id: 'preview',
+    points: [origin, destination],
+    distanceMeters: haversineMeters(origin, destination).round(),
+    duration: Duration.zero,
+    label: 'Recomendada',
+  );
+}
+
+RiderRouteResult previewRouteResult({
+  required LatLng origin,
+  required LatLng destination,
+  RiderRouteResult? fetched,
+}) {
+  final routes = fetched?.routes ?? const <RiderRouteOption>[];
+  final first = routes.isEmpty ? null : routes.first;
+  if (first != null && first.points.length >= 2) {
+    return RiderRouteResult(
+      routes: [
+        RiderRouteOption(
+          id: 'preview',
+          points: first.points,
+          distanceMeters: first.distanceMeters,
+          duration: first.duration,
+          label: 'Recomendada',
+        ),
+      ],
+    );
+  }
+  return RiderRouteResult(
+    routes: [straightLinePreview(origin: origin, destination: destination)],
+  );
+}
 
 String _cacheKey(LatLng origin, LatLng destination) {
   return [
@@ -60,13 +109,15 @@ void invalidateRiderRouteCache() {
   _cache.clear();
 }
 
-Future<RiderRouteResult?> fetchRiderRoutes({
+Future<RiderRouteResult> fetchRiderRoutes({
   required LatLng origin,
   required LatLng destination,
 }) {
   final key = AppConfig.googleMapsApiKey;
   if (key.isEmpty) {
-    return Future<RiderRouteResult?>.value(null);
+    return Future.value(
+      previewRouteResult(origin: origin, destination: destination),
+    );
   }
   final cacheKey = _cacheKey(origin, destination);
   return _cache.putIfAbsent(
@@ -75,44 +126,52 @@ Future<RiderRouteResult?> fetchRiderRoutes({
   );
 }
 
-Future<RiderRouteResult?> _fetchRiderRoutes({
+/// Body for Compute Routes. DRIVE only: TWO_WHEELER bills as
+/// Routes: Compute Routes Enterprise.
+Map<String, dynamic> computeRoutesRequestBody({
+  required LatLng origin,
+  required LatLng destination,
+}) {
+  return {
+    'origin': {
+      'location': {
+        'latLng': {
+          'latitude': origin.latitude,
+          'longitude': origin.longitude,
+        },
+      },
+    },
+    'destination': {
+      'location': {
+        'latLng': {
+          'latitude': destination.latitude,
+          'longitude': destination.longitude,
+        },
+      },
+    },
+    'travelMode': 'DRIVE',
+    'routingPreference': 'TRAFFIC_AWARE',
+    'computeAlternativeRoutes': false,
+    'languageCode': 'es-MX',
+    'units': 'METRIC',
+  };
+}
+
+Future<RiderRouteResult> _fetchRiderRoutes({
   required LatLng origin,
   required LatLng destination,
   required String apiKey,
 }) async {
-  final fetched = await Future.wait([
-    _computeRoutes(
-      origin: origin,
-      destination: destination,
-      apiKey: apiKey,
-      travelMode: 'TWO_WHEELER',
-    ),
-    _computeRoutes(
-      origin: origin,
-      destination: destination,
-      apiKey: apiKey,
-      travelMode: 'DRIVE',
-    ),
-  ]);
-  var merged = mergeRouteOptions([
-    fetched[0]?.routes ?? const <RiderRouteOption>[],
-    fetched[1]?.routes ?? const <RiderRouteOption>[],
-  ]);
-  if (merged.length < 3) {
-    final fallback = await _directionsFallback(
-      origin: origin,
-      destination: destination,
-      apiKey: apiKey,
-    );
-    merged = mergeRouteOptions([
-      merged,
-      fallback?.routes ?? const <RiderRouteOption>[],
-    ]);
-  }
-  if (merged.isEmpty) {
-    return null;
-  }
-  return RiderRouteResult(routes: merged);
+  final fetched = await _computeRoutes(
+    origin: origin,
+    destination: destination,
+    apiKey: apiKey,
+  );
+  return previewRouteResult(
+    origin: origin,
+    destination: destination,
+    fetched: fetched,
+  );
 }
 
 List<RiderRouteOption> mergeRouteOptions(
@@ -170,8 +229,6 @@ Future<RiderRouteResult?> _computeRoutes({
   required LatLng origin,
   required LatLng destination,
   required String apiKey,
-  required String travelMode,
-  List<String> requestedReferenceRoutes = const [],
 }) async {
   final uri = Uri.parse('https://routes.googleapis.com/directions/v2:computeRoutes');
   try {
@@ -183,31 +240,9 @@ Future<RiderRouteResult?> _computeRoutes({
         'X-Goog-FieldMask':
             'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.routeLabels',
       },
-      body: jsonEncode({
-        'origin': {
-          'location': {
-            'latLng': {
-              'latitude': origin.latitude,
-              'longitude': origin.longitude,
-            },
-          },
-        },
-        'destination': {
-          'location': {
-            'latLng': {
-              'latitude': destination.latitude,
-              'longitude': destination.longitude,
-            },
-          },
-        },
-        'travelMode': travelMode,
-        'routingPreference': 'TRAFFIC_AWARE',
-        'computeAlternativeRoutes': true,
-        if (requestedReferenceRoutes.isNotEmpty)
-          'requestedReferenceRoutes': requestedReferenceRoutes,
-        'languageCode': 'es-MX',
-        'units': 'METRIC',
-      }),
+      body: jsonEncode(
+        computeRoutesRequestBody(origin: origin, destination: destination),
+      ),
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return null;
@@ -256,72 +291,4 @@ Duration _parseDuration(Object? raw) {
     }
   }
   return Duration.zero;
-}
-
-Future<RiderRouteResult?> _directionsFallback({
-  required LatLng origin,
-  required LatLng destination,
-  required String apiKey,
-}) async {
-  final uri = Uri.https('maps.googleapis.com', '/maps/api/directions/json', {
-    'origin': '${origin.latitude},${origin.longitude}',
-    'destination': '${destination.latitude},${destination.longitude}',
-    'alternatives': 'true',
-    'mode': 'driving',
-    'language': 'es',
-    'key': apiKey,
-  });
-  try {
-    final response = await http.get(uri);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      return null;
-    }
-    final body = jsonDecode(response.body);
-    if (body is! Map<String, dynamic> || body['status'] != 'OK') {
-      return null;
-    }
-    final rawRoutes = body['routes'];
-    if (rawRoutes is! List || rawRoutes.isEmpty) {
-      return null;
-    }
-    final routes = <RiderRouteOption>[];
-    for (var i = 0; i < rawRoutes.length; i++) {
-      final item = rawRoutes[i];
-      if (item is! Map<String, dynamic>) continue;
-      final overview = item['overview_polyline'];
-      final encoded = overview is Map<String, dynamic>
-          ? overview['points'] as String?
-          : null;
-      if (encoded == null || encoded.isEmpty) continue;
-      final points = decodePolyline(encoded);
-      if (points.length < 2) continue;
-      final legs = item['legs'];
-      var meters = 0;
-      var seconds = 0;
-      if (legs is List && legs.isNotEmpty && legs.first is Map<String, dynamic>) {
-        final leg = legs.first as Map<String, dynamic>;
-        final distance = leg['distance'];
-        final duration = leg['duration'];
-        if (distance is Map<String, dynamic>) {
-          meters = (distance['value'] as num?)?.toInt() ?? 0;
-        }
-        if (duration is Map<String, dynamic>) {
-          seconds = (duration['value'] as num?)?.toInt() ?? 0;
-        }
-      }
-      routes.add(
-        RiderRouteOption(
-          id: 'route-$i',
-          points: points,
-          distanceMeters: meters,
-          duration: Duration(seconds: seconds),
-          label: i == 0 ? 'Recomendada' : 'Opción ${i + 1}',
-        ),
-      );
-    }
-    if (routes.isEmpty) return null;
-    return RiderRouteResult(routes: routes);
-  } catch (_) {
-    return null;
-  }
 }

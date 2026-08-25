@@ -6,6 +6,81 @@ import 'package:mexy_rider/maps/nav_target.dart';
 import 'package:mexy_rider/models.dart';
 
 void main() {
+  test('computeRoutesRequestBody avoids Enterprise SKU features', () {
+    final body = computeRoutesRequestBody(
+      origin: const LatLng(19.43, -99.13),
+      destination: const LatLng(19.44, -99.14),
+    );
+
+    expect(body['travelMode'], 'DRIVE');
+    expect(body.containsKey('extraComputations'), isFalse);
+    expect(body['travelMode'], isNot('TWO_WHEELER'));
+    expect(body['computeAlternativeRoutes'], isFalse);
+  });
+
+  test('straightLinePreview always has origin and destination', () {
+    const origin = LatLng(19.43, -99.13);
+    const destination = LatLng(19.44, -99.14);
+    final preview = straightLinePreview(
+      origin: origin,
+      destination: destination,
+    );
+
+    expect(preview.points, [origin, destination]);
+    expect(preview.distanceMeters, greaterThan(0));
+  });
+
+  test('previewRouteResult keeps one Google route and falls back to a straight line', () {
+    const origin = LatLng(19.43, -99.13);
+    const destination = LatLng(19.44, -99.14);
+    final road = RiderRouteOption(
+      id: 'route-0',
+      points: [origin, const LatLng(19.435, -99.135), destination],
+      distanceMeters: 1800,
+      duration: const Duration(minutes: 6),
+    );
+
+    final fromGoogle = previewRouteResult(
+      origin: origin,
+      destination: destination,
+      fetched: RiderRouteResult(routes: [road, road]),
+    );
+    expect(fromGoogle.routes, hasLength(1));
+    expect(fromGoogle.routes.first.points, hasLength(3));
+
+    final fallback = previewRouteResult(
+      origin: origin,
+      destination: destination,
+    );
+    expect(fallback.routes, hasLength(1));
+    expect(fallback.routes.first.points, [origin, destination]);
+  });
+
+  test('previewRouteQueryKey ignores rider movement and changes with the stop', () {
+    const dropoff = LatLng(19.44, -99.14);
+    const restaurant = LatLng(19.43, -99.13);
+    final assigned = previewRouteQueryKey(
+      jobKey: 'job-1:assigned',
+      destination: dropoff,
+    );
+    expect(
+      assigned,
+      previewRouteQueryKey(jobKey: 'job-1:assigned', destination: dropoff),
+    );
+    expect(
+      assigned,
+      isNot(
+        previewRouteQueryKey(jobKey: 'job-1:picked_up', destination: dropoff),
+      ),
+    );
+    expect(
+      assigned,
+      isNot(
+        previewRouteQueryKey(jobKey: 'job-1:assigned', destination: restaurant),
+      ),
+    );
+  });
+
   test('mergeRouteOptions keeps distinct paths and caps the list', () {
     RiderRouteOption option({
       required String id,

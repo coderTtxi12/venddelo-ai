@@ -46,7 +46,6 @@ class _HomeScreenState extends State<HomeScreen> {
   RiderRouteResult? _routes;
   int _selectedRoute = 0;
   String? _routeQueryKey;
-  DateTime? _lastRerouteAt;
   DateTime? _lastDriveMoveAt;
   DateTime? _ignoreMapGestureUntil;
   BitmapDescriptor? _restaurantIcon;
@@ -184,41 +183,30 @@ class _HomeScreenState extends State<HomeScreen> {
     final job = _currentJob;
     final position = widget.controller.currentPosition;
     final destination = _destination;
-    if (job == null || position == null || destination == null) {
+    if (job == null || destination == null) {
       if (_routes != null) {
         setState(() {
           _routes = null;
           _selectedRoute = 0;
           _routeQueryKey = null;
           _overview = false;
-          _lastRerouteAt = null;
         });
       }
       return;
     }
-    final origin = latLngFromPosition(position);
-    final jobKey = SelectedRouteStore.jobKey(job.id, job.status);
-    final queryKey =
-        '$jobKey-${_quantize(origin.latitude)},${_quantize(origin.longitude)}-'
-        '${_quantize(destination.latitude)},${_quantize(destination.longitude)}';
-    final selected = _selectedRouteOption;
-    final offRoute = selected != null && isOffRoute(origin, selected.points);
-    if (queryKey == _routeQueryKey && !offRoute) {
+    if (position == null) {
       return;
     }
-    if (offRoute) {
-      final now = DateTime.now();
-      final recentlyRerouted =
-          _lastRerouteAt != null &&
-          now.difference(_lastRerouteAt!) < const Duration(seconds: 12);
-      if (queryKey == _routeQueryKey && recentlyRerouted) {
-        return;
-      }
-      _lastRerouteAt = now;
-      invalidateRiderRouteCache();
+    final jobKey = SelectedRouteStore.jobKey(job.id, job.status);
+    final queryKey = previewRouteQueryKey(
+      jobKey: jobKey,
+      destination: destination,
+    );
+    if (queryKey == _routeQueryKey) {
+      return;
     }
     _routeQueryKey = queryKey;
-    await selectedRouteStore.load(jobKey);
+    final origin = latLngFromPosition(position);
     final result = await fetchRiderRoutes(
       origin: origin,
       destination: destination,
@@ -226,13 +214,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted || queryKey != _routeQueryKey) {
       return;
     }
-    final nextIndex = clampSelectedRoute(
-      selectedRouteStore.peek(jobKey),
-      result?.routes.length ?? 0,
-    );
     setState(() {
       _routes = result;
-      _selectedRoute = nextIndex;
+      _selectedRoute = 0;
     });
   }
 
@@ -1031,8 +1015,6 @@ double _headingDegrees(double heading) {
   }
   return heading;
 }
-
-double _quantize(double value) => (value * 1000).round() / 1000;
 
 class _RouteFlow extends StatelessWidget {
   const _RouteFlow({required this.stops});

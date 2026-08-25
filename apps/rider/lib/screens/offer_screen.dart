@@ -87,8 +87,11 @@ class _OfferScreenState extends State<OfferScreen> {
     if (origin == null || destination == null) {
       return;
     }
-    final result = await fetchRiderRoutes(origin: origin, destination: destination);
-    if (!mounted || result == null || result.routes.isEmpty) {
+    final result = await fetchRiderRoutes(
+      origin: origin,
+      destination: destination,
+    );
+    if (!mounted || result.routes.isEmpty) {
       return;
     }
     _roadPoints = result.routes.first.points;
