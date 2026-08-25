@@ -46,14 +46,26 @@ export function fetchRoadRoute(
   const cached = cache.get(key);
   if (cached) return cached;
 
-  const pending = (async () => {
-    for (const mode of travelModes()) {
-      const path = await requestRoute(origin, destination, mode);
-      if (path) return path;
-    }
-    return null;
-  })();
+  const pending = requestRoute(origin, destination);
 
   cache.set(key, pending);
+  return pending;
+}
+
+const stablePaths = new Map<string, Promise<RoadRoutePoint[]>>();
+
+/** Fetch a road once per cacheKey. Later GPS updates reuse the same polyline. */
+export function fetchStableRoadPath(
+  cacheKey: string,
+  origin: RoadRoutePoint,
+  destination: RoadRoutePoint,
+): Promise<RoadRoutePoint[]> {
+  const cached = stablePaths.get(cacheKey);
+  if (cached) return cached;
+
+  const pending = fetchRoadRoute(origin, destination).then((road) =>
+    road && road.length > 1 ? road : [origin, destination],
+  );
+  stablePaths.set(cacheKey, pending);
   return pending;
 }
