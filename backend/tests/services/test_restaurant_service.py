@@ -200,3 +200,21 @@ def test_check_subdomain_availability():
     normalized, available, valid, message = svc.check_subdomain_availability("ab")
     assert available is False
     assert valid is False
+
+
+@pytest.mark.parametrize(
+    "email",
+    [
+        "Marco.Marc.181818@gmail.com",
+        "AlfredoQuijanoFlores@gmail.com",
+    ],
+)
+def test_add_admin_invite_rejects_platform_email(email: str):
+    repo = FakeRestaurantRepo()
+    svc = RestaurantService(repo)
+    svc.create(OWNER, RestaurantCreate(name="R", subdomain="tacos"))
+    with pytest.raises(ConflictError, match="no está disponible"):
+        svc.add_admin_invite(
+            OWNER,
+            RestaurantAdminInviteCreate(email=email),
+        )
