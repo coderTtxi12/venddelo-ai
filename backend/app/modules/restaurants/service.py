@@ -278,17 +278,29 @@ class RestaurantService:
 
     def list_admin_invites(self, user_id: uuid.UUID) -> list[RestaurantAdminInviteDTO]:
         restaurant_id = self._require_owner_restaurant_id(user_id)
-        return list(self._repo.list_admin_invites(restaurant_id))
+        return [
+            row
+            for row in self._repo.list_admin_invites(restaurant_id)
+            if not is_platform_restaurant_admin(row.email)
+        ]
 
     def list_admin_members(self, user_id: uuid.UUID) -> list[RestaurantMemberDTO]:
         restaurant_id = self._require_owner_restaurant_id(user_id)
-        return list(self._repo.list_admin_members(restaurant_id))
+        return [
+            row
+            for row in self._repo.list_admin_members(restaurant_id)
+            if not (
+                is_platform_restaurant_admin(row.email) and row.member_role != "owner"
+            )
+        ]
 
     def add_admin_invite(
         self, user_id: uuid.UUID, data: RestaurantAdminInviteCreate
     ) -> RestaurantAdminInviteDTO:
         restaurant_id = self._require_owner_restaurant_id(user_id)
         normalized = self._normalize_admin_email(data.email)
+        if is_platform_restaurant_admin(normalized):
+            raise ConflictError("Ese correo no está disponible")
         if self._repo.email_associated_with_other_restaurant(
             normalized,
             exclude_restaurant_id=restaurant_id,
