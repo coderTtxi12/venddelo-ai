@@ -6,7 +6,12 @@ import pytest
 from app.core.exceptions import ConflictError, ValidationError
 from app.core.pagination import CursorPage, PaginationParams
 from app.modules.restaurants.repository import RestaurantRepository
-from app.modules.restaurants.schemas import RestaurantCreate, RestaurantDTO, RestaurantUpdate
+from app.modules.restaurants.schemas import (
+    RestaurantAdminInviteCreate,
+    RestaurantCreate,
+    RestaurantDTO,
+    RestaurantUpdate,
+)
 from app.modules.restaurants.service import RestaurantService
 
 OWNER = uuid.uuid4()
@@ -79,13 +84,19 @@ class FakeRestaurantRepo(RestaurantRepository):
     def set_payment_methods(self, id, methods) -> None:
         pass
 
-    def get_for_user(self, user_id: uuid.UUID, *, restaurant_id: uuid.UUID | None = None):
+    def get_for_user(
+        self,
+        user_id: uuid.UUID,
+        *,
+        restaurant_id: uuid.UUID | None = None,
+        email: str | None = None,
+    ):
         for dto in self.items.values():
             if dto.owner_id == user_id:
                 return dto, "owner"
         return None
 
-    def list_accessible(self, user_id: uuid.UUID):
+    def list_accessible(self, user_id: uuid.UUID, *, email: str | None = None):
         return []
 
     def touch_last_accessed(self, user_id: uuid.UUID, restaurant_id: uuid.UUID) -> None:
