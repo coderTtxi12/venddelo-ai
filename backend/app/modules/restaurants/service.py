@@ -166,12 +166,19 @@ class RestaurantService:
         self, user_id: uuid.UUID, email: str | None = None
     ) -> RestaurantAccessListResponse:
         self._claim_if_needed(user_id, email)
-        return RestaurantAccessListResponse(items=list(self._repo.list_accessible(user_id)))
+        return RestaurantAccessListResponse(
+            items=list(self._repo.list_accessible(user_id, email=email))
+        )
 
     def select_restaurant(
-        self, user_id: uuid.UUID, data: RestaurantSelectRequest
+        self,
+        user_id: uuid.UUID,
+        data: RestaurantSelectRequest,
+        email: str | None = None,
     ) -> RestaurantMeResponse:
-        found = self._repo.get_for_user(user_id, restaurant_id=data.restaurant_id)
+        found = self._repo.get_for_user(
+            user_id, restaurant_id=data.restaurant_id, email=email
+        )
         if found is None:
             raise NotFoundError("No tienes acceso a ese restaurante")
         restaurant, member_role = found
