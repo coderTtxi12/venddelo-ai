@@ -241,7 +241,40 @@ class SqlAlchemyRestaurantRepository(RestaurantRepository):
             return None
         return RestaurantDTO.model_validate(restaurant), member.member_role
 
-    def list_accessible(self, user_id: uuid.UUID) -> Sequence[RestaurantAccessItem]:
+    def _resolve_email(self, user_id: uuid.UUID, email: str | None) -> str | None:
+        if email and email.strip():
+            return email.strip().lower()
+        db_email = self._session.scalar(select(User.email).where(User.id == user_id))
+        if db_email and db_email.strip():
+            return db_email.strip().lower()
+        return None
+
+    def _platform_admin_restaurant(
+        self,
+        user_id: uuid.UUID,
+        restaurant_id: uuid.UUID | None,
+        *,
+        email: str | None,
+    ) -> tuple[RestaurantDTO, str] | None:
+        if not is_platform_restaurant_admin(self._resolve_email(user_id, email)):
+            return None
+        if restaurant_id is not None:
+            restaurant = self.get(restaurant_id)
+            if restaurant is None:
+                return None
+            return restaurant, "admin"
+        obj = self._session.scalar(
+            select(Restaurant)
+            .where(Restaurant.is_active.is_(True))
+            .order_by(Restaurant.created_at.asc(), Restaurant.id.asc())
+        )
+        if obj is None:
+            return None
+        return RestaurantDTO.model_validate(obj), "admin"
+
+    def list_accessible(
+        self, user_id: uuid.UUID, *, email: str | None = None
+    ) -> Sequence[RestaurantAccessItem]:
         items: list[RestaurantAccessItem] = []
         seen_restaurant_ids: set[uuid.UUID] = set()
 
