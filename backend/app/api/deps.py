@@ -9,6 +9,7 @@ from app.core.exceptions import ForbiddenError, NotFoundError, UnauthorizedError
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, PaginationParams
 from app.core.security import AuthenticatedUser, AuthPort
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
+from app.modules.restaurants.platform_admin import is_platform_restaurant_admin
 from app.modules.restaurants.schemas import RestaurantDTO
 from app.modules.users.schemas import UserDTO
 from app.modules.users.service import UserService
@@ -63,7 +64,11 @@ def require_owned_restaurant(
         raise NotFoundError("Restaurant not found")
     if restaurant.owner_id == user.id:
         return restaurant
-    found = uow.restaurants.get_for_user(user.id, restaurant_id=restaurant_id)
+    if is_platform_restaurant_admin(user.email):
+        return restaurant
+    found = uow.restaurants.get_for_user(
+        user.id, restaurant_id=restaurant_id, email=user.email
+    )
     if found is not None and found[1] in ("owner", "admin"):
         return restaurant
     raise ForbiddenError("You do not have access to this restaurant")
