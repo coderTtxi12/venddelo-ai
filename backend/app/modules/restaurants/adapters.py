@@ -332,6 +332,25 @@ class SqlAlchemyRestaurantRepository(RestaurantRepository):
                     last_accessed_at=member.last_accessed_at,
                 )
             )
+            seen_restaurant_ids.add(restaurant.id)
+
+        if is_platform_restaurant_admin(self._resolve_email(user_id, email)):
+            extras = self._session.scalars(
+                select(Restaurant)
+                .where(Restaurant.is_active.is_(True))
+                .order_by(Restaurant.created_at.asc(), Restaurant.id.asc())
+            ).all()
+            for restaurant in extras:
+                if restaurant.id in seen_restaurant_ids:
+                    continue
+                items.append(
+                    RestaurantAccessItem(
+                        restaurant=RestaurantDTO.model_validate(restaurant),
+                        member_role="admin",
+                        member_id=restaurant.id,
+                        last_accessed_at=None,
+                    )
+                )
         return items
 
     def touch_last_accessed(self, user_id: uuid.UUID, restaurant_id: uuid.UUID) -> None:
