@@ -153,7 +153,9 @@ class RestaurantService:
         restaurant_id: uuid.UUID | None = None,
     ) -> RestaurantMeResponse:
         self._claim_if_needed(user_id, email)
-        found = self._repo.get_for_user(user_id, restaurant_id=restaurant_id)
+        found = self._repo.get_for_user(
+            user_id, restaurant_id=restaurant_id, email=email
+        )
         if found is None:
             return RestaurantMeResponse(restaurant=None, member_role=None)
         restaurant, member_role = found
