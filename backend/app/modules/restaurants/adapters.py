@@ -21,14 +21,15 @@ from app.db.models.restaurant import (
     RestaurantSchedule,
 )
 from app.db.models.user import User
+from app.modules.restaurants.platform_admin import is_platform_restaurant_admin
 from app.modules.restaurants.repository import RestaurantRepository
 from app.modules.restaurants.schemas import (
     PaymentMethodCreate,
     PaymentMethodDTO,
+    RestaurantAccessItem,
     RestaurantAdminInviteDTO,
     RestaurantCreate,
     RestaurantDTO,
-    RestaurantAccessItem,
     RestaurantMemberDTO,
     RestaurantUpdate,
     ScheduleCreate,
