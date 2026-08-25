@@ -18,23 +18,17 @@ function cacheKey(origin: RoadRoutePoint, destination: RoadRoutePoint): string {
   ].join(',');
 }
 
-function travelModes(): string[] {
-  const twoWheeler = google.maps.TravelMode?.TWO_WHEELER;
-  if (twoWheeler) return [twoWheeler, google.maps.TravelMode.DRIVING];
-  return [google.maps.TravelMode.DRIVING];
-}
-
 async function requestRoute(
   origin: RoadRoutePoint,
   destination: RoadRoutePoint,
-  travelMode: string,
 ): Promise<RoadRoutePoint[] | null> {
   const service = new google.maps.DirectionsService();
   try {
     const result = await service.route({
       origin,
       destination,
-      travelMode,
+      // DRIVING only: TWO_WHEELER bills as Routes Compute Routes Enterprise.
+      travelMode: google.maps.TravelMode.DRIVING,
     });
     const path = result.routes[0]?.overview_path ?? [];
     if (path.length < 2) return null;
