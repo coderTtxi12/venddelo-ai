@@ -141,8 +141,9 @@ class RestaurantService:
         self._repo = repo
 
     def _claim_if_needed(self, user_id: uuid.UUID, email: str | None) -> None:
-        if email:
-            self._repo.claim_admin_invites(user_id, email)
+        if not email or is_platform_restaurant_admin(email):
+            return
+        self._repo.claim_admin_invites(user_id, email)
 
     def get_me(
         self,
