@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { DispatchStatus, PublicDispatchTracking } from '@/lib/api/dispatch';
-import { fetchRoadRoute } from '@/lib/dispatch/fetchRoadRoute';
+import { fetchRoadRoute, fetchStableRoadPath } from '@/lib/dispatch/fetchRoadRoute';
+import { remainingPathFrom } from '@/lib/dispatch/remainingRoadPath';
 import { getGoogleMapsMapId, loadGoogleMaps } from '@/lib/loadGoogleMapsPlaces';
 import styles from './PublicTrackingMap.module.css';
 
@@ -243,14 +244,21 @@ export function PublicTrackingMap({ tracking }: PublicTrackingMapProps) {
           : pickup;
 
       if (origin && destination) {
-        const road = await fetchRoadRoute(origin, destination);
-        if (cancelled) return;
-        const path = road && road.length > 1 ? road : [origin, destination];
-        points.push(path[0], path[path.length - 1]);
         const liveRoute =
           tracking.status === 'assigned' ||
           tracking.status === 'picked_up' ||
           tracking.status === 'in_transit';
+        const full = liveRoute
+          ? await fetchStableRoadPath(
+              `${tracking.status}:${destination.lat}:${destination.lng}`,
+              origin,
+              destination,
+            )
+          : (await fetchRoadRoute(origin, destination)) ?? [origin, destination];
+        if (cancelled) return;
+        const path =
+          liveRoute && rider ? remainingPathFrom(full, rider) : full.length > 1 ? full : [origin, destination];
+        points.push(path[0], path[path.length - 1]);
         polylinesRef.current.push(
           new google.maps.Polyline({
             map,
