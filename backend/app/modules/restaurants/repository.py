@@ -66,10 +66,13 @@ class RestaurantRepository(ABC):
         user_id: uuid.UUID,
         *,
         restaurant_id: uuid.UUID | None = None,
+        email: str | None = None,
     ) -> tuple[RestaurantDTO, str] | None: ...
 
     @abstractmethod
-    def list_accessible(self, user_id: uuid.UUID) -> Sequence[RestaurantAccessItem]: ...
+    def list_accessible(
+        self, user_id: uuid.UUID, *, email: str | None = None
+    ) -> Sequence[RestaurantAccessItem]: ...
 
     @abstractmethod
     def touch_last_accessed(self, user_id: uuid.UUID, restaurant_id: uuid.UUID) -> None: ...
