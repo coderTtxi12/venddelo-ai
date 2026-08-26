@@ -1,35 +1,43 @@
 .page {
   width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
+  overflow-x: clip;
+  overscroll-behavior: contain;
 }
 
 .header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+}
+
+.headerCopy {
+  min-width: 0;
 }
 
 .headerActions {
   display: flex;
+  flex-direction: column;
   align-items: stretch;
-  justify-content: flex-end;
-  gap: 0.7rem;
-  flex-wrap: wrap;
+  gap: 0.6rem;
+  width: 100%;
 }
 
 .title {
-  font-size: 1.6rem;
+  margin: 0;
+  font-size: 1.35rem;
   font-weight: 800;
+  line-height: 1.2;
   color: var(--color-text);
 }
 
 .subtitle {
-  margin-top: 0.35rem;
-  font-size: 0.92rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
   color: var(--color-text-secondary);
   max-width: 42rem;
   line-height: 1.45;
