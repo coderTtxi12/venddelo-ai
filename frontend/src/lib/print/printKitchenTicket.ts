@@ -1,7 +1,9 @@
 import type { Order, Product } from '@/lib/api/types';
+import { printKitchenNetworkTicket } from '@/lib/api/restaurants';
 import { buildKitchenTicketDocument, type KitchenTicketDocument } from './ticketDocument';
 import { encodeKitchenTicketEscPos, kitchenTicketHtml } from './escposEncoder';
 import {
+  CLASSIC_BLUETOOTH_FALLBACK,
   hasDefaultKitchenPrinter,
   readKitchenPrinterPreference,
   sendEscPosToKitchenPrinter,
