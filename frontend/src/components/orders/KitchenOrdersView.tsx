@@ -479,7 +479,7 @@ function OrderDetailContent({
         </div>
       </div>
 
-      {showActions ? (
+      {showActions || onPrint ? (
         <footer className={styles.detailActions}>
           {meta.nextActionLabel ? (
             <button
