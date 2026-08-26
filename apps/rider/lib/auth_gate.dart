@@ -240,6 +240,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
             errorMessage: controller.errorMessage,
             busy: controller.offerBusy,
             onAccept: controller.acceptOffer,
+            onExpired: controller.clearExpiredOffer,
           );
         }
         return HomeScreen(controller: controller, onSignOut: _onSignOut);
