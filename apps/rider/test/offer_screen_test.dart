@@ -69,6 +69,31 @@ void main() {
     expect(find.text('La oferta ya no está disponible'), findsOneWidget);
   });
 
+  testWidgets('offer sheet notifies when the countdown has expired', (tester) async {
+    var expired = 0;
+    await _pumpSheet(
+      tester,
+      offer: RiderOffer(
+        id: 'o1',
+        requestId: 'r1',
+        shortId: 'K7M2P',
+        status: 'offered',
+        expiresAt: DateTime.now().toUtc().subtract(const Duration(seconds: 2)),
+        restaurantName: 'Tacos',
+        dropoffAddress: 'Calle 1',
+        collectCents: 15000,
+        quotedFeeCents: 4500,
+        paymentMethod: 'cash',
+        packageCount: 1,
+      ),
+      onExpired: () => expired += 1,
+    );
+    await tester.pump();
+    expect(expired, 1);
+    await tester.pump(const Duration(seconds: 1));
+    expect(expired, 1);
+  });
+
   testWidgets('offer sheet shows distance and delivery fee', (tester) async {
     await _pumpSheet(tester, offer: _offer());
 
