@@ -323,6 +323,7 @@ export function DispatchDeliveryAddressPicker({
     if (value.latitude == null && value.longitude == null && !value.address.trim()) {
       setSearchText('');
       setInputError(null);
+      setFailedMapsLink(null);
     }
   }, [value.address, value.latitude, value.longitude]);
 
@@ -345,10 +346,22 @@ export function DispatchDeliveryAddressPicker({
       setMapState('loading');
       try {
         await loadGoogleMapsEditor();
-        if (cancelled || !mapContainerRef.current) return;
+        if (cancelled) return;
+
+        let container = mapContainerRef.current;
+        for (let attempt = 0; attempt < 8 && !container && !cancelled; attempt += 1) {
+          await new Promise<void>((resolve) => {
+            window.requestAnimationFrame(() => resolve());
+          });
+          container = mapContainerRef.current;
+        }
+        if (cancelled) return;
+        if (!container) {
+          setMapState('error');
+          return;
+        }
 
         const position = { lat: value.latitude!, lng: value.longitude! };
-        const container = mapContainerRef.current;
 
         if (mapNeedsNewInstance(mapRef.current, container)) {
           disposeMap();
