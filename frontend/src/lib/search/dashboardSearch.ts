@@ -105,6 +105,14 @@ const STATIC_ITEMS: Omit<DashboardSearchItem, 'score'>[] = [
     href: '/hours',
   },
   {
+    id: 'page:printer',
+    kind: 'page',
+    title: 'Impresora',
+    subtitle: 'Tickets de cocina y dispositivo predeterminado',
+    keywords: ['impresora', 'ticket', 'imprimir', 'cocina', 'usb', 'recibo', 'bluetooth', 'printer'],
+    href: '/printer',
+  },
+  {
     id: 'page:analytics',
     kind: 'page',
     title: 'Analíticas',
