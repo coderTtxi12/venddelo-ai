@@ -165,3 +165,75 @@ test('buildKitchenTicketDocument includes delivery address for delivery orders',
     ),
   );
 });
+
+test('buildKitchenTicketDocument includes complements when the product catalog is available', () => {
+  const groupId = 'group-1';
+  const optionId = 'opt-1';
+  const productId = 'prod-frappe';
+  const product = {
+    id: productId,
+    restaurant_id: 'rest-1',
+    name: 'Frappe moca',
+    description: null,
+    price_cents: 8500,
+    currency: 'MXN',
+    image_path: null,
+    status: 'active' as const,
+    category_ids: [],
+    option_groups: [
+      {
+        id: groupId,
+        product_id: productId,
+        title: 'Personaliza tu bebida',
+        selection: 'multiple' as const,
+        required: false,
+        min_selections: 0,
+        max_selections: 4,
+        sort_index: 0,
+        is_active: true,
+        items: [
+          {
+            id: optionId,
+            label: 'Deslactosada',
+            price_delta_cents: 0,
+            sort_index: 0,
+            is_active: true,
+          },
+        ],
+      },
+    ],
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+  };
+  const doc = buildKitchenTicketDocument({
+    order: takeoutOrder({
+      items: [
+        {
+          id: 'item-1',
+          product_id: productId,
+          product_name: 'Frappe moca',
+          product_image_path: null,
+          quantity: 1,
+          unit_price_cents: 8500,
+          selected_options: { [groupId]: [optionId] },
+          line_subtotal_cents: 8500,
+          discount_cents: 0,
+          line_total_cents: 8500,
+          applied_promotion_id: null,
+          applied_discounts: [],
+        },
+      ],
+    }),
+    settings: DEFAULT_TICKET_PRINT_SETTINGS,
+    restaurantName: 'Freych',
+    productsById: new Map([[productId, product]]),
+  });
+  assert.ok(
+    doc.lines.some(
+      (line) =>
+        line.kind === 'option' &&
+        line.text.includes('Personaliza tu bebida') &&
+        line.text.includes('Deslactosada'),
+    ),
+  );
+});
