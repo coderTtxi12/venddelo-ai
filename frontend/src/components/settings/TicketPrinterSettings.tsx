@@ -12,7 +12,9 @@ import { previewKitchenTicketDocument } from '@/lib/print/ticketDocument';
 import { printKitchenTicketDocument } from '@/lib/print/printKitchenTicket';
 import {
   discoverKitchenNetworkPrinters,
+  discoverKitchenSystemPrinters,
   type KitchenNetworkPrinter,
+  type KitchenSystemPrinter,
 } from '@/lib/api/restaurants';
 import { ApiError } from '@/lib/api/types';
 import {
