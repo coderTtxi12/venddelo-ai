@@ -1,3 +1,5 @@
+import type { TicketPrintSettings } from '@/lib/print/ticketSettings';
+
 export type ApiErrorBody = {
   error: {
     code: string;
