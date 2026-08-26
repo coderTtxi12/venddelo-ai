@@ -183,6 +183,23 @@ def test_update_allows_keeping_same_subdomain():
     assert updated.subdomain == "my-rest"
 
 
+def test_update_ticket_print_settings():
+    repo = FakeRestaurantRepo()
+    svc = RestaurantService(repo)
+    created = svc.create(OWNER, RestaurantCreate(name="R", subdomain="my-rest"))
+    updated = svc.update(
+        created.id,
+        RestaurantUpdate(
+            ticket_print_settings=created.ticket_print_settings.model_copy(
+                update={"brand_name": "Tacos Pepe", "paper_width_mm": 58, "copies": 2}
+            )
+        ),
+    )
+    assert updated.ticket_print_settings.brand_name == "Tacos Pepe"
+    assert updated.ticket_print_settings.paper_width_mm == 58
+    assert updated.ticket_print_settings.copies == 2
+
+
 def test_check_subdomain_availability():
     repo = FakeRestaurantRepo()
     svc = RestaurantService(repo)
