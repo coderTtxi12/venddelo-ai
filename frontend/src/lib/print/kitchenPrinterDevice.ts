@@ -344,10 +344,13 @@ export function useSystemKitchenPrinter(restaurantId: string): KitchenPrinterPre
 async function writeUsbBytes(data: Uint8Array): Promise<void> {
   const usb = usbNavigator();
   if (!usb) throw new Error('USB no disponible');
-  const devices = await usb.getDevices();
-  const device = devices[0];
+  let device = (await usb.getDevices())[0];
   if (!device) {
-    throw new Error('No hay una impresora USB autorizada en este equipo.');
+    try {
+      device = await usb.requestDevice({ filters: USB_FILTERS });
+    } catch {
+      throw new Error('No hay una impresora USB autorizada en este equipo.');
+    }
   }
   if (!device.opened) await device.open();
   if (device.configuration == null) await device.selectConfiguration(1);
@@ -371,8 +374,14 @@ async function writeSerialBytes(data: Uint8Array): Promise<void> {
   const serial = serialNavigator();
   if (!serial) throw new Error('Puerto serie no disponible');
   const ports = await serial.getPorts();
-  const port = ports[0];
-  if (!port) throw new Error('No hay un puerto serie autorizado en este equipo.');
+  let port = ports[0];
+  if (!port) {
+    try {
+      port = await serial.requestPort();
+    } catch {
+      throw new Error('No hay un puerto serie autorizado en este equipo.');
+    }
+  }
   await port.open({ baudRate: 9600 });
   try {
     const writer = port.writable?.getWriter();
@@ -405,14 +414,99 @@ async function findWritableCharacteristic(
   return null;
 }
 
-async function writeBluetoothBytes(data: Uint8Array): Promise<void> {
+function isUserCancelledBluetooth(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const name = 'name' in error ? String((error as { name?: string }).name) : '';
+  return name === 'NotFoundError' || name === 'AbortError' || /canceló|canceled|cancelled/i.test(error.message);
+}
+
+function rememberBluetoothDevice(restaurantId: string, device: BluetoothDeviceLike): void {
+  bluetoothDeviceCache.set(restaurantId, device);
+  if (typeof device.watchAdvertisements === 'function') {
+    void device.watchAdvertisements().catch(() => undefined);
+  }
+}
+
+function pickBluetoothDevice(
+  devices: BluetoothDeviceLike[],
+  deviceId?: string,
+): BluetoothDeviceLike | null {
+  if (deviceId) {
+    const match = devices.find((item) => item.id === deviceId);
+    if (match) return match;
+  }
+  return devices.find((item) => item.gatt) ?? devices[0] ?? null;
+}
+
+async function requestBluetoothDevice(): Promise<BluetoothDeviceLike> {
+  const bluetooth = bluetoothNavigator();
+  if (!bluetooth) {
+    throw new Error('Este navegador no permite Bluetooth. Usa Chrome o Edge con Bluetooth activado.');
+  }
+  return bluetooth.requestDevice({
+    acceptAllDevices: true,
+    optionalServices: BLE_OPTIONAL_SERVICES,
+  });
+}
+
+async function persistPairedBluetoothDevice(
+  restaurantId: string,
+  device: BluetoothDeviceLike,
+): Promise<KitchenPrinterPreference> {
+  if (!device.gatt) {
+    return useSystemKitchenPrinter(restaurantId);
+  }
+  try {
+    if (!device.gatt.connected) await device.gatt.connect();
+  } catch {
+    return useSystemKitchenPrinter(restaurantId);
+  }
+  rememberBluetoothDevice(restaurantId, device);
+  const preference: KitchenPrinterPreference = {
+    kind: 'bluetooth',
+    label: device.name?.trim() || 'Impresora Bluetooth',
+    bluetoothDeviceId: device.id,
+  };
+  writeKitchenPrinterPreference(restaurantId, preference);
+  return preference;
+}
+
+async function resolveBluetoothDevice(restaurantId: string): Promise<BluetoothDeviceLike> {
+  const cached = bluetoothDeviceCache.get(restaurantId);
+  if (cached?.gatt) return cached;
+
+  const preference = readKitchenPrinterPreference(restaurantId);
   const bluetooth = bluetoothNavigator();
   if (!bluetooth) throw new Error('Bluetooth no disponible');
-  const devices = bluetooth.getDevices ? await bluetooth.getDevices() : [];
-  const device = devices[0];
-  if (!device?.gatt) {
-    throw new Error('No hay una impresora Bluetooth autorizada en este equipo. Vuelve a conectarla.');
+
+  const known = bluetooth.getDevices ? await bluetooth.getDevices() : [];
+  const fromBrowser = pickBluetoothDevice(known, preference.bluetoothDeviceId);
+  if (fromBrowser?.gatt) {
+    rememberBluetoothDevice(restaurantId, fromBrowser);
+    return fromBrowser;
   }
+
+  try {
+    const device = await requestBluetoothDevice();
+    const persisted = await persistPairedBluetoothDevice(restaurantId, device);
+    if (persisted.kind !== 'bluetooth') {
+      throw new Error(CLASSIC_BLUETOOTH_FALLBACK);
+    }
+    const resolved = bluetoothDeviceCache.get(restaurantId);
+    if (resolved?.gatt) return resolved;
+  } catch (error) {
+    if (error instanceof Error && error.message === CLASSIC_BLUETOOTH_FALLBACK) throw error;
+    if (isUserCancelledBluetooth(error)) {
+      throw new Error('Se canceló la conexión Bluetooth.');
+    }
+    throw error;
+  }
+  throw new Error('No se pudo conectar la impresora Bluetooth.');
+}
+
+async function writeBluetoothBytes(restaurantId: string, data: Uint8Array): Promise<void> {
+  const device = await resolveBluetoothDevice(restaurantId);
+  if (!device.gatt) throw new Error(CLASSIC_BLUETOOTH_FALLBACK);
   const server = device.gatt.connected ? device.gatt : await device.gatt.connect();
   const services = await server.getPrimaryServices();
   const characteristic = await findWritableCharacteristic(services);
@@ -448,7 +542,7 @@ export async function sendEscPosToKitchenPrinter(
     return 'serial';
   }
   if (preference.kind === 'bluetooth') {
-    await writeBluetoothBytes(payload);
+    await writeBluetoothBytes(restaurantId, payload);
     return 'bluetooth';
   }
   if (preference.kind === 'system') {
