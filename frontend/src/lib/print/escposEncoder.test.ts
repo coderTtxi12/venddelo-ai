@@ -6,6 +6,8 @@ import type { KitchenTicketDocument } from './ticketDocument.ts';
 
 const ESC = 0x1b;
 
+const INIT = [ESC, 0x40, 0x1c, 0x2e, ESC, 0x74, 2, 0x1d, 0x4c, 0, 0];
+
 function ticket(lines: KitchenTicketDocument['lines']): KitchenTicketDocument {
   return {
     paperWidthMm: 80,
@@ -17,18 +19,13 @@ function ticket(lines: KitchenTicketDocument['lines']): KitchenTicketDocument {
 }
 
 function payloadText(bytes: Uint8Array): Uint8Array {
-  const init = [ESC, 0x40, ESC, 0x74, 2];
-  assert.deepEqual([...bytes.slice(0, 5)], init);
+  assert.deepEqual([...bytes.slice(0, INIT.length)], INIT);
   return bytes;
 }
 
-test('encodeKitchenTicketEscPos selects PC850, not Windows-1252', () => {
+test('encodeKitchenTicketEscPos cancels Chinese mode then selects PC850', () => {
   const bytes = encodeKitchenTicketEscPos(ticket([{ kind: 'center', text: 'México' }]));
-  assert.equal(bytes[0], ESC);
-  assert.equal(bytes[1], 0x40);
-  assert.equal(bytes[2], ESC);
-  assert.equal(bytes[3], 0x74);
-  assert.equal(bytes[4], 2);
+  assert.deepEqual([...bytes.slice(0, INIT.length)], INIT);
 });
 
 test('encodeKitchenTicketEscPos encodes Spanish accents as PC850 single bytes', () => {
