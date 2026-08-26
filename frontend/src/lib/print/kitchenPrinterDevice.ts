@@ -201,6 +201,9 @@ export function writeKitchenPrinterPreference(
   restaurantId: string,
   preference: KitchenPrinterPreference,
 ): void {
+  if (preference.kind !== 'bluetooth') {
+    bluetoothDeviceCache.delete(restaurantId);
+  }
   if (typeof window === 'undefined') return;
   if (preference.kind === 'none') {
     window.localStorage.removeItem(kitchenPrinterStorageKey(restaurantId));
