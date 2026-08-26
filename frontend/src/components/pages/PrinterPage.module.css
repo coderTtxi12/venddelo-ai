@@ -101,8 +101,9 @@
   background: var(--color-primary);
   color: #fff;
   font-weight: 800;
-  padding: 0.65rem 1.1rem;
+  padding: 0.7rem 1.1rem;
   min-height: 44px;
+  width: 100%;
   cursor: pointer;
   touch-action: manipulation;
   transition: opacity 0.18s ease;
@@ -135,6 +136,47 @@
   font-size: 0.9rem;
   color: var(--color-text-secondary);
   line-height: 1.45;
+}
+
+@media (min-width: 768px) {
+  .page {
+    gap: 1.25rem;
+  }
+
+  .header {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .headerActions {
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: flex-end;
+    width: auto;
+    max-width: min(100%, 28rem);
+  }
+
+  .title {
+    font-size: 1.6rem;
+  }
+
+  .printerChip {
+    width: auto;
+    flex: 1 1 12rem;
+    max-width: 22rem;
+  }
+
+  .primaryBtn {
+    width: auto;
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 1024px) {
+  .headerActions {
+    max-width: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
