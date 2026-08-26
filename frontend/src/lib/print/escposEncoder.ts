@@ -77,13 +77,13 @@ function charsForWidth(paperWidthMm: 58 | 80): number {
 
 function encodeText(text: string): number[] {
   const bytes: number[] = [];
-  for (const char of text) {
+  for (const char of text.normalize('NFC')) {
     const code = char.charCodeAt(0);
     if (code < 128) {
       bytes.push(code);
       continue;
     }
-    bytes.push(CP1252[char] ?? 0x3f);
+    bytes.push(CP850[char] ?? 0x3f);
   }
   return bytes;
 }
