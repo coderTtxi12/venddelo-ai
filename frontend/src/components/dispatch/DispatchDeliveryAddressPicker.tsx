@@ -450,6 +450,10 @@ export function DispatchDeliveryAddressPicker({
     );
   }
 
+  const canUseMapsLink = looksLikeMapsUrl(searchText) || Boolean(failedMapsLink);
+  const showMapBusy =
+    mapState !== 'error' && (mapState === 'loading' || geocoding || linkResolving);
+
   return (
     <div className={styles.wrap}>
       <label className={styles.label} htmlFor="dispatch-address-search">
