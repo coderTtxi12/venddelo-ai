@@ -135,7 +135,7 @@ export default function PrinterPage() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <div>
+        <div className={styles.headerCopy}>
           <h1 className={styles.title}>Impresora</h1>
           <p className={styles.subtitle}>
             Conecta la impresora de tickets y elige qué se imprime al confirmar un pedido.
@@ -182,6 +182,7 @@ export default function PrinterPage() {
           setSaveOk(false);
         }}
         onPrinterChange={setDefaultPrinter}
+        accessToken={accessToken}
       />
     </div>
   );
