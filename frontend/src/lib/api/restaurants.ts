@@ -300,6 +300,36 @@ export function printKitchenNetworkTicket(
   });
 }
 
+export type KitchenSystemPrinter = {
+  name: string;
+  is_default: boolean;
+};
+
+export type KitchenSystemPrinterDiscover = {
+  items: KitchenSystemPrinter[];
+  default_name: string | null;
+  message: string | null;
+};
+
+export function discoverKitchenSystemPrinters(token: string, restaurantId: string) {
+  return apiRequest<KitchenSystemPrinterDiscover>(
+    `/restaurants/${restaurantId}/kitchen-printers/system/discover`,
+    { method: 'POST', token },
+  );
+}
+
+export function printKitchenSystemTicket(
+  token: string,
+  restaurantId: string,
+  data: { printer_name: string; payload_base64: string },
+) {
+  return apiRequest<void>(`/restaurants/${restaurantId}/kitchen-printers/system/print`, {
+    method: 'POST',
+    token,
+    body: data,
+  });
+}
+
 export function getMexyCoverage(token: string, latitude: number, longitude: number) {
   const q = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude) });
   return apiRequest<MexyCoverageResponse>(`/restaurants/mexy-coverage?${q}`, { token });
