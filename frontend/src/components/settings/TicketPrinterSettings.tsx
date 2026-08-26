@@ -104,6 +104,7 @@ export function TicketPrinterSettings({
   value: TicketPrintSettings;
   onChange: (next: TicketPrintSettings) => void;
   onPrinterChange?: (next: KitchenPrinterPreference) => void;
+  accessToken?: string | null;
 }) {
   const [printer, setPrinterState] = useState<KitchenPrinterPreference>(() =>
     readKitchenPrinterPreference(restaurantId),
