@@ -335,9 +335,27 @@ class RiderController extends ChangeNotifier {
     });
   }
 
+  void clearExpiredOffer() {
+    final current = offer;
+    if (current == null || !isOfferCountdownExpired(current.expiresAt)) {
+      return;
+    }
+    _dismissedExpiredOfferIds.add(current.id);
+    _applyOffer(null);
+    notifyListeners();
+    if (profile?.isOnline == true) {
+      unawaited(refreshOffers());
+    }
+  }
+
   void _applyOffer(RiderOffer? next) {
-    offer = next;
-    _syncOfferAlarm(next?.id);
+    offer = visibleOfferIgnoringDismissedExpiry(
+      offer: next,
+      idOf: (item) => item.id,
+      expiresAtOf: (item) => item.expiresAt,
+      dismissedExpiredIds: _dismissedExpiredOfferIds,
+    );
+    _syncOfferAlarm(offer?.id);
   }
 
   void _syncOfferAlarm(String? nextOfferId) {
