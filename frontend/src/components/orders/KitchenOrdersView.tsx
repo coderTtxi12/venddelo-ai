@@ -491,6 +491,12 @@ function OrderDetailContent({
               {updating ? 'Actualizando…' : meta.nextActionLabel}
             </button>
           ) : null}
+          {onPrint ? (
+            <button type="button" className={styles.actionSecondary} disabled={updating} onClick={onPrint}>
+              <PrintOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
+              Imprimir ticket
+            </button>
+          ) : null}
           {canCancelOrder(order.status) ? (
             <button
               type="button"
