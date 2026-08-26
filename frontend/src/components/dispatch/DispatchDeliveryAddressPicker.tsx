@@ -473,7 +473,6 @@ export function DispatchDeliveryAddressPicker({
           value={searchText}
           onChange={(event) => {
             setSearchText(event.target.value);
-            if (inputError) setInputError(null);
           }}
           onPaste={(event) => {
             const text = event.clipboardData.getData('text').trim();
