@@ -451,12 +451,12 @@ export function TicketPrinterSettings({
               Quitar predeterminada
             </button>
           ) : null}
-          <button
-            type="button"
-            className={styles.primaryBtn}
-            disabled={testBusy || !hasDefaultKitchenPrinter(printer)}
-            onClick={() => void testPrint()}
-          >
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              disabled={testBusy || (!hasDefaultKitchenPrinter(printer) && !isLanPrinterIpv4(networkHost))}
+              onClick={() => void testPrint()}
+            >
             <PrintOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
             {testBusy ? 'Imprimiendo…' : 'Imprimir prueba'}
           </button>
