@@ -12,6 +12,7 @@ import {
   EMPTY_KITCHEN_PRINTER,
   defaultPrinterDisplayName,
   hasDefaultKitchenPrinter,
+  primeKitchenPrinterConnections,
   type KitchenPrinterPreference,
 } from '@/lib/print/kitchenPrinterDevice';
 import { normalizeTicketPrintSettings, type TicketPrintSettings } from '@/lib/print/ticketSettings';
