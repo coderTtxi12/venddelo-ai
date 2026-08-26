@@ -126,8 +126,8 @@ Future<RiderRouteResult> fetchRiderRoutes({
   );
 }
 
-/// Body for Compute Routes. DRIVE only: TWO_WHEELER bills as
-/// Routes: Compute Routes Enterprise.
+/// Body for Compute Routes Essentials: DRIVE + TRAFFIC_UNAWARE.
+/// TWO_WHEELER bills Enterprise; TRAFFIC_AWARE bills Pro.
 Map<String, dynamic> computeRoutesRequestBody({
   required LatLng origin,
   required LatLng destination,
@@ -150,7 +150,7 @@ Map<String, dynamic> computeRoutesRequestBody({
       },
     },
     'travelMode': 'DRIVE',
-    'routingPreference': 'TRAFFIC_AWARE',
+    'routingPreference': 'TRAFFIC_UNAWARE',
     'computeAlternativeRoutes': false,
     'languageCode': 'es-MX',
     'units': 'METRIC',
