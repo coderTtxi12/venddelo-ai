@@ -524,6 +524,7 @@ function OrderDetailPanel({
   onBack,
   onAdvance,
   onCancel,
+  onPrint,
 }: {
   order: Order | null;
   productsById: ReadonlyMap<string, Product>;
