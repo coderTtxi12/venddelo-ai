@@ -99,11 +99,23 @@ function encodeText(text: string): number[] {
   return bytes;
 }
 
-function padKv(label: string, value: string, width: number): string {
-  const left = `${label}:`;
-  const space = width - left.length - value.length;
-  if (space >= 1) return `${left}${' '.repeat(space)}${value}`;
-  return `${left} ${value}`;
+function padColumns(left: string, right: string, width: number): string[] {
+  const leftLen = glyphCount(left);
+  const rightLen = glyphCount(right);
+  if (leftLen + 1 + rightLen <= width) {
+    return [`${left}${' '.repeat(width - leftLen - rightLen)}${right}`];
+  }
+  const wrapWidth = Math.max(8, width - rightLen - 1);
+  const wrapped = wrapWords(left, wrapWidth);
+  const first = wrapped[0] ?? '';
+  const firstLen = glyphCount(first);
+  if (firstLen + 1 + rightLen <= width) {
+    return [
+      `${first}${' '.repeat(width - firstLen - rightLen)}${right}`,
+      ...wrapped.slice(1),
+    ];
+  }
+  return [...wrapped, `${' '.repeat(Math.max(0, width - rightLen))}${right}`];
 }
 
 function wrapWords(text: string, width: number): string[] {
