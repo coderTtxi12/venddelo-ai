@@ -141,7 +141,7 @@ function lineToRows(line: TicketLine, width: number): Array<{ text: string; alig
     case 'title':
       return [{ text: line.text.toUpperCase(), align: 'left', bold: true }];
     case 'item': {
-      const qtyName = `${line.qty}× ${line.name}`;
+      const qtyName = `${line.qty}x ${line.name}`;
       const space = width - qtyName.length - line.price.length;
       const text =
         space >= 1 ? `${qtyName}${' '.repeat(space)}${line.price}` : `${qtyName}\n${line.price}`;
