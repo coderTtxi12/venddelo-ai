@@ -24,6 +24,8 @@ export type CursorPage<T> = {
   has_more: boolean;
 };
 
+export type { TicketPrintSettings } from '@/lib/print/ticketSettings';
+
 export type Restaurant = {
   id: string;
   name: string;
