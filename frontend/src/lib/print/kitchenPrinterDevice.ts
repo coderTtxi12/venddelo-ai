@@ -268,6 +268,18 @@ export function isLanPrinterIpv4(value: string): boolean {
   return false;
 }
 
+export function shouldApplyTypedNetworkHost(
+  preference: KitchenPrinterPreference,
+  typedHost: string,
+): boolean {
+  const host = typedHost.trim();
+  if (!isLanPrinterIpv4(host)) return false;
+  if (preference.kind === 'usb' || preference.kind === 'serial' || preference.kind === 'bluetooth') {
+    return false;
+  }
+  return preference.kind !== 'network' || preference.host !== host;
+}
+
 export function canUseWebUsb(): boolean {
   return typeof navigator !== 'undefined' && usbNavigator() != null;
 }
