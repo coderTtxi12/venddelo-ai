@@ -496,9 +496,36 @@ export function DispatchDeliveryAddressPicker({
           disabled={disabled || linkResolving}
           autoComplete="off"
         />
+        {looksLikeMapsUrl(searchText) ? (
+          <button
+            type="button"
+            className={styles.useLinkButton}
+            onClick={() => void handleMapsLink(searchText)}
+            disabled={disabled || linkResolving}
+          >
+            {linkResolving ? 'Leyendo…' : 'Usar enlace'}
+          </button>
+        ) : null}
       </div>
+      {inputError ? (
+        <div className={styles.errorRow} role="alert">
+          <p className={styles.error}>{inputError}</p>
+          {canUseMapsLink ? (
+            <button
+              type="button"
+              className={styles.retryButton}
+              onClick={retryMapsLink}
+              disabled={disabled || linkResolving}
+            >
+              <RefreshOutlinedIcon className={styles.retryIcon} aria-hidden />
+              Reintentar enlace
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <p className={styles.hint}>
-        Busca una dirección o pega un enlace de Google Maps para ubicar la entrega.
+        Pega el enlace de Google Maps y pulsa Usar enlace. Si el mapa no aparece, reintenta;
+        también puedes buscar la dirección por nombre.
       </p>
 
       {linkResolving ? (
@@ -520,7 +547,7 @@ export function DispatchDeliveryAddressPicker({
           </div>
 
           <div className={styles.mapShell} aria-label="Mapa de entrega">
-            {mapState === 'loading' || geocoding || linkResolving ? (
+            {showMapBusy ? (
               <p className={styles.mapOverlay}>
                 {linkResolving
                   ? 'Leyendo enlace…'
