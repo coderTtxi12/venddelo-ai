@@ -356,9 +356,9 @@ export function TicketPrinterSettings({
       }
       if (result.status === 'printed') {
         setPrinterMessage(
-          result.method === 'system' && !printer.systemPrinterName
+          result.method === 'system' && !active.systemPrinterName
             ? 'Se abrió el diálogo de impresión. Elige tu impresora térmica.'
-            : `Ticket de prueba enviado a ${defaultPrinterDisplayName(printer)}.`,
+            : `Ticket de prueba enviado a ${defaultPrinterDisplayName(active)}.`,
         );
       }
     } finally {
