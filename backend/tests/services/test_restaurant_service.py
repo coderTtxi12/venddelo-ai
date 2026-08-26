@@ -69,7 +69,7 @@ class FakeRestaurantRepo(RestaurantRepository):
         if "subdomain" in updates and updates["subdomain"] != dto.subdomain:
             del self.by_subdomain[dto.subdomain]
             self.by_subdomain[updates["subdomain"]] = dto
-        updated = dto.model_copy(update=updates)
+        updated = RestaurantDTO.model_validate({**dto.model_dump(), **updates})
         self.items[id] = updated
         if "subdomain" in updates:
             self.by_subdomain[updates["subdomain"]] = updated
