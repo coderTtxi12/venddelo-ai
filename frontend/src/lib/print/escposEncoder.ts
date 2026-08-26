@@ -160,7 +160,7 @@ function lineToRows(line: TicketLine, width: number): Array<{ text: string; alig
 
 export function encodeKitchenTicketEscPos(doc: KitchenTicketDocument): Uint8Array {
   const width = charsForWidth(doc.paperWidthMm);
-  const out: number[] = [ESC, 0x40, ESC, 0x74, 16];
+  const out: number[] = [ESC, 0x40, ESC, 0x74, 2];
 
   function writeRow(text: string, align: 'left' | 'center' | 'right', bold?: boolean) {
     out.push(ESC, 0x61, alignBits(align));
