@@ -6,9 +6,15 @@ import UsbOutlinedIcon from '@mui/icons-material/UsbOutlined';
 import CableOutlinedIcon from '@mui/icons-material/CableOutlined';
 import DesktopWindowsOutlinedIcon from '@mui/icons-material/DesktopWindowsOutlined';
 import BluetoothOutlinedIcon from '@mui/icons-material/BluetoothOutlined';
+import WifiOutlinedIcon from '@mui/icons-material/WifiOutlined';
 import { KitchenTicketPreview } from '@/components/print/KitchenTicketPreview';
 import { previewKitchenTicketDocument } from '@/lib/print/ticketDocument';
 import { printKitchenTicketDocument } from '@/lib/print/printKitchenTicket';
+import {
+  discoverKitchenNetworkPrinters,
+  type KitchenNetworkPrinter,
+} from '@/lib/api/restaurants';
+import { ApiError } from '@/lib/api/types';
 import {
   canUseWebBluetooth,
   canUseWebSerial,
