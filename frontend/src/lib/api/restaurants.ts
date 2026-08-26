@@ -269,6 +269,37 @@ export function listActiveDeliveryProviderPaymentMethods(token: string, restaura
   );
 }
 
+export type KitchenNetworkPrinter = {
+  host: string;
+  port: number;
+  label: string;
+};
+
+export type KitchenNetworkPrinterDiscover = {
+  items: KitchenNetworkPrinter[];
+  scanned_subnets: string[];
+  message: string | null;
+};
+
+export function discoverKitchenNetworkPrinters(token: string, restaurantId: string) {
+  return apiRequest<KitchenNetworkPrinterDiscover>(
+    `/restaurants/${restaurantId}/kitchen-printers/discover`,
+    { method: 'POST', token },
+  );
+}
+
+export function printKitchenNetworkTicket(
+  token: string,
+  restaurantId: string,
+  data: { host: string; port: number; payload_base64: string },
+) {
+  return apiRequest<void>(`/restaurants/${restaurantId}/kitchen-printers/print`, {
+    method: 'POST',
+    token,
+    body: data,
+  });
+}
+
 export function getMexyCoverage(token: string, latitude: number, longitude: number) {
   const q = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude) });
   return apiRequest<MexyCoverageResponse>(`/restaurants/mexy-coverage?${q}`, { token });
