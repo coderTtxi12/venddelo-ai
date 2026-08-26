@@ -429,6 +429,7 @@ export function DispatchDeliveryAddressPicker({
     emitMarkerPosition,
     handleMapPoiClick,
     hasCoords,
+    mapBootId,
     value.latitude,
     value.longitude,
   ]);
