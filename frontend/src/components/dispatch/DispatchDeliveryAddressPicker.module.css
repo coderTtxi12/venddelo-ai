@@ -323,6 +323,13 @@
 
 .mapOverlayError {
   color: #b91c1c;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.mapErrorText {
+  margin: 0;
+  text-align: center;
 }
 
 .fieldError {
