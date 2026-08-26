@@ -557,9 +557,24 @@ export function DispatchDeliveryAddressPicker({
               </p>
             ) : null}
             {mapState === 'error' ? (
-              <p className={styles.mapOverlayError}>No se pudo cargar el mapa.</p>
+              <div className={styles.mapOverlayError}>
+                <p className={styles.mapErrorText}>No se pudo cargar el mapa.</p>
+                <button
+                  type="button"
+                  className={styles.retryButton}
+                  onClick={retryMap}
+                  disabled={disabled}
+                >
+                  <RefreshOutlinedIcon className={styles.retryIcon} aria-hidden />
+                  Reintentar mapa
+                </button>
+              </div>
             ) : null}
-            <div ref={mapContainerRef} className={styles.mapCanvas} />
+            <div
+              key={mapBootId}
+              ref={mapContainerRef}
+              className={styles.mapCanvas}
+            />
           </div>
         </>
       ) : null}
