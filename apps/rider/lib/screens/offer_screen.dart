@@ -16,6 +16,7 @@ class OfferScreen extends StatefulWidget {
     super.key,
     required this.offer,
     required this.onAccept,
+    this.onExpired,
     this.errorMessage,
     this.busy = false,
     this.showMap = true,
@@ -23,6 +24,7 @@ class OfferScreen extends StatefulWidget {
 
   final RiderOffer offer;
   final VoidCallback onAccept;
+  final VoidCallback? onExpired;
   final String? errorMessage;
   final bool busy;
   final bool showMap;
@@ -162,6 +164,7 @@ class _OfferScreenState extends State<OfferScreen> {
                       errorMessage: widget.errorMessage,
                       busy: widget.busy,
                       onAccept: widget.onAccept,
+                      onExpired: widget.onExpired,
                     ),
                   ),
                 ),
