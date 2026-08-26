@@ -232,18 +232,20 @@ Future<RiderRouteResult?> _computeRoutes({
 }) async {
   final uri = Uri.parse('https://routes.googleapis.com/directions/v2:computeRoutes');
   try {
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask':
-            'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.routeLabels',
-      },
-      body: jsonEncode(
-        computeRoutesRequestBody(origin: origin, destination: destination),
-      ),
-    );
+    final response = await http
+        .post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask':
+                'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.routeLabels',
+          },
+          body: jsonEncode(
+            computeRoutesRequestBody(origin: origin, destination: destination),
+          ),
+        )
+        .timeout(const Duration(seconds: 6));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return null;
     }
