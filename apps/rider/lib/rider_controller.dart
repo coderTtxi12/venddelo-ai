@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'api.dart';
 import 'config.dart';
+import 'countdown.dart';
 import 'friendly_error.dart';
 import 'location_auth.dart';
 import 'location_task.dart';
@@ -45,6 +46,7 @@ class RiderController extends ChangeNotifier {
   Timer? _mePoll;
   RiderSocket? _socket;
   RiderSocketStatus _socketStatus = RiderSocketStatus.offline;
+  final Set<String> _dismissedExpiredOfferIds = {};
   StreamSubscription<RemoteMessage>? _fcmForeground;
   StreamSubscription<RemoteMessage>? _fcmOpened;
   StreamSubscription<String>? _fcmTokenRefresh;
