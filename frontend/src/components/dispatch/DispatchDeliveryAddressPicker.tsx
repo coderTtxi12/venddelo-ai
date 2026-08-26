@@ -480,6 +480,12 @@ export function DispatchDeliveryAddressPicker({
             event.preventDefault();
             void handleMapsLink(text);
           }}
+          onBlur={() => {
+            if (disabled || linkResolving) return;
+            if (!looksLikeMapsUrl(searchText)) return;
+            if (mapsUrl === normalizeMapsUrlInput(searchText) && hasCoords) return;
+            void handleMapsLink(searchText);
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && looksLikeMapsUrl(searchText)) {
               event.preventDefault();
