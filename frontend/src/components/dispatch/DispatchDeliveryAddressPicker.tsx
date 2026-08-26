@@ -463,7 +463,6 @@ export function DispatchDeliveryAddressPicker({
       {autocompleteError ? (
         <p className={styles.error} role="alert">{autocompleteError}</p>
       ) : null}
-      {inputError ? <p className={styles.error} role="alert">{inputError}</p> : null}
       <div className={styles.searchShell}>
         <SearchOutlinedIcon className={styles.searchLeadIcon} aria-hidden />
         <input
