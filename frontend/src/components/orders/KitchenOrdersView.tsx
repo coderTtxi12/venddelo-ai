@@ -49,6 +49,7 @@ import { OrderDispatchDrawer } from '@/components/dispatch/OrderDispatchDrawer';
 import { OrderCancelDialog } from '@/components/orders/OrderCancelDialog';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { kitchenConfirmOpensDispatch } from '@/lib/orders/kitchenDispatch';
+import { useKitchenTicketPrinter } from '@/lib/print/useKitchenTicketPrinter';
 import { KitchenLiveIndicator } from '@/components/orders/KitchenLiveIndicator';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { type KitchenCancelReason } from '@/lib/orders/kitchenWhatsApp';
@@ -325,6 +326,7 @@ function OrderDetailContent({
   onBack,
   onAdvance,
   onCancel,
+  onPrint,
 }: {
   order: Order;
   productsById: ReadonlyMap<string, Product>;
@@ -336,6 +338,7 @@ function OrderDetailContent({
   onBack?: () => void;
   onAdvance: () => void;
   onCancel: () => void;
+  onPrint?: () => void;
 }) {
   const meta = ORDER_STATUS_META[order.status];
   const itemCount = countOrderItems(order.items);
