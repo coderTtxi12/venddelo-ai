@@ -1,4 +1,4 @@
-from app.modules.delivery_dispatch.maps_url import parse_maps_url
+from app.modules.delivery_dispatch.maps_url import extract_maps_query_text, parse_maps_url
 
 
 def test_parses_at_lat_lng():
@@ -52,3 +52,28 @@ def test_parses_query_param_coordinates():
     assert parse_maps_url(
         "https://www.google.com/maps/search/?api=1&query=48.857469,2.295821"
     ) == (48.857469, 2.295821)
+
+
+PLACE_SHARE_WITHOUT_COORDS = (
+    "https://www.google.com/maps/place/Tiendas+3B+Coacalco+Centro,"
+    "+And.+Emiliano+Zapata+S%2FN,+Col.+Centro,+55709+San+Francisco+Coacalco,"
+    "+M%C3%A9x./data=!4m2!3m1!1s0x85d1f5862d3edc43:0x173398338da507f6!18m1!1e1"
+    "?utm_source=mstt_1&entry=gps"
+)
+
+
+def test_place_share_url_without_coordinates_is_not_parsed_locally():
+    assert parse_maps_url(PLACE_SHARE_WITHOUT_COORDS) is None
+
+
+def test_extracts_place_name_from_maps_place_path():
+    assert extract_maps_query_text(PLACE_SHARE_WITHOUT_COORDS) == (
+        "Tiendas 3B Coacalco Centro, And. Emiliano Zapata S/N, Col. Centro, "
+        "55709 San Francisco Coacalco, Méx."
+    )
+
+
+def test_extracts_q_text_for_geocoding():
+    assert extract_maps_query_text(
+        "https://www.google.com/maps?q=Andador+Emiliano+Zapata+Coacalco"
+    ) == "Andador Emiliano Zapata Coacalco"
