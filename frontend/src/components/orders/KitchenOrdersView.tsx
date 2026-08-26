@@ -536,6 +536,7 @@ function OrderDetailPanel({
   onBack?: () => void;
   onAdvance: () => void;
   onCancel: () => void;
+  onPrint?: () => void;
 }) {
   return (
     <section className={styles.detailPanel} aria-label="Detalle del pedido">
@@ -551,6 +552,7 @@ function OrderDetailPanel({
           onBack={onBack}
           onAdvance={onAdvance}
           onCancel={onCancel}
+          onPrint={onPrint}
         />
       ) : (
         <div className={styles.detailEmpty}>
@@ -585,6 +587,7 @@ export function KitchenOrdersView() {
     replaceOrder,
     applyBoardCleared,
   } = useRestaurantOrders();
+  const { printOrder } = useKitchenTicketPrinter(accessToken, restaurantId);
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
@@ -717,7 +720,13 @@ export function KitchenOrdersView() {
       setDispatchOrder(selectedOrder);
       return;
     }
-    await patchOrder(selectedOrder.id, next);
+    const updated = await patchOrder(selectedOrder.id, next);
+    if (updated && next === 'confirmed') {
+      const printed = await printOrder(updated, 'confirm', productsById);
+      if (printed.status === 'failed') {
+        setActionError(`Pedido confirmado, pero no se imprimió el ticket: ${printed.error}`);
+      }
+    }
   };
 
   const handleCancelRequest = () => {
@@ -1046,6 +1055,13 @@ export function KitchenOrdersView() {
               updating={updating}
               onAdvance={handleAdvance}
               onCancel={handleCancelRequest}
+              onPrint={
+                selectedOrder
+                  ? () => {
+                      void printOrder(selectedOrder, 'manual', productsById);
+                    }
+                  : undefined
+              }
             />
           </div>
         ) : null}
@@ -1064,6 +1080,9 @@ export function KitchenOrdersView() {
             onBack={() => setSelectedOrderId(null)}
             onAdvance={handleAdvance}
             onCancel={handleCancelRequest}
+            onPrint={() => {
+              void printOrder(selectedOrder, 'manual', productsById);
+            }}
           />
         </div>
       ) : null}
@@ -1107,6 +1126,9 @@ export function KitchenOrdersView() {
           onClose={() => setDispatchOrder(null)}
           onOrderConfirmed={(updated) => {
             replaceOrder(updated);
+          }}
+          onDispatchPrinted={(updated) => {
+            void printOrder(updated, 'request_rider', productsById);
           }}
         />
       ) : null}
