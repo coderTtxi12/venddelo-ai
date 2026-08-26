@@ -1014,9 +1014,18 @@ class RestaurantDispatchService:
 
         if coordinates is None:
             api_key = get_settings().google_maps_api_key
-            query_text = extract_maps_query_text(resolved_url or trimmed)
-            if api_key and query_text:
-                coordinates = geocode_address_text(query_text, api_key)
+            candidates: list[str] = []
+            for candidate_url in (resolved_url, trimmed):
+                if not candidate_url:
+                    continue
+                query_text = extract_maps_query_text(candidate_url)
+                if query_text and query_text not in candidates:
+                    candidates.append(query_text)
+            if api_key:
+                for query_text in candidates:
+                    coordinates = geocode_address_text(query_text, api_key)
+                    if coordinates is not None:
+                        break
 
         if coordinates is None:
             raise ValidationError("No se pudo leer la ubicación del enlace")
