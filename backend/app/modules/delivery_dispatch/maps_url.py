@@ -11,6 +11,7 @@ _DATA_COORDINATES = re.compile(r"!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)")
 _ALT_DATA_COORDINATES = re.compile(r"!1d(-?\d+(?:\.\d+)?)!2d(-?\d+(?:\.\d+)?)")
 _Q_COORDINATES = re.compile(r"^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$")
 _SEARCH_PATH_COORDINATES = re.compile(r"/search/([^/?#]+),([^/?#]+)")
+_PLACE_PATH = re.compile(r"/maps/place/([^/@]+)", re.IGNORECASE)
 
 
 def _parse_coord_fragment(raw: str) -> float | None:
@@ -122,20 +123,38 @@ def parse_maps_url(url: str) -> tuple[float, float] | None:
     return None
 
 
+def _usable_geocode_text(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    text = raw.strip()
+    if not text or _Q_COORDINATES.match(text):
+        return None
+    return text
+
+
 def extract_maps_query_text(url: str) -> str | None:
+    """Best-effort address/place text for geocoding when the URL has no lat/lng."""
     try:
         parsed = urlparse(url.strip())
     except ValueError:
         return None
 
-    q_values = parse_qs(parsed.query).get("q")
-    if not q_values:
-        return None
+    query_params = parse_qs(parsed.query)
+    for key in ("q", "query", "destination"):
+        values = query_params.get(key)
+        if not values:
+            continue
+        text = _usable_geocode_text(values[0])
+        if text:
+            return text
 
-    q_text = q_values[0].strip()
-    if not q_text or _Q_COORDINATES.match(q_text):
-        return None
-    return q_text
+    place_match = _PLACE_PATH.search(parsed.path)
+    if place_match:
+        text = _usable_geocode_text(unquote_plus(place_match.group(1)))
+        if text:
+            return text
+
+    return None
 
 
 def geocode_address_text(address: str, api_key: str) -> tuple[float, float] | None:
