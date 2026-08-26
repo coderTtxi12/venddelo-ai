@@ -16,12 +16,14 @@ class OfferDetailsSheet extends StatefulWidget {
     super.key,
     required this.offer,
     required this.onAccept,
+    this.onExpired,
     this.errorMessage,
     this.busy = false,
   });
 
   final RiderOffer offer;
   final VoidCallback onAccept;
+  final VoidCallback? onExpired;
   final String? errorMessage;
   final bool busy;
 
