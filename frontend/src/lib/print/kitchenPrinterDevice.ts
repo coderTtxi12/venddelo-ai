@@ -91,9 +91,13 @@ type BluetoothRemoteGattLike = {
 };
 
 type BluetoothDeviceLike = {
+  id?: string;
   name?: string;
   gatt?: BluetoothRemoteGattLike;
+  watchAdvertisements?: () => Promise<void>;
 };
+
+const bluetoothDeviceCache = new Map<string, BluetoothDeviceLike>();
 
 function usbNavigator(): {
   requestDevice: (opts: { filters: typeof USB_FILTERS }) => Promise<UsbLike>;
