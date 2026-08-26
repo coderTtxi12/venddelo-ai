@@ -102,6 +102,14 @@ class RestaurantUpdate(BaseModel):
     delivery_enabled: bool | None = None
     timezone: str | None = None
     branch_count: int | None = Field(default=None, ge=1, le=999)
+    ticket_print_settings: TicketPrintSettings | None = None
+
+    @field_validator("ticket_print_settings", mode="before")
+    @classmethod
+    def _normalize_ticket_print_settings(cls, value: object) -> object:
+        if value is None:
+            return None
+        return normalize_ticket_print_settings(value)
 
 
 class SubdomainAvailabilityDTO(BaseModel):
