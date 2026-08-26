@@ -835,51 +835,67 @@ _MAPS_REDIRECT_HEADERS = {
 _MAPS_SSL_CONTEXT = ssl.create_default_context()
 
 
+_MAPS_REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+
+
+def _maps_http_request(method: str, url: str) -> tuple[int, str | None]:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("unsupported maps url scheme")
+    host = parsed.hostname
+    if not host:
+        raise ValueError("maps url missing host")
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    path = parsed.path or "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+
+    if parsed.scheme == "https":
+        conn: http.client.HTTPConnection = http.client.HTTPSConnection(
+            host,
+            port,
+            timeout=10,
+            context=_MAPS_SSL_CONTEXT,
+        )
+    else:
+        conn = http.client.HTTPConnection(host, port, timeout=10)
+
+    try:
+        conn.request(method, path, headers=_MAPS_REDIRECT_HEADERS)
+        response = conn.getresponse()
+        location = response.getheader("Location")
+        response.read()
+        return response.status, location
+    finally:
+        conn.close()
+
+
 def _follow_maps_redirects(url: str) -> str | None:
-    """Expand goo.gl / maps.app.goo.gl links via HEAD Location headers."""
+    """Expand goo.gl / maps.app.goo.gl links via redirect Location headers."""
     current = url.strip()
     if not current:
         return None
 
+    last_maps_url = current if should_follow_maps_redirect(current) else None
+
     for _ in range(5):
         try:
-            parsed = urlparse(current)
-            if parsed.scheme not in {"http", "https"}:
-                return None
-            host = parsed.hostname
-            if not host:
-                return None
-            port = parsed.port or (443 if parsed.scheme == "https" else 80)
-            path = parsed.path or "/"
-            if parsed.query:
-                path = f"{path}?{parsed.query}"
+            status, location = _maps_http_request("HEAD", current)
+            if status not in _MAPS_REDIRECT_STATUSES and status != 200:
+                status, location = _maps_http_request("GET", current)
+            elif status in _MAPS_REDIRECT_STATUSES and not location:
+                status, location = _maps_http_request("GET", current)
 
-            if parsed.scheme == "https":
-                conn: http.client.HTTPConnection = http.client.HTTPSConnection(
-                    host,
-                    port,
-                    timeout=10,
-                    context=_MAPS_SSL_CONTEXT,
-                )
-            else:
-                conn = http.client.HTTPConnection(host, port, timeout=10)
-
-            conn.request("HEAD", path, headers=_MAPS_REDIRECT_HEADERS)
-            response = conn.getresponse()
-            response.read()
-            conn.close()
-
-            if response.status in (301, 302, 303, 307, 308):
-                location = response.getheader("Location")
-                if not location:
-                    return None
+            if status in _MAPS_REDIRECT_STATUSES and location:
                 current = urljoin(current, location)
+                if should_follow_maps_redirect(current):
+                    last_maps_url = current
                 continue
-            if response.status == 200:
+            if status == 200:
                 return current
-            return None
+            return last_maps_url
         except (TimeoutError, OSError, ValueError, http.client.HTTPException):
-            return None
+            return last_maps_url
 
     return current
 
