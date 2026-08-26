@@ -6,13 +6,14 @@ import 'package:mexy_rider/maps/nav_target.dart';
 import 'package:mexy_rider/models.dart';
 
 void main() {
-  test('computeRoutesRequestBody avoids Enterprise SKU features', () {
+  test('computeRoutesRequestBody uses Essentials SKU features only', () {
     final body = computeRoutesRequestBody(
       origin: const LatLng(19.43, -99.13),
       destination: const LatLng(19.44, -99.14),
     );
 
     expect(body['travelMode'], 'DRIVE');
+    expect(body['routingPreference'], 'TRAFFIC_UNAWARE');
     expect(body.containsKey('extraComputations'), isFalse);
     expect(body['travelMode'], isNot('TWO_WHEELER'));
     expect(body['computeAlternativeRoutes'], isFalse);
