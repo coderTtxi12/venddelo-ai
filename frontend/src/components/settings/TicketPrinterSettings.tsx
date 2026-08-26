@@ -273,10 +273,13 @@ export function TicketPrinterSettings({
   }
 
   function useSystem() {
-    const next = useSystemKitchenPrinter(restaurantId);
-    setPrinter(next);
-    setPrinterError(null);
-    setPrinterMessage('Predeterminada: impresora del sistema.');
+    const current = readKitchenPrinterPreference(restaurantId);
+    const keepName = current.kind === 'system' ? current.systemPrinterName : undefined;
+    selectOsDefaultRef.current = !keepName;
+    selectSystemPrinter(keepName);
+    if (current.kind === 'system') {
+      void loadSystemPrinters({ selectOsDefault: !keepName });
+    }
   }
 
   function selectNetworkPrinter(host: string, port = 9100) {
