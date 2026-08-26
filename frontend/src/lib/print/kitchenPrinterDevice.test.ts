@@ -5,6 +5,7 @@ import {
   EMPTY_KITCHEN_PRINTER,
   defaultPrinterDisplayName,
   hasDefaultKitchenPrinter,
+  isLanPrinterIpv4,
   parseKitchenPrinterPreference,
   printerKindLabel,
 } from './kitchenPrinterDevice.ts';
@@ -39,7 +40,32 @@ test('defaultPrinterDisplayName uses the stored device name', () => {
   );
 });
 
+test('parseKitchenPrinterPreference keeps bluetooth device id', () => {
+  const bluetooth = parseKitchenPrinterPreference(
+    JSON.stringify({ kind: 'bluetooth', label: 'MTP-II', bluetoothDeviceId: 'id-123' }),
+  );
+  assert.equal(bluetooth.kind, 'bluetooth');
+  assert.equal(bluetooth.bluetoothDeviceId, 'id-123');
+});
+
+test('parseKitchenPrinterPreference keeps a network printer', () => {
+  const network = parseKitchenPrinterPreference(
+    JSON.stringify({ kind: 'network', label: 'Cocina', host: '192.168.1.50', port: 9100 }),
+  );
+  assert.equal(network.kind, 'network');
+  assert.equal(network.host, '192.168.1.50');
+  assert.equal(defaultPrinterDisplayName(network), 'Cocina (192.168.1.50)');
+});
+
+test('isLanPrinterIpv4 accepts private addresses', () => {
+  assert.equal(isLanPrinterIpv4('192.168.1.50'), true);
+  assert.equal(isLanPrinterIpv4('10.0.0.8'), true);
+  assert.equal(isLanPrinterIpv4('8.8.8.8'), false);
+  assert.equal(isLanPrinterIpv4('printer.local'), false);
+});
+
 test('printerKindLabel names bluetooth printers', () => {
   assert.equal(printerKindLabel('bluetooth'), 'Bluetooth');
+  assert.equal(printerKindLabel('network'), 'Wi‑Fi / Ethernet');
   assert.equal(printerKindLabel('none'), 'Sin impresora');
 });
