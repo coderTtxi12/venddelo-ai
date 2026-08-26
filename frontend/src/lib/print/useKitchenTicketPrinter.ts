@@ -34,6 +34,11 @@ export function useKitchenTicketPrinter(
     };
   }, [accessToken, restaurantId]);
 
+  useEffect(() => {
+    if (!restaurantId) return;
+    void primeKitchenPrinterConnections(restaurantId);
+  }, [restaurantId]);
+
   const printOrder = useCallback(
     async (
       order: Order,
@@ -50,9 +55,10 @@ export function useKitchenTicketPrinter(
         logoUrl: storagePublicUrl(restaurant.logo_path),
         productsById,
         trigger,
+        accessToken,
       });
     },
-    [restaurant, restaurantId],
+    [accessToken, restaurant, restaurantId],
   );
 
   return { restaurant, printOrder };
