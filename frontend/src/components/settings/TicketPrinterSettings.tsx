@@ -95,6 +95,7 @@ export function TicketPrinterSettings({
   value,
   onChange,
   onPrinterChange,
+  accessToken,
 }: {
   restaurantId: string;
   restaurantName: string;
