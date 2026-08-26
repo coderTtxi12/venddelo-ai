@@ -156,25 +156,35 @@ function lineToRows(line: TicketLine, width: number): Array<{ text: string; alig
       return wrapWords(line.text, width).map((text) => ({ text, align: 'center' as const }));
     case 'rule':
       return [{ text: '-'.repeat(width), align: 'left' }];
-    case 'kv':
-      return wrapWords(padKv(line.label, line.value, width), width).map((text) => ({
+    case 'kv': {
+      const left = `${line.label}:`;
+      if (glyphCount(left) + 1 + glyphCount(line.value) <= width) {
+        return padColumns(left, line.value, width).map((text) => ({ text, align: 'left' as const }));
+      }
+      return wrapWords(`${left} ${line.value}`, width).map((text) => ({
         text,
         align: 'left' as const,
       }));
+    }
     case 'title':
       return [{ text: line.text.toUpperCase(), align: 'left', bold: true }];
-    case 'item': {
-      const qtyName = `${line.qty}x ${line.name}`;
-      const space = width - qtyName.length - line.price.length;
-      const text =
-        space >= 1 ? `${qtyName}${' '.repeat(space)}${line.price}` : `${qtyName}\n${line.price}`;
-      return wrapWords(text, width).map((row) => ({ text: row, align: 'left' as const }));
-    }
+    case 'item':
+      return padColumns(`${line.qty}x ${line.name}`, line.price, width).map((text) => ({
+        text,
+        align: 'left' as const,
+      }));
     case 'option':
-      return wrapWords(`  ${line.text}`, width).map((text) => ({ text, align: 'left' as const }));
+      return wrapWords(line.text, Math.max(8, width - 2)).map((text) => ({
+        text: `  ${text}`,
+        align: 'left' as const,
+      }));
     case 'total': {
       const label = line.strong ? line.label.toUpperCase() : line.label;
-      return [{ text: padKv(label, line.value, width), align: 'left', bold: line.strong }];
+      return padColumns(`${label}:`, line.value, width).map((text) => ({
+        text,
+        align: 'left' as const,
+        bold: line.strong,
+      }));
     }
     case 'center':
       return wrapWords(line.text, width).map((text) => ({ text, align: 'center' as const }));
