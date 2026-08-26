@@ -1,10 +1,13 @@
 const STORAGE_PREFIX = 'venddelo:kitchen-printer:';
 
-export type KitchenPrinterKind = 'none' | 'system' | 'usb' | 'serial' | 'bluetooth';
+export type KitchenPrinterKind = 'none' | 'system' | 'usb' | 'serial' | 'bluetooth' | 'network';
 
 export type KitchenPrinterPreference = {
   kind: KitchenPrinterKind;
   label: string;
+  bluetoothDeviceId?: string;
+  host?: string;
+  port?: number;
 };
 
 export const EMPTY_KITCHEN_PRINTER: KitchenPrinterPreference = {
