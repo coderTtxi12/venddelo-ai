@@ -124,12 +124,12 @@ function wrapWords(text: string, width: number): string[] {
   let current = '';
   for (const word of words) {
     const next = current ? `${current} ${word}` : word;
-    if (next.length <= width) {
+    if (glyphCount(next) <= width) {
       current = next;
       continue;
     }
     if (current) rows.push(current);
-    if (word.length <= width) {
+    if (glyphCount(word) <= width) {
       current = word;
     } else {
       for (let i = 0; i < word.length; i += width) {
