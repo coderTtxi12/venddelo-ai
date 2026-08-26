@@ -289,6 +289,7 @@ export function TicketPrinterSettings({
     setNetworkHost(host);
     setPrinterError(null);
     setPrinterMessage(`Predeterminada: ${defaultPrinterDisplayName(next)}.`);
+    return next;
   }
 
   async function discoverNetwork() {
