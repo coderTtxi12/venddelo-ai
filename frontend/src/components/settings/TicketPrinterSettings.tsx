@@ -344,6 +344,10 @@ export function TicketPrinterSettings({
     setTestBusy(true);
     setPrinterError(null);
     setPrinterMessage(null);
+    let active = printer;
+    if (shouldApplyTypedNetworkHost(printer, networkHost)) {
+      active = selectNetworkPrinter(networkHost.trim());
+    }
     try {
       const result = await printKitchenTicketDocument(restaurantId, preview, { accessToken });
       if (result.status === 'failed') {
