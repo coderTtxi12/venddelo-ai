@@ -180,18 +180,33 @@ export function DispatchDeliveryAddressPicker({
         await applyCoordinates(coords.latitude, coords.longitude, {
           mapsUrl: trimmed,
         });
+        setMapBootId((current) => current + 1);
       } catch (err) {
+        setFailedMapsLink(trimmed);
         setInputError(
           err instanceof ApiError
             ? err.message
             : 'No se pudo leer la ubicación del enlace.',
         );
       } finally {
+        mapsLinkInFlightRef.current = null;
         setLinkResolving(false);
       }
     },
     [applyCoordinates, resolveMapsUrl],
   );
+
+  const retryMapsLink = useCallback(() => {
+    const target = failedMapsLink || searchText;
+    if (!looksLikeMapsUrl(target)) return;
+    void handleMapsLink(target);
+  }, [failedMapsLink, handleMapsLink, searchText]);
+
+  const retryMap = useCallback(() => {
+    disposeMap();
+    setMapState('loading');
+    setMapBootId((current) => current + 1);
+  }, [disposeMap]);
 
   const emitMarkerPosition = useCallback(() => {
     if (skipDragEmitRef.current) return;
