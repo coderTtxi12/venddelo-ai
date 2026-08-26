@@ -201,7 +201,8 @@
   min-width: 0;
 }
 
-.networkManual .secondaryBtn {
+.networkManual .secondaryBtn,
+.networkManual .primaryBtn {
   width: 100%;
 }
 
