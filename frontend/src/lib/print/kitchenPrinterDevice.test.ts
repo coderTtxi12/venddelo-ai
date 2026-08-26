@@ -69,3 +69,21 @@ test('printerKindLabel names bluetooth printers', () => {
   assert.equal(printerKindLabel('network'), 'Wi‑Fi / Ethernet');
   assert.equal(printerKindLabel('none'), 'Sin impresora');
 });
+
+test('parseKitchenPrinterPreference keeps a named system printer', () => {
+  const system = parseKitchenPrinterPreference(
+    JSON.stringify({ kind: 'system', label: 'EPSON_TM', systemPrinterName: 'EPSON_TM' }),
+  );
+  assert.equal(system.kind, 'system');
+  assert.equal(system.systemPrinterName, 'EPSON_TM');
+  assert.equal(defaultPrinterDisplayName(system), 'EPSON_TM');
+});
+
+test('parseKitchenPrinterPreference system without a queue uses the generic label', () => {
+  const system = parseKitchenPrinterPreference(
+    JSON.stringify({ kind: 'system', label: 'Impresora del sistema' }),
+  );
+  assert.equal(system.kind, 'system');
+  assert.equal(system.systemPrinterName, undefined);
+  assert.equal(defaultPrinterDisplayName(system), 'Impresora del sistema');
+});
