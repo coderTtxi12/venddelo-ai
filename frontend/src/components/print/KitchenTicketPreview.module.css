@@ -1,0 +1,103 @@
+.stage {
+  display: flex;
+  justify-content: center;
+  padding: 1.1rem 0.75rem 1.25rem;
+  border-radius: 16px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #e2e8f0 0 10px,
+      #edf2f7 10px 20px
+    );
+  min-height: 100%;
+}
+
+.paper {
+  position: relative;
+  background: #fffef8;
+  color: #111827;
+  padding: 12px 10px 18px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  max-width: 100%;
+}
+
+.perforation {
+  height: 8px;
+  margin: -12px -10px 10px;
+  background:
+    radial-gradient(circle at 8px 8px, transparent 5px, #fffef8 6px) 0 -8px / 16px 16px repeat-x;
+}
+
+.logo {
+  display: block;
+  max-width: 72px;
+  max-height: 48px;
+  margin: 0 auto 8px;
+  object-fit: contain;
+}
+
+.brand {
+  margin: 0 0 4px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.muted,
+.center {
+  margin: 0 0 3px;
+  text-align: center;
+  color: #334155;
+}
+
+.rule {
+  border: 0;
+  border-top: 1px dashed #111827;
+  margin: 8px 0;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 3px;
+}
+
+.row span:last-child {
+  text-align: right;
+}
+
+.title {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.option {
+  margin: 0 0 3px 8px;
+  font-size: 10px;
+  color: #334155;
+}
+
+.strong {
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.cut {
+  margin-top: 10px;
+  border-top: 1px dashed #94a3b8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper {
+    box-shadow: none;
+  }
+}
