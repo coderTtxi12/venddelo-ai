@@ -125,19 +125,19 @@ function serialNavigator(): {
   return serial ?? null;
 }
 
+type BluetoothRequestOptions = {
+  acceptAllDevices?: boolean;
+  filters?: Array<{ name?: string; namePrefix?: string }>;
+  optionalServices?: string[];
+};
+
 function bluetoothNavigator(): {
-  requestDevice: (opts: {
-    acceptAllDevices?: boolean;
-    optionalServices?: string[];
-  }) => Promise<BluetoothDeviceLike>;
+  requestDevice: (opts: BluetoothRequestOptions) => Promise<BluetoothDeviceLike>;
   getDevices?: () => Promise<BluetoothDeviceLike[]>;
 } | null {
   const bluetooth = (navigator as Navigator & { bluetooth?: unknown }).bluetooth as
     | {
-        requestDevice: (opts: {
-          acceptAllDevices?: boolean;
-          optionalServices?: string[];
-        }) => Promise<BluetoothDeviceLike>;
+        requestDevice: (opts: BluetoothRequestOptions) => Promise<BluetoothDeviceLike>;
         getDevices?: () => Promise<BluetoothDeviceLike[]>;
       }
     | undefined;
