@@ -133,6 +133,9 @@ export function TicketPrinterSettings({
     onPrinterChangeRef.current?.(next);
     setPrinterMessage(null);
     setPrinterError(null);
+    setNetworkPrinters([]);
+    setNetworkHint(null);
+    if (next.kind === 'network' && next.host) setNetworkHost(next.host);
   }, [restaurantId]);
 
   const preview = useMemo(
@@ -191,7 +194,11 @@ export function TicketPrinterSettings({
     try {
       const next = await pairBluetoothKitchenPrinter(restaurantId);
       setPrinter(next);
-      setPrinterMessage(`Predeterminada: ${next.label}. Los tickets se enviarán por Bluetooth.`);
+      setPrinterMessage(
+        next.kind === 'system'
+          ? 'Esta impresora no admite Bluetooth directo. Los tickets usarán el diálogo de impresión del sistema.'
+          : `Predeterminada: ${next.label}. Los tickets se enviarán por Bluetooth.`,
+      );
     } catch (error) {
       setPrinterError(
         error instanceof Error ? error.message : 'No se pudo conectar la impresora Bluetooth.',
@@ -208,6 +215,54 @@ export function TicketPrinterSettings({
     setPrinterMessage('Predeterminada: impresora del sistema.');
   }
 
+  function selectNetworkPrinter(host: string, port = 9100) {
+    const next = pairNetworkKitchenPrinter(restaurantId, host, port);
+    setPrinter(next);
+    setNetworkHost(host);
+    setPrinterError(null);
+    setPrinterMessage(`Predeterminada: ${defaultPrinterDisplayName(next)}.`);
+  }
+
+  async function discoverNetwork() {
+    if (!accessToken) {
+      setPrinterError('Inicia sesión para buscar impresoras en la red.');
+      return;
+    }
+    setNetworkBusy(true);
+    setPrinterError(null);
+    setPrinterMessage(null);
+    setNetworkHint(null);
+    try {
+      const result = await discoverKitchenNetworkPrinters(accessToken, restaurantId);
+      setNetworkPrinters(result.items);
+      setNetworkHint(result.message);
+      if (result.items.length === 1 && result.items[0]) {
+        selectNetworkPrinter(result.items[0].host, result.items[0].port);
+      } else if (result.items.length > 1) {
+        setPrinterMessage(`Se encontraron ${result.items.length} impresoras. Elige una.`);
+      }
+    } catch (error) {
+      setNetworkPrinters([]);
+      setPrinterError(
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'No se pudieron buscar impresoras en la red.',
+      );
+    } finally {
+      setNetworkBusy(false);
+    }
+  }
+
+  function useNetworkIp() {
+    if (!isLanPrinterIpv4(networkHost)) {
+      setPrinterError('Escribe una IP local, por ejemplo 192.168.1.50.');
+      return;
+    }
+    selectNetworkPrinter(networkHost.trim());
+  }
+
   function clearDefault() {
     const next = clearKitchenPrinterPreference(restaurantId);
     setPrinter(next);
@@ -221,7 +276,7 @@ export function TicketPrinterSettings({
     setPrinterError(null);
     setPrinterMessage(null);
     try {
-      const result = await printKitchenTicketDocument(restaurantId, preview);
+      const result = await printKitchenTicketDocument(restaurantId, preview, { accessToken });
       if (result.status === 'failed') {
         setPrinterError(result.error);
         return;
@@ -267,7 +322,7 @@ export function TicketPrinterSettings({
                   {printerKindLabel(printer.kind)}
                 </>
               ) : (
-                'Ninguna conectada. Conecta USB, Bluetooth o elige la impresora del sistema.'
+                'Ninguna conectada. Conecta USB, Bluetooth, Wi‑Fi/Ethernet o elige la impresora del sistema.'
               )}
             </p>
           </div>
@@ -300,6 +355,15 @@ export function TicketPrinterSettings({
             <CableOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
             Puerto serie
           </button>
+          <button
+            type="button"
+            className={styles.secondaryBtn}
+            disabled={printerBusy || networkBusy || !accessToken}
+            onClick={() => void discoverNetwork()}
+          >
+            <WifiOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
+            {networkBusy ? 'Buscando en la red…' : 'Buscar Wi‑Fi / Ethernet'}
+          </button>
           <button type="button" className={styles.secondaryBtn} onClick={useSystem}>
             <DesktopWindowsOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
             Usar sistema
@@ -319,6 +383,48 @@ export function TicketPrinterSettings({
             {testBusy ? 'Imprimiendo…' : 'Imprimir prueba'}
           </button>
         </div>
+        <div className={styles.networkPanel}>
+          <p className={styles.networkTitle}>Impresora de red</p>
+          {networkPrinters.length > 0 ? (
+            <div className={styles.networkList} role="list">
+              {networkPrinters.map((item) => (
+                <button
+                  key={`${item.host}:${item.port}`}
+                  type="button"
+                  role="listitem"
+                  className={`${styles.networkItem} ${printer.kind === 'network' && printer.host === item.host ? styles.networkItemActive : ''}`}
+                  onClick={() => selectNetworkPrinter(item.host, item.port)}
+                >
+                  {item.host}
+                  {item.port !== 9100 ? `:${item.port}` : ''}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className={styles.networkManual}>
+            <label className={styles.field} htmlFor="network-printer-ip">
+              <span className={styles.fieldLabel}>IP de la impresora</span>
+              <input
+                id="network-printer-ip"
+                className={styles.input}
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="192.168.1.50"
+                value={networkHost}
+                onChange={(event) => setNetworkHost(event.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              disabled={networkBusy}
+              onClick={useNetworkIp}
+            >
+              Usar esta IP
+            </button>
+          </div>
+          {networkHint ? <p className={styles.helpText}>{networkHint}</p> : null}
+        </div>
         <FieldToggle
           label="Imprimir automáticamente al confirmar pedido"
           hint={
@@ -337,8 +443,9 @@ export function TicketPrinterSettings({
           </p>
         ) : null}
         <p className={styles.helpText}>
-          USB y Bluetooth funcionan en Chrome o Edge. Bluetooth clásico (no BLE) a veces requiere
-          emparejar la impresora en el sistema y elegir “Usar sistema”.
+          USB, Bluetooth y red funcionan en Chrome o Edge. La búsqueda Wi‑Fi/Ethernet recorre el
+          puerto 9100 desde el servidor. Si no aparece, escribe la IP. En iPhone/iPad, o Bluetooth
+          clásico, usa “Usar sistema”.
         </p>
       </div>
 
