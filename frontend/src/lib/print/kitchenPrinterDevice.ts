@@ -298,20 +298,35 @@ export async function pairSerialKitchenPrinter(restaurantId: string): Promise<Ki
 export async function pairBluetoothKitchenPrinter(
   restaurantId: string,
 ): Promise<KitchenPrinterPreference> {
+  const device = await requestBluetoothDevice();
+  return persistPairedBluetoothDevice(restaurantId, device);
+}
+
+export async function primeKitchenPrinterConnections(restaurantId: string): Promise<void> {
+  const preference = readKitchenPrinterPreference(restaurantId);
+  if (preference.kind !== 'bluetooth') return;
   const bluetooth = bluetoothNavigator();
-  if (!bluetooth) {
-    throw new Error('Este navegador no permite Bluetooth. Usa Chrome o Edge con Bluetooth activado.');
+  if (!bluetooth?.getDevices) return;
+  try {
+    const devices = await bluetooth.getDevices();
+    const device = pickBluetoothDevice(devices, preference.bluetoothDeviceId);
+    if (device) rememberBluetoothDevice(restaurantId, device);
+  } catch {
+    // Chrome may deny getDevices until the next user gesture; printing will retry.
   }
-  const device = await bluetooth.requestDevice({
-    acceptAllDevices: true,
-    optionalServices: BLE_OPTIONAL_SERVICES,
-  });
-  if (device.gatt) {
-    await device.gatt.connect();
-  }
+}
+
+export function pairNetworkKitchenPrinter(
+  restaurantId: string,
+  host: string,
+  port = 9100,
+): KitchenPrinterPreference {
+  const trimmed = host.trim();
   const preference: KitchenPrinterPreference = {
-    kind: 'bluetooth',
-    label: device.name?.trim() || 'Impresora Bluetooth',
+    kind: 'network',
+    label: `Impresora de red ${trimmed}`,
+    host: trimmed,
+    port,
   };
   writeKitchenPrinterPreference(restaurantId, preference);
   return preference;
