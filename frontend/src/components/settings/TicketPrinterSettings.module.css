@@ -148,6 +148,10 @@
 }
 
 .networkItem {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
   min-height: 44px;
   min-width: 44px;
   padding: 0.45rem 0.75rem;
