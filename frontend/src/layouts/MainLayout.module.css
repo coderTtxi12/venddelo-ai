@@ -14,12 +14,14 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: clip;
   padding: 1.5rem;
   background: var(--color-bg);
 }
 
 @media (max-width: 900px) {
   .content {
-    padding: 1rem;
+    padding: 0.85rem;
+    padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
   }
 }
