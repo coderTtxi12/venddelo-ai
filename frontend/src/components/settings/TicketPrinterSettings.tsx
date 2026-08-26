@@ -517,23 +517,44 @@ export function TicketPrinterSettings({
               <span className={styles.fieldLabel}>IP de la impresora</span>
               <input
                 id="network-printer-ip"
-                className={styles.input}
+                className={`${styles.input} ${printer.kind === 'network' && printer.host === networkHost.trim() ? styles.networkInputActive : ''}`}
                 inputMode="decimal"
                 autoComplete="off"
                 placeholder="192.168.1.50"
                 value={networkHost}
                 onChange={(event) => setNetworkHost(event.target.value)}
+                onBlur={() => {
+                  if (shouldApplyTypedNetworkHost(printer, networkHost)) {
+                    selectNetworkPrinter(networkHost.trim());
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    useNetworkIp();
+                  }
+                }}
               />
             </label>
             <button
               type="button"
-              className={styles.secondaryBtn}
+              className={
+                shouldApplyTypedNetworkHost(printer, networkHost)
+                  ? styles.primaryBtn
+                  : styles.secondaryBtn
+              }
               disabled={networkBusy}
               onClick={useNetworkIp}
             >
               Usar esta IP
             </button>
           </div>
+          {shouldApplyTypedNetworkHost(printer, networkHost) ? (
+            <p className={styles.helpText}>
+              Esa IP aún no es la predeterminada. Púlsala o usa Imprimir prueba para enviarla a la
+              Xprinter por Ethernet.
+            </p>
+          ) : null}
           {networkHint ? <p className={styles.helpText}>{networkHint}</p> : null}
         </div>
         <FieldToggle
