@@ -37,6 +37,7 @@ export function OrderDispatchDrawer({
   restaurantId,
   onClose,
   onOrderConfirmed,
+  onDispatchPrinted,
 }: {
   open: boolean;
   order: Order | null;
@@ -44,6 +45,7 @@ export function OrderDispatchDrawer({
   restaurantId: string;
   onClose: () => void;
   onOrderConfirmed: (order: Order) => void;
+  onDispatchPrinted?: (order: Order) => void;
 }) {
   const createdByOrderIdRef = useRef<Map<string, CachedDispatchState>>(new Map());
   const [subdomain, setSubdomain] = useState('');
@@ -152,13 +154,14 @@ export function OrderDispatchDrawer({
       if (result.status === 'ok') {
         onOrderConfirmed(result.order);
         cacheCreatedState(order.id, result.request, null);
+        onDispatchPrinted?.(result.order);
         return;
       }
       if (result.status === 'confirm_failed') {
         cacheCreatedState(order.id, result.request, confirmFailureMessage(result.error));
       }
     },
-    [cacheCreatedState, confirmOrder, onOrderConfirmed, order],
+    [cacheCreatedState, confirmOrder, onDispatchPrinted, onOrderConfirmed, order],
   );
 
   async function retryConfirm() {
@@ -168,6 +171,7 @@ export function OrderDispatchDrawer({
       const updated = await confirmOrder();
       onOrderConfirmed(updated);
       cacheCreatedState(order.id, created, null);
+      onDispatchPrinted?.(updated);
     } catch (error) {
       const message = confirmFailureMessage(error);
       setConfirmError(message);
