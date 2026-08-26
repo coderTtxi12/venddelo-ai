@@ -1,3 +1,4 @@
+import base64
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
@@ -27,6 +28,13 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderScheduleDTO,
     MexyCoverageResponse,
     RestaurantDeliveryPartnershipResponse,
+)
+from app.modules.restaurants.network_printer import (
+    NetworkPrinterDiscoverDTO,
+    NetworkPrinterPrintRequest,
+    discover_raw_printers,
+    send_raw_escpos,
+    validate_printer_target,
 )
 from app.modules.restaurants.schemas import (
     PaymentMethodCreate,
