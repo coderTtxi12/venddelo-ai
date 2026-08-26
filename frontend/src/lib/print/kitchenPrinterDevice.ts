@@ -223,6 +223,14 @@ export function hasDefaultKitchenPrinter(preference: KitchenPrinterPreference): 
 
 export function defaultPrinterDisplayName(preference: KitchenPrinterPreference): string {
   if (!hasDefaultKitchenPrinter(preference)) return EMPTY_KITCHEN_PRINTER.label;
+  if (preference.kind === 'network' && preference.host) {
+    const port = preference.port && preference.port !== 9100 ? `:${preference.port}` : '';
+    const named = preference.label.trim();
+    if (named && named !== printerKindLabel('network') && !named.includes(preference.host)) {
+      return `${named} (${preference.host}${port})`;
+    }
+    return `${preference.host}${port}`;
+  }
   return preference.label.trim() || printerKindLabel(preference.kind);
 }
 
