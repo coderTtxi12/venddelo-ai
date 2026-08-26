@@ -455,6 +455,39 @@ export function TicketPrinterSettings({
             {testBusy ? 'Imprimiendo…' : 'Imprimir prueba'}
           </button>
         </div>
+        {printer.kind === 'system' ? (
+          <div className={styles.networkPanel}>
+            <p className={styles.networkTitle}>Impresoras del sistema</p>
+            <div className={styles.networkList} role="list">
+              <button
+                type="button"
+                role="listitem"
+                className={`${styles.networkItem} ${!printer.systemPrinterName ? styles.networkItemActive : ''}`}
+                onClick={() => selectSystemPrinter()}
+              >
+                Diálogo de impresión
+              </button>
+              {systemPrinters.map((item) => (
+                <button
+                  key={item.name}
+                  type="button"
+                  role="listitem"
+                  className={`${styles.networkItem} ${printer.systemPrinterName === item.name ? styles.networkItemActive : ''}`}
+                  onClick={() => selectSystemPrinter(item.name)}
+                >
+                  {item.name}
+                  {item.is_default ? (
+                    <span className={styles.systemDefaultHint}>Predeterminada del equipo</span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+            {systemBusy && systemPrinters.length === 0 ? (
+              <p className={styles.helpText}>Leyendo las impresoras instaladas en este equipo…</p>
+            ) : null}
+            {systemHint ? <p className={styles.helpText}>{systemHint}</p> : null}
+          </div>
+        ) : null}
         <div className={styles.networkPanel}>
           <p className={styles.networkTitle}>Impresora de red</p>
           {networkPrinters.length > 0 ? (
@@ -517,7 +550,7 @@ export function TicketPrinterSettings({
         <p className={styles.helpText}>
           USB, Bluetooth y red funcionan en Chrome o Edge. La búsqueda Wi‑Fi/Ethernet recorre el
           puerto 9100 desde el servidor. Si no aparece, escribe la IP. En iPhone/iPad, o Bluetooth
-          clásico, usa “Usar sistema”.
+          clásico, usa “Usar sistema” y elige una impresora de la lista, o el diálogo de impresión.
         </p>
       </div>
 
