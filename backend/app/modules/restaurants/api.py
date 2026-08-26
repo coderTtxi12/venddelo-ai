@@ -454,3 +454,31 @@ def list_active_delivery_provider_payment_methods(
     partnership: DeliveryPartnershipService = Depends(_partnership_service),
 ) -> list[DeliveryProviderPaymentMethodDTO]:
     return partnership.get_active_provider_payment_methods(restaurant.id)
+
+
+@router.post(
+    "/{restaurant_id}/kitchen-printers/discover",
+    response_model=NetworkPrinterDiscoverDTO,
+)
+def discover_kitchen_network_printers(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+) -> NetworkPrinterDiscoverDTO:
+    del restaurant
+    return discover_raw_printers()
+
+
+@router.post(
+    "/{restaurant_id}/kitchen-printers/print",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def print_kitchen_network_ticket(
+    data: NetworkPrinterPrintRequest,
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+) -> None:
+    del restaurant
+    host, port = validate_printer_target(data.host, data.port)
+    try:
+        payload = base64.b64decode(data.payload_base64, validate=False)
+    except ValueError as exc:
+        raise ValidationError("El ticket no se pudo leer.") from exc
+    send_raw_escpos(host, port, payload)
