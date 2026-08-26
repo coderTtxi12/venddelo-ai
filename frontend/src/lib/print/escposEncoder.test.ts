@@ -55,3 +55,35 @@ test('encodeKitchenTicketEscPos writes quantity with ASCII x, not ×', () => {
   assert.match(ascii, /2x Tacos al Pastor/);
   assert.doesNotMatch(ascii, /2\? Tacos/);
 });
+
+test('encodeKitchenTicketEscPos maps middle dots to ASCII hyphen', () => {
+  const bytes = encodeKitchenTicketEscPos(
+    ticket([{ kind: 'kv', label: 'Pago', value: 'Efectivo · con $200.00' }]),
+  );
+  const ascii = String.fromCharCode(...bytes.filter((b) => b >= 32 && b < 127));
+  assert.match(ascii, /Efectivo - con \$200\.00/);
+  assert.doesNotMatch(ascii, /Efectivo \? con/);
+});
+
+test('encodeKitchenTicketEscPos sets 80mm print area and right-aligns prices', () => {
+  const bytes = encodeKitchenTicketEscPos(
+    ticket([{ kind: 'item', qty: 1, name: 'Vaso Gomitas', price: '$40.00' }]),
+  );
+  const gsW = [...bytes].slice(7, 13);
+  assert.deepEqual(gsW, [0x1d, 0x4c, 0, 0, 0x1d, 0x57]);
+  assert.equal(bytes[13], 576 & 0xff);
+  assert.equal(bytes[14], 576 >> 8);
+  const ascii = String.fromCharCode(...bytes.filter((b) => b >= 32 && b < 127));
+  assert.match(ascii, /1x Vaso Gomitas {2,}\$40\.00/);
+});
+
+test('encodeKitchenTicketEscPos indents complements on their own lines', () => {
+  const bytes = encodeKitchenTicketEscPos(
+    ticket([
+      { kind: 'item', qty: 1, name: 'Frappe moca', price: '$85.00' },
+      { kind: 'option', text: 'Personaliza tu bebida: Deslactosada, Sin azucar' },
+    ]),
+  );
+  const ascii = String.fromCharCode(...bytes.filter((b) => b >= 32 && b < 127));
+  assert.match(ascii, /  Personaliza tu bebida:/);
+});
