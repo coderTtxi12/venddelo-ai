@@ -33,15 +33,40 @@ class OfferDetailsSheet extends StatefulWidget {
 
 class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
   Timer? _ticker;
+  bool _expiredNotified = false;
 
   @override
   void initState() {
     super.initState();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {});
+      if (!mounted) {
+        return;
       }
+      _notifyExpiredIfNeeded();
+      setState(() {});
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _notifyExpiredIfNeeded();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant OfferDetailsSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.offer.id != widget.offer.id) {
+      _expiredNotified = false;
+    }
+  }
+
+  void _notifyExpiredIfNeeded() {
+    if (_expiredNotified || widget.onExpired == null) {
+      return;
+    }
+    if (!isOfferCountdownExpired(widget.offer.expiresAt)) {
+      return;
+    }
+    _expiredNotified = true;
+    widget.onExpired!();
   }
 
   @override
