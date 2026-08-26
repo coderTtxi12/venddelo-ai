@@ -120,9 +120,12 @@ export function TicketPrinterSettings({
   const [printerBusy, setPrinterBusy] = useState(false);
   const [testBusy, setTestBusy] = useState(false);
   const [networkBusy, setNetworkBusy] = useState(false);
+  const [systemBusy, setSystemBusy] = useState(false);
   const [networkHost, setNetworkHost] = useState('');
   const [networkPrinters, setNetworkPrinters] = useState<KitchenNetworkPrinter[]>([]);
+  const [systemPrinters, setSystemPrinters] = useState<KitchenSystemPrinter[]>([]);
   const [networkHint, setNetworkHint] = useState<string | null>(null);
+  const [systemHint, setSystemHint] = useState<string | null>(null);
   const [printerMessage, setPrinterMessage] = useState<string | null>(null);
   const [printerError, setPrinterError] = useState<string | null>(null);
 
