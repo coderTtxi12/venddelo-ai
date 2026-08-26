@@ -431,9 +431,14 @@ export function TicketPrinterSettings({
             <WifiOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
             {networkBusy ? 'Buscando en la red…' : 'Buscar Wi‑Fi / Ethernet'}
           </button>
-          <button type="button" className={styles.secondaryBtn} onClick={useSystem}>
+          <button
+            type="button"
+            className={styles.secondaryBtn}
+            disabled={systemBusy || !accessToken}
+            onClick={useSystem}
+          >
             <DesktopWindowsOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
-            Usar sistema
+            {systemBusy ? 'Leyendo impresoras…' : 'Usar sistema'}
           </button>
           {hasDefaultKitchenPrinter(printer) ? (
             <button type="button" className={styles.secondaryBtn} onClick={clearDefault}>
