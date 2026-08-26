@@ -341,10 +341,16 @@
 @media (max-width: 760px) {
   .searchShell {
     min-height: 44px;
+    flex-wrap: wrap;
+    padding-bottom: 0.45rem;
   }
 
   .searchInput {
     font-size: 1rem;
+  }
+
+  .useLinkButton {
+    width: 100%;
   }
 
   .mapShell {
