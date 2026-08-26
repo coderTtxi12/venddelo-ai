@@ -156,14 +156,34 @@ export function parseKitchenPrinterPreference(raw: string | null): KitchenPrinte
       parsed.kind === 'usb' ||
       parsed.kind === 'serial' ||
       parsed.kind === 'system' ||
-      parsed.kind === 'bluetooth'
+      parsed.kind === 'bluetooth' ||
+      parsed.kind === 'network'
     ) {
+      const host =
+        parsed.kind === 'network' && typeof parsed.host === 'string' ? parsed.host.trim() : undefined;
+      const port =
+        parsed.kind === 'network' && typeof parsed.port === 'number' && Number.isInteger(parsed.port)
+          ? parsed.port
+          : parsed.kind === 'network'
+            ? 9100
+            : undefined;
+      if (parsed.kind === 'network' && !host) {
+        return EMPTY_KITCHEN_PRINTER;
+      }
       return {
         kind: parsed.kind,
         label:
           typeof parsed.label === 'string' && parsed.label.trim()
             ? parsed.label
             : printerKindLabel(parsed.kind),
+        bluetoothDeviceId:
+          parsed.kind === 'bluetooth' &&
+          typeof parsed.bluetoothDeviceId === 'string' &&
+          parsed.bluetoothDeviceId.trim()
+            ? parsed.bluetoothDeviceId.trim()
+            : undefined,
+        host,
+        port,
       };
     }
   } catch {
