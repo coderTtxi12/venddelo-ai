@@ -238,8 +238,23 @@ export function printerKindLabel(kind: KitchenPrinterKind): string {
   if (kind === 'usb') return 'USB';
   if (kind === 'serial') return 'Puerto serie';
   if (kind === 'bluetooth') return 'Bluetooth';
+  if (kind === 'network') return 'Wi‑Fi / Ethernet';
   if (kind === 'system') return 'Impresora del sistema';
   return 'Sin impresora';
+}
+
+export function isLanPrinterIpv4(value: string): boolean {
+  const parts = value.trim().split('.');
+  if (parts.length !== 4) return false;
+  const octets = parts.map((part) => Number(part));
+  if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) return false;
+  const first = octets[0];
+  const second = octets[1];
+  if (first === 10) return true;
+  if (first === 192 && second === 168) return true;
+  if (first === 172 && second != null && second >= 16 && second <= 31) return true;
+  if (first === 169 && second === 254) return true;
+  return false;
 }
 
 export function canUseWebUsb(): boolean {
