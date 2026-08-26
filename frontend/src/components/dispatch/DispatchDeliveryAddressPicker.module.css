@@ -176,6 +176,67 @@
   color: var(--color-text-secondary);
 }
 
+.useLinkButton {
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  min-height: 36px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 200ms ease, opacity 200ms ease;
+}
+
+.useLinkButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.useLinkButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.errorRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.75rem;
+}
+
+.retryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  min-height: 36px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 200ms ease, background-color 200ms ease;
+}
+
+.retryButton:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+}
+
+.retryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.retryIcon {
+  width: 16px;
+  height: 16px;
+}
+
 .predictionSlotIcon,
 :global(.dispatch-place-prediction-icon) {
   width: 20px;
