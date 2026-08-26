@@ -79,12 +79,12 @@
 
 .printerName {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.25;
   color: var(--color-text);
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .defaultBadge {
@@ -112,9 +112,90 @@
 }
 
 .printerActions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+.printerActions .primaryBtn,
+.printerActions .secondaryBtn {
+  width: 100%;
+}
+
+.networkPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.networkTitle {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.networkList {
   display: flex;
   flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.networkItem {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.45rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.networkItem:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
+}
+
+.networkItem:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.networkItemActive {
+  border-color: color-mix(in srgb, #166534 40%, var(--color-border));
+  background: color-mix(in srgb, #16a34a 10%, var(--color-surface));
+}
+
+.networkManual {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 0.5rem;
+}
+
+.networkManual .field {
+  width: 100%;
+  min-width: 0;
+}
+
+.networkManual .secondaryBtn {
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .networkItem {
+    transition: none;
+  }
 }
 
 .primaryBtn,
@@ -123,12 +204,15 @@
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  min-height: 40px;
-  padding: 0.45rem 0.8rem;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.55rem 0.8rem;
   border-radius: 12px;
-  font-size: 0.82rem;
+  font-size: 0.86rem;
   font-weight: 700;
   cursor: pointer;
+  touch-action: manipulation;
+  text-align: center;
   transition: background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
 }
 
@@ -159,6 +243,13 @@
   cursor: not-allowed;
 }
 
+.primaryBtn:focus-visible,
+.secondaryBtn:focus-visible,
+.segment:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .okText,
 .errorText,
 .helpText {
@@ -181,7 +272,7 @@
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(220px, 0.9fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   align-items: start;
 }
@@ -193,8 +284,7 @@
 }
 
 .previewCol {
-  position: sticky;
-  top: 1rem;
+  position: static;
   min-width: 0;
 }
 
@@ -233,7 +323,9 @@
   background: var(--color-bg);
   color: var(--color-text);
   font: inherit;
+  font-size: 1rem;
   font-weight: 600;
+  box-sizing: border-box;
 }
 
 .textarea {
@@ -248,12 +340,14 @@
 }
 
 .segments {
-  display: flex;
-  gap: 0.4rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
 }
 
 .segment {
-  min-height: 40px;
+  min-height: 44px;
+  min-width: 44px;
   padding: 0 0.9rem;
   border-radius: 12px;
   border: 1px solid var(--color-border);
@@ -261,6 +355,7 @@
   color: var(--color-text);
   font-weight: 700;
   cursor: pointer;
+  touch-action: manipulation;
   transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
@@ -276,7 +371,7 @@
 
 .toggleGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.55rem;
 }
 
@@ -285,7 +380,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
-  padding: 0.6rem 0.7rem;
+  min-height: 44px;
+  padding: 0.7rem 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-bg);
@@ -353,6 +449,11 @@
   transition: transform 0.2s ease;
 }
 
+.switch input:focus-visible + .slider {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .switch input:checked + .slider {
   background: var(--color-primary);
 }
@@ -361,14 +462,70 @@
   transform: translateX(18px);
 }
 
-@media (max-width: 900px) {
-  .layout,
+@media (min-width: 480px) {
+  .printerActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .printerActions .primaryBtn {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 768px) {
+  .panel {
+    padding: 1rem 1.1rem;
+    gap: 1rem;
+  }
+
+  .printerCard {
+    padding: 0.85rem;
+  }
+
+  .printerName {
+    font-size: 1.2rem;
+  }
+
+  .networkManual {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .networkManual .field {
+    flex: 1 1 12rem;
+  }
+
+  .networkManual .secondaryBtn {
+    width: auto;
+  }
+
   .toggleGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 1024px) {
+  .layout {
+    grid-template-columns: minmax(0, 1.1fr) minmax(220px, 0.9fr);
   }
 
   .previewCol {
-    position: static;
+    position: sticky;
+    top: 1rem;
+  }
+
+  .printerActions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .printerActions .primaryBtn,
+  .printerActions .secondaryBtn {
+    width: auto;
+  }
+
+  .printerActions .primaryBtn {
+    grid-column: auto;
   }
 }
 
