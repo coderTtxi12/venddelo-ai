@@ -1071,6 +1071,10 @@
 .actionPrimary,
 .actionSecondary,
 .actionDanger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   flex: 1 1 160px;
   min-height: 52px;
   border-radius: 14px;
