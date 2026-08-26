@@ -31,6 +31,7 @@ import {
   pairUsbKitchenPrinter,
   printerKindLabel,
   readKitchenPrinterPreference,
+  shouldApplyTypedNetworkHost,
   useSystemKitchenPrinter,
   type KitchenPrinterPreference,
 } from '@/lib/print/kitchenPrinterDevice';
