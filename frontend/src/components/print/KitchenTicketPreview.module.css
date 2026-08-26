@@ -10,10 +10,14 @@
       #edf2f7 10px 20px
     );
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .paper {
   position: relative;
+  box-sizing: border-box;
   background: #fffef8;
   color: #111827;
   padding: 12px 10px 18px;
@@ -66,6 +70,10 @@
   justify-content: space-between;
   gap: 8px;
   margin: 0 0 3px;
+}
+
+.row span {
+  overflow-wrap: anywhere;
 }
 
 .row span:last-child {
