@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, time
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -13,7 +14,9 @@ from sqlalchemy import (
     Text,
     Time,
     UniqueConstraint,
+    text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -76,6 +79,12 @@ class Restaurant(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
         String(64), nullable=False, server_default="America/Mexico_City"
     )
     branch_count: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    ticket_print_settings: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=dict,
+        server_default=text("'{}'::jsonb"),
+    )
     owner_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
