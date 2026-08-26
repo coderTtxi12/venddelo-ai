@@ -489,3 +489,31 @@ def print_kitchen_network_ticket(
     except ValueError as exc:
         raise ValidationError("El ticket no se pudo leer.") from exc
     send_raw_escpos(host, port, payload)
+
+
+@router.post(
+    "/{restaurant_id}/kitchen-printers/system/discover",
+    response_model=SystemPrinterDiscoverDTO,
+)
+def discover_kitchen_system_printers(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+) -> SystemPrinterDiscoverDTO:
+    del restaurant
+    return list_system_printers()
+
+
+@router.post(
+    "/{restaurant_id}/kitchen-printers/system/print",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def print_kitchen_system_ticket(
+    data: SystemPrinterPrintRequest,
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+) -> None:
+    del restaurant
+    printer_name = validate_system_printer_name(data.printer_name)
+    try:
+        payload = base64.b64decode(data.payload_base64, validate=False)
+    except ValueError as exc:
+        raise ValidationError("El ticket no se pudo leer.") from exc
+    send_to_system_printer(printer_name, payload)
