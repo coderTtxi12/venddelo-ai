@@ -140,8 +140,67 @@ export function TicketPrinterSettings({
     setPrinterError(null);
     setNetworkPrinters([]);
     setNetworkHint(null);
+    setSystemPrinters([]);
+    setSystemHint(null);
     if (next.kind === 'network' && next.host) setNetworkHost(next.host);
   }, [restaurantId]);
+
+  const selectOsDefaultRef = useRef(false);
+
+  function selectSystemPrinter(printerName?: string) {
+    const next = useSystemKitchenPrinter(restaurantId, printerName);
+    setPrinter(next);
+    setPrinterError(null);
+    setPrinterMessage(
+      printerName
+        ? `Predeterminada: ${printerName}. Los tickets se enviarán a esa cola.`
+        : 'Predeterminada: diálogo de impresión del sistema.',
+    );
+  }
+
+  async function loadSystemPrinters(opts?: { selectOsDefault?: boolean }) {
+    if (!accessToken) {
+      setPrinterError('Inicia sesión para ver las impresoras del sistema.');
+      return;
+    }
+    setSystemBusy(true);
+    setPrinterError(null);
+    setSystemHint(null);
+    try {
+      const result = await discoverKitchenSystemPrinters(accessToken, restaurantId);
+      setSystemPrinters(result.items);
+      setSystemHint(result.message);
+      const current = readKitchenPrinterPreference(restaurantId);
+      if (opts?.selectOsDefault && current.kind === 'system' && !current.systemPrinterName) {
+        if (result.default_name) {
+          selectSystemPrinter(result.default_name);
+        } else if (result.items.length === 1 && result.items[0]) {
+          selectSystemPrinter(result.items[0].name);
+        } else if (result.items.length > 1) {
+          setPrinterMessage(`Se encontraron ${result.items.length} impresoras. Elige una.`);
+        }
+      }
+    } catch (error) {
+      setSystemPrinters([]);
+      setPrinterError(
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'No se pudieron leer las impresoras del sistema.',
+      );
+    } finally {
+      setSystemBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (printer.kind !== 'system' || !accessToken) return;
+    const selectOsDefault = selectOsDefaultRef.current;
+    selectOsDefaultRef.current = false;
+    void loadSystemPrinters({ selectOsDefault });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load when this machine is in system mode
+  }, [printer.kind, accessToken, restaurantId]);
 
   const preview = useMemo(
     () =>
