@@ -47,7 +47,19 @@ export function useKitchenTicketPrinter(
       trigger: KitchenTicketPrintTrigger | 'manual',
       productsById?: ReadonlyMap<string, Product>,
     ): Promise<PrintKitchenTicketResult> => {
-      if (!restaurantId || !restaurant) return { status: 'skipped' };
+      if (!restaurantId || !restaurant || !accessToken) return { status: 'skipped' };
+      let catalog = new Map(productsById ?? []);
+      const missing = productIdsNeededForTicketOptions(order, catalog);
+      if (missing.length > 0) {
+        try {
+          const loaded = await Promise.all(
+            missing.map((productId) => getProduct(accessToken, restaurantId, productId)),
+          );
+          for (const product of loaded) catalog.set(product.id, product);
+        } catch {
+          // Print the ticket even if option labels cannot be resolved.
+        }
+      }
       return printKitchenOrderTicket({
         restaurantId,
         order,
@@ -55,7 +67,7 @@ export function useKitchenTicketPrinter(
         restaurantName: restaurant.name,
         restaurantAddress: restaurant.address,
         logoUrl: storagePublicUrl(restaurant.logo_path),
-        productsById,
+        productsById: catalog,
         trigger,
         accessToken,
       });
