@@ -65,11 +65,36 @@ function printHtmlCopies(html: string, copies: number): void {
 export async function printKitchenTicketDocument(
   restaurantId: string,
   doc: KitchenTicketDocument,
+  options?: { accessToken?: string | null },
 ): Promise<PrintKitchenTicketResult> {
   const preference = readKitchenPrinterPreference(restaurantId);
   const copies = Math.max(1, doc.copies);
   if (preference.kind === 'none') {
     return { status: 'failed', error: 'Elige una impresora predeterminada.' };
+  }
+  if (preference.kind === 'network') {
+    if (!options?.accessToken) {
+      return { status: 'failed', error: 'Inicia sesión para imprimir por Wi‑Fi o Ethernet.' };
+    }
+    if (!preference.host) {
+      return { status: 'failed', error: 'Elige una impresora de red.' };
+    }
+    try {
+      const payload = encodeKitchenTicketEscPos(doc);
+      for (let i = 0; i < copies; i += 1) {
+        await printKitchenNetworkTicket(options.accessToken, restaurantId, {
+          host: preference.host,
+          port: preference.port ?? 9100,
+          payload_base64: bytesToBase64(payload),
+        });
+      }
+      return { status: 'printed', method: 'network' };
+    } catch (error) {
+      return {
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'No se pudo imprimir en la impresora de red.',
+      };
+    }
   }
   if (preference.kind === 'usb' || preference.kind === 'serial' || preference.kind === 'bluetooth') {
     try {
