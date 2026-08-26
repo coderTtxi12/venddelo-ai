@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from urllib.error import URLError
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, unquote_plus, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 _AT_COORDINATES = re.compile(r"/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)")
