@@ -168,6 +168,12 @@ export function parseKitchenPrinterPreference(raw: string | null): KitchenPrinte
           : parsed.kind === 'network'
             ? 9100
             : undefined;
+      const systemPrinterName =
+        parsed.kind === 'system' &&
+        typeof parsed.systemPrinterName === 'string' &&
+        parsed.systemPrinterName.trim()
+          ? parsed.systemPrinterName.trim()
+          : undefined;
       if (parsed.kind === 'network' && !host) {
         return EMPTY_KITCHEN_PRINTER;
       }
