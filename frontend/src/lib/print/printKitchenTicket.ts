@@ -1,5 +1,5 @@
 import type { Order, Product } from '@/lib/api/types';
-import { printKitchenNetworkTicket } from '@/lib/api/restaurants';
+import { printKitchenNetworkTicket, printKitchenSystemTicket } from '@/lib/api/restaurants';
 import { buildKitchenTicketDocument, type KitchenTicketDocument } from './ticketDocument';
 import { encodeKitchenTicketEscPos, kitchenTicketHtml } from './escposEncoder';
 import {
@@ -93,6 +93,27 @@ export async function printKitchenTicketDocument(
       return {
         status: 'failed',
         error: error instanceof Error ? error.message : 'No se pudo imprimir en la impresora de red.',
+      };
+    }
+  }
+  if (preference.kind === 'system' && preference.systemPrinterName) {
+    if (!options?.accessToken) {
+      return { status: 'failed', error: 'Inicia sesión para imprimir en la impresora del sistema.' };
+    }
+    try {
+      const payload = encodeKitchenTicketEscPos(doc);
+      for (let i = 0; i < copies; i += 1) {
+        await printKitchenSystemTicket(options.accessToken, restaurantId, {
+          printer_name: preference.systemPrinterName,
+          payload_base64: bytesToBase64(payload),
+        });
+      }
+      return { status: 'printed', method: 'system' };
+    } catch (error) {
+      return {
+        status: 'failed',
+        error:
+          error instanceof Error ? error.message : 'No se pudo imprimir en la impresora del sistema.',
       };
     }
   }
