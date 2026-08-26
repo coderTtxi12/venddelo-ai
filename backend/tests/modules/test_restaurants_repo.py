@@ -68,6 +68,28 @@ def test_update_and_soft_delete(session):
 
 
 @requires_db
+def test_ticket_print_settings_default_and_update(session):
+    repo = SqlAlchemyRestaurantRepository(session)
+    dto = repo.add(RestaurantCreate(name="R", subdomain="tickets"))
+    loaded = repo.get(dto.id)
+    assert loaded is not None
+    assert loaded.ticket_print_settings.enabled is False
+    assert loaded.ticket_print_settings.paper_width_mm == 80
+    updated = repo.update(
+        dto.id,
+        RestaurantUpdate(
+            ticket_print_settings=loaded.ticket_print_settings.model_copy(
+                update={"brand_name": "Taquería El Sol", "paper_width_mm": 58, "copies": 2}
+            )
+        ),
+    )
+    assert updated is not None
+    assert updated.ticket_print_settings.brand_name == "Taquería El Sol"
+    assert updated.ticket_print_settings.paper_width_mm == 58
+    assert updated.ticket_print_settings.copies == 2
+
+
+@requires_db
 def test_list_pagination(session):
     repo = SqlAlchemyRestaurantRepository(session)
     for i in range(3):
