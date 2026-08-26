@@ -180,6 +180,15 @@
   background: color-mix(in srgb, #16a34a 10%, var(--color-surface));
 }
 
+.systemDefaultHint {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-secondary);
+}
+
 .networkManual {
   display: flex;
   flex-direction: column;
