@@ -62,14 +62,17 @@ export function DispatchDeliveryAddressPicker({
   const skipDragEmitRef = useRef(false);
   const onChangeRef = useRef(onChange);
   const valueRef = useRef(value);
+  const mapsLinkInFlightRef = useRef<string | null>(null);
 
   const [searchText, setSearchText] = useState('');
   const [autocompleteLoading, setAutocompleteLoading] = useState(true);
   const [autocompleteError, setAutocompleteError] = useState<string | null>(null);
   const [mapState, setMapState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [mapBootId, setMapBootId] = useState(0);
   const [geocoding, setGeocoding] = useState(false);
   const [linkResolving, setLinkResolving] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [failedMapsLink, setFailedMapsLink] = useState<string | null>(null);
 
   onChangeRef.current = onChange;
   valueRef.current = value;
@@ -164,8 +167,11 @@ export function DispatchDeliveryAddressPicker({
         return;
       }
 
+      if (mapsLinkInFlightRef.current === trimmed) return;
+      mapsLinkInFlightRef.current = trimmed;
       setLinkResolving(true);
       setInputError(null);
+      setFailedMapsLink(null);
       setSearchText(trimmed);
 
       try {
