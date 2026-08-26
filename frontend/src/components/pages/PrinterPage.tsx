@@ -85,6 +85,11 @@ export default function PrinterPage() {
     };
   }, [accessToken, accessLoading, authLoading, selectedRestaurantId]);
 
+  useEffect(() => {
+    if (!restaurantId) return;
+    void primeKitchenPrinterConnections(restaurantId);
+  }, [restaurantId]);
+
   async function handleSave() {
     if (!accessToken || !restaurantId) return;
     setSaving(true);
