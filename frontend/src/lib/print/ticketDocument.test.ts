@@ -1,0 +1,167 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import type { Order } from '@/lib/api/types';
+import { formatCents } from '@/lib/orders/orderDisplay.ts';
+import { DEFAULT_TICKET_PRINT_SETTINGS } from './ticketSettings.ts';
+import { buildKitchenTicketDocument, sampleKitchenTicketOrder } from './ticketDocument.ts';
+
+function takeoutOrder(overrides: Partial<Order> = {}): Order {
+  return {
+    id: '11111111-2222-3333-4444-555555555555',
+    restaurant_id: 'rest-1',
+    type: 'takeout',
+    customer_name: 'María López',
+    customer_phone: '+525512345678',
+    payment_method: 'cash',
+    subtotal_cents: 18000,
+    subtotal_before_discount_cents: 18000,
+    discount_cents: 0,
+    total_cents: 18000,
+    applied_order_promotion_id: null,
+    applied_order_discounts: [],
+    status: 'pending',
+    delivery_address: null,
+    delivery_latitude: null,
+    delivery_longitude: null,
+    delivery_fee_cents: 0,
+    cash_denomination_cents: 50000,
+    cancellation_reason: null,
+    idempotency_key: null,
+    note: 'Sin cebolla',
+    kds_cleared_at: null,
+    created_at: '2026-08-20T18:00:00Z',
+    updated_at: '2026-08-20T18:00:00Z',
+    items: [
+      {
+        id: 'item-1',
+        product_id: 'prod-1',
+        product_name: 'Tacos al Pastor',
+        product_image_path: null,
+        quantity: 2,
+        unit_price_cents: 9000,
+        selected_options: null,
+        line_subtotal_cents: 18000,
+        discount_cents: 0,
+        line_total_cents: 18000,
+        applied_promotion_id: null,
+        applied_discounts: [],
+      },
+    ],
+    ...overrides,
+  };
+}
+
+test('sampleKitchenTicketOrder is takeout with items for settings preview', () => {
+  assert.equal(sampleKitchenTicketOrder.type, 'takeout');
+  assert.ok(sampleKitchenTicketOrder.items.length >= 1);
+});
+
+test('buildKitchenTicketDocument uses restaurant name when brand is empty', () => {
+  const doc = buildKitchenTicketDocument({
+    order: takeoutOrder(),
+    settings: DEFAULT_TICKET_PRINT_SETTINGS,
+    restaurantName: 'Taquería El Sol',
+    restaurantAddress: 'Centro, Tlaxcala',
+    logoUrl: 'https://cdn.example/logo.png',
+  });
+  assert.equal(doc.brandName, 'Taquería El Sol');
+  assert.equal(doc.logoUrl, 'https://cdn.example/logo.png');
+  assert.ok(doc.lines.some((line) => line.kind === 'brand' && line.text === 'Taquería El Sol'));
+  assert.ok(doc.lines.some((line) => line.kind === 'item' && line.name === 'Tacos al Pastor'));
+  assert.ok(doc.lines.some((line) => line.kind === 'kv' && line.label === 'Cliente' && line.value === 'María López'));
+});
+
+test('buildKitchenTicketDocument prefers custom brand name and hides optional fields', () => {
+  const doc = buildKitchenTicketDocument({
+    order: takeoutOrder(),
+    settings: {
+      ...DEFAULT_TICKET_PRINT_SETTINGS,
+      brand_name: 'Marca propia',
+      show_logo: false,
+      show_customer: false,
+      show_notes: false,
+      header_extra: 'RFC XAXX010101000',
+      footer_message: 'Vuelve pronto',
+    },
+    restaurantName: 'Taquería El Sol',
+    restaurantAddress: 'Centro',
+    logoUrl: 'https://cdn.example/logo.png',
+  });
+  assert.equal(doc.brandName, 'Marca propia');
+  assert.equal(doc.logoUrl, null);
+  assert.ok(doc.lines.some((line) => line.kind === 'muted' && line.text === 'RFC XAXX010101000'));
+  assert.ok(doc.lines.some((line) => line.kind === 'center' && line.text === 'Vuelve pronto'));
+  assert.equal(
+    doc.lines.some((line) => line.kind === 'kv' && line.label === 'Cliente'),
+    false,
+  );
+  assert.equal(
+    doc.lines.some((line) => line.kind === 'kv' && line.label === 'Notas'),
+    false,
+  );
+});
+
+test('buildKitchenTicketDocument lists item prices before discounts', () => {
+  const doc = buildKitchenTicketDocument({
+    order: takeoutOrder({
+      subtotal_cents: 18000,
+      subtotal_before_discount_cents: 36000,
+      discount_cents: 18000,
+      total_cents: 18000,
+      items: [
+        {
+          id: 'item-1',
+          product_id: 'prod-1',
+          product_name: 'Burger & Boneless',
+          product_image_path: null,
+          quantity: 2,
+          unit_price_cents: 18000,
+          selected_options: null,
+          line_subtotal_cents: 36000,
+          discount_cents: 18000,
+          line_total_cents: 18000,
+          applied_promotion_id: null,
+          applied_discounts: [{ label: '2x1', badge: null, discount_cents: 18000, applied: true }],
+        },
+      ],
+    }),
+    settings: DEFAULT_TICKET_PRINT_SETTINGS,
+    restaurantName: 'Wild Rooster',
+    restaurantAddress: 'Coacalco',
+    logoUrl: null,
+  });
+  const itemLine = doc.lines.find((line) => line.kind === 'item');
+  assert.ok(itemLine);
+  if (itemLine && itemLine.kind === 'item') {
+    assert.equal(itemLine.name, 'Burger & Boneless');
+    assert.equal(itemLine.qty, 2);
+    assert.equal(itemLine.price, formatCents(36000));
+    assert.notEqual(itemLine.price, formatCents(18000));
+  }
+});
+
+test('buildKitchenTicketDocument includes delivery address for delivery orders', () => {
+  const doc = buildKitchenTicketDocument({
+    order: takeoutOrder({
+      type: 'delivery',
+      delivery_address: 'Calle Reforma 100\nReferencias: puerta azul',
+      delivery_fee_cents: 4500,
+      total_cents: 22500,
+    }),
+    settings: DEFAULT_TICKET_PRINT_SETTINGS,
+    restaurantName: 'Taquería El Sol',
+    restaurantAddress: 'Centro',
+    logoUrl: null,
+  });
+  assert.ok(
+    doc.lines.some(
+      (line) => line.kind === 'kv' && line.label === 'Tipo' && line.value === 'Entrega a domicilio',
+    ),
+  );
+  assert.ok(
+    doc.lines.some(
+      (line) => line.kind === 'kv' && line.label === 'Entrega' && line.value.includes('Calle Reforma 100'),
+    ),
+  );
+});
