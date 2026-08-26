@@ -67,6 +67,7 @@ class RestaurantCreate(BaseModel):
     delivery_enabled: bool = True
     timezone: str = "America/Mexico_City"
     branch_count: int | None = Field(default=None, ge=1, le=999)
+    ticket_print_settings: TicketPrintSettings = Field(default_factory=TicketPrintSettings)
 
 
 class RestaurantUpdate(BaseModel):
