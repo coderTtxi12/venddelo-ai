@@ -104,6 +104,20 @@ export async function printKitchenTicketDocument(
       }
       return { status: 'printed', method: preference.kind };
     } catch (error) {
+      if (error instanceof Error && error.message === CLASSIC_BLUETOOTH_FALLBACK) {
+        try {
+          printHtmlCopies(kitchenTicketHtml(doc), 1);
+          return { status: 'printed', method: 'system' };
+        } catch (fallbackError) {
+          return {
+            status: 'failed',
+            error:
+              fallbackError instanceof Error
+                ? fallbackError.message
+                : 'No se pudo imprimir el ticket.',
+          };
+        }
+      }
       return {
         status: 'failed',
         error: error instanceof Error ? error.message : 'No se pudo imprimir en la impresora predeterminada.',
@@ -131,6 +145,7 @@ export async function printKitchenOrderTicket(opts: {
   logoUrl?: string | null;
   productsById?: ReadonlyMap<string, Product>;
   trigger?: KitchenTicketPrintTrigger | 'manual';
+  accessToken?: string | null;
 }): Promise<PrintKitchenTicketResult> {
   const settings = normalizeTicketPrintSettings(opts.settings);
   if (opts.trigger && opts.trigger !== 'manual') {
@@ -154,5 +169,5 @@ export async function printKitchenOrderTicket(opts: {
     logoUrl: opts.logoUrl,
     productsById: opts.productsById,
   });
-  return printKitchenTicketDocument(opts.restaurantId, doc);
+  return printKitchenTicketDocument(opts.restaurantId, doc, { accessToken: opts.accessToken });
 }
