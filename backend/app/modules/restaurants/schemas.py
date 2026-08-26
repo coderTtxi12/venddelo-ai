@@ -155,9 +155,15 @@ class RestaurantDTO(BaseModel):
     delivery_enabled: bool = True
     timezone: str = "America/Mexico_City"
     branch_count: int | None = None
+    ticket_print_settings: TicketPrintSettings = Field(default_factory=TicketPrintSettings)
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("ticket_print_settings", mode="before")
+    @classmethod
+    def _normalize_ticket_print_settings(cls, value: object) -> TicketPrintSettings:
+        return normalize_ticket_print_settings(value)
 
 
 class RestaurantMeResponse(BaseModel):
