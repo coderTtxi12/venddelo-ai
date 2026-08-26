@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getRestaurant } from '@/lib/api/restaurants';
+import { getProduct } from '@/lib/api/menu';
 import type { Order, Product, Restaurant } from '@/lib/api/types';
 import { printKitchenOrderTicket, type PrintKitchenTicketResult } from '@/lib/print/printKitchenTicket';
 import { primeKitchenPrinterConnections } from '@/lib/print/kitchenPrinterDevice';
+import { productIdsNeededForTicketOptions } from '@/lib/print/ticketDocument';
 import { normalizeTicketPrintSettings, type KitchenTicketPrintTrigger } from '@/lib/print/ticketSettings';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 
