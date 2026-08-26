@@ -36,6 +36,13 @@ from app.modules.restaurants.network_printer import (
     send_raw_escpos,
     validate_printer_target,
 )
+from app.modules.restaurants.system_printer import (
+    SystemPrinterDiscoverDTO,
+    SystemPrinterPrintRequest,
+    list_system_printers,
+    send_to_system_printer,
+    validate_system_printer_name,
+)
 from app.modules.restaurants.schemas import (
     PaymentMethodCreate,
     PaymentMethodDTO,
