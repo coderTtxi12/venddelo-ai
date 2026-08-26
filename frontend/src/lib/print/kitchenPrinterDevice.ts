@@ -8,6 +8,7 @@ export type KitchenPrinterPreference = {
   bluetoothDeviceId?: string;
   host?: string;
   port?: number;
+  systemPrinterName?: string;
 };
 
 export const EMPTY_KITCHEN_PRINTER: KitchenPrinterPreference = {
