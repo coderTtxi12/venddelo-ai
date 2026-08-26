@@ -78,6 +78,14 @@ function charsForWidth(paperWidthMm: 58 | 80): number {
   return paperWidthMm === 58 ? 32 : 48;
 }
 
+function printAreaDots(paperWidthMm: 58 | 80): number {
+  return paperWidthMm === 58 ? 384 : 576;
+}
+
+function glyphCount(text: string): number {
+  return [...text.normalize('NFC')].length;
+}
+
 function encodeText(text: string): number[] {
   const bytes: number[] = [];
   for (const char of text.normalize('NFC')) {
