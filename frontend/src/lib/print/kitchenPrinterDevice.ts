@@ -191,6 +191,7 @@ export function parseKitchenPrinterPreference(raw: string | null): KitchenPrinte
             : undefined,
         host,
         port,
+        systemPrinterName,
       };
     }
   } catch {
@@ -237,6 +238,9 @@ export function defaultPrinterDisplayName(preference: KitchenPrinterPreference):
       return `${named} (${preference.host}${port})`;
     }
     return `${preference.host}${port}`;
+  }
+  if (preference.kind === 'system' && preference.systemPrinterName) {
+    return preference.systemPrinterName;
   }
   return preference.label.trim() || printerKindLabel(preference.kind);
 }
@@ -339,10 +343,15 @@ export function pairNetworkKitchenPrinter(
   return preference;
 }
 
-export function useSystemKitchenPrinter(restaurantId: string): KitchenPrinterPreference {
+export function useSystemKitchenPrinter(
+  restaurantId: string,
+  printerName?: string,
+): KitchenPrinterPreference {
+  const trimmed = printerName?.trim();
   const preference: KitchenPrinterPreference = {
     kind: 'system',
-    label: 'Impresora del sistema',
+    label: trimmed || 'Impresora del sistema',
+    systemPrinterName: trimmed,
   };
   writeKitchenPrinterPreference(restaurantId, preference);
   return preference;
