@@ -179,6 +179,7 @@ export function updateRestaurant(
       | 'status'
       | 'takeout_enabled'
       | 'delivery_enabled'
+      | 'ticket_print_settings'
     >
   >,
 ) {
