@@ -1,9 +1,10 @@
 import type { KitchenTicketDocument, TicketLine } from './ticketDocument';
 
 const ESC = 0x1b;
+const FS = 0x1c;
 const GS = 0x1d;
 
-/** IBM PC850 (ESC t 2). Xprinter treats page 16 as a DBCS table, so CP1252 garbles á/é/í. */
+/** IBM PC850 (ESC t 2). FS . cancels Xprinter Chinese/DBCS so á/é/í are not 2-byte glyphs. */
 const CP850: Record<string, number> = {
   Ç: 0x80,
   ü: 0x81,
@@ -68,6 +69,8 @@ const CP850: Record<string, number> = {
   '´': 0xef,
   '°': 0xf8,
   '×': 0x78,
+  '·': 0x2d,
+  '•': 0x2d,
   '€': 0xee,
 };
 
