@@ -137,14 +137,6 @@ const STATIC_ITEMS: Omit<DashboardSearchItem, 'score'>[] = [
     href: '/settings',
   },
   {
-    id: 'section:identity',
-    kind: 'section',
-    title: 'Identidad del restaurante',
-    subtitle: 'Nombre, logo y subdominio',
-    keywords: ['nombre', 'logo', 'subdominio', 'marca', 'identidad'],
-    href: '/settings#settings-identity',
-  },
-  {
     id: 'section:whatsapp',
     kind: 'section',
     title: 'WhatsApp',
