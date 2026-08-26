@@ -353,6 +353,11 @@
   outline-offset: 1px;
 }
 
+.networkInputActive {
+  border-color: color-mix(in srgb, #166534 40%, var(--color-border));
+  background: color-mix(in srgb, #16a34a 10%, var(--color-surface));
+}
+
 .segments {
   display: grid;
   grid-template-columns: 1fr 1fr;
