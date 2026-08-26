@@ -21,4 +21,28 @@ void main() {
       45,
     );
   });
+
+  test('visibleOfferIgnoringDismissedExpiry hides an expired dismissed offer', () {
+    const dismissed = {'offer-1'};
+    expect(
+      visibleOfferIgnoringDismissedExpiry<String>(
+        offer: 'offer-1',
+        idOf: (id) => id,
+        expiresAtOf: (_) => DateTime.utc(2026, 8, 17, 12, 0, 0),
+        dismissedExpiredIds: dismissed,
+        now: DateTime.utc(2026, 8, 17, 12, 0, 5),
+      ),
+      isNull,
+    );
+    expect(
+      visibleOfferIgnoringDismissedExpiry<String>(
+        offer: 'offer-2',
+        idOf: (id) => id,
+        expiresAtOf: (_) => DateTime.utc(2026, 8, 17, 12, 0, 0),
+        dismissedExpiredIds: dismissed,
+        now: DateTime.utc(2026, 8, 17, 12, 0, 5),
+      ),
+      'offer-2',
+    );
+  });
 }
