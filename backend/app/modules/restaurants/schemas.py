@@ -2,7 +2,12 @@ import uuid
 from datetime import datetime, time
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.modules.restaurants.ticket_print import (
+    TicketPrintSettings,
+    normalize_ticket_print_settings,
+)
 
 
 class ScheduleCreate(BaseModel):
