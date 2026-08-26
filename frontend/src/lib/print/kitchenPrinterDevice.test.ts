@@ -8,6 +8,7 @@ import {
   isLanPrinterIpv4,
   parseKitchenPrinterPreference,
   printerKindLabel,
+  shouldApplyTypedNetworkHost,
 } from './kitchenPrinterDevice.ts';
 
 test('parseKitchenPrinterPreference is empty when nothing is stored', () => {
@@ -86,4 +87,34 @@ test('parseKitchenPrinterPreference system without a queue uses the generic labe
   assert.equal(system.kind, 'system');
   assert.equal(system.systemPrinterName, undefined);
   assert.equal(defaultPrinterDisplayName(system), 'Impresora del sistema');
+});
+
+test('shouldApplyTypedNetworkHost uses a typed LAN IP instead of the system dialog', () => {
+  const systemDialog = parseKitchenPrinterPreference(
+    JSON.stringify({ kind: 'system', label: 'Impresora del sistema' }),
+  );
+  assert.equal(shouldApplyTypedNetworkHost(systemDialog, '192.168.100.50'), true);
+  assert.equal(shouldApplyTypedNetworkHost(EMPTY_KITCHEN_PRINTER, '192.168.100.50'), true);
+  assert.equal(
+    shouldApplyTypedNetworkHost(
+      { kind: 'network', label: 'Cocina', host: '192.168.1.10', port: 9100 },
+      '192.168.100.50',
+    ),
+    true,
+  );
+});
+
+test('shouldApplyTypedNetworkHost does not override USB or an already selected host', () => {
+  assert.equal(
+    shouldApplyTypedNetworkHost({ kind: 'usb', label: 'Epson TM-T20' }, '192.168.100.50'),
+    false,
+  );
+  assert.equal(
+    shouldApplyTypedNetworkHost(
+      { kind: 'network', label: 'Cocina', host: '192.168.100.50', port: 9100 },
+      '192.168.100.50',
+    ),
+    false,
+  );
+  assert.equal(shouldApplyTypedNetworkHost(EMPTY_KITCHEN_PRINTER, 'not-an-ip'), false);
 });
