@@ -35,6 +35,7 @@ Future<void> _pumpSheet(
   required RiderOffer offer,
   String? errorMessage,
   bool busy = false,
+  VoidCallback? onExpired,
 }) {
   return tester.pumpWidget(
     MaterialApp(
@@ -48,6 +49,7 @@ Future<void> _pumpSheet(
               errorMessage: errorMessage,
               busy: busy,
               onAccept: () {},
+              onExpired: onExpired,
             ),
           ),
         ),
