@@ -35,10 +35,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 0.85rem;
+  padding: 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-bg);
+  min-width: 0;
 }
 
 .printerStatus {
