@@ -91,6 +91,20 @@ export const sampleKitchenTicketOrder: Order = {
   ],
 };
 
+export function productIdsNeededForTicketOptions(
+  order: Order,
+  productsById: ReadonlyMap<string, Product>,
+): string[] {
+  const ids: string[] = [];
+  for (const item of order.items) {
+    if (!item.product_id) continue;
+    const selected = item.selected_options;
+    if (!selected || Object.keys(selected).length === 0) continue;
+    if (!productsById.has(item.product_id)) ids.push(item.product_id);
+  }
+  return [...new Set(ids)];
+}
+
 export function resolveTicketBrandName(
   settings: TicketPrintSettings,
   restaurantName: string,
