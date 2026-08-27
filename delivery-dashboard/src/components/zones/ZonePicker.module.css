@@ -180,4 +180,38 @@
   .menu {
     min-width: 11.5rem;
   }
+
+  :global(header:has([data-topbar-service-status])) .wrap {
+    width: 100%;
+    min-width: 0;
+    gap: 0.15rem;
+  }
+
+  :global(header:has([data-topbar-service-status])) .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  :global(header:has([data-topbar-service-status])) .trigger {
+    max-width: none;
+    width: 100%;
+    min-width: 0;
+    padding-left: 0;
+  }
+
+  :global(header:has([data-topbar-service-status])) .value {
+    flex: 1;
+  }
+
+  :global(header:has([data-topbar-service-status])) .menu {
+    left: 0;
+    right: auto;
+  }
 }
