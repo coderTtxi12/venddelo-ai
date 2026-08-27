@@ -990,6 +990,7 @@ def _to_engine_driver(
         assigned_restaurant_ids=assigned_restaurant_ids,
         last_dropoff_lat=last[0] if last is not None else None,
         last_dropoff_lng=last[1] if last is not None else None,
+        app_build_number=driver.app_build_number,
     )
 
 
@@ -1008,6 +1009,7 @@ def _engine_settings(row: DeliveryProviderAssignmentSettings) -> EngineSettings:
         max_pickup_detour_meters=row.max_pickup_detour_meters,
         max_destination_detour_meters=row.max_destination_detour_meters,
         assignment_timeout_seconds=row.assignment_timeout_seconds,
+        rider_min_app_build=get_settings().rider_min_app_build,
     )
 
 
