@@ -65,7 +65,7 @@ test('encodeKitchenTicketEscPos maps middle dots to ASCII hyphen', () => {
   assert.doesNotMatch(ascii, /Efectivo \? con/);
 });
 
-test('encodeKitchenTicketEscPos sets 80mm print area and right-aligns prices', () => {
+test('encodeKitchenTicketEscPos sets 80mm print area and places price on the item line', () => {
   const bytes = encodeKitchenTicketEscPos(
     ticket([{ kind: 'item', qty: 1, name: 'Vaso Gomitas', price: '$40.00' }]),
   );
@@ -74,7 +74,11 @@ test('encodeKitchenTicketEscPos sets 80mm print area and right-aligns prices', (
   assert.equal(bytes[13], 576 & 0xff);
   assert.equal(bytes[14], 576 >> 8);
   const ascii = String.fromCharCode(...bytes.filter((b) => b >= 32 && b < 127));
-  assert.match(ascii, /1x Vaso Gomitas {2,}\$40\.00/);
+  assert.match(ascii, /1x Vaso Gomitas/);
+  assert.match(ascii, /\$40\.00/);
+  const arr = [...bytes];
+  const priceIdx = arr.findIndex((b, i) => b === 0x24 && i > 0 && arr[i - 1] === ESC);
+  assert.ok(priceIdx >= 0, 'item price should use ESC $ column positioning');
 });
 
 test('encodeKitchenTicketEscPos indents complements on their own lines', () => {
