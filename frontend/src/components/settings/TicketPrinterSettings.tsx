@@ -25,6 +25,7 @@ import {
   defaultPrinterDisplayName,
   hasDefaultKitchenPrinter,
   isLanPrinterIpv4,
+  isSystemPrintDialog,
   pairBluetoothKitchenPrinter,
   pairNetworkKitchenPrinter,
   pairSerialKitchenPrinter,
