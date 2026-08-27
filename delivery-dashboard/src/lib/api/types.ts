@@ -287,6 +287,8 @@ export type DeliveryDriver = {
   registered_zone_name: string | null;
   status: DeliveryDriverStatus;
   is_online: boolean;
+  app_version?: string | null;
+  app_build_number?: number | null;
 };
 
 export type DeliveryDriverCreateInput = {
