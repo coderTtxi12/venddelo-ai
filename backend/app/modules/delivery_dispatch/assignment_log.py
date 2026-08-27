@@ -20,6 +20,7 @@ BLOCKER_LABELS = {
     "compartment": "caja chica",
     "packages": "sin capacidad",
     "credit": "sin crédito",
+    "outdated_app": "app vieja",
 }
 
 CASE_DETAILS = {
