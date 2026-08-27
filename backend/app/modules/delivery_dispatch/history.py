@@ -17,6 +17,7 @@ from app.db.models.delivery import (
 )
 from app.db.models.restaurant import Restaurant
 from app.modules.delivery_dispatch.monitor import _offers_by_request, _timeline_events
+from app.modules.delivery_dispatch.search_at import prep_minutes_from_times
 from app.modules.delivery_dispatch.schemas import (
     ProviderHistoryItemDTO,
     RiderHistoryHoldDTO,
@@ -183,6 +184,9 @@ def _to_provider_item(
         dispatch_group_id=request.dispatch_group_id,
         case_applied=case_applied,
         credit_hold_status=hold.status if hold is not None else None,
+        prep_minutes=prep_minutes_from_times(request.created_at, request.ready_at),
+        tracking_token=request.tracking_token,
+        restaurant_subdomain=restaurant.subdomain if restaurant is not None else None,
         timeline=_timeline_events(
             request,
             timeout_at=request.search_at,
