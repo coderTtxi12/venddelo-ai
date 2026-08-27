@@ -2,15 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
-import ChevronRightOutlinedIcon from '@mui/icons-material/ChevronRightOutlined';
 import MailOutlineOutlinedIcon from '@mui/icons-material/MailOutlineOutlined';
-import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import WorkOutlineOutlinedIcon from '@mui/icons-material/WorkOutlineOutlined';
 import { DeliveryProviderHoursEditor } from '@/components/settings/DeliveryProviderHoursEditor';
+import { RiderApkPanel } from '@/components/settings/RiderApkPanel';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
-import Link from 'next/link';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
@@ -503,7 +501,7 @@ export default function SettingsPage() {
   return (
     <PanelPageShell
       title="Configuración"
-      subtitle="Edita el logo y contacto de tu empresa de delivery."
+      subtitle="Edita el logo, el contacto y la app del rider de tu empresa de delivery."
       styles={{
         page: styles.page,
         header: styles.header,
@@ -664,38 +662,9 @@ export default function SettingsPage() {
               </div>
             </div>
           </section>
-
-          <section className={styles.panel} aria-labelledby="settings-zone">
-            <h2 id="settings-zone" className={styles.panelTitle}>
-              Zona de reparto
-            </h2>
-            <Link
-              href="/cerco-geografico"
-              className={styles.zoneRow}
-              aria-label={
-                form.serviceZoneName
-                  ? `Abrir Cerco geográfico. Zona actual: ${form.serviceZoneName}`
-                  : 'Abrir Cerco geográfico para configurar una zona'
-              }
-            >
-              <span className={styles.zoneRowIcon} aria-hidden>
-                <MapOutlinedIcon sx={{ fontSize: 20 }} />
-              </span>
-              <span className={styles.zoneRowCopy}>
-                <span className={styles.zoneRowName}>
-                  {form.serviceZoneName || 'Sin zona'}
-                </span>
-                <span className={styles.zoneRowHint}>
-                  Nombre y polígono se editan en Cerco geográfico
-                </span>
-              </span>
-              <span className={styles.zoneRowAction}>
-                Abrir
-                <ChevronRightOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
-              </span>
-            </Link>
-          </section>
           </fieldset>
+
+          <RiderApkPanel />
 
           {canManageMembers ? (
             <section className={styles.panel} aria-labelledby="settings-admins">
