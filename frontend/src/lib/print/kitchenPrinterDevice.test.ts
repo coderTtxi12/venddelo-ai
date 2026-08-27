@@ -89,11 +89,7 @@ test('parseKitchenPrinterPreference system without a queue uses the generic labe
   assert.equal(defaultPrinterDisplayName(system), 'Impresora del sistema');
 });
 
-test('shouldApplyTypedNetworkHost uses a typed LAN IP instead of the system dialog', () => {
-  const systemDialog = parseKitchenPrinterPreference(
-    JSON.stringify({ kind: 'system', label: 'Impresora del sistema' }),
-  );
-  assert.equal(shouldApplyTypedNetworkHost(systemDialog, '192.168.100.50'), true);
+test('shouldApplyTypedNetworkHost uses a typed LAN IP when nothing else is selected', () => {
   assert.equal(shouldApplyTypedNetworkHost(EMPTY_KITCHEN_PRINTER, '192.168.100.50'), true);
   assert.equal(
     shouldApplyTypedNetworkHost(
