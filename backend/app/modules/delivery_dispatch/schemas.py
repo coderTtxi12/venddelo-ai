@@ -427,6 +427,9 @@ class ProviderHistoryItemDTO(RiderHistoryItemDTO):
     dispatch_group_id: uuid.UUID | None = None
     case_applied: str | None = None
     credit_hold_status: str | None = None
+    prep_minutes: int | None = None
+    tracking_token: str | None = None
+    restaurant_subdomain: str | None = None
     timeline: list[DispatchMonitorTimelineEventDTO] = Field(default_factory=list)
 
 
