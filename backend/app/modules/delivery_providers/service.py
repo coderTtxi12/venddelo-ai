@@ -6,23 +6,31 @@ import re
 import uuid
 
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
-from app.core.storage import StoragePort
+from app.core.storage import StorageError, StoragePort
 from app.infra.realtime.restaurant_dispatch_hub import (
     notify_restaurants_delivery_service_updated,
 )
 from app.modules.delivery_dispatch.monitor_notify import notify_dispatch_monitor_changed
 from app.modules.delivery_providers.availability import resolve_service_status
+from app.modules.delivery_providers.permissions import (
+    require_manage_rider_app,
+    require_manage_weather,
+    require_write_provider_config,
+)
 from app.modules.delivery_providers.pricing import (
     config_from_json,
     quote_delivery_fee,
     validate_pricing_config,
 )
-from app.modules.delivery_providers.permissions import (
-    require_manage_weather,
-    require_write_provider_config,
-)
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
+from app.modules.delivery_providers.rider_apk import (
+    validate_rider_apk_bytes,
+    validate_rider_apk_filename,
+    validate_rider_apk_url,
+)
 from app.modules.delivery_providers.schemas import (
+    DeliveryPricingQuoteDTO,
+    DeliveryPricingSimulateRequest,
     DeliveryProviderAdminInviteCreate,
     DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
