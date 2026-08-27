@@ -109,6 +109,24 @@ def upload_rider_apk(
     )
 
 
+@router.post("/me/rider-apk/uploads", response_model=RiderApkUploadSessionDTO)
+def begin_rider_apk_upload(
+    data: RiderApkUploadBegin,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> RiderApkUploadSessionDTO:
+    return service.begin_rider_apk_upload(user.id, data)
+
+
+@router.post("/me/rider-apk/uploads/complete", response_model=RiderApkDTO)
+def complete_rider_apk_upload(
+    data: RiderApkUploadComplete,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> RiderApkDTO:
+    return service.complete_rider_apk_upload(user.id, data)
+
+
 @router.post(
     "/onboarding",
     response_model=DeliveryProviderDTO,
