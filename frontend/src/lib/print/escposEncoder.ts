@@ -171,7 +171,7 @@ function lineToRows(line: TicketLine, width: number): EncodedRow[] {
     case 'kv': {
       const left = `${line.label}:`;
       if (glyphCount(left) + 1 + glyphCount(line.value) <= width) {
-        return padColumns(left, line.value, width).map((text) => ({ text, align: 'left' as const }));
+        return columnRows(left, line.value, width);
       }
       return wrapWords(`${left} ${line.value}`, width).map((text) => ({
         text,
@@ -181,10 +181,7 @@ function lineToRows(line: TicketLine, width: number): EncodedRow[] {
     case 'title':
       return [{ text: line.text.toUpperCase(), align: 'left', bold: true }];
     case 'item':
-      return padColumns(`${line.qty}x ${line.name}`, line.price, width).map((text) => ({
-        text,
-        align: 'left' as const,
-      }));
+      return columnRows(`${line.qty}x ${line.name}`, line.price, width);
     case 'option':
       return wrapWords(line.text, Math.max(8, width - 2)).map((text) => ({
         text: `  ${text}`,
@@ -192,11 +189,9 @@ function lineToRows(line: TicketLine, width: number): EncodedRow[] {
       }));
     case 'total': {
       const label = line.strong ? line.label.toUpperCase() : line.label;
-      return padColumns(`${label}:`, line.value, width).map((text) => ({
-        text,
-        align: 'left' as const,
-        bold: line.strong,
-      }));
+      return columnRows(`${label}:`, line.value, width).map((row) =>
+        'right' in row ? { ...row, bold: line.strong } : { ...row, bold: line.strong },
+      );
     }
     case 'center':
       return wrapWords(line.text, width).map((text) => ({ text, align: 'center' as const }));
@@ -214,20 +209,41 @@ export function encodeKitchenTicketEscPos(doc: KitchenTicketDocument): Uint8Arra
     GS, 0x57, dots & 0xff, (dots >> 8) & 0xff,
   ];
 
-  function writeRow(text: string, align: 'left' | 'center' | 'right', bold?: boolean) {
+  function writeTextRow(text: string, align: 'left' | 'center' | 'right', bold?: boolean) {
     out.push(ESC, 0x61, alignBits(align));
     if (bold) out.push(ESC, 0x45, 1);
     out.push(...encodeText(text), 0x0a);
     if (bold) out.push(ESC, 0x45, 0);
   }
 
+  function writeColumnRow(left: string, right: string, bold?: boolean) {
+    out.push(ESC, 0x61, 0);
+    if (bold) out.push(ESC, 0x45, 1);
+    out.push(...encodeText(left));
+    if (bold) out.push(ESC, 0x45, 0);
+    const pos = priceColumnDots(doc.paperWidthMm, right);
+    out.push(ESC, 0x24, pos & 0xff, (pos >> 8) & 0xff);
+    if (bold) out.push(ESC, 0x45, 1);
+    out.push(...encodeText(right));
+    if (bold) out.push(ESC, 0x45, 0);
+    out.push(0x0a);
+  }
+
+  function writeRow(row: EncodedRow) {
+    if ('right' in row) {
+      writeColumnRow(row.left, row.right, row.bold);
+      return;
+    }
+    writeTextRow(row.text, row.align, row.bold);
+  }
+
   if (doc.brandName && !doc.lines.some((line) => line.kind === 'brand')) {
-    writeRow(doc.brandName.toUpperCase(), 'center', true);
+    writeTextRow(doc.brandName.toUpperCase(), 'center', true);
   }
 
   for (const line of doc.lines) {
     for (const row of lineToRows(line, width)) {
-      writeRow(row.text, row.align, row.bold);
+      writeRow(row);
     }
   }
 
