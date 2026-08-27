@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { getMyDeliveryProvider } from '@/lib/api/deliveryProviders';
 import {
   canManageMembers,
+  canManageRiderApp,
   canManagePartnerships,
   canManageWeather,
   canSimulatePricing,
@@ -19,6 +20,7 @@ type DeliveryProviderAccessContextValue = {
   memberRole: DeliveryProviderMemberRole | null;
   memberRoleLabel: string;
   canManageMembers: boolean;
+  canManageRiderApp: boolean;
   canWriteProviderConfig: boolean;
   canManagePartnerships: boolean;
   canManageWeather: boolean;
@@ -71,6 +73,7 @@ export function DeliveryProviderAccessProvider({ children }: { children: ReactNo
       memberRole,
       memberRoleLabel: memberRoleLabel(memberRole),
       canManageMembers: canManageMembers(memberRole),
+      canManageRiderApp: canManageRiderApp(memberRole),
       canWriteProviderConfig: canWriteProviderConfig(memberRole),
       canManagePartnerships: canManagePartnerships(memberRole),
       canManageWeather: canManageWeather(memberRole),
