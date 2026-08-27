@@ -11,6 +11,8 @@ import {
   riderApkEmptyHint,
   riderApkOwnerHintTouch,
   riderApkReadOnlyHint,
+  riderApkUploadProgressLabel,
+  riderApkUploadProgressPercent,
 } from './riderApkCopy';
 
 test('only the delivery owner can upload or edit the rider APK', () => {
