@@ -231,6 +231,9 @@ def test_provider_history_lists_company_rows_and_filters_driver(client, engine):
     assert body["items"][0]["assigned_driver_first_name"]
     assert body["items"][0]["zone_id"]
     assert "dropoff_lat" in body["items"][0]
+    assert body["items"][0]["prep_minutes"] == 5
+    assert body["items"][0]["tracking_token"]
+    assert body["items"][0]["restaurant_subdomain"] == "rider-offers"
     kinds = [event["kind"] for event in body["items"][0]["timeline"]]
     assert "requested" in kinds
     assert "accepted" in kinds
