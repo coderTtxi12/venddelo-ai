@@ -1,15 +1,18 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.api.deps import get_synced_user
 from app.core.exceptions import ValidationError
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.infra.storage.factory import build_storage
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
+from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
     DeliveryPartnershipZoneUpdate,
+    DeliveryPricingQuoteDTO,
+    DeliveryPricingSimulateRequest,
     DeliveryProviderAdminInviteCreate,
     DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
@@ -18,20 +21,19 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderOnboardingSubmit,
     DeliveryProviderPaymentMethodCreate,
     DeliveryProviderPaymentMethodDTO,
+    DeliveryProviderPricingResponse,
+    DeliveryProviderPricingUpdate,
     DeliveryProviderProfileUpdate,
     DeliveryProviderScheduleCreate,
     DeliveryProviderScheduleDTO,
     DeliveryProviderServiceStatusDTO,
     DeliveryProviderServiceStatusUpdate,
-    DeliveryProviderPricingResponse,
-    DeliveryProviderPricingUpdate,
     DeliveryProviderWeatherModeUpdate,
     DeliveryProviderZoneDTO,
     DeliveryProviderZoneWrite,
-    DeliveryPricingQuoteDTO,
-    DeliveryPricingSimulateRequest,
+    RiderApkDTO,
+    RiderApkUrlUpdate,
 )
-from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
 from app.modules.delivery_providers.service import DeliveryProviderService
 from app.modules.users.schemas import UserDTO
 
@@ -66,6 +68,42 @@ def get_my_delivery_provider(
     service: DeliveryProviderService = Depends(_service),
 ) -> DeliveryProviderMeResponse:
     return service.get_me(user.id, user.email)
+
+
+@router.get("/me/rider-apk", response_model=RiderApkDTO)
+def get_rider_apk(
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> RiderApkDTO:
+    return service.get_rider_apk(user.id)
+
+
+@router.patch("/me/rider-apk", response_model=RiderApkDTO)
+def patch_rider_apk_url(
+    data: RiderApkUrlUpdate,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> RiderApkDTO:
+    return service.set_rider_apk_url(user.id, data)
+
+
+@router.post(
+    "/me/rider-apk",
+    response_model=RiderApkDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+def upload_rider_apk(
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+    file: UploadFile = File(...),
+) -> RiderApkDTO:
+    payload = file.file.read()
+    return service.upload_rider_apk(
+        user.id,
+        filename=file.filename,
+        payload=payload,
+        content_type=file.content_type,
+    )
 
 
 @router.post(
