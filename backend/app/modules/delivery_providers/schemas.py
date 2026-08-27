@@ -87,6 +87,23 @@ class RiderApkUrlUpdate(BaseModel):
     url: str | None = Field(default=None, max_length=2048)
 
 
+class RiderApkUploadBegin(BaseModel):
+    file_name: str = Field(min_length=1, max_length=255)
+    size: int = Field(gt=0)
+    content_type: str | None = None
+
+
+class RiderApkUploadSessionDTO(BaseModel):
+    path: str
+    upload_url: str
+    token: str | None = None
+
+
+class RiderApkUploadComplete(BaseModel):
+    path: str = Field(min_length=1, max_length=512)
+    file_name: str = Field(min_length=1, max_length=255)
+
+
 class DeliveryProviderMeResponse(BaseModel):
     provider: DeliveryProviderDTO | None
     member_role: str | None = None
