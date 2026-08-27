@@ -8,6 +8,12 @@ class StoredObject(BaseModel):
     public_url: str
 
 
+class SignedUpload(BaseModel):
+    path: str
+    upload_url: str
+    token: str | None = None
+
+
 class StorageError(Exception):
     """Uniform error type wrapping provider-specific storage failures."""
 
