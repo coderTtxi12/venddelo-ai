@@ -1375,8 +1375,20 @@ class RiderDispatchService:
             active_holds=list_active_holds(self._session, driver.id),
         )
 
-    def set_online(self, user: UserDTO, is_online: bool) -> RiderProfileDTO:
+    def set_online(
+        self,
+        user: UserDTO,
+        is_online: bool,
+        *,
+        app_version: str | None = None,
+        app_build_number: int | None = None,
+    ) -> RiderProfileDTO:
         driver = self._require_driver(user)
+        _apply_app_client(driver, app_version=app_version, app_build_number=app_build_number)
+        if is_online and must_update_app(
+            driver.app_build_number, min_build=get_settings().rider_min_app_build
+        ):
+            raise ValidationError("Actualiza la app para conectarte")
         driver.is_online = is_online
         self._session.flush()
         self._session.refresh(driver)
@@ -1389,12 +1401,16 @@ class RiderDispatchService:
         user: UserDTO,
         latitude: float,
         longitude: float,
+        *,
+        app_version: str | None = None,
+        app_build_number: int | None = None,
     ) -> None:
         """Persist GPS only — rider app ignores the body; keep this cheap for 15s pings."""
         driver = self._require_driver(user)
         driver.last_lat = latitude
         driver.last_lng = longitude
         driver.location_updated_at = datetime.now(UTC)
+        _apply_app_client(driver, app_version=app_version, app_build_number=app_build_number)
         self._session.flush()
         notify_driver_location_realtime(self._session, driver)
 
@@ -1693,7 +1709,28 @@ class RiderDispatchService:
         profile = RiderProfileDTO.model_validate(driver)
         profile.assignments = self._list_assignments(driver.id)
         profile.itinerary = hydrate_itinerary(self._session, driver.id)
+        settings = get_settings()
+        provider = self._session.get(DeliveryProvider, driver.delivery_provider_id)
+        must, url = force_update_payload(
+            driver.app_build_number,
+            min_build=settings.rider_min_app_build,
+            apk_url=provider_rider_apk_url(provider) or settings.rider_apk_download_url,
+        )
+        profile.must_update = must
+        profile.update_apk_url = url
         return profile
+
+    def _force_offline_if_outdated(self, driver: DeliveryDriver) -> bool:
+        if not must_update_app(
+            driver.app_build_number, min_build=get_settings().rider_min_app_build
+        ):
+            return False
+        if not driver.is_online:
+            return False
+        driver.is_online = False
+        notify_dispatch_monitor_changed(driver.delivery_provider_id)
+        notify_rider_updated(driver.id)
+        return True
 
     def _list_assignments(self, driver_id: uuid.UUID) -> list[RiderAssignmentDTO]:
         rows = self._session.execute(
