@@ -1301,12 +1301,43 @@ _ASSIGNMENT_TRANSITIONS = {
 }
 
 
+def _apply_app_client(
+    driver: DeliveryDriver,
+    *,
+    app_version: str | None,
+    app_build_number: int | None,
+) -> None:
+    if app_version is not None:
+        stripped = app_version.strip()
+        driver.app_version = stripped or None
+    if app_build_number is not None:
+        driver.app_build_number = app_build_number
+
+
 class RiderDispatchService:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def get_me(self, user: UserDTO) -> RiderProfileDTO:
-        return self._to_profile(self._require_driver(user))
+    def get_me(
+        self,
+        user: UserDTO,
+        *,
+        app_version: str | None = None,
+        app_build_number: int | None = None,
+    ) -> RiderProfileDTO:
+        driver = self._require_driver(user)
+        changed = False
+        if app_version is not None or app_build_number is not None:
+            _apply_app_client(
+                driver, app_version=app_version, app_build_number=app_build_number
+            )
+            changed = True
+        if self._force_offline_if_outdated(driver):
+            changed = True
+        if changed:
+            self._session.flush()
+            self._session.refresh(driver)
+        return self._to_profile(driver)
 
     def get_history(
         self,
