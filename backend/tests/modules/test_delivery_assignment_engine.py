@@ -84,6 +84,7 @@ def _driver(
     assigned_restaurant_ids: tuple[str, ...] = (),
     last_dropoff_lat: float | None = None,
     last_dropoff_lng: float | None = None,
+    app_build_number: int | None = 2,
 ) -> EngineDriver:
     occupied = occupied_job_count
     if occupied is None:
@@ -98,6 +99,7 @@ def _driver(
         credit_limit_cents=credit_limit_cents,
         credit_held_cents=credit_held_cents,
         compartment_size=compartment_size,
+        app_build_number=app_build_number,
         active_request_status=active_request_status,
         active_package_count=active_package_count,
         has_open_offer=has_open_offer,
@@ -724,3 +726,34 @@ def test_eligibility_blockers_offline_and_gps():
     offline = _driver("off", last_lat=19.4330, last_lng=-99.1335, is_online=False)
     context = _context(request, (offline,))
     assert "offline" in eligibility_blockers(context, request, offline)
+
+
+def test_missing_app_build_is_not_assigned():
+    request = _request()
+    old = _driver("old", last_lat=19.4330, last_lng=-99.1335, app_build_number=None)
+    fresh = _driver("fresh", last_lat=19.4400, last_lng=-99.1400, app_build_number=2)
+    result = choose_assignments(_context(request, (old, fresh)))
+
+    assert result.case == "A"
+    assert result.offers[0].driver_id == "fresh"
+
+
+def test_stale_app_build_is_not_assigned():
+    request = _request()
+    stale = _driver("stale", last_lat=19.4330, last_lng=-99.1335, app_build_number=1)
+    fresh = _driver("fresh", last_lat=19.4400, last_lng=-99.1400, app_build_number=2)
+    result = choose_assignments(_context(request, (stale, fresh)))
+
+    assert result.case == "A"
+    assert result.offers[0].driver_id == "fresh"
+
+
+def test_eligibility_blockers_outdated_app():
+    request = _request()
+    missing = _driver("missing", last_lat=19.4330, last_lng=-99.1335, app_build_number=None)
+    stale = _driver("stale", last_lat=19.4330, last_lng=-99.1335, app_build_number=1)
+    current = _driver("current", last_lat=19.4330, last_lng=-99.1335, app_build_number=2)
+    context = _context(request, (missing, stale, current))
+    assert "outdated_app" in eligibility_blockers(context, request, missing)
+    assert "outdated_app" in eligibility_blockers(context, request, stale)
+    assert "outdated_app" not in eligibility_blockers(context, request, current)
