@@ -118,6 +118,9 @@ export function HistoryDetailDrawer({
   }, [open, item?.id, accessToken]);
 
   const cashDenom = item ? cashDenominationLine(item) : null;
+  const trackingUrl = item
+    ? publicTrackingUrl(item.tracking_token, item.restaurant_subdomain)
+    : null;
   const dropoffCoords = item ? formatCoords(item.dropoff_lat, item.dropoff_lng) : null;
   const dropoffMaps = item
     ? item.dropoff_maps_url || mapsSearchUrl(item.dropoff_lat, item.dropoff_lng)
