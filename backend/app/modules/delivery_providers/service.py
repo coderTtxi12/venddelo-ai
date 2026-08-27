@@ -57,6 +57,9 @@ from app.modules.delivery_providers.schemas import (
     DeliveryWeatherMode,
     GeoJsonPolygon,
     RiderApkDTO,
+    RiderApkUploadBegin,
+    RiderApkUploadComplete,
+    RiderApkUploadSessionDTO,
     RiderApkUrlUpdate,
 )
 
@@ -240,6 +243,54 @@ class DeliveryProviderService:
             provider.id,
             path=stored.path,
             url=stored.public_url,
+            file_name=safe_name,
+        )
+        return self._rider_apk_dto(updated)
+
+    def begin_rider_apk_upload(
+        self, user_id: uuid.UUID, data: RiderApkUploadBegin
+    ) -> RiderApkUploadSessionDTO:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, member_role = found
+        require_manage_rider_app(member_role)
+        validate_rider_apk_filename(data.file_name)
+        validate_rider_apk_size(data.size)
+        path = rider_apk_storage_path(provider.id)
+        try:
+            signed = self._storage.create_signed_upload(
+                path,
+                content_type=data.content_type or APK_CONTENT_TYPE,
+            )
+        except StorageError as exc:
+            raise ValidationError("No se pudo preparar la carga del APK") from exc
+        return RiderApkUploadSessionDTO(
+            path=signed.path,
+            upload_url=signed.upload_url,
+            token=signed.token,
+        )
+
+    def complete_rider_apk_upload(
+        self, user_id: uuid.UUID, data: RiderApkUploadComplete
+    ) -> RiderApkDTO:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, member_role = found
+        require_manage_rider_app(member_role)
+        path = validate_rider_apk_storage_path(data.path, provider.id)
+        safe_name = validate_rider_apk_filename(data.file_name)
+        try:
+            public_url = self._storage.get_public_url(path)
+        except StorageError as exc:
+            raise ValidationError("No se encontró el APK subido") from exc
+        if provider.rider_apk_path and provider.rider_apk_path != path:
+            self._delete_stored_apk(provider.rider_apk_path)
+        updated = self._repo.set_rider_apk(
+            provider.id,
+            path=path,
+            url=public_url,
             file_name=safe_name,
         )
         return self._rider_apk_dto(updated)
