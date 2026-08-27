@@ -66,25 +66,27 @@
 .publishedLink {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.3rem;
-  margin-top: 0.35rem;
+  margin-top: 0.45rem;
   width: fit-content;
+  min-height: 44px;
+  padding: 0.45rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
   color: var(--color-primary);
   font-size: 0.84rem;
   font-weight: 700;
   text-decoration: none;
   cursor: pointer;
-  transition: opacity 180ms ease;
-}
-
-.publishedLink:hover {
-  opacity: 0.82;
+  touch-action: manipulation;
+  transition: background-color 180ms ease, opacity 180ms ease;
 }
 
 .publishedLink:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-  border-radius: 6px;
 }
 
 .dropzone {
