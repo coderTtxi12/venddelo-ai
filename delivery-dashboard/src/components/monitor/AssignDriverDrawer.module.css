@@ -361,6 +361,8 @@
 @media (prefers-reduced-motion: reduce) {
   .systemAssign,
   .confirm,
+  .filterChip,
+  .row,
   .routeBtns button {
     transition: none;
   }
