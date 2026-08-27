@@ -15,10 +15,14 @@ import {
 import {
   pickDroppedApkFile,
   riderApkDropActiveHint,
+  riderApkDropDetailHint,
+  riderApkDropDetailHintTouch,
   riderApkDropIdleHint,
+  riderApkDropIdleHintTouch,
   riderApkDropRejectHint,
   riderApkEmptyHint,
   riderApkOwnerHint,
+  riderApkOwnerHintTouch,
   riderApkReadOnlyHint,
 } from '@/lib/settings/riderApkCopy';
 import pageStyles from '@/components/pages/SettingsPage.module.css';
