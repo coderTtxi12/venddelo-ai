@@ -26,6 +26,7 @@ from app.db.models.delivery import (
     DeliveryDispatchOffer,
     DeliveryDispatchRequest,
     DeliveryDriver,
+    DeliveryProvider,
     DeliveryProviderAssignmentSettings,
     DeliveryProviderMember,
     DeliveryProviderZone,
