@@ -34,8 +34,14 @@ def _rider_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> RiderDispatc
 def get_rider_me(
     user: UserDTO = Depends(get_synced_user),
     service: RiderDispatchService = Depends(_rider_service),
+    app_version: str | None = Query(default=None, max_length=32),
+    app_build_number: int | None = Query(default=None, ge=1),
 ) -> RiderProfileDTO:
-    return service.get_me(user)
+    return service.get_me(
+        user,
+        app_version=app_version,
+        app_build_number=app_build_number,
+    )
 
 
 @rider_router.get("/me/history", response_model=RiderHistoryPageDTO)
@@ -59,7 +65,12 @@ def patch_rider_online(
     user: UserDTO = Depends(get_synced_user),
     service: RiderDispatchService = Depends(_rider_service),
 ) -> RiderProfileDTO:
-    return service.set_online(user, data.is_online)
+    return service.set_online(
+        user,
+        data.is_online,
+        app_version=data.app_version,
+        app_build_number=data.app_build_number,
+    )
 
 
 @rider_router.post(
@@ -73,7 +84,13 @@ def post_rider_location(
     user: UserDTO = Depends(get_synced_user),
     service: RiderDispatchService = Depends(_rider_service),
 ) -> Response:
-    service.update_location(user, data.latitude, data.longitude)
+    service.update_location(
+        user,
+        data.latitude,
+        data.longitude,
+        app_version=data.app_version,
+        app_build_number=data.app_build_number,
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
