@@ -76,3 +76,34 @@ def test_rejects_non_http_apk_url():
             assert "http" in error.message.lower()
             continue
         raise AssertionError(url)
+
+
+def test_rejects_apk_size_without_reading_bytes():
+    from app.modules.delivery_providers.rider_apk import validate_rider_apk_size
+
+    try:
+        validate_rider_apk_size(MAX_RIDER_APK_BYTES + 1)
+    except ValidationError as error:
+        assert "80" in error.message
+    else:
+        raise AssertionError("expected ValidationError")
+    assert validate_rider_apk_size(1024) == 1024
+
+
+def test_storage_path_must_belong_to_provider():
+    from uuid import UUID
+
+    from app.modules.delivery_providers.rider_apk import validate_rider_apk_storage_path
+
+    provider_id = UUID("11111111-1111-1111-1111-111111111111")
+    other_id = UUID("22222222-2222-2222-2222-222222222222")
+    path = f"delivery-providers/{provider_id}/rider-app/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.apk"
+    assert validate_rider_apk_storage_path(path, provider_id) == path
+    try:
+        validate_rider_apk_storage_path(
+            f"delivery-providers/{other_id}/rider-app/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.apk",
+            provider_id,
+        )
+    except ValidationError:
+        return
+    raise AssertionError("expected ValidationError")
