@@ -38,6 +38,12 @@ export type RiderApk = {
   path: string | null;
 };
 
+export type RiderApkUploadSession = {
+  path: string;
+  upload_url: string;
+  token: string | null;
+};
+
 export type GeoJsonPolygon = {
   type: 'Polygon';
   coordinates: number[][][];
