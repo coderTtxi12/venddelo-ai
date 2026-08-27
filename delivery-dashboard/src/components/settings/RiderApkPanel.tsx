@@ -271,7 +271,7 @@ export function RiderApkPanel() {
                 <div className={styles.urlRow}>
                   <input
                     id={urlInputId}
-                    className={pageStyles.input}
+                    className={`${pageStyles.input} ${styles.urlInput}`}
                     type="url"
                     inputMode="url"
                     autoComplete="url"
