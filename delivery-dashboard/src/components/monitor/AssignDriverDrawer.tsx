@@ -123,36 +123,38 @@ export function AssignDriverDrawer({
 }: AssignDriverDrawerProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draftStops, setDraftStops] = useState<DraftStop[]>([]);
+  const [filter, setFilter] = useState<AssignDriverFilter>('online');
+
+  useEffect(() => {
+    if (open) setFilter('online');
+  }, [open, request?.id]);
+
+  const counts = useMemo(
+    () =>
+      assignDriverFilterCounts(
+        drivers,
+        request?.restaurant_lat,
+        request?.restaurant_lng,
+      ),
+    [drivers, request?.restaurant_lat, request?.restaurant_lng],
+  );
 
   const rows = useMemo(() => {
     if (!request) return [];
-    return [...drivers]
-      .filter((driver) => driver.status !== 'blocked')
-      .sort((a, b) => Number(b.is_online) - Number(a.is_online))
-      .map((driver) => {
-        const isCurrent = driver.id === request.assigned_driver_id;
-        const hasOpenOffer = Boolean(driver.open_offer_id);
-        const smallBox =
-          request.package_size === 'grande' && driver.compartment_size !== 'grande';
-        const noCredit =
-          request.payment_method === 'cash' &&
-          (driver.credit_blocked || driver.credit_available_cents < request.collect_cents);
-        const warnings: string[] = [];
-        if (!driver.is_online) warnings.push('Offline');
-        if (driver.location_stale) warnings.push('GPS');
-        if (noCredit) warnings.push('Sin crédito');
-        if (smallBox) warnings.push('Compartimento chico');
-        if (driver.active_request_id) {
-          warnings.push(driver.is_pre_free ? 'Pre-libre' : 'En ruta');
-        }
-        if (hasOpenOffer) warnings.push('Oferta abierta');
-        if (!isCurrentRiderApp(driver.app_build_number)) warnings.push('App antigua');
-        const disabled = isCurrent || hasOpenOffer || submitting;
-        return { driver, isCurrent, warnings, disabled };
-      });
-  }, [drivers, request, submitting]);
+    return filterAssignDrivers(
+      drivers,
+      filter,
+      request.restaurant_lat,
+      request.restaurant_lng,
+    ).map((driver) => describeAssignRow(driver, request, submitting));
+  }, [drivers, filter, request, submitting]);
 
-  const selected = rows.find((row) => row.driver.id === selectedId);
+  const selected = useMemo(() => {
+    if (!selectedId || !request) return undefined;
+    const driver = drivers.find((item) => item.id === selectedId);
+    if (!driver || driver.status === 'blocked') return undefined;
+    return describeAssignRow(driver, request, submitting);
+  }, [drivers, request, selectedId, submitting]);
   const pairTones = useMemo(() => pairToneByRequest(draftStops), [draftStops]);
 
   useEffect(() => {
