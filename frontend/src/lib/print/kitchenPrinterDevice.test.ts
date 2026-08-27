@@ -100,6 +100,13 @@ test('shouldApplyTypedNetworkHost uses a typed LAN IP when nothing else is selec
   );
 });
 
+test('shouldApplyTypedNetworkHost does not override the system print dialog', () => {
+  const systemDialog = parseKitchenPrinterPreference(
+    JSON.stringify({ kind: 'system', label: 'Impresora del sistema' }),
+  );
+  assert.equal(shouldApplyTypedNetworkHost(systemDialog, '192.168.100.50'), false);
+});
+
 test('shouldApplyTypedNetworkHost does not override USB or an already selected host', () => {
   assert.equal(
     shouldApplyTypedNetworkHost({ kind: 'usb', label: 'Epson TM-T20' }, '192.168.100.50'),
