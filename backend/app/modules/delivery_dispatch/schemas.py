@@ -329,15 +329,21 @@ class RiderProfileDTO(DeliveryDriverDTO):
     location_updated_at: datetime | None = None
     assignments: list[RiderAssignmentDTO] = Field(default_factory=list)
     itinerary: list[DriverItineraryStopDTO] = Field(default_factory=list)
+    must_update: bool = False
+    update_apk_url: str | None = None
 
 
 class RiderOnlineUpdate(BaseModel):
     is_online: bool
+    app_version: str | None = Field(default=None, max_length=32)
+    app_build_number: int | None = Field(default=None, ge=1)
 
 
 class RiderLocationUpdate(BaseModel):
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
+    app_version: str | None = Field(default=None, max_length=32)
+    app_build_number: int | None = Field(default=None, ge=1)
 
 
 class RiderFcmTokenUpdate(BaseModel):
