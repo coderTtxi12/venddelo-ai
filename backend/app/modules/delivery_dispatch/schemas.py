@@ -132,6 +132,8 @@ class DeliveryDriverDTO(BaseModel):
     registered_zone_name: str | None = None
     status: str
     is_online: bool
+    app_version: str | None = None
+    app_build_number: int | None = None
 
 
 class DeliveryDriverCreate(BaseModel):
