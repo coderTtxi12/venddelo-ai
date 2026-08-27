@@ -29,6 +29,7 @@ import type {
   AssignmentLog,
   DispatchHistoryPage,
   DispatchMonitorSnapshot,
+  RiderApk,
 } from './types';
 
 function withZoneId(path: string, zoneId: string): string {
@@ -37,6 +38,28 @@ function withZoneId(path: string, zoneId: string): string {
 
 export function getMyDeliveryProvider(token: string) {
   return apiRequest<DeliveryProviderMeResponse>('/delivery-providers/me', { token });
+}
+
+export function getMyRiderApk(token: string) {
+  return apiRequest<RiderApk>('/delivery-providers/me/rider-apk', { token });
+}
+
+export function patchMyRiderApkUrl(token: string, url: string | null) {
+  return apiRequest<RiderApk>('/delivery-providers/me/rider-apk', {
+    method: 'PATCH',
+    token,
+    body: { url },
+  });
+}
+
+export function uploadMyRiderApk(token: string, file: File) {
+  const body = new FormData();
+  body.append('file', file);
+  return apiRequest<RiderApk>('/delivery-providers/me/rider-apk', {
+    method: 'POST',
+    token,
+    body,
+  });
 }
 
 export function listMyDeliveryProviderZones(token: string) {
