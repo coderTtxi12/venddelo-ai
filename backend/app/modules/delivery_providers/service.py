@@ -50,10 +50,10 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderWeatherModeUpdate,
     DeliveryProviderZoneDTO,
     DeliveryProviderZoneWrite,
-    DeliveryPricingQuoteDTO,
-    DeliveryPricingSimulateRequest,
     DeliveryWeatherMode,
     GeoJsonPolygon,
+    RiderApkDTO,
+    RiderApkUrlUpdate,
 )
 
 PAYMENT_METHOD_KEYS: frozenset[str] = frozenset({"cash", "transfer", "card_terminal"})
@@ -181,6 +181,64 @@ class DeliveryProviderService:
             whatsapp_phone=data.whatsapp_phone.strip(),
             logo_path=logo_path,
         )
+
+    def get_rider_apk(self, user_id: uuid.UUID) -> RiderApkDTO:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, _role = found
+        return self._rider_apk_dto(provider)
+
+    def set_rider_apk_url(self, user_id: uuid.UUID, data: RiderApkUrlUpdate) -> RiderApkDTO:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, member_role = found
+        require_manage_rider_app(member_role)
+        self._delete_stored_apk(provider.rider_apk_path)
+        if data.url is None or not data.url.strip():
+            updated = self._repo.set_rider_apk(
+                provider.id, path=None, url=None, file_name=None
+            )
+        else:
+            updated = self._repo.set_rider_apk(
+                provider.id,
+                path=None,
+                url=validate_rider_apk_url(data.url),
+                file_name=None,
+            )
+        return self._rider_apk_dto(updated)
+
+    def upload_rider_apk(
+        self,
+        user_id: uuid.UUID,
+        *,
+        filename: str | None,
+        payload: bytes,
+        content_type: str | None,
+    ) -> RiderApkDTO:
+        found = self._repo.get_for_user(user_id)
+        if found is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider, member_role = found
+        require_manage_rider_app(member_role)
+        safe_name = validate_rider_apk_filename(filename)
+        validate_rider_apk_bytes(payload)
+        path = f"delivery-providers/{provider.id}/rider-app/{uuid.uuid4()}.apk"
+        stored = self._storage.upload(
+            path,
+            payload,
+            content_type or "application/vnd.android.package-archive",
+        )
+        if provider.rider_apk_path and provider.rider_apk_path != stored.path:
+            self._delete_stored_apk(provider.rider_apk_path)
+        updated = self._repo.set_rider_apk(
+            provider.id,
+            path=stored.path,
+            url=stored.public_url,
+            file_name=safe_name,
+        )
+        return self._rider_apk_dto(updated)
 
     def submit_onboarding(
         self, user_id: uuid.UUID, data: DeliveryProviderOnboardingSubmit
@@ -493,6 +551,22 @@ class DeliveryProviderService:
             raise NotFoundError("No tienes un proveedor de delivery registrado")
         provider, _member_role = found
         return provider
+
+    def _delete_stored_apk(self, path: str | None) -> None:
+        if not path:
+            return
+        try:
+            self._storage.delete(path)
+        except StorageError:
+            pass
+
+    @staticmethod
+    def _rider_apk_dto(provider: DeliveryProviderDTO) -> RiderApkDTO:
+        return RiderApkDTO(
+            url=provider.rider_apk_url,
+            file_name=provider.rider_apk_file_name,
+            path=provider.rider_apk_path,
+        )
 
     def _require_owner_provider_id(self, user_id: uuid.UUID) -> uuid.UUID:
         found = self._repo.get_for_user(user_id)
