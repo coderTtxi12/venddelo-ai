@@ -13,6 +13,10 @@ import {
   uploadMyRiderApk,
 } from '@/lib/api/deliveryProviders';
 import {
+  pickDroppedApkFile,
+  riderApkDropActiveHint,
+  riderApkDropIdleHint,
+  riderApkDropRejectHint,
   riderApkEmptyHint,
   riderApkOwnerHint,
   riderApkReadOnlyHint,
