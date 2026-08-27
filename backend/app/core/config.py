@@ -87,6 +87,8 @@ class Settings(BaseSettings):
     delivery_tasks_handler_url: str | None = None
     firebase_credentials_path: str | None = None
     firebase_credentials_json: str | None = None
+    rider_min_app_build: int = Field(default=2, ge=1)
+    rider_apk_download_url: str | None = None
 
     @field_validator("database_url", "database_url_test")
     @classmethod
