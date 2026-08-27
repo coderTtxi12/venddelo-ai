@@ -156,7 +156,7 @@ export function TicketPrinterSettings({
     setPrinterMessage(
       printerName
         ? `Predeterminada: ${printerName}. Los tickets se enviarán a esa cola.`
-        : 'Predeterminada: diálogo de impresión del sistema.',
+        : 'Predeterminada: diálogo de impresión. En Pedidos, Imprimir ticket abrirá el diálogo del sistema.',
     );
   }
 
