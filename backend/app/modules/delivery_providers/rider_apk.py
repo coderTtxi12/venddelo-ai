@@ -38,3 +38,22 @@ def validate_rider_apk_url(url: str) -> str:
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValidationError("La URL debe ser http o https")
     return stripped
+
+
+def rider_apk_storage_path(provider_id: uuid.UUID) -> str:
+    return f"delivery-providers/{provider_id}/rider-app/{uuid.uuid4()}.apk"
+
+
+def validate_rider_apk_storage_path(path: str, provider_id: uuid.UUID) -> str:
+    prefix = f"delivery-providers/{provider_id}/rider-app/"
+    cleaned = path.strip()
+    rest = cleaned[len(prefix) :] if cleaned.startswith(prefix) else ""
+    if (
+        not cleaned.startswith(prefix)
+        or not cleaned.lower().endswith(".apk")
+        or not rest
+        or "/" in rest
+        or ".." in rest
+    ):
+        raise ValidationError("La ruta del APK no es válida")
+    return cleaned
