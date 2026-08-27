@@ -51,6 +51,8 @@ def test_update_location_does_not_build_profile(monkeypatch):
         last_lat=None,
         last_lng=None,
         location_updated_at=None,
+        app_version=None,
+        app_build_number=None,
         delivery_provider_id=uuid.uuid4(),
     )
     user = UserDTO(
@@ -86,6 +88,48 @@ def test_update_location_does_not_build_profile(monkeypatch):
     assert notified["n"] == 1
     assert profile_calls["n"] == 0
     session.flush.assert_called_once()
+
+
+def test_update_location_stores_app_client_when_provided(monkeypatch):
+    session = MagicMock()
+    service = RiderDispatchService(session)
+    driver = SimpleNamespace(
+        id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        last_lat=None,
+        last_lng=None,
+        location_updated_at=None,
+        app_version=None,
+        app_build_number=None,
+        delivery_provider_id=uuid.uuid4(),
+    )
+    user = UserDTO(
+        id=driver.user_id,
+        email="rider@example.com",
+        display_name=None,
+        avatar_url=None,
+        role="owner",
+        plan="free",
+        billing_customer_id=None,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    monkeypatch.setattr(service, "_require_driver", lambda _user: driver)
+    monkeypatch.setattr(
+        "app.modules.delivery_dispatch.service.notify_driver_location_realtime",
+        lambda *_a, **_k: None,
+    )
+
+    service.update_location(
+        user,
+        19.43,
+        -99.13,
+        app_version="1.0.1",
+        app_build_number=2,
+    )
+
+    assert driver.app_version == "1.0.1"
+    assert driver.app_build_number == 2
 
 
 def test_update_driver_itinerary_notifies_rider(monkeypatch):
