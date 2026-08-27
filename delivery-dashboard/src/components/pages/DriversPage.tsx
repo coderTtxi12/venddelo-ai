@@ -372,6 +372,9 @@ function DriverBrief({ driver }: { driver: DeliveryDriver }) {
       motorcycleColor={driver.motorcycle_color}
       compartmentSize={driver.compartment_size}
       creditAvailableCents={availableCents}
+      appVersion={driver.app_version}
+      appBuildNumber={driver.app_build_number}
+      showAppBuild
       className={styles.driverBriefMeta}
     />
   );
