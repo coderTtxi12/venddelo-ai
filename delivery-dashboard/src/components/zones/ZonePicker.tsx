@@ -110,7 +110,7 @@ export default function ZonePicker() {
   const valueLabel = selectedZoneId === ALL_ZONES_ID ? 'Todas' : selectedZone?.name ?? 'Selecciona una zona';
 
   return (
-    <div ref={wrapRef} className={styles.wrap}>
+    <div ref={wrapRef} className={styles.wrap} data-topbar-zone-picker="">
       <span className={styles.label} id={`${listId}-label`}>
         Cobertura
       </span>
