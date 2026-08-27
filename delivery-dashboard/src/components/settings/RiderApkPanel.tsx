@@ -49,7 +49,19 @@ export function RiderApkPanel() {
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [uploadLoaded, setUploadLoaded] = useState(0);
+  const [uploadTotal, setUploadTotal] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState<'starting' | 'uploading' | 'finishing'>(
+    'starting',
+  );
   const busy = uploading || savingUrl;
+  const uploadPercent = riderApkUploadProgressPercent(uploadLoaded, uploadTotal);
+  const progressLabel =
+    uploadPhase === 'starting'
+      ? 'Preparando carga…'
+      : uploadPhase === 'finishing'
+        ? 'Publicando el APK…'
+        : riderApkUploadProgressLabel(uploadLoaded, uploadTotal);
 
   useEffect(() => {
     let cancelled = false;
