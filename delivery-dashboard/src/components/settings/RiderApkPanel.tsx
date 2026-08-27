@@ -91,10 +91,18 @@ export function RiderApkPanel() {
   async function handleUpload(file: File) {
     if (!accessToken || !canManageRiderApp) return;
     setUploading(true);
+    setUploadPhase('starting');
+    setUploadLoaded(0);
+    setUploadTotal(file.size);
     setError(null);
     setStatus(null);
     try {
-      const apk = await uploadMyRiderApk(accessToken, file);
+      const apk = await uploadMyRiderApk(accessToken, file, (loaded, total) => {
+        setUploadPhase('uploading');
+        setUploadLoaded(loaded);
+        setUploadTotal(total > 0 ? total : file.size);
+        if (total > 0 && loaded >= total) setUploadPhase('finishing');
+      });
       setUrl(apk.url);
       setFileName(apk.file_name);
       setUrlDraft(apk.url ?? '');
