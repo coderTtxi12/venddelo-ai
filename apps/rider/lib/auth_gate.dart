@@ -6,6 +6,7 @@ import 'package:mexy_rider/auth.dart';
 import 'package:mexy_rider/friendly_error.dart';
 import 'package:mexy_rider/location_task.dart';
 import 'package:mexy_rider/rider_controller.dart';
+import 'package:mexy_rider/screens/force_update_screen.dart';
 import 'package:mexy_rider/screens/home_screen.dart';
 import 'package:mexy_rider/screens/login_screen.dart';
 import 'package:mexy_rider/screens/offer_screen.dart';
@@ -166,7 +167,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
-        if (controller.loading || _checkingPermissions) {
+        if (controller.loading) {
           return Scaffold(
             body: Center(
               child: Padding(
@@ -177,9 +178,30 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
                     const CircularProgressIndicator(),
                     const SizedBox(height: 16),
                     Text(
-                      controller.loading
-                          ? 'Verificando tu registro…'
-                          : 'Revisando permisos…',
+                      'Verificando tu registro…',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+        if (controller.profile?.mustUpdate == true) {
+          return ForceUpdateScreen(apkUrl: controller.profile!.updateApkUrl);
+        }
+        if (_checkingPermissions) {
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppTheme.screenPadding),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Revisando permisos…',
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                   ],
