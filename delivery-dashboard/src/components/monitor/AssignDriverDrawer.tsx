@@ -255,46 +255,74 @@ export function AssignDriverDrawer({
                 del negocio no cambia.
               </p>
             ) : null}
-          <ul className={styles.list}>
-            {rows.map(({ driver, isCurrent, warnings, disabled }) => {
-              const active = selectedId === driver.id;
-              return (
-                <li key={driver.id}>
+            <div className={styles.filterRow} role="toolbar" aria-label="Filtrar repartidores">
+              {ASSIGN_DRIVER_FILTERS.map((item) => {
+                const active = filter === item.id;
+                return (
                   <button
+                    key={item.id}
                     type="button"
-                    className={`${styles.row}${active ? ` ${styles.rowActive}` : ''}`}
-                    onClick={() => setSelectedId(driver.id)}
-                    disabled={disabled}
+                    className={`${styles.filterChip}${active ? ` ${styles.filterChipActive}` : ''}`}
+                    aria-pressed={active}
+                    onClick={() => setFilter(item.id)}
                   >
-                    <DriverAvatar
-                      firstName={driver.first_name}
-                      lastName={driver.last_name}
-                      profilePhotoPath={driver.profile_photo_path}
-                      size="sm"
-                    />
-                    <div className={styles.rowMain}>
-                      <span className={styles.name}>
-                        {driver.first_name} {driver.last_name}
-                        {isCurrent ? ' · actual' : ''}
-                      </span>
-                      <DriverMetaTags
-                        plate={driver.plate}
-                        motorcycleColor={driver.motorcycle_color}
-                        compartmentSize={driver.compartment_size}
-                        creditAvailableCents={driver.credit_available_cents}
-                        appVersion={driver.app_version}
-                        appBuildNumber={driver.app_build_number}
-                        showAppBuild
-                      />
-                      {warnings.length > 0 ? (
-                        <span className={styles.warnings}>{warnings.join(' · ')}</span>
-                      ) : null}
-                    </div>
+                    {item.label}
+                    <span className={styles.filterCount}>{counts[item.id]}</span>
                   </button>
-                </li>
-              );
-            })}
-          </ul>
+                );
+              })}
+            </div>
+            {rows.length === 0 ? (
+              <p className={styles.emptyHint}>{emptyAssignHint(filter)}</p>
+            ) : (
+              <ul className={styles.list}>
+                {rows.map(({ driver, isCurrent, warnings, disabled, distanceLabel }) => {
+                  const active = selectedId === driver.id;
+                  return (
+                    <li key={driver.id}>
+                      <button
+                        type="button"
+                        className={`${styles.row}${active ? ` ${styles.rowActive}` : ''}`}
+                        onClick={() => setSelectedId(driver.id)}
+                        disabled={disabled}
+                      >
+                        <DriverAvatar
+                          firstName={driver.first_name}
+                          lastName={driver.last_name}
+                          profilePhotoPath={driver.profile_photo_path}
+                          size="sm"
+                        />
+                        <div className={styles.rowMain}>
+                          <span className={styles.name}>
+                            {driver.first_name} {driver.last_name}
+                            {isCurrent ? ' · actual' : ''}
+                          </span>
+                          {distanceLabel ? (
+                            <span className={styles.distance} title="Distancia al restaurante">
+                              {distanceLabel} al restaurante
+                            </span>
+                          ) : (
+                            <span className={styles.distance}>Sin GPS</span>
+                          )}
+                          <DriverMetaTags
+                            plate={driver.plate}
+                            motorcycleColor={driver.motorcycle_color}
+                            compartmentSize={driver.compartment_size}
+                            creditAvailableCents={driver.credit_available_cents}
+                            appVersion={driver.app_version}
+                            appBuildNumber={driver.app_build_number}
+                            showAppBuild
+                          />
+                          {warnings.length > 0 ? (
+                            <span className={styles.warnings}>{warnings.join(' · ')}</span>
+                          ) : null}
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           {selected && draftStops.length > 0 ? (
             <div className={styles.routeBox}>
               <p className={styles.routeTitle}>Orden de la ruta</p>
