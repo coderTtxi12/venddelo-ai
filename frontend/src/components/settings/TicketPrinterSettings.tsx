@@ -274,14 +274,15 @@ export function TicketPrinterSettings({
     }
   }
 
+  function usePrintDialog() {
+    selectOsDefaultRef.current = false;
+    selectSystemPrinter();
+  }
+
   function useSystem() {
-    const current = readKitchenPrinterPreference(restaurantId);
-    const keepName = current.kind === 'system' ? current.systemPrinterName : undefined;
-    selectOsDefaultRef.current = !keepName;
-    selectSystemPrinter(keepName);
-    if (current.kind === 'system') {
-      void loadSystemPrinters({ selectOsDefault: !keepName });
-    }
+    selectOsDefaultRef.current = false;
+    selectSystemPrinter();
+    void loadSystemPrinters({ selectOsDefault: false });
   }
 
   function selectNetworkPrinter(host: string, port = 9100) {
