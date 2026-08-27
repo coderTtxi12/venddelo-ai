@@ -38,6 +38,23 @@ export function riderApkDropRejectHint(): string {
   return 'Solo se aceptan archivos .apk.';
 }
 
+export function riderApkUploadProgressPercent(loaded: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((loaded / total) * 100)));
+}
+
+export function riderApkUploadProgressLabel(loaded: number, total: number): string {
+  if (total <= 0) return 'Subiendo…';
+  const percent = riderApkUploadProgressPercent(loaded, total);
+  return `${formatMegaBytes(loaded)} de ${formatMegaBytes(total)} · ${percent}%`;
+}
+
+function formatMegaBytes(bytes: number): string {
+  const mega = bytes / (1024 * 1024);
+  const digits = mega >= 10 ? 0 : 1;
+  return `${mega.toFixed(digits)} MB`;
+}
+
 export type RiderApkFileLike = {
   name: string;
   type?: string;
