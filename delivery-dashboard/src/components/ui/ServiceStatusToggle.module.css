@@ -130,6 +130,19 @@
   .statusLabel {
     font-size: 0.75rem;
   }
+
+  :global(header:has([data-topbar-service-status])) .toggleWrap {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.35rem 0.7rem 0.35rem 0.65rem;
+    border-radius: 12px;
+    background: var(--color-bg);
+  }
+
+  :global(header:has([data-topbar-service-status])) .statusLabel {
+    font-size: 0.8rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
