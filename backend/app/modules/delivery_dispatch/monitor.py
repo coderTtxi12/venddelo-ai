@@ -27,6 +27,7 @@ from app.modules.delivery_dispatch.engine import (
     pre_free_eta_seconds,
 )
 from app.modules.delivery_dispatch.itinerary import hydrate_itinerary
+from app.modules.delivery_dispatch.search_at import prep_minutes_from_times
 from app.modules.delivery_dispatch.schemas import (
     DispatchMonitorCreditHoldDTO,
     DispatchMonitorDriverDTO,
@@ -584,6 +585,7 @@ def build_dispatch_monitor_snapshot(
                 cycle_silent_count=len(request.cycle_silent_driver_ids),
                 created_at=request.created_at,
                 tracking_token=request.tracking_token,
+                prep_minutes=prep_minutes_from_times(request.created_at, request.ready_at),
                 timeline=_timeline_events(
                     request,
                     timeout_at=timeout_at,
