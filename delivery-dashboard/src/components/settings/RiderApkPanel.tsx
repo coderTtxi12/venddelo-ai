@@ -164,21 +164,26 @@ export function RiderApkPanel() {
       ) : (
         <>
           {url ? (
-            <div className={pageStyles.readonlyField}>
-              <span className={pageStyles.readonlyLabel}>Publicado</span>
-              <span className={`${pageStyles.readonlyValue} ${styles.fileRow}`}>
-                <InsertDriveFileOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
-                <span>
-                  {fileName ? <strong>{fileName}</strong> : 'APK publicado'}
-                  {' · '}
-                  <a href={url} target="_blank" rel="noreferrer">
-                    Abrir enlace
-                  </a>
-                </span>
+            <div className={styles.published}>
+              <span className={styles.publishedIcon} aria-hidden>
+                <InsertDriveFileOutlinedIcon sx={{ fontSize: 22 }} />
               </span>
+              <div className={styles.publishedBody}>
+                <p className={styles.publishedName}>{fileName || 'APK publicado'}</p>
+                <p className={styles.publishedMeta}>Listo para que los riders lo descarguen.</p>
+                <a
+                  className={styles.publishedLink}
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Abrir enlace
+                  <OpenInNewOutlinedIcon sx={{ fontSize: 16 }} aria-hidden />
+                </a>
+              </div>
             </div>
           ) : (
-            <p className={pageStyles.empty}>{riderApkEmptyHint()}</p>
+            <p className={styles.empty}>{riderApkEmptyHint()}</p>
           )}
           {error ? (
             <div id={errorId} className={pageStyles.errorBanner} role="alert">
@@ -199,56 +204,67 @@ export function RiderApkPanel() {
                 void handleSaveUrl();
               }}
             >
-              <label className={pageStyles.label} htmlFor={fileInputId}>
-                Archivo APK
-              </label>
-              <p className={styles.fieldHint}>Máximo 80 MB. Solo archivos .apk.</p>
-              <div className={styles.fileActions}>
-                <button
-                  type="button"
-                  className={`${pageStyles.secondaryBtn} ${styles.uploadBtn}`}
-                  disabled={busy}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <CloudUploadOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
-                  {uploading ? 'Subiendo…' : 'Subir APK'}
-                </button>
-                <input
-                  id={fileInputId}
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".apk,application/vnd.android.package-archive"
-                  className={pageStyles.hiddenInput}
-                  aria-describedby={hintId}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void handleUpload(file);
-                    event.target.value = '';
-                  }}
-                />
-              </div>
-              <label className={pageStyles.label} htmlFor={urlInputId}>
-                URL de descarga
-              </label>
               <input
-                id={urlInputId}
-                className={pageStyles.input}
-                type="url"
-                inputMode="url"
-                autoComplete="url"
-                placeholder="https://"
-                value={urlDraft}
-                aria-invalid={error ? true : undefined}
-                aria-describedby={error ? errorId : hintId}
-                onChange={(event) => setUrlDraft(event.target.value)}
-              />
-              <button
-                type="submit"
-                className={`${pageStyles.primaryBtn} ${styles.saveBtn}`}
+                id={fileInputId}
+                ref={fileInputRef}
+                type="file"
+                accept=".apk,application/vnd.android.package-archive"
+                className={pageStyles.hiddenInput}
                 disabled={busy}
+                aria-describedby={`${hintId} ${dropHintId}`}
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  acceptFile(file && pickDroppedApkFile([file]));
+                  event.target.value = '';
+                }}
+              />
+              <label
+                htmlFor={fileInputId}
+                className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''} ${
+                  uploading ? styles.dropzoneBusy : ''
+                }`}
+                onDragEnter={handleDragEnter}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               >
-                {savingUrl ? 'Guardando…' : 'Guardar URL'}
-              </button>
+                <span className={styles.dropIcon} aria-hidden>
+                  <CloudUploadOutlinedIcon sx={{ fontSize: 28 }} />
+                </span>
+                <span className={styles.dropTitle}>{uploading ? 'Subiendo…' : dropTitle}</span>
+                <span id={dropHintId} className={styles.dropHint}>
+                  {uploading
+                    ? 'Espera a que termine la carga. No cierres esta página.'
+                    : 'Haz clic o suelta un archivo .apk · Máximo 80 MB'}
+                </span>
+              </label>
+              <div className={styles.urlBlock}>
+                <p className={styles.urlDivider}>o pega una URL</p>
+                <label className={pageStyles.label} htmlFor={urlInputId}>
+                  URL de descarga
+                </label>
+                <div className={styles.urlRow}>
+                  <input
+                    id={urlInputId}
+                    className={pageStyles.input}
+                    type="url"
+                    inputMode="url"
+                    autoComplete="url"
+                    placeholder="https://"
+                    value={urlDraft}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? errorId : hintId}
+                    onChange={(event) => setUrlDraft(event.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    className={`${pageStyles.primaryBtn} ${styles.saveBtn}`}
+                    disabled={busy}
+                  >
+                    {savingUrl ? 'Guardando…' : 'Guardar URL'}
+                  </button>
+                </div>
+              </div>
             </form>
           ) : null}
         </>
