@@ -143,6 +143,37 @@
   padding-inline: 0.25rem;
 }
 
+.progressBlock {
+  width: min(100%, 22rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-inline: 0.5rem;
+}
+
+.progress {
+  height: 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-border));
+  overflow: hidden;
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+  transition: width 180ms ease;
+}
+
+.progressLabel {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.35;
+}
+
 .onlyTouch {
   display: none;
 }
