@@ -21,6 +21,7 @@ import {
   requestStatusLabel,
 } from '@/lib/dispatch/monitorCopy';
 import { publicTrackingUrl } from '@/lib/dispatch/publicTrackingUrl';
+import { formatPrepMinutes, requestPrepMinutes } from '@/lib/dispatch/prepTime';
 import { formatMoney } from '@/lib/pricing/tariffUtils';
 import styles from './RequestDetailDrawer.module.css';
 
@@ -175,6 +176,9 @@ export function RequestDetailDrawer({
                   <ExternalLink href={trackingUrl}>Abrir rastreo</ExternalLink>
                 </DetailRow>
               ) : null}
+              <DetailRow label="Preparación">
+                {formatPrepMinutes(requestPrepMinutes(request))}
+              </DetailRow>
               <DetailRow label="Cliente">{request.customer_name}</DetailRow>
               <DetailRow label="Celular">
                 {request.customer_phone ? (
