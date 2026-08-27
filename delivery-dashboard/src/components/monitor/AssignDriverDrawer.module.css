@@ -205,6 +205,13 @@
   color: var(--color-text);
 }
 
+.distance {
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+}
+
 .warnings {
   font-size: 0.68rem;
   font-weight: 600;
