@@ -70,6 +70,7 @@ class EngineDriver:
     assigned_restaurant_ids: tuple[str, ...] = ()
     last_dropoff_lat: float | None = None
     last_dropoff_lng: float | None = None
+    app_build_number: int | None = None
 
 
 @dataclass(frozen=True)
@@ -221,6 +222,8 @@ def eligibility_blockers(
         available = driver.credit_limit_cents - driver.credit_held_cents
         if available < request.collect_cents:
             reasons.append("credit")
+    if not _has_current_app(context, driver):
+        reasons.append("outdated_app")
     return tuple(reasons)
 
 
@@ -460,7 +463,15 @@ def _is_eligible(context: EngineContext, request: EngineRequest, driver: EngineD
         available = driver.credit_limit_cents - driver.credit_held_cents
         if available < request.collect_cents:
             return False
+    if not _has_current_app(context, driver):
+        return False
     return True
+
+
+def _has_current_app(context: EngineContext, driver: EngineDriver) -> bool:
+    if driver.app_build_number is None:
+        return False
+    return driver.app_build_number >= context.settings.rider_min_app_build
 
 
 def _is_online_fresh(context: EngineContext, driver: EngineDriver) -> bool:
