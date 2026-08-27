@@ -7,16 +7,14 @@ from collections.abc import Sequence
 from app.modules.delivery_providers.matching import MexyZoneMatchCandidate
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
-    DeliveryProviderAdminInviteCreate,
     DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
     DeliveryProviderMemberDTO,
-    DeliveryProviderPricingConfigDTO,
     DeliveryProviderPaymentMethodCreate,
     DeliveryProviderPaymentMethodDTO,
+    DeliveryProviderPricingConfigDTO,
     DeliveryProviderScheduleCreate,
     DeliveryProviderScheduleDTO,
-    DeliveryProviderServiceStatusDTO,
     DeliveryProviderZoneDTO,
     RestaurantDeliveryPartnershipDTO,
 )
@@ -46,6 +44,16 @@ class DeliveryProviderRepository(ABC):
 
     @abstractmethod
     def set_logo_path(self, provider_id: uuid.UUID, logo_path: str) -> None: ...
+
+    @abstractmethod
+    def set_rider_apk(
+        self,
+        provider_id: uuid.UUID,
+        *,
+        path: str | None,
+        url: str | None,
+        file_name: str | None,
+    ) -> DeliveryProviderDTO: ...
 
     @abstractmethod
     def get_primary_zone(self, provider_id: uuid.UUID) -> DeliveryProviderZoneDTO | None: ...
