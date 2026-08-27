@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.core.storage import StorageError, StoragePort, StoredObject
+from app.core.storage import SignedUpload, StorageError, StoragePort, StoredObject
 
 
 class MemoryStorageAdapter(StoragePort):
@@ -27,6 +27,12 @@ class MemoryStorageAdapter(StoragePort):
 
     def create_signed_url(self, path: str, expires_in: int) -> str:
         return self.get_public_url(path)
+
+    def create_signed_upload(
+        self, path: str, *, content_type: str, upsert: bool = True
+    ) -> SignedUpload:
+        del content_type, upsert
+        return SignedUpload(path=path, upload_url=f"memory://upload/{path}", token="memory")
 
     def read(self, path: str) -> bytes:
         obj = self._objects.get(path)
