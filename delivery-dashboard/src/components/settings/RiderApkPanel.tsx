@@ -151,15 +151,20 @@ export function RiderApkPanel() {
     }
   }
 
-  const dropTitle = dragActive ? riderApkDropActiveHint() : riderApkDropIdleHint();
-
   return (
     <section className={pageStyles.panel} aria-labelledby="settings-rider-apk">
       <h2 id="settings-rider-apk" className={pageStyles.panelTitle}>
         App del rider
       </h2>
       <p id={hintId} className={pageStyles.panelHint}>
-        {canManageRiderApp ? riderApkOwnerHint() : riderApkReadOnlyHint()}
+        {canManageRiderApp ? (
+          <>
+            <span className={styles.onlyDesktop}>{riderApkOwnerHint()}</span>
+            <span className={styles.onlyTouch}>{riderApkOwnerHintTouch()}</span>
+          </>
+        ) : (
+          riderApkReadOnlyHint()
+        )}
       </p>
       {loading ? (
         <p className={pageStyles.loading} role="status">
