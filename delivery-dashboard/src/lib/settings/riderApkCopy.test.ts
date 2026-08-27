@@ -52,3 +52,11 @@ test('pickDroppedApkFile rejects non-apk drops', () => {
   assert.equal(pickDroppedApkFile([{ name: 'mexy-rider.zip', type: 'application/zip' }]), null);
   assert.equal(pickDroppedApkFile([]), null);
 });
+
+test('upload progress shows megabytes and percent', () => {
+  assert.equal(riderApkUploadProgressPercent(25, 100), 25);
+  assert.equal(riderApkUploadProgressPercent(0, 0), 0);
+  assert.match(riderApkUploadProgressLabel(10 * 1024 * 1024, 40 * 1024 * 1024), /10/);
+  assert.match(riderApkUploadProgressLabel(10 * 1024 * 1024, 40 * 1024 * 1024), /40/);
+  assert.match(riderApkUploadProgressLabel(10 * 1024 * 1024, 40 * 1024 * 1024), /25%/);
+});
