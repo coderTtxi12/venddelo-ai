@@ -43,6 +43,16 @@ def test_searched_detail_blockers_and_high_demand() -> None:
     assert text == "Nadie elegible: 2 offline, 1 GPS viejo · alta demanda"
 
 
+def test_searched_detail_outdated_app() -> None:
+    text = searched_detail(
+        driver_count=2,
+        eligible_count=0,
+        blocker_counts={"outdated_app": 2},
+        high_demand=False,
+    )
+    assert text == "Nadie elegible: 2 app vieja"
+
+
 def test_searched_detail_eligible_but_no_offer() -> None:
     assert searched_detail(
         driver_count=4,
@@ -113,6 +123,7 @@ def _driver(
         credit_limit_cents=50_000,
         credit_held_cents=0,
         compartment_size="normal",
+        app_build_number=2,
     )
 
 
