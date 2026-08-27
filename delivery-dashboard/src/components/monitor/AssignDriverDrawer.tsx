@@ -71,6 +71,45 @@ function requestStatusLabel(status: string): string {
   return labels[status] ?? status;
 }
 
+function emptyAssignHint(filter: AssignDriverFilter): string {
+  if (filter === 'nearby') return 'Nadie en línea con GPS fresco cerca del restaurante.';
+  if (filter === 'online') return 'Nadie en línea.';
+  return 'Sin repartidores.';
+}
+
+function describeAssignRow(
+  driver: DispatchMonitorDriver,
+  request: DispatchMonitorRequest,
+  submitting: boolean,
+) {
+  const isCurrent = driver.id === request.assigned_driver_id;
+  const hasOpenOffer = Boolean(driver.open_offer_id);
+  const smallBox = request.package_size === 'grande' && driver.compartment_size !== 'grande';
+  const noCredit =
+    request.payment_method === 'cash' &&
+    (driver.credit_blocked || driver.credit_available_cents < request.collect_cents);
+  const warnings: string[] = [];
+  if (!driver.is_online) warnings.push('Offline');
+  if (driver.location_stale) warnings.push('GPS');
+  if (noCredit) warnings.push('Sin crédito');
+  if (smallBox) warnings.push('Compartimento chico');
+  if (driver.active_request_id) {
+    warnings.push(driver.is_pre_free ? 'Pre-libre' : 'En ruta');
+  }
+  if (hasOpenOffer) warnings.push('Oferta abierta');
+  if (!isCurrentRiderApp(driver.app_build_number)) warnings.push('App antigua');
+  const distanceLabel = formatPickupDistance(
+    pickupDistanceMeters(driver, request.restaurant_lat, request.restaurant_lng),
+  );
+  return {
+    driver,
+    isCurrent,
+    warnings,
+    disabled: isCurrent || hasOpenOffer || submitting,
+    distanceLabel,
+  };
+}
+
 export function AssignDriverDrawer({
   open,
   request,
