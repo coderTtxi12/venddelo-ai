@@ -592,6 +592,7 @@ class DispatchMonitorRequestDTO(BaseModel):
     cycle_silent_count: int = 0
     created_at: datetime | None = None
     tracking_token: str
+    prep_minutes: int | None = None
     timeline: list[DispatchMonitorTimelineEventDTO] = Field(default_factory=list)
 
 
