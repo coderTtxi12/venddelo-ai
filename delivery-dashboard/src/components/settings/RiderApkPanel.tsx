@@ -31,13 +31,16 @@ export function RiderApkPanel() {
   const urlInputId = useId();
   const hintId = useId();
   const errorId = useId();
+  const dropHintId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragDepth = useRef(0);
   const [url, setUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [urlDraft, setUrlDraft] = useState('');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [savingUrl, setSavingUrl] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const busy = uploading || savingUrl;
