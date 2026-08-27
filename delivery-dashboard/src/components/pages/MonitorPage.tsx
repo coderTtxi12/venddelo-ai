@@ -553,10 +553,10 @@ function DriversList({
   });
 
   const filters: { id: DriverFilter; label: string; count: number; warn?: boolean }[] = [
-    { id: 'all', label: 'Todos', count: counts.all },
     { id: 'online', label: 'En línea', count: counts.online },
     { id: 'stale', label: 'GPS viejo', count: counts.stale, warn: true },
     { id: 'offline', label: 'Offline', count: counts.offline },
+    { id: 'all', label: 'Todos', count: counts.all },
   ];
 
   const emptyHint =
@@ -643,6 +643,9 @@ function DriversList({
                         motorcycleColor={driver.motorcycle_color}
                         compartmentSize={driver.compartment_size}
                         creditAvailableCents={driver.credit_available_cents}
+                        appVersion={driver.app_version}
+                        appBuildNumber={driver.app_build_number}
+                        showAppBuild
                       />
                       <span className={styles.listMeta}>
                         {occupation} · {packages} · crédito {credit}
@@ -804,7 +807,7 @@ export default function MonitorPage() {
   const [focusedRequestId, setFocusedRequestId] = useState<string | null>(null);
   const [focusedDriverId, setFocusedDriverId] = useState<string | null>(null);
   const [focusedRestaurantId, setFocusedRestaurantId] = useState<string | null>(null);
-  const [driverFilter, setDriverFilter] = useState<DriverFilter>('all');
+  const [driverFilter, setDriverFilter] = useState<DriverFilter>('online');
   const [timeSort, setTimeSort] = useState<Record<string, TimeSort>>({
     queue: 'desc',
     unassigned: 'desc',
@@ -1042,7 +1045,7 @@ export default function MonitorPage() {
   }
 
   function handleDriverFilter(next: DriverFilter) {
-    setDriverFilter((current) => (current === next && next !== 'all' ? 'all' : next));
+    setDriverFilter((current) => (current === next && next !== 'online' ? 'online' : next));
     document.getElementById('monitor-drivers')?.scrollIntoView({ block: 'nearest' });
   }
 
