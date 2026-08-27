@@ -274,10 +274,19 @@ export function shouldApplyTypedNetworkHost(
 ): boolean {
   const host = typedHost.trim();
   if (!isLanPrinterIpv4(host)) return false;
-  if (preference.kind === 'usb' || preference.kind === 'serial' || preference.kind === 'bluetooth') {
+  if (
+    preference.kind === 'usb' ||
+    preference.kind === 'serial' ||
+    preference.kind === 'bluetooth' ||
+    preference.kind === 'system'
+  ) {
     return false;
   }
   return preference.kind !== 'network' || preference.host !== host;
+}
+
+export function isSystemPrintDialog(preference: KitchenPrinterPreference): boolean {
+  return preference.kind === 'system' && !preference.systemPrinterName;
 }
 
 export function canUseWebUsb(): boolean {
@@ -362,7 +371,7 @@ export function useSystemKitchenPrinter(
   const trimmed = printerName?.trim();
   const preference: KitchenPrinterPreference = {
     kind: 'system',
-    label: trimmed || 'Impresora del sistema',
+    label: trimmed || 'Diálogo de impresión',
     systemPrinterName: trimmed,
   };
   writeKitchenPrinterPreference(restaurantId, preference);
