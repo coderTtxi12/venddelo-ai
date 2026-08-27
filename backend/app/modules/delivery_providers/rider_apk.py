@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import uuid
 from urllib.parse import urlparse
 
 from app.core.exceptions import ValidationError
 
 MAX_RIDER_APK_BYTES = 80 * 1024 * 1024
 _APK_MAGIC = b"PK"
+APK_CONTENT_TYPE = "application/vnd.android.package-archive"
 
 
 def validate_rider_apk_filename(filename: str | None) -> str:
