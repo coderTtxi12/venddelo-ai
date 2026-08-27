@@ -1,4 +1,5 @@
-import { apiRequest } from './client';
+import { apiRequest, API_URL } from './client';
+import { postFormWithProgress, putBlobWithProgress } from './uploadWithProgress';
 import type {
   DeliveryAssignmentSettings,
   DeliveryAssignmentSettingsUpdate,
@@ -30,6 +31,7 @@ import type {
   DispatchHistoryPage,
   DispatchMonitorSnapshot,
   RiderApk,
+  RiderApkUploadSession,
 } from './types';
 
 function withZoneId(path: string, zoneId: string): string {
@@ -52,13 +54,44 @@ export function patchMyRiderApkUrl(token: string, url: string | null) {
   });
 }
 
-export function uploadMyRiderApk(token: string, file: File) {
-  const body = new FormData();
-  body.append('file', file);
-  return apiRequest<RiderApk>('/delivery-providers/me/rider-apk', {
+export async function uploadMyRiderApk(
+  token: string,
+  file: File,
+  onProgress?: (loaded: number, total: number) => void,
+) {
+  const session = await apiRequest<RiderApkUploadSession>(
+    '/delivery-providers/me/rider-apk/uploads',
+    {
+      method: 'POST',
+      token,
+      body: {
+        file_name: file.name,
+        size: file.size,
+        content_type: file.type || 'application/vnd.android.package-archive',
+      },
+    },
+  );
+  if (session.upload_url.startsWith('memory://')) {
+    const body = new FormData();
+    body.append('file', file);
+    return postFormWithProgress<RiderApk>(`${API_URL}/delivery-providers/me/rider-apk`, body, {
+      token,
+      onProgress,
+    });
+  }
+  const headers: Record<string, string> = {
+    'Content-Type': file.type || 'application/vnd.android.package-archive',
+    'x-upsert': 'true',
+  };
+  if (session.token && !session.upload_url.includes('token=')) {
+    headers.Authorization = `Bearer ${session.token}`;
+  }
+  await putBlobWithProgress(session.upload_url, file, { headers, onProgress });
+  onProgress?.(file.size, file.size);
+  return apiRequest<RiderApk>('/delivery-providers/me/rider-apk/uploads/complete', {
     method: 'POST',
     token,
-    body,
+    body: { path: session.path, file_name: file.name },
   });
 }
 
