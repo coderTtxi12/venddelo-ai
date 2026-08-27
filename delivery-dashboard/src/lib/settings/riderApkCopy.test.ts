@@ -6,8 +6,10 @@ import {
   pickDroppedApkFile,
   riderApkDropActiveHint,
   riderApkDropIdleHint,
+  riderApkDropIdleHintTouch,
   riderApkDropRejectHint,
   riderApkEmptyHint,
+  riderApkOwnerHintTouch,
   riderApkReadOnlyHint,
 } from './riderApkCopy';
 
