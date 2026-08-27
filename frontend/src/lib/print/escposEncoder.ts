@@ -160,7 +160,7 @@ function alignBits(align: 'left' | 'center' | 'right'): number {
   return 0;
 }
 
-function lineToRows(line: TicketLine, width: number): Array<{ text: string; align: 'left' | 'center' | 'right'; bold?: boolean }> {
+function lineToRows(line: TicketLine, width: number): EncodedRow[] {
   switch (line.kind) {
     case 'brand':
       return [{ text: line.text.toUpperCase(), align: 'center', bold: true }];
