@@ -1,6 +1,7 @@
 import { ApiError, type ApiErrorBody } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api/v1';
+export { API_URL };
 
 export type RequestOptions = {
   method?: string;
