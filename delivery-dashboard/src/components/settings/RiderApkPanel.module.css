@@ -44,6 +44,7 @@
   flex-direction: column;
   gap: 0.2rem;
   min-width: 0;
+  flex: 1;
 }
 
 .publishedName {
