@@ -24,6 +24,8 @@ import {
   riderApkOwnerHint,
   riderApkOwnerHintTouch,
   riderApkReadOnlyHint,
+  riderApkUploadProgressLabel,
+  riderApkUploadProgressPercent,
 } from '@/lib/settings/riderApkCopy';
 import pageStyles from '@/components/pages/SettingsPage.module.css';
 import styles from './RiderApkPanel.module.css';
