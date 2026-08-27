@@ -35,6 +35,9 @@ class DeliveryProvider(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     responsible_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     whatsapp_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     logo_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rider_apk_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rider_apk_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rider_apk_file_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     timezone: Mapped[str] = mapped_column(
         String(64), nullable=False, server_default="America/Mexico_City"
     )
