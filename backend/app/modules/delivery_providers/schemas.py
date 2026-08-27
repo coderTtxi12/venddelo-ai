@@ -40,6 +40,9 @@ class DeliveryProviderDTO(BaseModel):
     responsible_phone: str | None
     whatsapp_phone: str | None
     logo_path: str | None
+    rider_apk_path: str | None = None
+    rider_apk_url: str | None = None
+    rider_apk_file_name: str | None = None
     timezone: str
     status: str
     submitted_at: datetime | None
@@ -72,6 +75,16 @@ class DeliveryProviderProfileUpdate(BaseModel):
     whatsapp_phone: str = Field(min_length=8, max_length=20)
     logo_base64: str | None = None
     logo_file_name: str | None = None
+
+
+class RiderApkDTO(BaseModel):
+    url: str | None = None
+    file_name: str | None = None
+    path: str | None = None
+
+
+class RiderApkUrlUpdate(BaseModel):
+    url: str | None = Field(default=None, max_length=2048)
 
 
 class DeliveryProviderMeResponse(BaseModel):
