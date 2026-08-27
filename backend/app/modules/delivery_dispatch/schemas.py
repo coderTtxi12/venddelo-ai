@@ -540,6 +540,8 @@ class DispatchMonitorDriverDTO(BaseModel):
     registered_zone_id: uuid.UUID | None = None
     registered_zone_name: str | None = None
     itinerary: list[DriverItineraryStopDTO] = Field(default_factory=list)
+    app_version: str | None = None
+    app_build_number: int | None = None
 
 
 class DispatchMonitorRequestDTO(BaseModel):
