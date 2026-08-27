@@ -88,6 +88,46 @@ export function RiderApkPanel() {
     }
   }
 
+  function acceptFile(file: File | null) {
+    if (!file) {
+      setStatus(null);
+      setError(riderApkDropRejectHint());
+      return;
+    }
+    void handleUpload(file);
+  }
+
+  function handleDragEnter(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (busy) return;
+    dragDepth.current += 1;
+    setDragActive(true);
+  }
+
+  function handleDragOver(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (busy) return;
+    event.dataTransfer.dropEffect = 'copy';
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragActive(false);
+  }
+
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth.current = 0;
+    setDragActive(false);
+    if (busy) return;
+    acceptFile(pickDroppedApkFile(event.dataTransfer.files));
+  }
+
   async function handleSaveUrl() {
     if (!accessToken || !canManageRiderApp) return;
     setSavingUrl(true);
