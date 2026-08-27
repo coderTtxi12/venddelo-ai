@@ -32,6 +32,9 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderZoneDTO,
     DeliveryProviderZoneWrite,
     RiderApkDTO,
+    RiderApkUploadBegin,
+    RiderApkUploadComplete,
+    RiderApkUploadSessionDTO,
     RiderApkUrlUpdate,
 )
 from app.modules.delivery_providers.service import DeliveryProviderService
