@@ -83,6 +83,8 @@ class RiderProfile {
     this.plate = '',
     this.motorcycleBrand = '',
     this.motorcycleColor = '',
+    this.mustUpdate = false,
+    this.updateApkUrl,
   });
 
   final String id;
@@ -97,6 +99,8 @@ class RiderProfile {
   final String plate;
   final String motorcycleBrand;
   final String motorcycleColor;
+  final bool mustUpdate;
+  final String? updateApkUrl;
 
   int get creditAvailableCents {
     final available = creditLimitCents - creditHeldCents;
@@ -117,6 +121,8 @@ class RiderProfile {
       plate: plate,
       motorcycleBrand: motorcycleBrand,
       motorcycleColor: motorcycleColor,
+      mustUpdate: mustUpdate,
+      updateApkUrl: updateApkUrl,
     );
   }
 
@@ -134,6 +140,8 @@ class RiderProfile {
       plate: json['plate'] as String? ?? '',
       motorcycleBrand: json['motorcycle_brand'] as String? ?? '',
       motorcycleColor: json['motorcycle_color'] as String? ?? '',
+      mustUpdate: json['must_update'] == true,
+      updateApkUrl: json['update_apk_url'] as String?,
       assignments: raw
           .map((item) => RiderAssignment.fromJson(item as Map<String, dynamic>))
           .toList(),
