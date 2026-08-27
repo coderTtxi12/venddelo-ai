@@ -150,5 +150,55 @@
   .actions {
     gap: 0.5rem;
   }
+
+  /*
+    Specific coverage selected: service toggle is in the DOM.
+    Split into two rows so the zone name is not crushed by the status pill.
+  */
+  .topbar:has([data-topbar-service-status]) {
+    height: auto;
+    min-height: 60px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'menu picker user logout'
+      'status status status status';
+    align-items: center;
+    column-gap: 0.5rem;
+    row-gap: 0.4rem;
+    padding: 0.5rem 0.85rem 0.55rem;
+  }
+
+  .topbar:has([data-topbar-service-status]) .menuButton {
+    grid-area: menu;
+  }
+
+  .topbar:has([data-topbar-service-status]) .actions {
+    display: contents;
+  }
+
+  .topbar:has([data-topbar-service-status]) .userInfo {
+    grid-area: user;
+  }
+
+  .topbar:has([data-topbar-service-status]) .logoutButton {
+    grid-area: logout;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .topbar:has([data-topbar-service-status]) :global([data-topbar-zone-picker]) {
+    grid-area: picker;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .topbar:has([data-topbar-service-status]) :global([data-topbar-service-status]) {
+    grid-area: status;
+    min-width: 0;
+  }
 }
 
