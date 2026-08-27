@@ -465,6 +465,8 @@ class DeliveryDriver(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         DateTime(timezone=True), nullable=True
     )
     fcm_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    app_version: Mapped[str | None] = mapped_column(Text, nullable=True)
+    app_build_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     delivery_provider: Mapped["DeliveryProvider"] = relationship(back_populates="drivers")
     registered_zone: Mapped["DeliveryProviderZone | None"] = relationship(
