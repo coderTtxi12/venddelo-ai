@@ -189,6 +189,24 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         provider.logo_path = logo_path
         self._session.flush()
 
+    def set_rider_apk(
+        self,
+        provider_id: uuid.UUID,
+        *,
+        path: str | None,
+        url: str | None,
+        file_name: str | None,
+    ) -> DeliveryProviderDTO:
+        provider = self._session.get(DeliveryProvider, provider_id)
+        if provider is None:
+            raise NotFoundError("No tienes un proveedor de delivery registrado")
+        provider.rider_apk_path = path
+        provider.rider_apk_url = url
+        provider.rider_apk_file_name = file_name
+        self._session.flush()
+        self._session.refresh(provider)
+        return DeliveryProviderDTO.model_validate(provider)
+
     def get_primary_zone(self, provider_id: uuid.UUID) -> DeliveryProviderZoneDTO | None:
         zones = self.list_zones(provider_id)
         return zones[0] if zones else None
