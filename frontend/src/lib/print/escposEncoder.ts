@@ -99,23 +99,35 @@ function encodeText(text: string): number[] {
   return bytes;
 }
 
-function padColumns(left: string, right: string, width: number): string[] {
+/** Font A on 203 dpi thermal heads is ~12 dots per character. */
+const DOTS_PER_CHAR = 12;
+
+type EncodedRow =
+  | { text: string; align: 'left' | 'center' | 'right'; bold?: boolean }
+  | { left: string; right: string; bold?: boolean };
+
+function priceColumnDots(paperWidthMm: 58 | 80, right: string): number {
+  const totalDots = printAreaDots(paperWidthMm);
+  return Math.max(0, totalDots - glyphCount(right) * DOTS_PER_CHAR);
+}
+
+function columnRows(left: string, right: string, width: number): EncodedRow[] {
   const leftLen = glyphCount(left);
   const rightLen = glyphCount(right);
   if (leftLen + 1 + rightLen <= width) {
-    return [`${left}${' '.repeat(width - leftLen - rightLen)}${right}`];
+    return [{ left, right }];
   }
   const wrapWidth = Math.max(8, width - rightLen - 1);
   const wrapped = wrapWords(left, wrapWidth);
   const first = wrapped[0] ?? '';
   const firstLen = glyphCount(first);
   if (firstLen + 1 + rightLen <= width) {
-    return [
-      `${first}${' '.repeat(width - firstLen - rightLen)}${right}`,
-      ...wrapped.slice(1),
-    ];
+    return [{ left: first, right }, ...wrapped.slice(1).map((text) => ({ text, align: 'left' as const }))];
   }
-  return [...wrapped, `${' '.repeat(Math.max(0, width - rightLen))}${right}`];
+  return [
+    ...wrapped.map((text) => ({ text, align: 'left' as const })),
+    { left: '', right },
+  ];
 }
 
 function wrapWords(text: string, width: number): string[] {
