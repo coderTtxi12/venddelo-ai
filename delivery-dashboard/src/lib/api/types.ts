@@ -26,7 +26,16 @@ export type DeliveryProvider = {
   responsible_phone: string | null;
   whatsapp_phone: string | null;
   logo_path: string | null;
+  rider_apk_path?: string | null;
+  rider_apk_url?: string | null;
+  rider_apk_file_name?: string | null;
   submitted_at: string | null;
+};
+
+export type RiderApk = {
+  url: string | null;
+  file_name: string | null;
+  path: string | null;
 };
 
 export type GeoJsonPolygon = {
