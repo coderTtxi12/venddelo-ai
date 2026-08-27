@@ -4,6 +4,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
+import 'app_build.dart';
 import 'location_auth.dart';
 
 const _apiBaseUrlKey = 'apiBaseUrl';
@@ -52,10 +53,12 @@ class LocationTaskHandler extends TaskHandler {
               'Authorization': 'Bearer ${creds.accessToken}',
               'Content-Type': 'application/json',
             },
-            body: jsonEncode({
-              'latitude': position.latitude,
-              'longitude': position.longitude,
-            }),
+            body: jsonEncode(
+              riderLocationBody(
+                latitude: position.latitude,
+                longitude: position.longitude,
+              ),
+            ),
           );
         },
         refreshTokens: refreshSupabaseTokens,
