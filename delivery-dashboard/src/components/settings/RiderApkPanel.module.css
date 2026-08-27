@@ -1,0 +1,61 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.fieldHint {
+  margin: -0.15rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+.fileRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  overflow-wrap: anywhere;
+}
+
+.fileRow a {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.fileActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.uploadBtn,
+.saveBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  align-self: flex-start;
+  transition: background-color 180ms ease, border-color 180ms ease, opacity 180ms ease;
+}
+
+.uploadBtn:hover:not(:disabled) {
+  background: var(--color-bg);
+}
+
+.saveBtn:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.uploadBtn:focus-visible,
+.saveBtn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uploadBtn,
+  .saveBtn {
+    transition: none;
+  }
+}
