@@ -274,16 +274,33 @@ export function RiderApkPanel() {
                     </>
                   )}
                 </span>
-                <span id={dropHintId} className={styles.dropHint}>
-                  {uploading ? (
-                    'Espera a que termine la carga. No cierres esta página.'
-                  ) : (
-                    <>
-                      <span className={styles.onlyDesktop}>{riderApkDropDetailHint()}</span>
-                      <span className={styles.onlyTouch}>{riderApkDropDetailHintTouch()}</span>
-                    </>
-                  )}
-                </span>
+                {uploading ? (
+                  <div className={styles.progressBlock}>
+                    <div
+                      className={styles.progress}
+                      role="progressbar"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={uploadPhase === 'uploading' ? uploadPercent : undefined}
+                      aria-valuetext={progressLabel}
+                    >
+                      <span
+                        className={styles.progressFill}
+                        style={{
+                          width: `${uploadPhase === 'starting' ? 8 : uploadPercent}%`,
+                        }}
+                      />
+                    </div>
+                    <p className={styles.progressLabel} aria-live="polite">
+                      {progressLabel}
+                    </p>
+                  </div>
+                ) : (
+                  <span id={dropHintId} className={styles.dropHint}>
+                    <span className={styles.onlyDesktop}>{riderApkDropDetailHint()}</span>
+                    <span className={styles.onlyTouch}>{riderApkDropDetailHintTouch()}</span>
+                  </span>
+                )}
               </label>
               <div className={styles.urlBlock}>
                 <p className={styles.urlDivider}>o pega una URL</p>
