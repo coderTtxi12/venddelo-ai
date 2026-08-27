@@ -462,6 +462,7 @@ export type DispatchMonitorRequest = {
   cycle_silent_count?: number;
   created_at?: string | null;
   tracking_token?: string | null;
+  prep_minutes?: number | null;
   timeline?: DispatchMonitorTimelineEvent[];
 };
 
