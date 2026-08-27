@@ -64,6 +64,10 @@ class RiderController extends ChangeNotifier {
     _listenAuth();
     try {
       await refreshMe();
+      if (profile?.mustUpdate == true) {
+        await _stopOnlineServices();
+        return;
+      }
       await _setupFcm();
       await startLiveLocation();
       await _ensureRiderSocket();
@@ -112,6 +116,10 @@ class RiderController extends ChangeNotifier {
       final recovered = errorMessage != null;
       errorMessage = null;
       notifyListeners();
+      if (profile?.mustUpdate == true) {
+        unawaited(_stopOnlineServices());
+        return;
+      }
       if (recovered) {
         unawaited(_setupFcm());
         if (profile?.isOnline == true) {
@@ -144,6 +152,9 @@ class RiderController extends ChangeNotifier {
 
   Future<void> setOnline(bool isOnline) async {
     if (onlineBusy) {
+      return;
+    }
+    if (isOnline && profile?.mustUpdate == true) {
       return;
     }
     onlineBusy = true;
