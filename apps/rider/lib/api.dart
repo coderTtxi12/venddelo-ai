@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'app_build.dart';
 import 'config.dart';
 import 'friendly_error.dart';
 import 'models.dart';
@@ -52,7 +53,10 @@ class RiderApi {
 
   Future<RiderProfile> getMe() async {
     final response = await _send(
-      () => _client.get(_uri('/rider/me'), headers: _headers()),
+      () => _client.get(
+        _uri('/rider/me').replace(queryParameters: riderMeQuery()),
+        headers: _headers(),
+      ),
     );
     return RiderProfile.fromJson(_decode(response));
   }
@@ -62,7 +66,7 @@ class RiderApi {
       () => _client.patch(
         _uri('/rider/me/online'),
         headers: _headers(),
-        body: jsonEncode({'is_online': isOnline}),
+        body: jsonEncode(riderOnlineBody(isOnline: isOnline)),
       ),
     );
     return RiderProfile.fromJson(_decode(response));
@@ -73,7 +77,9 @@ class RiderApi {
       () => _client.post(
         _uri('/rider/me/location'),
         headers: _headers(),
-        body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
+        body: jsonEncode(
+          riderLocationBody(latitude: latitude, longitude: longitude),
+        ),
       ),
     );
     _decode(response);
