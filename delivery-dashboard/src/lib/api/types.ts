@@ -395,6 +395,8 @@ export type DispatchMonitorDriver = {
   registered_zone_id?: string | null;
   registered_zone_name?: string | null;
   itinerary?: DriverItineraryStopApi[];
+  app_version?: string | null;
+  app_build_number?: number | null;
 };
 
 export type DriverItineraryStopApi = {
