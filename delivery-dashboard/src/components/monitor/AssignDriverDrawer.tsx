@@ -7,6 +7,7 @@ import { DriverMetaTags } from '@/components/drivers/DriverMetaTags';
 import { RightDrawer } from '@/components/ui/RightDrawer';
 import type { DispatchMonitorDriver, DispatchMonitorRequest } from '@/lib/api/types';
 import { formatShortId, requestMoneyLine, requestPackageLine } from '@/lib/dispatch/monitorCopy';
+import { isCurrentRiderApp } from '@/lib/drivers/appBuild';
 import { pickupBeforeDropoff } from '@/lib/dispatch/driverItinerary';
 import styles from './AssignDriverDrawer.module.css';
 
@@ -98,6 +99,7 @@ export function AssignDriverDrawer({
           warnings.push(driver.is_pre_free ? 'Pre-libre' : 'En ruta');
         }
         if (hasOpenOffer) warnings.push('Oferta abierta');
+        if (!isCurrentRiderApp(driver.app_build_number)) warnings.push('App antigua');
         const disabled = isCurrent || hasOpenOffer || submitting;
         return { driver, isCurrent, warnings, disabled };
       });
@@ -231,6 +233,9 @@ export function AssignDriverDrawer({
                         motorcycleColor={driver.motorcycle_color}
                         compartmentSize={driver.compartment_size}
                         creditAvailableCents={driver.credit_available_cents}
+                        appVersion={driver.app_version}
+                        appBuildNumber={driver.app_build_number}
+                        showAppBuild
                       />
                       {warnings.length > 0 ? (
                         <span className={styles.warnings}>{warnings.join(' · ')}</span>
