@@ -15,7 +15,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     ...options.headers,
   };
 
-  if (options.body !== undefined) {
+  if (options.body !== undefined && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
 
@@ -28,7 +28,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     response = await fetch(`${API_URL}${path}`, {
       method: options.method ?? (options.body !== undefined ? 'POST' : 'GET'),
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body:
+        options.body === undefined
+          ? undefined
+          : options.body instanceof FormData
+            ? options.body
+            : JSON.stringify(options.body),
     });
   } catch {
     throw new ApiError(
