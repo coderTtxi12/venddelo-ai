@@ -17,9 +17,16 @@ def validate_rider_apk_filename(filename: str | None) -> str:
     return name.split("/")[-1].split("\\")[-1]
 
 
-def validate_rider_apk_bytes(payload: bytes) -> bytes:
-    if len(payload) > MAX_RIDER_APK_BYTES:
+def validate_rider_apk_size(size: int) -> int:
+    if size <= 0:
+        raise ValidationError("El archivo está vacío")
+    if size > MAX_RIDER_APK_BYTES:
         raise ValidationError("El APK no puede pesar más de 80 MB")
+    return size
+
+
+def validate_rider_apk_bytes(payload: bytes) -> bytes:
+    validate_rider_apk_size(len(payload))
     if not payload.startswith(_APK_MAGIC):
         raise ValidationError("El archivo no parece un APK válido")
     return payload
