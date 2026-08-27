@@ -240,11 +240,27 @@ export function RiderApkPanel() {
                 <span className={styles.dropIcon} aria-hidden>
                   <CloudUploadOutlinedIcon sx={{ fontSize: 28 }} />
                 </span>
-                <span className={styles.dropTitle}>{uploading ? 'Subiendo…' : dropTitle}</span>
+                <span className={styles.dropTitle}>
+                  {uploading ? (
+                    'Subiendo…'
+                  ) : dragActive ? (
+                    riderApkDropActiveHint()
+                  ) : (
+                    <>
+                      <span className={styles.onlyDesktop}>{riderApkDropIdleHint()}</span>
+                      <span className={styles.onlyTouch}>{riderApkDropIdleHintTouch()}</span>
+                    </>
+                  )}
+                </span>
                 <span id={dropHintId} className={styles.dropHint}>
-                  {uploading
-                    ? 'Espera a que termine la carga. No cierres esta página.'
-                    : 'Haz clic o suelta un archivo .apk · Máximo 80 MB'}
+                  {uploading ? (
+                    'Espera a que termine la carga. No cierres esta página.'
+                  ) : (
+                    <>
+                      <span className={styles.onlyDesktop}>{riderApkDropDetailHint()}</span>
+                      <span className={styles.onlyTouch}>{riderApkDropDetailHintTouch()}</span>
+                    </>
+                  )}
                 </span>
               </label>
               <div className={styles.urlBlock}>
