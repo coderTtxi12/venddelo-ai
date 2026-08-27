@@ -36,6 +36,11 @@ from app.db.models.delivery import (
 from app.db.models.restaurant import Restaurant
 from app.infra.storage.factory import build_storage
 from app.modules.assistant.image_webp import WEBP_CONTENT_TYPE, convert_image_bytes_to_webp
+from app.modules.delivery_dispatch.app_client import (
+    force_update_payload,
+    must_update_app,
+    provider_rider_apk_url,
+)
 from app.modules.delivery_dispatch.assignment_log import list_assignment_events
 from app.modules.delivery_dispatch.geo import geodesic_meters
 from app.modules.delivery_dispatch.history import list_active_holds, list_dispatch_history
