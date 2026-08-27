@@ -16,6 +16,11 @@ def can_manage_members(role: str | None) -> bool:
     return role == "owner"
 
 
+def require_manage_rider_app(role: str | None) -> None:
+    if not can_manage_members(role):
+        raise ForbiddenError("Solo el propietario puede modificar la app del rider")
+
+
 def can_write_provider_config(role: str | None) -> bool:
     return role in _WRITE_CONFIG_ROLES
 
