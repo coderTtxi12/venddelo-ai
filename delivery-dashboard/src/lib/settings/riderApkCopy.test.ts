@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { canManageRiderApp } from '../access/deliveryProviderPermissions';
-import { riderApkEmptyHint, riderApkReadOnlyHint } from './riderApkCopy';
+import {
+  pickDroppedApkFile,
+  riderApkDropActiveHint,
+  riderApkDropIdleHint,
+  riderApkDropRejectHint,
+  riderApkEmptyHint,
+  riderApkReadOnlyHint,
+} from './riderApkCopy';
 
 test('only the delivery owner can upload or edit the rider APK', () => {
   assert.equal(canManageRiderApp('owner'), true);
