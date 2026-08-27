@@ -78,6 +78,7 @@ def _engine_settings(row: DeliveryProviderAssignmentSettings) -> EngineSettings:
         max_pickup_detour_meters=row.max_pickup_detour_meters,
         max_destination_detour_meters=row.max_destination_detour_meters,
         assignment_timeout_seconds=row.assignment_timeout_seconds,
+        rider_min_app_build=get_settings().rider_min_app_build,
     )
 
 
@@ -243,7 +244,11 @@ def build_dispatch_monitor_snapshot(
             DeliveryProviderAssignmentSettings.delivery_provider_id == provider_id
         )
     )
-    settings = _engine_settings(settings_row) if settings_row is not None else EngineSettings()
+    settings = (
+        _engine_settings(settings_row)
+        if settings_row is not None
+        else EngineSettings(rider_min_app_build=get_settings().rider_min_app_build)
+    )
     staleness_seconds = settings.driver_location_staleness_seconds
 
     zone_rows = list(
@@ -435,6 +440,7 @@ def build_dispatch_monitor_snapshot(
             active_dropoff_lat=active.dropoff_lat if active is not None else None,
             active_dropoff_lng=active.dropoff_lng if active is not None else None,
             occupied_job_count=len(occupied),
+            app_build_number=driver.app_build_number,
         )
         engine_drivers.append(engine_driver)
         pre_free_eta = pre_free_eta_seconds(scratch_context, engine_driver)
@@ -472,6 +478,8 @@ def build_dispatch_monitor_snapshot(
                 if driver.registered_zone_id is not None
                 else None,
                 itinerary=hydrate_itinerary(session, driver.id),
+                app_version=driver.app_version,
+                app_build_number=driver.app_build_number,
             )
         )
 
