@@ -64,6 +64,7 @@ export function blockerLabel(code: string): string {
     compartment: 'Caja chica',
     packages: 'Capacidad',
     credit: 'Crédito',
+    outdated_app: 'App vieja',
   };
   return labels[code] ?? code;
 }
