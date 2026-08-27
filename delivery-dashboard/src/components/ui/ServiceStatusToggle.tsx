@@ -36,7 +36,7 @@ export default function ServiceStatusToggle() {
 
   if (loading) {
     return (
-      <div className={styles.toggleWrap} aria-busy="true">
+      <div className={styles.toggleWrap} data-topbar-service-status="" aria-busy="true">
         <span className={styles.loadingText}>Estado del servicio…</span>
       </div>
     );
@@ -56,7 +56,7 @@ export default function ServiceStatusToggle() {
       : styles.statusDotInactive;
 
   return (
-    <div className={styles.toggleWrap}>
+    <div className={styles.toggleWrap} data-topbar-service-status="">
       <div className={styles.statusMeta}>
         <div className={styles.statusRow}>
           <span className={`${styles.statusDot} ${dotClass}`} aria-hidden />
