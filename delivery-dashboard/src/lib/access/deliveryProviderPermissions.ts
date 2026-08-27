@@ -24,6 +24,10 @@ export function canManageMembers(role: string | null | undefined): boolean {
   return role === 'owner';
 }
 
+export function canManageRiderApp(role: string | null | undefined): boolean {
+  return canManageMembers(role);
+}
+
 export function canWriteProviderConfig(role: string | null | undefined): boolean {
   return role === 'owner' || role === 'admin';
 }
