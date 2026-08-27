@@ -311,7 +311,8 @@
 @media (prefers-reduced-motion: reduce) {
   .dropzone,
   .publishedLink,
-  .saveBtn {
+  .saveBtn,
+  .progressFill {
     transition: none;
   }
 }
