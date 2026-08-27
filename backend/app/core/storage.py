@@ -34,4 +34,9 @@ class StoragePort(ABC):
     def create_signed_url(self, path: str, expires_in: int) -> str: ...
 
     @abstractmethod
+    def create_signed_upload(
+        self, path: str, *, content_type: str, upsert: bool = True
+    ) -> SignedUpload: ...
+
+    @abstractmethod
     def read(self, path: str) -> bytes: ...
