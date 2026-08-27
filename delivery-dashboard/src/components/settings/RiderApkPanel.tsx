@@ -264,7 +264,7 @@ export function RiderApkPanel() {
                 </span>
                 <span className={styles.dropTitle}>
                   {uploading ? (
-                    'Subiendo…'
+                    'Subiendo APK…'
                   ) : dragActive ? (
                     riderApkDropActiveHint()
                   ) : (
