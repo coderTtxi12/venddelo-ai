@@ -441,6 +441,14 @@ export function TicketPrinterSettings({
           </button>
           <button
             type="button"
+            className={isSystemPrintDialog(printer) ? styles.primaryBtn : styles.secondaryBtn}
+            onClick={usePrintDialog}
+          >
+            <PrintOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
+            Diálogo de impresión
+          </button>
+          <button
+            type="button"
             className={styles.secondaryBtn}
             disabled={systemBusy || !accessToken}
             onClick={useSystem}
@@ -577,9 +585,9 @@ export function TicketPrinterSettings({
           </p>
         ) : null}
         <p className={styles.helpText}>
-          USB, Bluetooth y red funcionan en Chrome o Edge. La búsqueda Wi‑Fi/Ethernet recorre el
-          puerto 9100 desde el servidor. Si no aparece, escribe la IP. En iPhone/iPad, o Bluetooth
-          clásico, usa “Usar sistema” y elige una impresora de la lista, o el diálogo de impresión.
+          Elige <strong>Diálogo de impresión</strong> para que en Pedidos, al pulsar Imprimir
+          ticket, Chrome abra el diálogo del sistema. Bluetooth y USB imprimen en silencio desde
+          esta tablet. Wi‑Fi/Ethernet pasa por el servidor y no llega a la red del restaurante.
         </p>
       </div>
 
