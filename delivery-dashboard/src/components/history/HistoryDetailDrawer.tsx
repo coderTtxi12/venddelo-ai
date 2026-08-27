@@ -167,6 +167,14 @@ export function HistoryDetailDrawer({
               Pedido
             </h3>
             <dl className={styles.list}>
+              {trackingUrl ? (
+                <DetailRow label="Rastreo">
+                  <ExternalLink href={trackingUrl}>Abrir rastreo</ExternalLink>
+                </DetailRow>
+              ) : null}
+              <DetailRow label="Preparación">
+                {formatPrepMinutes(requestPrepMinutes(item))}
+              </DetailRow>
               <DetailRow label="Cliente">{item.customer_name}</DetailRow>
               <DetailRow label="Celular">
                 {item.customer_phone ? (
