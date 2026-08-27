@@ -31,6 +31,12 @@ test('dropzone copy explains drag, drop and apk-only', () => {
   assert.match(riderApkDropRejectHint(), /\.apk/i);
 });
 
+test('touch copy asks to tap instead of drag', () => {
+  assert.match(riderApkDropIdleHintTouch(), /toca/i);
+  assert.match(riderApkDropIdleHintTouch(), /apk/i);
+  assert.match(riderApkOwnerHintTouch(), /elige el apk/i);
+});
+
 test('pickDroppedApkFile takes the first apk and ignores other files', () => {
   const apk = pickDroppedApkFile([
     { name: 'notes.txt', type: 'text/plain' },
