@@ -147,6 +147,8 @@ export function RiderApkPanel() {
     }
   }
 
+  const dropTitle = dragActive ? riderApkDropActiveHint() : riderApkDropIdleHint();
+
   return (
     <section className={pageStyles.panel} aria-labelledby="settings-rider-apk">
       <h2 id="settings-rider-apk" className={pageStyles.panelTitle}>
