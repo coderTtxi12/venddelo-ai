@@ -21,6 +21,8 @@ import {
   requestStatusLabel,
 } from '@/lib/dispatch/monitorCopy';
 import { formatMoney } from '@/lib/pricing/tariffUtils';
+import { publicTrackingUrl } from '@/lib/dispatch/publicTrackingUrl';
+import { formatPrepMinutes, requestPrepMinutes } from '@/lib/dispatch/prepTime';
 import styles from '@/components/monitor/RequestDetailDrawer.module.css';
 
 type HistoryDetailDrawerProps = {
