@@ -577,6 +577,9 @@ export type DispatchHistoryItem = {
   dispatch_group_id?: string | null;
   case_applied?: string | null;
   timeline?: DispatchMonitorTimelineEvent[];
+  prep_minutes?: number | null;
+  tracking_token?: string | null;
+  restaurant_subdomain?: string | null;
 };
 
 export type DispatchHistoryPage = {
