@@ -10,12 +10,28 @@ export function riderApkOwnerHint(): string {
   return 'Arrastra el APK, elige un archivo o pega una URL https. Ese enlace es el que recibe la app si hay que forzar actualización.';
 }
 
+export function riderApkOwnerHintTouch(): string {
+  return 'Elige el APK o pega una URL https. Ese enlace es el que recibe la app si hay que forzar actualización.';
+}
+
 export function riderApkDropIdleHint(): string {
   return 'Arrastra el APK aquí o elige un archivo';
 }
 
+export function riderApkDropIdleHintTouch(): string {
+  return 'Toca para elegir el APK';
+}
+
 export function riderApkDropActiveHint(): string {
   return 'Suelta para subir el APK';
+}
+
+export function riderApkDropDetailHint(): string {
+  return 'Haz clic o suelta un archivo .apk · Máximo 80 MB';
+}
+
+export function riderApkDropDetailHintTouch(): string {
+  return 'Elige un archivo .apk · Máximo 80 MB';
 }
 
 export function riderApkDropRejectHint(): string {
