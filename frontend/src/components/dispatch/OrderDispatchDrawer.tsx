@@ -13,6 +13,7 @@ import { isActiveDeliveryPartnership } from '@/lib/fetchActiveDeliveryProviderCo
 import {
   kitchenConfirmOpensDispatch,
   orderToDispatchFormValues,
+  orderWithDispatch,
   requestRiderThenConfirmOrder,
 } from '@/lib/orders/kitchenDispatch';
 import { formatOrderDisplayId } from '@/lib/orders/orderDisplay';
@@ -152,12 +153,13 @@ export function OrderDispatchDrawer({
         confirmOrder,
       });
       if (result.status === 'ok') {
-        onOrderConfirmed(result.order);
+        onOrderConfirmed(orderWithDispatch(result.order, result.request));
         cacheCreatedState(order.id, result.request, null);
         onDispatchPrinted?.(result.order);
         return;
       }
       if (result.status === 'confirm_failed') {
+        onOrderConfirmed(orderWithDispatch(order, result.request));
         cacheCreatedState(order.id, result.request, confirmFailureMessage(result.error));
       }
     },
@@ -169,7 +171,7 @@ export function OrderDispatchDrawer({
     setConfirming(true);
     try {
       const updated = await confirmOrder();
-      onOrderConfirmed(updated);
+      onOrderConfirmed(orderWithDispatch(updated, created));
       cacheCreatedState(order.id, created, null);
       onDispatchPrinted?.(updated);
     } catch (error) {
@@ -234,6 +236,7 @@ export function OrderDispatchDrawer({
               courierReason={courierReason}
               leadTimes={leadTimes}
               initialValues={initialValues}
+              sourceOrder={order}
               submitLabel="Continuar y solicitar repartidor"
               resetOnSuccess={false}
               onSubmittingChange={setSubmitting}
