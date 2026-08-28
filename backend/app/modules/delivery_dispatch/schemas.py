@@ -212,6 +212,7 @@ class DispatchRequestCreate(BaseModel):
     package_count: int = Field(ge=1)
     prep_minutes: int = Field(ge=1, lt=60)
     notes: str | None = Field(default=None, max_length=500)
+    order_id: uuid.UUID | None = None
 
 
 class MapsUrlResolveDTO(BaseModel):
@@ -244,6 +245,7 @@ class DispatchRequestDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    order_id: uuid.UUID | None = None
     customer_name: str
     customer_phone: str
     dropoff_lat: float

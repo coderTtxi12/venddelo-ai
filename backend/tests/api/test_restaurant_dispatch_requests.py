@@ -30,6 +30,7 @@ def _clean_dispatch_tables(engine):
                          delivery_provider_payment_methods,
                          delivery_provider_schedules, delivery_provider_zones,
                          delivery_provider_members, delivery_providers,
+                         order_items, orders,
                          restaurant_members, restaurants, users
                 RESTART IDENTITY CASCADE
                 """
@@ -550,3 +551,87 @@ def test_public_plate_suffix_uses_last_three_alnum():
     assert public_plate_suffix("ab-12-3") == "123"
     assert public_plate_suffix("12") == "12"
     assert public_plate_suffix("   ") == ""
+
+
+def _create_delivery_order(engine, restaurant_id: str, **overrides):
+    from app.db.uow import SqlAlchemyUnitOfWork
+    from app.modules.orders.schemas import OrderCreate
+
+    payload = {
+        "restaurant_id": uuid.UUID(restaurant_id),
+        "type": "delivery",
+        "customer_name": "María López",
+        "customer_phone": "+525512345678",
+        "payment_method": "cash",
+        "subtotal_cents": 18000,
+        "total_cents": 25777,
+        "delivery_address": "Centro Histórico, CDMX",
+        "delivery_latitude": COVERED_LAT,
+        "delivery_longitude": COVERED_LNG,
+        "delivery_fee_cents": 7777,
+        "cash_denomination_cents": 50000,
+        "note": "Ref. pedido #A1B2C3D4 | sin cebolla",
+        "items": [],
+    }
+    payload.update(overrides)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        order = uow.orders.add(OrderCreate(**payload))
+        uow.commit()
+        return order
+
+
+@requires_db
+def test_create_dispatch_from_order_reuses_display_id_and_quoted_fee(client, engine):
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-order-id")
+    _activate_partnership(client, engine, restaurant_id)
+    order = _create_delivery_order(engine, restaurant_id)
+
+    response = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(order_id=str(order.id)),
+        headers=AUTH,
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["short_id"] == "A1B2C"
+    assert body["quoted_fee_cents"] == 7777
+    assert body["order_id"] == str(order.id)
+
+    listed = client.get(
+        f"/api/v1/restaurants/{restaurant_id}/orders",
+        headers=AUTH,
+    )
+    assert listed.status_code == 200
+    item = next(row for row in listed.json()["items"] if row["id"] == str(order.id))
+    assert item["dispatch"]["short_id"] == "A1B2C"
+    assert item["dispatch"]["tracking_token"] == body["tracking_token"]
+    assert item["dispatch"]["status"] == body["status"]
+
+
+@requires_db
+def test_create_dispatch_from_order_requotes_when_pin_moves(client, engine):
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-order-move")
+    _activate_partnership(client, engine, restaurant_id)
+    order = _create_delivery_order(engine, restaurant_id)
+
+    response = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(
+            order_id=str(order.id),
+            dropoff_lat=COVERED_LAT + 0.002,
+            dropoff_lng=COVERED_LNG + 0.002,
+        ),
+        headers=AUTH,
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["short_id"] == "A1B2C"
+    assert body["quoted_fee_cents"] != 7777
+    assert body["quoted_fee_cents"] > 0

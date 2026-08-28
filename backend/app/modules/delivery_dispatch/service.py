@@ -33,6 +33,7 @@ from app.db.models.delivery import (
     DeliverySearchLeadTime,
     RestaurantDeliveryProvider,
 )
+from app.db.models.orders import Order
 from app.db.models.restaurant import Restaurant
 from app.infra.storage.factory import build_storage
 from app.modules.assistant.image_webp import WEBP_CONTENT_TYPE, convert_image_bytes_to_webp
@@ -98,7 +99,7 @@ from app.modules.delivery_dispatch.schemas import (
     SearchLeadTimeUpdate,
 )
 from app.modules.delivery_dispatch.search_at import compute_search_at
-from app.modules.delivery_dispatch.short_id import allocate_dispatch_short_id
+from app.modules.delivery_dispatch.short_id import claim_dispatch_short_id
 from app.modules.delivery_dispatch.tasks import (
     close_offered_offers,
     enqueue,
@@ -119,6 +120,7 @@ from app.modules.delivery_providers.permissions import (
     require_write_provider_config,
 )
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
+from app.modules.orders.display_id import order_display_id
 from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
 from app.modules.restaurants.schemas import RestaurantDTO
 from app.modules.users.schemas import UserDTO
@@ -934,13 +936,29 @@ class RestaurantDispatchService:
             data.collect_cents,
             data.cash_denomination_cents,
         )
-        quote = self._quotes.quote_delivery(
-            restaurant,
-            delivery_latitude=latitude,
-            delivery_longitude=longitude,
+        source_order = self._resolve_source_order(restaurant.id, data.order_id)
+        if source_order is not None:
+            existing = self._existing_order_dispatch(restaurant.id, source_order.id)
+            if existing is not None:
+                return self._to_dto(existing)
+
+        lock_quoted_fee = source_order is not None and _same_dropoff_coords(
+            source_order,
+            latitude,
+            longitude,
         )
-        if not quote.available:
-            raise ValidationError(quote.reason or "El servicio de reparto no está disponible.")
+        if lock_quoted_fee:
+            assert source_order is not None
+            quoted_fee_cents = source_order.delivery_fee_cents
+        else:
+            quote = self._quotes.quote_delivery(
+                restaurant,
+                delivery_latitude=latitude,
+                delivery_longitude=longitude,
+            )
+            if not quote.available:
+                raise ValidationError(quote.reason or "El servicio de reparto no está disponible.")
+            quoted_fee_cents = quote.delivery_fee_cents
 
         now = datetime.now(UTC)
         ready_at = now + timedelta(minutes=data.prep_minutes)
@@ -949,8 +967,14 @@ class RestaurantDispatchService:
             ready_at,
             lead_time.search_ahead_minutes,
         )
+        preferred_short_id = (
+            order_display_id(order_id=source_order.id, note=source_order.note)
+            if source_order is not None
+            else None
+        )
         row = DeliveryDispatchRequest(
             restaurant_id=restaurant.id,
+            order_id=source_order.id if source_order is not None else None,
             delivery_provider_id=provider_id,
             zone_id=partnership.zone_id,
             customer_name=data.customer_name.strip(),
@@ -967,11 +991,11 @@ class RestaurantDispatchService:
             ready_at=ready_at,
             search_at=search_at,
             next_attempt_at=search_at,
-            quoted_fee_cents=quote.delivery_fee_cents,
+            quoted_fee_cents=quoted_fee_cents,
             status="searching" if search_at <= now else "scheduled",
             assigned_driver_id=None,
             tracking_token=secrets.token_hex(24),
-            short_id=allocate_dispatch_short_id(self._session),
+            short_id=claim_dispatch_short_id(self._session, preferred_short_id),
             notes=data.notes.strip() if data.notes else None,
             decision_json=None,
             cancelled_at=None,
@@ -1148,6 +1172,37 @@ class RestaurantDispatchService:
             storage=self._storage or build_storage(),
         )
 
+    def _resolve_source_order(
+        self,
+        restaurant_id: uuid.UUID,
+        order_id: uuid.UUID | None,
+    ) -> Order | None:
+        if order_id is None:
+            return None
+        order = self._session.get(Order, order_id)
+        if order is None or order.restaurant_id != restaurant_id:
+            raise ValidationError("El pedido no pertenece a este restaurante.")
+        if order.type != "delivery":
+            raise ValidationError("Solo se puede vincular un envío a un pedido a domicilio.")
+        return order
+
+    def _existing_order_dispatch(
+        self,
+        restaurant_id: uuid.UUID,
+        order_id: uuid.UUID,
+    ) -> DeliveryDispatchRequest | None:
+        return self._session.scalar(
+            select(DeliveryDispatchRequest)
+            .options(
+                selectinload(DeliveryDispatchRequest.assigned_driver),
+                selectinload(DeliveryDispatchRequest.credit_hold),
+            )
+            .where(
+                DeliveryDispatchRequest.order_id == order_id,
+                DeliveryDispatchRequest.restaurant_id == restaurant_id,
+            )
+        )
+
     def _active_partnership(
         self,
         restaurant_id: uuid.UUID,
@@ -1290,6 +1345,18 @@ class RestaurantDispatchService:
                 0,
                 locked_driver.credit_held_cents - hold.amount_cents,
             )
+
+
+_DROPOFF_COORD_EPS = 1e-5
+
+
+def _same_dropoff_coords(order: Order, latitude: float, longitude: float) -> bool:
+    if order.delivery_latitude is None or order.delivery_longitude is None:
+        return False
+    return (
+        abs(order.delivery_latitude - latitude) <= _DROPOFF_COORD_EPS
+        and abs(order.delivery_longitude - longitude) <= _DROPOFF_COORD_EPS
+    )
 
 
 _ACTIVE_ASSIGNMENT_STATUSES = frozenset({"assigned", "picked_up", "in_transit"})
