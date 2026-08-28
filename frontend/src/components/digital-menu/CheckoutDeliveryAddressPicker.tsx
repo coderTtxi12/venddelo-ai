@@ -13,6 +13,7 @@ import {
 } from '@/lib/loadGoogleMapsPlaces';
 import { dismissMobileKeyboard, scrollElementIntoViewAfterKeyboard } from '@/lib/mobileKeyboard';
 import { applyPlaceAutocompleteTheme } from '@/lib/digital-menu/checkout/applyPlaceAutocompleteTheme';
+import { writePlaceAutocompleteValue } from '@/lib/digital-menu/checkout/placeAutocompleteValue';
 import {
   isBrowserGeolocationAvailable,
   requestBrowserGeolocation,
@@ -58,6 +59,7 @@ export function CheckoutDeliveryAddressPicker({
   showValidation = false,
 }: CheckoutDeliveryAddressPickerProps) {
   const autocompleteHostRef = useRef<HTMLDivElement>(null);
+  const autocompleteElementRef = useRef<google.maps.places.PlaceAutocompleteElement | null>(null);
   const mapShellRef = useRef<HTMLDivElement>(null);
   const shouldScrollToMapRef = useRef(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -270,6 +272,8 @@ export function CheckoutDeliveryAddressPicker({
         );
 
         autocompleteHostRef.current.replaceChildren(autocomplete as unknown as Node);
+        autocompleteElementRef.current = autocomplete;
+        writePlaceAutocompleteValue(autocomplete, valueRef.current.address);
         if (!cancelled) setAutocompleteError(null);
       } catch (error) {
         console.error(error);
@@ -283,10 +287,15 @@ export function CheckoutDeliveryAddressPicker({
 
     return () => {
       cancelled = true;
+      autocompleteElementRef.current = null;
       stopAutocompleteThemeRef.current?.();
       stopAutocompleteThemeRef.current = null;
     };
   }, [apiKeyMissing, handlePlaceSelected]);
+
+  useEffect(() => {
+    writePlaceAutocompleteValue(autocompleteElementRef.current, value.address);
+  }, [value.address]);
 
   useEffect(() => {
     if (!hasCoords || !shouldScrollToMapRef.current) return;

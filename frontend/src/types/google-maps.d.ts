@@ -7,6 +7,7 @@ declare global {
       className: string;
       placeholder: string;
       noInputIcon: boolean;
+      value: string;
       appendChild<T extends Node>(node: T): T;
       querySelector(selectors: string): Element | null;
       addEventListener(
