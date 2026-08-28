@@ -11,10 +11,14 @@ import {
 function envWith(
   getCurrentPosition: Geolocation['getCurrentPosition'] | null,
   isSecureContext = true,
+  permissionState?: 'granted' | 'denied' | 'prompt',
 ): BrowserGeolocationEnv {
   return {
     isSecureContext,
     geolocation: getCurrentPosition ? { getCurrentPosition } : null,
+    permissions: permissionState
+      ? { query: async () => ({ state: permissionState }) }
+      : null,
   };
 }
 
@@ -55,7 +59,7 @@ test('requestBrowserGeolocation maps PERMISSION_DENIED', async () => {
   assert.deepEqual(result, { ok: false, reason: 'denied' });
 });
 
-test('requestBrowserGeolocation maps timeout and unavailable', async () => {
+test('requestBrowserGeolocation maps timeout as unavailable', async () => {
   const timeout = await requestBrowserGeolocation(
     envWith((_success, error) => {
       error?.({ code: 3 } as GeolocationPositionError);
@@ -64,7 +68,33 @@ test('requestBrowserGeolocation maps timeout and unavailable', async () => {
   assert.deepEqual(timeout, { ok: false, reason: 'unavailable' });
 });
 
-test('requestBrowserGeolocation uses high accuracy 12s timeout', async () => {
+test('POSITION_UNAVAILABLE without prior permission is services_off', async () => {
+  const result = await requestBrowserGeolocation(
+    envWith(
+      (_success, error) => {
+        error?.({ code: 2 } as GeolocationPositionError);
+      },
+      true,
+      'prompt',
+    ),
+  );
+  assert.deepEqual(result, { ok: false, reason: 'services_off' });
+});
+
+test('POSITION_UNAVAILABLE after permission granted stays unavailable', async () => {
+  const result = await requestBrowserGeolocation(
+    envWith(
+      (_success, error) => {
+        error?.({ code: 2 } as GeolocationPositionError);
+      },
+      true,
+      'granted',
+    ),
+  );
+  assert.deepEqual(result, { ok: false, reason: 'unavailable' });
+});
+
+test('requestBrowserGeolocation does not timeout native location dialogs', async () => {
   let seen: PositionOptions | undefined;
   await requestBrowserGeolocation(
     envWith((success, _error, options) => {
@@ -74,10 +104,8 @@ test('requestBrowserGeolocation uses high accuracy 12s timeout', async () => {
       } as GeolocationPosition);
     }),
   );
-  assert.deepEqual(seen, {
-    enableHighAccuracy: true,
-    timeout: 12_000,
-    maximumAge: 15_000,
-  });
-  assert.equal(BROWSER_GEOLOCATION_OPTIONS.timeout, 12_000);
+  assert.equal(seen?.enableHighAccuracy, true);
+  assert.equal(seen?.maximumAge, 15_000);
+  assert.equal(seen?.timeout, undefined);
+  assert.equal(BROWSER_GEOLOCATION_OPTIONS.timeout, undefined);
 });
