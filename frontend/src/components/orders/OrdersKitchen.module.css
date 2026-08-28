@@ -842,6 +842,61 @@
   grid-column: 1 / -1;
 }
 
+.trackingActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.trackingAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 40px;
+  padding: 0.4rem 0.8rem;
+  border-radius: 11px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+
+.trackingAction:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+}
+
+.trackingWhatsApp {
+  border-color: color-mix(in srgb, #25d366 38%, var(--color-border));
+  color: #0f766e;
+}
+
+.trackingWhatsApp:hover {
+  border-color: #25d366;
+  background: color-mix(in srgb, #25d366 10%, var(--color-surface));
+  color: #075e54;
+}
+
+.trackingAction:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trackingAction {
+    transition: none;
+  }
+}
+
 .addressBlock {
   margin-top: 0.2rem;
   font-size: 0.98rem;
@@ -891,7 +946,11 @@
 }
 
 .itemThumbFallback {
+  overflow: hidden;
   background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  --dm-product-thumb-bg: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  --dm-text-secondary: var(--color-text-secondary);
+  --dm-text: var(--color-text);
 }
 
 .itemBody {
@@ -1206,6 +1265,10 @@
   .listActionBtn {
     min-height: 44px;
     font-size: 0.8rem;
+  }
+
+  .trackingAction {
+    min-height: 44px;
   }
 }
 

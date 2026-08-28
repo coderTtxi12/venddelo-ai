@@ -47,7 +47,9 @@ import { useKitchenOrderProducts } from '@/lib/orders/useKitchenOrderProducts';
 import { useKitchenOrdersInfiniteScroll } from '@/lib/orders/useKitchenOrdersInfiniteScroll';
 import { OrderDispatchDrawer } from '@/components/dispatch/OrderDispatchDrawer';
 import { OrderCancelDialog } from '@/components/orders/OrderCancelDialog';
+import { OrderTrackingLink } from '@/components/orders/OrderTrackingLink';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
 import { kitchenConfirmOpensDispatch } from '@/lib/orders/kitchenDispatch';
 import { useKitchenTicketPrinter } from '@/lib/print/useKitchenTicketPrinter';
 import { KitchenLiveIndicator } from '@/components/orders/KitchenLiveIndicator';
@@ -58,6 +60,8 @@ import {
   kitchenClosedCount,
 } from '@/lib/orders/kitchenBoard';
 import { formatOrderCustomerPhone } from '@/lib/digital-menu/checkout/customerPhone';
+import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
+import { publicMenuOrigin } from '@/lib/restaurantSubdomain';
 import styles from './OrdersKitchen.module.css';
 
 const EMPTY_PROMOTIONS: Promotion[] = [];
@@ -264,7 +268,7 @@ function OrderItemCard({
           {imageUrl ? (
             <img src={imageUrl} alt="" className={styles.itemThumb} />
           ) : (
-            <div className={styles.itemThumbFallback} aria-hidden />
+            <ProductImagePlaceholder name={item.product_name} className={styles.itemThumbFallback} />
           )}
         </div>
         <div className={styles.itemBody}>
@@ -327,6 +331,7 @@ function OrderDetailContent({
   onAdvance,
   onCancel,
   onPrint,
+  trackingUrl,
 }: {
   order: Order;
   productsById: ReadonlyMap<string, Product>;
@@ -339,6 +344,7 @@ function OrderDetailContent({
   onAdvance: () => void;
   onCancel: () => void;
   onPrint?: () => void;
+  trackingUrl?: string | null;
 }) {
   const meta = ORDER_STATUS_META[order.status];
   const itemCount = countOrderItems(order.items);
@@ -406,6 +412,9 @@ function OrderDetailContent({
               <p className={styles.infoLabel}>Referencia</p>
               <p className={styles.infoValue}>#{orderRef}</p>
             </div>
+          ) : null}
+          {trackingUrl && order.dispatch ? (
+            <OrderTrackingLink trackingUrl={trackingUrl} shortId={order.dispatch.short_id} />
           ) : null}
         </div>
 
@@ -525,6 +534,7 @@ function OrderDetailPanel({
   onAdvance,
   onCancel,
   onPrint,
+  trackingUrl,
 }: {
   order: Order | null;
   productsById: ReadonlyMap<string, Product>;
@@ -537,6 +547,7 @@ function OrderDetailPanel({
   onAdvance: () => void;
   onCancel: () => void;
   onPrint?: () => void;
+  trackingUrl?: string | null;
 }) {
   return (
     <section className={styles.detailPanel} aria-label="Detalle del pedido">
@@ -553,6 +564,7 @@ function OrderDetailPanel({
           onAdvance={onAdvance}
           onCancel={onCancel}
           onPrint={onPrint}
+          trackingUrl={trackingUrl}
         />
       ) : (
         <div className={styles.detailEmpty}>
@@ -570,6 +582,7 @@ function OrderDetailPanel({
 
 export function KitchenOrdersView() {
   const { accessToken } = useAuth();
+  const { accessibleRestaurants } = useRestaurantAccess();
   const {
     restaurantId,
     orders,
@@ -644,6 +657,16 @@ export function KitchenOrdersView() {
     () => orders.find((order) => order.id === selectedOrderId) ?? null,
     [orders, selectedOrderId],
   );
+  const restaurantSubdomain = useMemo(
+    () =>
+      accessibleRestaurants.find((item) => item.restaurant.id === restaurantId)?.restaurant
+        .subdomain ?? '',
+    [accessibleRestaurants, restaurantId],
+  );
+  const trackingUrl =
+    selectedOrder?.dispatch?.tracking_token && restaurantSubdomain
+      ? `${publicMenuOrigin(restaurantSubdomain)}/rastreo/${selectedOrder.dispatch.tracking_token}`
+      : null;
 
   const bulkActions = kitchenBulkActions(kitchenFilter);
   const closedCount = kitchenClosedCount(filterCounts);
@@ -1062,6 +1085,7 @@ export function KitchenOrdersView() {
                     }
                   : undefined
               }
+              trackingUrl={trackingUrl}
             />
           </div>
         ) : null}
@@ -1083,6 +1107,7 @@ export function KitchenOrdersView() {
             onPrint={() => {
               void printOrder(selectedOrder, 'manual', productsById);
             }}
+            trackingUrl={trackingUrl}
           />
         </div>
       ) : null}
