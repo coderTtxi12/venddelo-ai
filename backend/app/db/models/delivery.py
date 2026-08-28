@@ -589,6 +589,12 @@ class DeliveryDispatchRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("restaurants.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    order_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("orders.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
+    )
     delivery_provider_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("delivery_providers.id", ondelete="RESTRICT"),
