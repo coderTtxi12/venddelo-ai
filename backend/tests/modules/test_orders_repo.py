@@ -104,7 +104,7 @@ def test_list_by_restaurant_eager_loads_items_bounded_queries(session, engine):
         page = repo.list_by_restaurant(r.id, PaginationParams(limit=10))
         assert len(page.items) == 3
         assert all(len(order.items) == 1 for order in page.items)
-        assert query_count["n"] <= 3
+        assert query_count["n"] <= 4
     finally:
         event.remove(engine, "before_cursor_execute", before_cursor_execute)
 

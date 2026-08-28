@@ -12,6 +12,7 @@ from app.core.pagination import (
     decode_keyset_cursor,
     encode_keyset_cursor,
 )
+from app.db.models.delivery import DeliveryDispatchRequest
 from app.db.models.orders import Order, OrderItem
 from app.modules.orders.constants import (
     ACTIVE_ORDER_STATUSES,
@@ -19,7 +20,12 @@ from app.modules.orders.constants import (
     ARCHIVE_ORDER_STATUSES,
 )
 from app.modules.orders.repository import OrderRepository
-from app.modules.orders.schemas import OrderCreate, OrderDTO, OrderStatusSummaryDTO
+from app.modules.orders.schemas import (
+    OrderCreate,
+    OrderDispatchDTO,
+    OrderDTO,
+    OrderStatusSummaryDTO,
+)
 
 
 class SqlAlchemyOrderRepository(OrderRepository):
@@ -33,13 +39,13 @@ class SqlAlchemyOrderRepository(OrderRepository):
         self._session.add(order)
         self._session.flush()
         self._session.refresh(order)
-        return OrderDTO.model_validate(order)
+        return self._to_dto(order)
 
     def get(self, id: uuid.UUID) -> OrderDTO | None:
         obj = self._session.scalar(
             select(Order).options(selectinload(Order.items)).where(Order.id == id)
         )
-        return OrderDTO.model_validate(obj) if obj else None
+        return self._to_dto(obj) if obj is not None else None
 
     def list_by_restaurant(
         self,
@@ -77,7 +83,7 @@ class SqlAlchemyOrderRepository(OrderRepository):
         rows = rows[: params.limit]
         next_cursor = encode_keyset_cursor(rows[-1].created_at, rows[-1].id) if has_more else None
         return CursorPage(
-            items=[OrderDTO.model_validate(r) for r in rows],
+            items=self._attach_dispatch([OrderDTO.model_validate(r) for r in rows]),
             next_cursor=next_cursor,
             has_more=has_more,
         )
@@ -128,7 +134,7 @@ class SqlAlchemyOrderRepository(OrderRepository):
         if cancellation_reason is not None:
             obj.cancellation_reason = cancellation_reason
         self._session.flush()
-        return OrderDTO.model_validate(obj)
+        return self._to_dto(obj)
 
     def clear_closed_from_kds(
         self,
@@ -155,4 +161,35 @@ class SqlAlchemyOrderRepository(OrderRepository):
                 Order.idempotency_key == key,
             )
         )
-        return OrderDTO.model_validate(obj) if obj else None
+        return self._to_dto(obj) if obj is not None else None
+
+    def _to_dto(self, order: Order) -> OrderDTO:
+        return self._attach_dispatch([OrderDTO.model_validate(order)])[0]
+
+    def _attach_dispatch(self, dtos: list[OrderDTO]) -> list[OrderDTO]:
+        if not dtos:
+            return dtos
+        rows = self._session.scalars(
+            select(DeliveryDispatchRequest)
+            .where(DeliveryDispatchRequest.order_id.in_([dto.id for dto in dtos]))
+            .order_by(DeliveryDispatchRequest.created_at.desc())
+        ).all()
+        by_order: dict[uuid.UUID, DeliveryDispatchRequest] = {}
+        for row in rows:
+            if row.order_id is None or row.order_id in by_order:
+                continue
+            by_order[row.order_id] = row
+        return [
+            dto.model_copy(
+                update={
+                    "dispatch": OrderDispatchDTO(
+                        tracking_token=row.tracking_token,
+                        short_id=row.short_id,
+                        status=row.status,
+                    )
+                    if (row := by_order.get(dto.id)) is not None
+                    else None
+                }
+            )
+            for dto in dtos
+        ]

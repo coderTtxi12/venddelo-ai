@@ -67,6 +67,12 @@ class OrderCreate(BaseModel):
     items: list[OrderItemCreate] = []
 
 
+class OrderDispatchDTO(BaseModel):
+    tracking_token: str
+    short_id: str
+    status: str
+
+
 class OrderDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -95,6 +101,7 @@ class OrderDTO(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: list[OrderItemDTO] = []
+    dispatch: OrderDispatchDTO | None = None
 
 
 class PublicOrderItemInput(BaseModel):
