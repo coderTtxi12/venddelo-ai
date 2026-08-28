@@ -13,6 +13,15 @@ import {
 } from '@/lib/loadGoogleMapsPlaces';
 import { dismissMobileKeyboard, scrollElementIntoViewAfterKeyboard } from '@/lib/mobileKeyboard';
 import { applyPlaceAutocompleteTheme } from '@/lib/digital-menu/checkout/applyPlaceAutocompleteTheme';
+import {
+  isBrowserGeolocationAvailable,
+  requestBrowserGeolocation,
+} from '@/lib/digital-menu/checkout/browserGeolocation';
+import {
+  CHECKOUT_GPS_COPY,
+  checkoutGpsErrorMessage,
+  resolveCheckoutGpsOffer,
+} from '@/lib/digital-menu/checkout/checkoutGpsOffer';
 import styles from './CheckoutDeliveryAddressPicker.module.css';
 
 export type DeliveryLocationValue = {
@@ -61,20 +70,43 @@ export function CheckoutDeliveryAddressPicker({
   const onChangeRef = useRef(onChange);
   const valueRef = useRef(value);
 
+  const gpsRequestIdRef = useRef(0);
   const [autocompleteLoading, setAutocompleteLoading] = useState(true);
   const [autocompleteError, setAutocompleteError] = useState<string | null>(null);
   const [mapState, setMapState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [geocoding, setGeocoding] = useState(false);
+  const [offerDismissed, setOfferDismissed] = useState(false);
+  const [clientReady, setClientReady] = useState(false);
+  const [gpsStatus, setGpsStatus] = useState<'idle' | 'requesting' | 'denied' | 'unavailable'>(
+    'idle',
+  );
 
   onChangeRef.current = onChange;
   valueRef.current = value;
 
   const hasCoords = value.latitude != null && value.longitude != null;
   const apiKeyMissing = !getGoogleMapsApiKey();
+  const gpsRequesting = gpsStatus === 'requesting';
+  const offerKind = resolveCheckoutGpsOffer({
+    geolocationAvailable: clientReady && isBrowserGeolocationAvailable(),
+    mapsApiAvailable: !apiKeyMissing,
+    hasCoordinates: hasCoords,
+    offerDismissed,
+  });
+  const gpsStatusMessage =
+    gpsStatus === 'requesting'
+      ? CHECKOUT_GPS_COPY.requesting
+      : gpsStatus === 'denied' || gpsStatus === 'unavailable'
+        ? checkoutGpsErrorMessage(gpsStatus)
+        : null;
 
   const showLocationError =
     showValidation &&
     (!value.address.trim() || value.latitude == null || value.longitude == null);
+
+  useEffect(() => {
+    setClientReady(true);
+  }, []);
 
   const handlePlaceSelected = useCallback(
     (place: { address: string; latitude: number; longitude: number; placeId: string | null }) => {
@@ -116,6 +148,49 @@ export function CheckoutDeliveryAddressPicker({
       })
       .finally(() => setGeocoding(false));
   }, []);
+
+  const applyGpsCoordinates = useCallback(
+    async (latitude: number, longitude: number, requestId: number) => {
+      shouldScrollToMapRef.current = true;
+      onChangeRef.current({
+        ...valueRef.current,
+        latitude,
+        longitude,
+        placeId: null,
+      });
+      setGeocoding(true);
+      try {
+        const address = await reverseGeocodeCoordinates(latitude, longitude);
+        if (requestId !== gpsRequestIdRef.current) return;
+        onChangeRef.current({
+          ...valueRef.current,
+          address: address ?? valueRef.current.address,
+          latitude,
+          longitude,
+          placeId: null,
+        });
+      } finally {
+        if (requestId === gpsRequestIdRef.current) {
+          setGeocoding(false);
+        }
+      }
+    },
+    [],
+  );
+
+  const handleUseLocation = useCallback(async () => {
+    const requestId = ++gpsRequestIdRef.current;
+    setGpsStatus('requesting');
+    const result = await requestBrowserGeolocation();
+    if (requestId !== gpsRequestIdRef.current) return;
+    setOfferDismissed(true);
+    if (!result.ok) {
+      setGpsStatus(result.reason === 'denied' ? 'denied' : 'unavailable');
+      return;
+    }
+    setGpsStatus('idle');
+    await applyGpsCoordinates(result.latitude, result.longitude, requestId);
+  }, [applyGpsCoordinates]);
 
   const handleMapPoiClick = useCallback(async (event: google.maps.MapMouseEvent) => {
     if (!event.placeId) return;
@@ -303,6 +378,7 @@ export function CheckoutDeliveryAddressPicker({
 
   useEffect(() => {
     return () => {
+      gpsRequestIdRef.current += 1;
       dragEndListenerRef.current?.remove();
       dragEndListenerRef.current = null;
       mapClickListenerRef.current?.remove();
@@ -349,6 +425,64 @@ export function CheckoutDeliveryAddressPicker({
 
   return (
     <div className={styles.wrap}>
+      {offerKind === 'card' ? (
+        <div className={styles.gpsCard}>
+          <div className={styles.gpsCardHeader}>
+            <MyLocationOutlinedIcon className={styles.gpsCardIcon} aria-hidden />
+            <div>
+              <p className={styles.gpsCardTitle}>{CHECKOUT_GPS_COPY.cardTitle}</p>
+              <p className={styles.gpsCardBody}>{CHECKOUT_GPS_COPY.cardBody}</p>
+            </div>
+          </div>
+          <div className={styles.gpsCardActions}>
+            <button
+              type="button"
+              className={styles.gpsPrimaryBtn}
+              onClick={() => {
+                void handleUseLocation();
+              }}
+              disabled={gpsRequesting}
+              aria-busy={gpsRequesting}
+            >
+              {CHECKOUT_GPS_COPY.allow}
+            </button>
+            <button
+              type="button"
+              className={styles.gpsSecondaryBtn}
+              onClick={() => setOfferDismissed(true)}
+              disabled={gpsRequesting}
+            >
+              {CHECKOUT_GPS_COPY.writeInstead}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {offerKind === 'button' ? (
+        <button
+          type="button"
+          className={styles.gpsCompactBtn}
+          onClick={() => {
+            void handleUseLocation();
+          }}
+          disabled={gpsRequesting}
+          aria-busy={gpsRequesting}
+        >
+          <MyLocationOutlinedIcon className={styles.gpsCompactIcon} aria-hidden />
+          <span>{CHECKOUT_GPS_COPY.useLocation}</span>
+        </button>
+      ) : null}
+
+      {gpsStatusMessage ? (
+        <p
+          className={gpsStatus === 'requesting' ? styles.gpsStatus : styles.gpsError}
+          role={gpsStatus === 'requesting' ? 'status' : 'alert'}
+          aria-live="polite"
+        >
+          {gpsStatusMessage}
+        </p>
+      ) : null}
+
       <label className={styles.label} htmlFor="checkout-delivery-address-search">
         Busca tu domicilio
       </label>
