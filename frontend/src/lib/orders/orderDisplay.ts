@@ -23,13 +23,13 @@ function selectedOptionIdsForGroup(
 }
 
 export function formatOrderShortId(orderId: string): string {
-  return orderId.replace(/-/g, '').slice(0, 8).toUpperCase();
+  return orderId.replace(/-/g, '').slice(0, 5).toUpperCase();
 }
 
 export function extractOrderRefFromNote(note: string | null | undefined): string | null {
   if (!note) return null;
-  const match = note.match(/Ref\.?\s*pedido\s*#?([A-Z0-9]{6,12})/i);
-  return match?.[1]?.toUpperCase() ?? null;
+  const match = note.match(/Ref\.?\s*pedido\s*#?([A-Z0-9]{5,12})/i);
+  return match?.[1]?.toUpperCase().slice(0, 5) ?? null;
 }
 
 export function formatOrderDisplayId(order: Order): string {

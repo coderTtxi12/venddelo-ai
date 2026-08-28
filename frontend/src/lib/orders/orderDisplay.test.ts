@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { OrderItem, Product } from '@/lib/api/types';
-import { resolveOrderItemOptions } from './orderDisplay.ts';
+import type { Order, OrderItem, Product } from '@/lib/api/types';
+import { formatOrderDisplayId, resolveOrderItemOptions } from './orderDisplay.ts';
 
 const GROUP_ID = '11111111-1111-1111-1111-111111111111';
 const OPTION_ID = '22222222-2222-2222-2222-222222222222';
@@ -116,5 +116,32 @@ test('resolveOrderItemOptions includes inactive option items for historical orde
         labels: ['Chipotle'],
       },
     ],
+  );
+});
+
+test('formatOrderDisplayId uses a 5-character checkout ref', () => {
+  assert.equal(
+    formatOrderDisplayId({
+      id: '11111111-2222-3333-4444-555555555555',
+      note: 'Ref. pedido #K7M2P | sin cebolla',
+    } as Order),
+    'K7M2P',
+  );
+});
+
+test('formatOrderDisplayId shortens legacy 8-character refs and uuid prefixes', () => {
+  assert.equal(
+    formatOrderDisplayId({
+      id: '11111111-2222-3333-4444-555555555555',
+      note: 'Ref. pedido #A1B2C3D4',
+    } as Order),
+    'A1B2C',
+  );
+  assert.equal(
+    formatOrderDisplayId({
+      id: 'abcdef12-3456-7890-abcd-ef1234567890',
+      note: null,
+    } as Order),
+    'ABCDE',
   );
 });
