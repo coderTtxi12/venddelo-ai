@@ -16,7 +16,10 @@ export const CHECKOUT_GPS_COPY = {
   useLocation: 'Usar mi ubicación',
   requesting: 'Obteniendo tu ubicación…',
   denied: 'No se usó la ubicación. Busca tu domicilio abajo.',
-  unavailable: 'No encontramos tu GPS. Búscalo o inténtalo de nuevo.',
+  servicesOff:
+    'Activa la ubicación en tu teléfono y vuelve a tocar Usar mi ubicación. Después te pediremos permiso.',
+  unavailable:
+    'Activa la ubicación en tu teléfono e inténtalo de nuevo. Si no aparece el aviso, enciéndela en Ajustes.',
 } as const;
 
 export function resolveCheckoutGpsOffer(input: CheckoutGpsOfferInput): CheckoutGpsOfferKind {
@@ -26,9 +29,10 @@ export function resolveCheckoutGpsOffer(input: CheckoutGpsOfferInput): CheckoutG
 }
 
 export function checkoutGpsErrorMessage(
-  reason: 'denied' | 'unavailable' | 'unsupported',
+  reason: 'denied' | 'unavailable' | 'unsupported' | 'services_off',
 ): string | null {
   if (reason === 'denied') return CHECKOUT_GPS_COPY.denied;
+  if (reason === 'services_off') return CHECKOUT_GPS_COPY.servicesOff;
   if (reason === 'unavailable') return CHECKOUT_GPS_COPY.unavailable;
   return null;
 }
