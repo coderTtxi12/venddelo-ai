@@ -295,6 +295,12 @@ export type AppliedOrderDiscount = {
   applied: boolean;
 };
 
+export type OrderDispatch = {
+  tracking_token: string;
+  short_id: string;
+  status: string;
+};
+
 export type Order = {
   id: string;
   restaurant_id: string;
@@ -321,4 +327,5 @@ export type Order = {
   created_at: string;
   updated_at: string;
   items: OrderItem[];
+  dispatch?: OrderDispatch | null;
 };

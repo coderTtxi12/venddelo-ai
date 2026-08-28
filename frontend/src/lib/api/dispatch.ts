@@ -25,6 +25,7 @@ export type DispatchAssignedRider = {
 
 export type DispatchRequest = {
   id: string;
+  order_id?: string | null;
   customer_name: string;
   customer_phone: string;
   dropoff_lat: number;
@@ -72,6 +73,7 @@ export type DispatchCreateInput = {
   package_count: number;
   prep_minutes: number;
   notes: string | null;
+  order_id?: string | null;
 };
 
 export type PublicDispatchTracking = {
