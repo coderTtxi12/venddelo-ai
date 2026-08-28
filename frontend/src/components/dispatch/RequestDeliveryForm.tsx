@@ -13,7 +13,7 @@ import {
   type DispatchCreateInput,
   type DispatchRequest,
 } from '@/lib/api/dispatch';
-import { ApiError } from '@/lib/api/types';
+import { ApiError, type Order } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
 import {
   isValidRestaurantCollect,
@@ -21,7 +21,11 @@ import {
 } from '@/lib/dispatch/collectTotal';
 import { getDeliveryWeatherNotice } from '@/lib/digital-menu/checkout/deliveryWeatherNotice';
 import { usePublicDeliveryQuote } from '@/lib/digital-menu/checkout/usePublicDeliveryQuote';
-import type { KitchenDispatchFormValues } from '@/lib/orders/kitchenDispatch';
+import {
+  kitchenDispatchLocationChanged,
+  splitDeliveryAddress,
+  type KitchenDispatchFormValues,
+} from '@/lib/orders/kitchenDispatch';
 import { DEFAULT_COUNTRY_ISO, findCountryByIso, formatE164 } from '@/lib/phone/countryDialCodes';
 import styles from './RequestDeliveryForm.module.css';
 
@@ -59,6 +63,7 @@ export function RequestDeliveryForm({
   showUnavailableAlert = true,
   leadTimes,
   initialValues = null,
+  sourceOrder = null,
   submitLabel = 'Solicitar repartidor',
   resetOnSuccess = true,
   onCreated,
@@ -72,6 +77,7 @@ export function RequestDeliveryForm({
   showUnavailableAlert?: boolean;
   leadTimes: number[];
   initialValues?: KitchenDispatchFormValues | null;
+  sourceOrder?: Order | null;
   submitLabel?: string;
   resetOnSuccess?: boolean;
   onCreated: (request: DispatchRequest) => void | Promise<void>;
@@ -119,7 +125,26 @@ export function RequestDeliveryForm({
   const prepValid =
     prepMinutes != null && prepMinutes >= 1 && prepMinutes < 60 && Number.isInteger(prepMinutes);
 
+  const lockedOrigin = useMemo(() => {
+    if (!sourceOrder) return null;
+    return {
+      address: splitDeliveryAddress(sourceOrder.delivery_address).address,
+      latitude: sourceOrder.delivery_latitude,
+      longitude: sourceOrder.delivery_longitude,
+      feeCents: sourceOrder.delivery_fee_cents,
+    };
+  }, [sourceOrder]);
+
+  const usingLockedFee =
+    lockedOrigin != null &&
+    !kitchenDispatchLocationChanged(lockedOrigin, {
+      address: location.address,
+      latitude: location.latitude,
+      longitude: location.longitude,
+    });
+
   const quoteEnabled =
+    !usingLockedFee &&
     courierAvailable &&
     subdomain.length > 0 &&
     location.latitude != null &&
@@ -223,7 +248,11 @@ export function RequestDeliveryForm({
     !deliveryQuoteLoading &&
     !deliveryQuoteError;
 
-  const deliveryFeeCents = deliveryQuoteReady ? deliveryQuote.delivery_fee_cents : null;
+  const deliveryFeeCents = usingLockedFee
+    ? lockedOrigin?.feeCents ?? null
+    : deliveryQuoteReady
+      ? deliveryQuote.delivery_fee_cents
+      : null;
   const customerTotalCents =
     paymentMethod === 'transfer' ? null : parsePesosToCents(collectAmount);
   const restaurantCollectCents =
@@ -239,7 +268,7 @@ export function RequestDeliveryForm({
     location.latitude != null &&
     location.longitude != null &&
     location.address.trim().length > 0 &&
-    deliveryQuoteReady &&
+    (usingLockedFee || deliveryQuoteReady) &&
     collectValid &&
     prepValid &&
     Number(packageCount) >= 1 &&
@@ -250,8 +279,9 @@ export function RequestDeliveryForm({
     if (!canRequestRider || prepMinutes == null) return;
 
     if (
-      !deliveryQuote?.available ||
-      !Number.isFinite(deliveryQuote.delivery_fee_cents)
+      deliveryFeeCents == null ||
+      (!usingLockedFee &&
+        (!deliveryQuote?.available || !Number.isFinite(deliveryQuote.delivery_fee_cents)))
     ) {
       setError('Espera a que se calcule el costo de envío para esta ubicación.');
       return;
@@ -312,6 +342,7 @@ export function RequestDeliveryForm({
         package_count: Number(packageCount),
         prep_minutes: prepMinutes,
         notes: notes.trim() || null,
+        order_id: sourceOrder?.id ?? null,
       });
       await onCreated(row);
       if (resetOnSuccess) {
@@ -407,19 +438,31 @@ export function RequestDeliveryForm({
         />
       </div>
 
-      {deliveryQuoteLoading ? (
+      {deliveryQuoteLoading && !usingLockedFee ? (
         <p className={styles.quoteStatus} role="status">
           Validando cobertura y calculando envío…
         </p>
       ) : null}
 
-      {deliveryBlockingReason && location.latitude != null ? (
+      {deliveryBlockingReason && location.latitude != null && !usingLockedFee ? (
         <p className={styles.quoteAlert} role="alert">
           {deliveryWeatherBlockedNotice ?? deliveryBlockingReason}
         </p>
       ) : null}
 
-      {deliveryQuote?.available && location.latitude != null ? (
+      {usingLockedFee && deliveryFeeCents != null ? (
+        <div className={styles.feeCard} role="status">
+          <span className={styles.feeLabel}>Costo de envío</span>
+          <span className={styles.feeValue}>
+            {formatMoney(deliveryFeeCents / 100, 'MXN')}
+          </span>
+          <span className={styles.feeHint}>
+            Tarifa que vio el cliente. Se recalcula solo si mueves el pin o cambias la dirección.
+          </span>
+        </div>
+      ) : null}
+
+      {!usingLockedFee && deliveryQuote?.available && location.latitude != null ? (
         <div className={styles.feeCard} role="status">
           <span className={styles.feeLabel}>Costo de envío</span>
           <span className={styles.feeValue}>
