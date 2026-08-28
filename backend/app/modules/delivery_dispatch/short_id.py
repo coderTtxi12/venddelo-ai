@@ -29,3 +29,20 @@ def allocate_dispatch_short_id(session: Session, *, attempts: int = 16) -> str:
         if exists is None:
             return candidate
     raise RuntimeError("No se pudo generar un ID corto único para el envío")
+
+
+def claim_dispatch_short_id(session: Session, preferred: str | None) -> str:
+    from sqlalchemy import select
+
+    from app.db.models.delivery import DeliveryDispatchRequest
+
+    candidate = (preferred or "").strip().upper()
+    if 4 <= len(candidate) <= 8 and candidate.isalnum():
+        exists = session.scalar(
+            select(DeliveryDispatchRequest.id).where(
+                DeliveryDispatchRequest.short_id == candidate
+            )
+        )
+        if exists is None:
+            return candidate
+    return allocate_dispatch_short_id(session)
