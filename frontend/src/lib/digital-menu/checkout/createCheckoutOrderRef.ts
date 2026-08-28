@@ -1,9 +1,28 @@
 export type CheckoutOrderRef = {
-  /** Short human-readable id shown in WhatsApp (e.g. A1B2C3D4). */
+  /** Short human-readable id shown in WhatsApp and /orders (e.g. K7M2P). */
   orderId: string;
   /** Full idempotency key for the background API save. */
   idempotencyKey: string;
 };
+
+/** Same unambiguous alphabet as delivery dispatch short ids. */
+export const CHECKOUT_ORDER_ID_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+export const CHECKOUT_ORDER_ID_LENGTH = 5;
+
+function generateCheckoutOrderId(): string {
+  const bytes = new Uint8Array(CHECKOUT_ORDER_ID_LENGTH);
+  if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  return Array.from(
+    bytes,
+    (value) => CHECKOUT_ORDER_ID_ALPHABET[value % CHECKOUT_ORDER_ID_ALPHABET.length],
+  ).join('');
+}
 
 export function createCheckoutOrderRef(): CheckoutOrderRef {
   const idempotencyKey =
@@ -11,9 +30,7 @@ export function createCheckoutOrderRef(): CheckoutOrderRef {
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-  const orderId = idempotencyKey.replace(/-/g, '').slice(0, 8).toUpperCase();
-
-  return { orderId, idempotencyKey };
+  return { orderId: generateCheckoutOrderId(), idempotencyKey };
 }
 
 export function formatCheckoutOrderIdLabel(orderId: string): string {
