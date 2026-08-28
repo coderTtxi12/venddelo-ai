@@ -34,9 +34,8 @@ test('resolveCheckoutGpsOffer hides when Maps API missing', () => {
   assert.equal(resolveCheckoutGpsOffer({ ...ready, mapsApiAvailable: false }), 'none');
 });
 
-test('checkoutGpsErrorMessage maps denied, services_off and unavailable', () => {
+test('checkoutGpsErrorMessage maps denied and unavailable', () => {
   assert.equal(checkoutGpsErrorMessage('denied'), CHECKOUT_GPS_COPY.denied);
-  assert.equal(checkoutGpsErrorMessage('services_off'), CHECKOUT_GPS_COPY.servicesOff);
   assert.equal(checkoutGpsErrorMessage('unavailable'), CHECKOUT_GPS_COPY.unavailable);
   assert.equal(checkoutGpsErrorMessage('unsupported'), null);
 });
@@ -53,11 +52,7 @@ test('CHECKOUT_GPS_COPY matches spec wording', () => {
   assert.equal(CHECKOUT_GPS_COPY.requesting, 'Obteniendo tu ubicación…');
   assert.equal(CHECKOUT_GPS_COPY.denied, 'No se usó la ubicación. Busca tu domicilio abajo.');
   assert.equal(
-    CHECKOUT_GPS_COPY.servicesOff,
-    'Activa la ubicación en tu teléfono y vuelve a tocar Usar mi ubicación. Después te pediremos permiso.',
-  );
-  assert.equal(
     CHECKOUT_GPS_COPY.unavailable,
-    'Activa la ubicación en tu teléfono e inténtalo de nuevo. Si no aparece el aviso, enciéndela en Ajustes.',
+    'No encontramos tu GPS. Búscalo o inténtalo de nuevo.',
   );
 });
