@@ -79,9 +79,9 @@ export function CheckoutDeliveryAddressPicker({
   const [geocoding, setGeocoding] = useState(false);
   const [offerDismissed, setOfferDismissed] = useState(false);
   const [clientReady, setClientReady] = useState(false);
-  const [gpsStatus, setGpsStatus] = useState<'idle' | 'requesting' | 'denied' | 'unavailable'>(
-    'idle',
-  );
+  const [gpsStatus, setGpsStatus] = useState<
+    'idle' | 'requesting' | 'denied' | 'unavailable' | 'services_off'
+  >('idle');
 
   onChangeRef.current = onChange;
   valueRef.current = value;
@@ -98,7 +98,7 @@ export function CheckoutDeliveryAddressPicker({
   const gpsStatusMessage =
     gpsStatus === 'requesting'
       ? CHECKOUT_GPS_COPY.requesting
-      : gpsStatus === 'denied' || gpsStatus === 'unavailable'
+      : gpsStatus === 'denied' || gpsStatus === 'unavailable' || gpsStatus === 'services_off'
         ? checkoutGpsErrorMessage(gpsStatus)
         : null;
 
@@ -187,7 +187,13 @@ export function CheckoutDeliveryAddressPicker({
     if (requestId !== gpsRequestIdRef.current) return;
     setOfferDismissed(true);
     if (!result.ok) {
-      setGpsStatus(result.reason === 'denied' ? 'denied' : 'unavailable');
+      setGpsStatus(
+        result.reason === 'denied'
+          ? 'denied'
+          : result.reason === 'services_off'
+            ? 'services_off'
+            : 'unavailable',
+      );
       return;
     }
     setGpsStatus('idle');
