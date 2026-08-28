@@ -5,7 +5,9 @@ import type { Order } from '@/lib/api/types';
 import {
   centsToPesosInput,
   kitchenConfirmOpensDispatch,
+  kitchenDispatchLocationChanged,
   orderToDispatchFormValues,
+  orderWithDispatch,
   requestRiderThenConfirmOrder,
   splitDeliveryAddress,
 } from './kitchenDispatch.ts';
@@ -135,4 +137,36 @@ test('requestRiderThenConfirmOrder keeps request when confirm fails', async () =
   if (result.status === 'confirm_failed') {
     assert.equal(result.request.id, 'req-1');
   }
+});
+
+test('kitchenDispatchLocationChanged ignores unchanged pin and address', () => {
+  assert.equal(
+    kitchenDispatchLocationChanged(
+      { address: 'Calle Reforma 100', latitude: 19.4326, longitude: -99.1332 },
+      { address: 'Calle Reforma 100', latitude: 19.4326, longitude: -99.1332 },
+    ),
+    false,
+  );
+});
+
+test('kitchenDispatchLocationChanged detects pin or address edits', () => {
+  const original = { address: 'Calle Reforma 100', latitude: 19.4326, longitude: -99.1332 };
+  assert.equal(
+    kitchenDispatchLocationChanged(original, { ...original, latitude: 19.44 }),
+    true,
+  );
+  assert.equal(
+    kitchenDispatchLocationChanged(original, { ...original, address: 'Otra calle 12' }),
+    true,
+  );
+});
+
+test('orderWithDispatch copies tracking onto the kitchen order', () => {
+  const next = orderWithDispatch(baseOrder(), {
+    tracking_token: 'tok123',
+    short_id: 'A1B2C3D4',
+    status: 'searching',
+  });
+  assert.equal(next.dispatch?.tracking_token, 'tok123');
+  assert.equal(next.dispatch?.short_id, 'A1B2C3D4');
 });

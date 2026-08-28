@@ -1,8 +1,16 @@
+import type { DispatchRequest } from '@/lib/api/dispatch';
 import type { Order } from '@/lib/api/types';
 import { buildOrderTotalsBreakdown } from '@/lib/orders/orderDisplay';
 import { parseE164Phone } from '@/lib/phone/parseE164';
 
 const REFERENCES_MARKER = '\nReferencias:';
+const COORD_EPS = 1e-5;
+
+export type KitchenDispatchLocation = {
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+};
 
 export type KitchenDispatchFormValues = {
   customerName: string;
@@ -59,6 +67,39 @@ export function orderToDispatchFormValues(order: Order): KitchenDispatchFormValu
 
 export function kitchenConfirmOpensDispatch(order: Order): boolean {
   return order.status === 'pending' && order.type === 'delivery';
+}
+
+function normalizeDispatchAddress(address: string): string {
+  return address.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+export function kitchenDispatchLocationChanged(
+  original: KitchenDispatchLocation,
+  current: KitchenDispatchLocation,
+): boolean {
+  if (normalizeDispatchAddress(original.address) !== normalizeDispatchAddress(current.address)) {
+    return true;
+  }
+  if (original.latitude == null || original.longitude == null) return true;
+  if (current.latitude == null || current.longitude == null) return true;
+  return (
+    Math.abs(original.latitude - current.latitude) > COORD_EPS ||
+    Math.abs(original.longitude - current.longitude) > COORD_EPS
+  );
+}
+
+export function orderWithDispatch(
+  order: Order,
+  request: Pick<DispatchRequest, 'tracking_token' | 'short_id' | 'status'>,
+): Order {
+  return {
+    ...order,
+    dispatch: {
+      tracking_token: request.tracking_token,
+      short_id: request.short_id,
+      status: request.status,
+    },
+  };
 }
 
 export async function requestRiderThenConfirmOrder<TRequest, TOrder>(opts: {
