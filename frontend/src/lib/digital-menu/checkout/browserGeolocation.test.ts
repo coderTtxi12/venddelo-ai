@@ -17,7 +17,7 @@ function envWith(
     isSecureContext,
     geolocation: getCurrentPosition ? { getCurrentPosition } : null,
     permissions: permissionState
-      ? { query: async () => ({ state: permissionState }) }
+      ? { query: async () => ({ state: permissionState, onchange: null }) }
       : null,
   };
 }
@@ -91,6 +91,58 @@ test('POSITION_UNAVAILABLE after permission granted stays unavailable', async ()
       'granted',
     ),
   );
+  assert.deepEqual(result, { ok: false, reason: 'unavailable' });
+});
+
+test('retries getCurrentPosition once after permission is granted so GPS-off can show the system dialog', async () => {
+  let calls = 0;
+  let permissionState: 'prompt' | 'granted' = 'prompt';
+  const result = await requestBrowserGeolocation({
+    isSecureContext: true,
+    geolocation: {
+      getCurrentPosition(_success, error) {
+        calls += 1;
+        permissionState = 'granted';
+        error?.({ code: 2 } as GeolocationPositionError);
+      },
+    },
+    permissions: {
+      query: async () => ({ state: permissionState, onchange: null }),
+    },
+  });
+  assert.equal(calls, 2);
+  assert.deepEqual(result, { ok: false, reason: 'unavailable' });
+});
+
+test('starts a second location request when permission changes to granted while the first hangs', async () => {
+  let calls = 0;
+  let permissionState: 'prompt' | 'granted' = 'prompt';
+  const status = {
+    get state() {
+      return permissionState;
+    },
+    onchange: null as (() => void) | null,
+  };
+
+  const result = await requestBrowserGeolocation({
+    isSecureContext: true,
+    geolocation: {
+      getCurrentPosition(_success, error) {
+        calls += 1;
+        if (calls === 1) {
+          permissionState = 'granted';
+          queueMicrotask(() => status.onchange?.());
+          return;
+        }
+        error?.({ code: 2 } as GeolocationPositionError);
+      },
+    },
+    permissions: {
+      query: async () => status,
+    },
+  });
+
+  assert.equal(calls, 2);
   assert.deepEqual(result, { ok: false, reason: 'unavailable' });
 });
 
