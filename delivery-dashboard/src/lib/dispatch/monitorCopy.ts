@@ -21,7 +21,7 @@ export function requestStatusLabel(status: string): string {
     offered: 'Ofertado',
     unassigned: 'Sin asignar',
     assigned: 'Asignado',
-    picked_up: 'Recogido',
+    picked_up: 'En el restaurante',
     in_transit: 'En camino',
     delivered: 'Entregado',
     cancelled: 'Cancelado',
@@ -148,7 +148,7 @@ export function timelineEventTitle(event: DispatchMonitorTimelineEvent): string 
   if (event.kind === 'expired') return `${driver} no respondió`;
   if (event.kind === 'closed') return `Oferta a ${driver} cerrada`;
   if (event.kind === 'accepted') return `${driver} aceptó`;
-  if (event.kind === 'picked_up') return 'Recogido';
+  if (event.kind === 'picked_up') return 'En el restaurante';
   if (event.kind === 'in_transit') return 'En camino';
   if (event.kind === 'delivered') return 'Entregado';
   if (event.kind === 'unassigned') return 'Se agotó la búsqueda';
