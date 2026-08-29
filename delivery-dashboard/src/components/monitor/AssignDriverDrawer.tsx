@@ -65,7 +65,7 @@ function requestStatusLabel(status: string): string {
     offered: 'Ofertado',
     unassigned: 'Sin asignar',
     assigned: 'Asignado',
-    picked_up: 'Recogido',
+    picked_up: 'En el restaurante',
     in_transit: 'En camino',
   };
   return labels[status] ?? status;

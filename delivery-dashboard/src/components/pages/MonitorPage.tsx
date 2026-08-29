@@ -599,7 +599,7 @@ function DriversList({
               : driver.active_request_status === 'in_transit'
                 ? 'En camino'
                 : driver.active_request_status === 'picked_up'
-                  ? 'Recogido'
+                  ? 'En el restaurante'
                   : driver.active_request_status === 'assigned'
                     ? 'Va al negocio'
                     : driver.open_offer_id
