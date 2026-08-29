@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:smooth_sheets/smooth_sheets.dart';
 
+import '../dropoff_location.dart';
 import '../formatters.dart';
 import '../maps/contact_links.dart';
 import '../maps/geo.dart';
@@ -1130,8 +1131,17 @@ class _JobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final goingToRestaurant = assignment.status == 'assigned';
-    final address = jobDestinationAddress(assignment);
-    final notes = assignment.notes?.trim() ?? '';
+    final dropoffParts = splitDropoffLocation(assignment.dropoffAddress);
+    final address = goingToRestaurant
+        ? jobDestinationAddress(assignment)
+        : (dropoffParts.address.isNotEmpty
+              ? dropoffParts.address
+              : assignment.dropoffAddress);
+    final notices = jobLocationNotices(
+      dropoffAddress: assignment.dropoffAddress,
+      notes: assignment.notes,
+      showDropoffReferences: !goingToRestaurant,
+    );
     final restaurantLat = assignment.restaurantLat;
     final restaurantLng = assignment.restaurantLng;
 
@@ -1165,7 +1175,7 @@ class _JobCard extends StatelessWidget {
                   : assignment.dropoffLng,
               address: goingToRestaurant
                   ? assignment.restaurantAddress
-                  : assignment.dropoffAddress,
+                  : dropoffParts.address,
             ),
           ),
         ),
@@ -1178,7 +1188,7 @@ class _JobCard extends StatelessWidget {
         ],
         const SizedBox(height: 14),
         _JobDetails(assignment: assignment),
-        if (notes.isNotEmpty) ...[
+        for (final notice in notices) ...[
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -1191,14 +1201,17 @@ class _JobCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Notas del negocio',
+                  notice.label,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textMuted,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(notes, style: Theme.of(context).textTheme.bodyLarge),
+                Text(
+                  notice.value,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
               ],
             ),
           ),
