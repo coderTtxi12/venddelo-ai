@@ -661,6 +661,7 @@ export function RequestDeliveryForm({
       <div className={styles.field}>
         <label className={styles.label} htmlFor="driver-notes">
           Notas para el repartidor
+          <span className={styles.optional}> (opcional)</span>
         </label>
         <textarea
           id="driver-notes"
