@@ -4,16 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mexy_rider/app_build.dart';
 
 void main() {
-  test('riderClientFields reports Essentials-era build 2', () {
+  test('riderClientFields reports current APK build', () {
     expect(riderClientFields(), {
-      'app_version': '1.0.1',
-      'app_build_number': 2,
+      'app_version': '1.0.2',
+      'app_build_number': 3,
     });
     expect(
       riderLocationBody(latitude: 19.43, longitude: -99.13),
-      containsPair('app_build_number', 2),
+      containsPair('app_build_number', 3),
     );
-    expect(riderOnlineBody(isOnline: true)['app_version'], '1.0.1');
+    expect(riderOnlineBody(isOnline: true)['app_version'], '1.0.2');
   });
 
   test('app_build constants match pubspec version', () {

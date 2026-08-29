@@ -1,6 +1,6 @@
 /// Keep in sync with pubspec.yaml `version: x.y.z+build`.
-const riderAppVersion = '1.0.1';
-const riderAppBuildNumber = 2;
+const riderAppVersion = '1.0.2';
+const riderAppBuildNumber = 3;
 
 Map<String, Object> riderClientFields() {
   return {

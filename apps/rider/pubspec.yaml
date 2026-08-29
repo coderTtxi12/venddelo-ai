@@ -1,7 +1,7 @@
 name: mexy_rider
 description: "App de riders Mexy."
 publish_to: 'none'
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: ^3.13.0
