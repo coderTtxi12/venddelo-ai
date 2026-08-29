@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DispatchStatus, PublicDispatchTracking } from '@/lib/api/dispatch';
 import { fetchRoadRoute, fetchStableRoadPath } from '@/lib/dispatch/fetchRoadRoute';
+import { publicTrackingRouteCaption } from '@/lib/dispatch/publicTrackingCopy';
 import { remainingPathFrom } from '@/lib/dispatch/remainingRoadPath';
 import { getGoogleMapsMapId, loadGoogleMaps } from '@/lib/loadGoogleMapsPlaces';
 import styles from './PublicTrackingMap.module.css';
@@ -81,16 +82,6 @@ function fitBounds(map: google.maps.Map, points: google.maps.LatLngLiteral[], pa
     bounds.extend(point);
   }
   map.fitBounds(bounds, padding);
-}
-
-function routeCaption(status: DispatchStatus, hasRider: boolean): string {
-  if (status === 'assigned' && hasRider) return 'El repartidor va rumbo al restaurante';
-  if ((status === 'picked_up' || status === 'in_transit') && hasRider) {
-    return 'El repartidor va rumbo a tu ubicación';
-  }
-  if (PENDING_STATUSES.has(status)) return 'Ruta del restaurante a tu destino';
-  if (status === 'delivered') return 'Entrega completada';
-  return 'Ubicación de entrega';
 }
 
 export function PublicTrackingMap({ tracking }: PublicTrackingMapProps) {
@@ -307,7 +298,7 @@ export function PublicTrackingMap({ tracking }: PublicTrackingMapProps) {
     <div className={styles.wrap}>
       <div ref={mapRef} className={styles.map} aria-label="Mapa de rastreo en vivo" />
       <div className={styles.meta}>
-        <p className={styles.caption}>{routeCaption(tracking.status, hasLiveRider)}</p>
+        <p className={styles.caption}>{publicTrackingRouteCaption(tracking.status, hasLiveRider)}</p>
         <ul className={styles.legend} aria-label="Simbología del mapa">
           <li>
             <span className={styles.legendRestaurant} aria-hidden />

@@ -23,80 +23,15 @@ import {
   usePublicTrackingRealtime,
   type PublicTrackingRealtimeStatus,
 } from '@/lib/dispatch/usePublicTrackingRealtime';
+import {
+  publicTrackingStatusCopy,
+  publicTrackingTimelineSteps,
+} from '@/lib/dispatch/publicTrackingCopy';
 import { PublicTrackingMap } from './PublicTrackingMap';
 import styles from './PublicTracking.module.css';
 
-const STATUS_COPY: Record<DispatchStatus, { title: string; detail: string }> = {
-  scheduled: {
-    title: 'Cocinando tu pedido',
-    detail: 'El restaurante está preparando tu comida. Después buscaremos un repartidor.',
-  },
-  searching: {
-    title: 'Buscando repartidor',
-    detail: 'Estamos buscando al mejor repartidor disponible para tu entrega.',
-  },
-  offered: {
-    title: 'Contactando a un repartidor',
-    detail: 'Un repartidor está revisando la solicitud.',
-  },
-  assigned: {
-    title: 'Repartidor asignado',
-    detail: 'El repartidor se dirige al restaurante.',
-  },
-  picked_up: {
-    title: 'Pedido recogido',
-    detail: 'El repartidor ya tiene tu pedido.',
-  },
-  in_transit: {
-    title: 'Tu entrega va en camino',
-    detail: 'El repartidor se dirige a la ubicación de entrega.',
-  },
-  delivered: {
-    title: 'Entregado',
-    detail: 'Tu pedido llegó a destino.',
-  },
-  unassigned: {
-    title: 'Aún no encontramos repartidor',
-    detail: 'El restaurante puede volver a intentar la búsqueda.',
-  },
-  cancelled: {
-    title: 'Entrega cancelada',
-    detail: 'Esta solicitud fue cancelada.',
-  },
-};
-
-const TIMELINE_STEPS = [
-  {
-    id: 'cooking',
-    label: 'Cocinando',
-    hint: 'El restaurante prepara tu pedido.',
-  },
-  {
-    id: 'searching',
-    label: 'Buscando repartidor',
-    hint: 'El sistema busca al repartidor más cercano.',
-  },
-  {
-    id: 'assigned',
-    label: 'Repartidor asignado',
-    hint: 'Va rumbo al restaurante a recoger.',
-  },
-  {
-    id: 'picked_up',
-    label: 'Pedido recogido',
-    hint: 'El repartidor ya tiene tu paquete.',
-  },
-  {
-    id: 'in_transit',
-    label: 'En camino',
-    hint: 'Se dirige a tu ubicación.',
-  },
-  {
-    id: 'delivered',
-    label: 'Entregado',
-    hint: 'Tu pedido llegó a destino.',
-  },
-] as const;
+const STATUS_COPY = publicTrackingStatusCopy;
+const TIMELINE_STEPS = publicTrackingTimelineSteps;
 
 type StepState = 'complete' | 'current' | 'upcoming' | 'failed';
 
