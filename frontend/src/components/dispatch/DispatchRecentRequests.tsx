@@ -33,7 +33,7 @@ const STATUS_LABELS: Record<DispatchStatus, string> = {
   searching: 'Buscando repartidor',
   offered: 'Oferta enviada',
   assigned: 'Repartidor asignado',
-  picked_up: 'Pedido recogido',
+  picked_up: 'En el restaurante',
   in_transit: 'En camino',
   delivered: 'Entregado',
   unassigned: 'Sin repartidor',
