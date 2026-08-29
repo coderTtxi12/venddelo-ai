@@ -42,7 +42,7 @@ String jobDestinationAddress(RiderAssignment assignment) {
 
 String jobSlideLabel(String status) {
   return switch (status) {
-    'assigned' => 'Desliza: ya recogí el pedido',
+    'assigned' => 'Desliza: ya llegué al restaurante',
     'picked_up' => 'Desliza: ya voy en camino',
     'in_transit' => 'Desliza: ya entregué',
     _ => 'Desliza para confirmar',

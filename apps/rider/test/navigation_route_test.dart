@@ -157,6 +157,7 @@ void main() {
     );
     expect(jobDestinationAddress(assignment), 'Av. Reforma 100');
     expect(jobStepLabel(assignment.status), 'Recoge el pedido');
+    expect(jobSlideLabel(assignment.status), 'Desliza: ya llegué al restaurante');
   });
 
   test('jobDestinationAddress uses dropoff after pickup', () {
