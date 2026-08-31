@@ -15,7 +15,14 @@ import {
   reverseGeocodeCoordinates,
 } from '@/lib/loadGoogleMapsPlaces';
 import { mapNeedsNewInstance, triggerGoogleMapResize } from '@/lib/maps/googleMapInstance';
-import { looksLikeMapsUrl, normalizeMapsUrlInput, parseMapsUrl } from '@/lib/maps/parseMapsUrl';
+import {
+  extractMapsQueryText,
+  looksLikeCoordinates,
+  looksLikeMapsUrl,
+  normalizeMapsUrlInput,
+  parseMapsUrl,
+  parsePastedCoordinates,
+} from '@/lib/maps/parseMapsUrl';
 import styles from './DispatchDeliveryAddressPicker.module.css';
 
 type DispatchDeliveryAddressPickerProps = {
@@ -23,7 +30,11 @@ type DispatchDeliveryAddressPickerProps = {
   mapsUrl: string | null;
   onChange: (next: DeliveryLocationValue) => void;
   onMapsUrlChange: (url: string | null) => void;
-  resolveMapsUrl: (url: string) => Promise<{ latitude: number; longitude: number }>;
+  resolveMapsUrl: (url: string) => Promise<{
+    latitude: number;
+    longitude: number;
+    address?: string | null;
+  }>;
   disabled?: boolean;
   showValidation?: boolean;
 };
@@ -157,13 +168,32 @@ export function DispatchDeliveryAddressPicker({
     [onMapsUrlChange],
   );
 
-  const handleMapsLink = useCallback(
+  const handlePastedLocation = useCallback(
     async (rawUrl: string) => {
+      const coords = parsePastedCoordinates(rawUrl);
+      if (coords) {
+        if (mapsLinkInFlightRef.current === rawUrl.trim()) return;
+        mapsLinkInFlightRef.current = rawUrl.trim();
+        setLinkResolving(true);
+        setInputError(null);
+        setFailedMapsLink(null);
+        try {
+          await applyCoordinates(coords.latitude, coords.longitude, { mapsUrl: null });
+          setMapBootId((current) => current + 1);
+        } catch {
+          setInputError('No se pudieron leer esas coordenadas.');
+        } finally {
+          mapsLinkInFlightRef.current = null;
+          setLinkResolving(false);
+        }
+        return;
+      }
+
       const trimmed = normalizeMapsUrlInput(rawUrl);
       if (!trimmed) return;
 
       if (!looksLikeMapsUrl(trimmed)) {
-        setInputError('Pega un enlace válido de Google Maps.');
+        setInputError('Pega un enlace de Google Maps o coordenadas (lat, lng).');
         return;
       }
 
@@ -176,9 +206,11 @@ export function DispatchDeliveryAddressPicker({
 
       try {
         const local = parseMapsUrl(trimmed);
-        const coords = local ?? await resolveMapsUrl(trimmed);
-        await applyCoordinates(coords.latitude, coords.longitude, {
+        const resolved = local ?? await resolveMapsUrl(trimmed);
+        const resolvedAddress = 'address' in resolved ? resolved.address : null;
+        await applyCoordinates(resolved.latitude, resolved.longitude, {
           mapsUrl: trimmed,
+          address: resolvedAddress ?? extractMapsQueryText(trimmed),
         });
         setMapBootId((current) => current + 1);
       } catch (err) {
@@ -198,9 +230,9 @@ export function DispatchDeliveryAddressPicker({
 
   const retryMapsLink = useCallback(() => {
     const target = failedMapsLink || searchText;
-    if (!looksLikeMapsUrl(target)) return;
-    void handleMapsLink(target);
-  }, [failedMapsLink, handleMapsLink, searchText]);
+    if (!looksLikeMapsUrl(target) && !looksLikeCoordinates(target)) return;
+    void handlePastedLocation(target);
+  }, [failedMapsLink, handlePastedLocation, searchText]);
 
   const retryMap = useCallback(() => {
     disposeMap();
@@ -450,14 +482,15 @@ export function DispatchDeliveryAddressPicker({
     );
   }
 
-  const canUseMapsLink = looksLikeMapsUrl(searchText) || Boolean(failedMapsLink);
+  const canUsePastedLocation =
+    looksLikeMapsUrl(searchText) || looksLikeCoordinates(searchText) || Boolean(failedMapsLink);
   const showMapBusy =
     mapState !== 'error' && (mapState === 'loading' || geocoding || linkResolving);
 
   return (
     <div className={styles.wrap}>
       <label className={styles.label} htmlFor="dispatch-address-search">
-        Buscar dirección o pegar enlace
+        Buscar dirección, enlace o coordenadas
       </label>
       {autocompleteLoading ? <p className={styles.hint}>Cargando búsqueda…</p> : null}
       {autocompleteError ? (
@@ -476,41 +509,49 @@ export function DispatchDeliveryAddressPicker({
           }}
           onPaste={(event) => {
             const text = event.clipboardData.getData('text').trim();
-            if (!text || !looksLikeMapsUrl(text)) return;
+            if (!text || (!looksLikeMapsUrl(text) && !looksLikeCoordinates(text))) return;
             event.preventDefault();
-            void handleMapsLink(text);
+            setSearchText(text);
+            void handlePastedLocation(text);
           }}
           onBlur={() => {
             if (disabled || linkResolving) return;
+            if (looksLikeCoordinates(searchText)) {
+              void handlePastedLocation(searchText);
+              return;
+            }
             if (!looksLikeMapsUrl(searchText)) return;
             if (mapsUrl === normalizeMapsUrlInput(searchText) && hasCoords) return;
-            void handleMapsLink(searchText);
+            void handlePastedLocation(searchText);
           }}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && looksLikeMapsUrl(searchText)) {
+            if (
+              event.key === 'Enter' &&
+              (looksLikeMapsUrl(searchText) || looksLikeCoordinates(searchText))
+            ) {
               event.preventDefault();
-              void handleMapsLink(searchText);
+              void handlePastedLocation(searchText);
             }
           }}
-          placeholder="Calle, número, colonia… o https://maps.app.goo.gl/…"
+          placeholder="Calle, colonia, maps.app.goo.gl o 19.62, -99.10"
           disabled={disabled || linkResolving}
           autoComplete="off"
         />
-        {looksLikeMapsUrl(searchText) ? (
+        {looksLikeMapsUrl(searchText) || looksLikeCoordinates(searchText) ? (
           <button
             type="button"
             className={styles.useLinkButton}
-            onClick={() => void handleMapsLink(searchText)}
+            onClick={() => void handlePastedLocation(searchText)}
             disabled={disabled || linkResolving}
           >
-            {linkResolving ? 'Leyendo…' : 'Usar enlace'}
+            {linkResolving ? 'Leyendo…' : looksLikeCoordinates(searchText) ? 'Usar coordenadas' : 'Usar enlace'}
           </button>
         ) : null}
       </div>
       {inputError ? (
         <div className={styles.errorRow} role="alert">
           <p className={styles.error}>{inputError}</p>
-          {canUseMapsLink ? (
+          {canUsePastedLocation ? (
             <button
               type="button"
               className={styles.retryButton}
@@ -524,15 +565,15 @@ export function DispatchDeliveryAddressPicker({
         </div>
       ) : null}
       <p className={styles.hint}>
-        Pega el enlace de Google Maps y pulsa Usar enlace. Si el mapa no aparece, reintenta;
-        también puedes buscar la dirección por nombre.
+        Pega un enlace de Google Maps o coordenadas (lat, lng). Si el mapa no aparece,
+        reintenta; también puedes buscar la dirección por nombre.
       </p>
 
       {linkResolving ? (
         <p className={styles.hint} role="status">Leyendo enlace de Google Maps…</p>
       ) : null}
 
-      {value.address.trim() && !looksLikeMapsUrl(searchText) ? (
+      {value.address.trim() && !looksLikeMapsUrl(searchText) && !looksLikeCoordinates(searchText) ? (
         <p className={styles.selectedAddress} aria-live="polite">{value.address}</p>
       ) : null}
 
