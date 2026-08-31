@@ -3,13 +3,24 @@ import type { DispatchMonitorDriver } from '../api/types';
 /** Keep in sync with backend `app.modules.delivery_dispatch.geo.geodesic_meters`. */
 const EARTH_RADIUS_METERS = 6_371_000;
 
-export type AssignDriverFilter = 'online' | 'nearby' | 'all';
+export type AssignDriverFilter = 'online' | 'available' | 'nearby' | 'all';
 
 export const ASSIGN_DRIVER_FILTERS: { id: AssignDriverFilter; label: string }[] = [
   { id: 'online', label: 'En línea' },
+  { id: 'available', label: 'Disponibles' },
   { id: 'nearby', label: 'Cercanía' },
   { id: 'all', label: 'Todos' },
 ];
+
+export function isDriverAvailable(
+  driver: Pick<DispatchMonitorDriver, 'is_online' | 'active_request_id' | 'occupied_job_count'>,
+): boolean {
+  return (
+    driver.is_online &&
+    !driver.active_request_id &&
+    (driver.occupied_job_count ?? 0) === 0
+  );
+}
 
 export function geodesicMeters(
   lat1: number,
@@ -73,6 +84,7 @@ function matchesFilter(
 ): boolean {
   if (!isAssignable(driver)) return false;
   if (filter === 'online') return driver.is_online;
+  if (filter === 'available') return isDriverAvailable(driver);
   if (filter === 'nearby') {
     if (restaurantLat == null || restaurantLng == null) return false;
     return isEngineProximityCandidate(driver);
@@ -112,6 +124,7 @@ export function assignDriverFilterCounts(
 ): Record<AssignDriverFilter, number> {
   return {
     online: filterAssignDrivers(drivers, 'online', restaurantLat, restaurantLng).length,
+    available: filterAssignDrivers(drivers, 'available', restaurantLat, restaurantLng).length,
     nearby: filterAssignDrivers(drivers, 'nearby', restaurantLat, restaurantLng).length,
     all: filterAssignDrivers(drivers, 'all', restaurantLat, restaurantLng).length,
   };

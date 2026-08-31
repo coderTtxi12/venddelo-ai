@@ -7,6 +7,7 @@ import {
   filterAssignDrivers,
   formatPickupDistance,
   geodesicMeters,
+  isDriverAvailable,
 } from './assignDriverList';
 
 const RESTAURANT = { lat: 19.632, lng: -99.095 };
@@ -112,9 +113,42 @@ test('Cercanía is empty without restaurant coordinates', () => {
 test('counts ignore blocked riders', () => {
   assert.deepEqual(assignDriverFilterCounts(pool, RESTAURANT.lat, RESTAURANT.lng), {
     online: 4,
+    available: 4,
     nearby: 2,
     all: 5,
   });
+});
+
+test('Disponibles lists online riders without an assigned order', () => {
+  const busy = driver({
+    id: 'busy',
+    first_name: 'Gia',
+    last_lat: 19.6328,
+    last_lng: -99.0958,
+    active_request_id: 'req-1',
+    occupied_job_count: 1,
+  });
+  const occupiedOnly = driver({
+    id: 'occupied',
+    first_name: 'Hugo',
+    last_lat: 19.631,
+    last_lng: -99.094,
+    occupied_job_count: 2,
+  });
+  const rows = filterAssignDrivers(
+    [...pool, busy, occupiedOnly],
+    'available',
+    RESTAURANT.lat,
+    RESTAURANT.lng,
+  );
+  assert.deepEqual(
+    rows.map((row) => row.id),
+    ['stale', 'near', 'far', 'no-gps'],
+  );
+  assert.equal(isDriverAvailable(busy), false);
+  assert.equal(isDriverAvailable(occupiedOnly), false);
+  assert.equal(isDriverAvailable(near), true);
+  assert.equal(isDriverAvailable(offlineClose), false);
 });
 
 test('formatPickupDistance uses meters then km', () => {
