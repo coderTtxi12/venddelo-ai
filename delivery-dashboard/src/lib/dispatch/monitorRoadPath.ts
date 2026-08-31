@@ -51,6 +51,64 @@ export async function resolveMonitorRoadPath(options: {
   return road && road.length > 1 ? road : straight;
 }
 
+export function isMonitorPolylineVisible(
+  requestId: string,
+  focusedRequestId: string | null | undefined,
+): boolean {
+  if (!focusedRequestId) return true;
+  return requestId === focusedRequestId;
+}
+
+export type MonitorOverviewRoute = {
+  request_id: string;
+  driver_id: string;
+};
+
+export type MonitorOverviewItineraryStop = {
+  sequence: number;
+  request_id: string;
+  current?: boolean;
+};
+
+export type MonitorOverviewDriver = {
+  id: string;
+  itinerary?: MonitorOverviewItineraryStop[] | null;
+};
+
+export function driverCurrentRequestId(driver: MonitorOverviewDriver): string | null {
+  const stops = driver.itinerary ?? [];
+  const current =
+    stops.find((stop) => stop.current) ?? stops.find((stop) => stop.sequence === 1);
+  return current?.request_id ?? null;
+}
+
+export function isDriverCurrentRequest(
+  driver: MonitorOverviewDriver | undefined,
+  requestId: string,
+): boolean {
+  if (!driver) return true;
+  const currentId = driverCurrentRequestId(driver);
+  if (!currentId) return true;
+  return currentId === requestId;
+}
+
+/** Overview (nothing focused): one straight line per rider, to their current stop. */
+export function monitorOverviewRoutes<T extends MonitorOverviewRoute>(
+  routes: T[],
+  drivers: MonitorOverviewDriver[],
+): T[] {
+  const currentByDriver = new Map<string, string>();
+  for (const driver of drivers) {
+    const currentId = driverCurrentRequestId(driver);
+    if (currentId) currentByDriver.set(driver.id, currentId);
+  }
+  return routes.filter((route) => {
+    const currentRequestId = currentByDriver.get(route.driver_id);
+    if (!currentRequestId) return true;
+    return route.request_id === currentRequestId;
+  });
+}
+
 const BUSINESS_SPOKE_STATUSES = new Set([
   'scheduled',
   'searching',
@@ -69,6 +127,7 @@ export type MonitorRestaurantSpokeRequest = {
   restaurant_lng: number | null;
   dropoff_lat: number;
   dropoff_lng: number;
+  assigned_driver_id?: string | null;
 };
 
 export type MonitorRestaurantSpoke = {
@@ -100,8 +159,7 @@ export type MonitorRestaurantRiderRequest = MonitorRestaurantSpokeRequest & {
   assigned_driver_id: string | null;
 };
 
-export type MonitorRestaurantRiderLocation = {
-  id: string;
+export type MonitorRestaurantRiderLocation = MonitorOverviewDriver & {
   last_lat: number | null;
   last_lng: number | null;
 };
@@ -119,6 +177,7 @@ export function monitorRestaurantRiderLegs(
     if (!request.assigned_driver_id) continue;
     const driver = byId.get(request.assigned_driver_id);
     if (driver?.last_lat == null || driver.last_lng == null) continue;
+    if (!isDriverCurrentRequest(driver, request.id)) continue;
     const rider = { lat: driver.last_lat, lng: driver.last_lng };
     if (request.status === 'assigned') {
       if (request.restaurant_lat == null || request.restaurant_lng == null) continue;
