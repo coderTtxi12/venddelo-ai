@@ -50,3 +50,94 @@ export async function resolveMonitorRoadPath(options: {
   const road = await options.loadRoad();
   return road && road.length > 1 ? road : straight;
 }
+
+const BUSINESS_SPOKE_STATUSES = new Set([
+  'scheduled',
+  'searching',
+  'offered',
+  'unassigned',
+  'assigned',
+  'picked_up',
+  'in_transit',
+]);
+
+export type MonitorRestaurantSpokeRequest = {
+  id: string;
+  status: string;
+  restaurant_id?: string | null;
+  restaurant_lat: number | null;
+  restaurant_lng: number | null;
+  dropoff_lat: number;
+  dropoff_lng: number;
+};
+
+export type MonitorRestaurantSpoke = {
+  requestId: string;
+  origin: MonitorRoadPoint;
+  destination: MonitorRoadPoint;
+};
+
+export function monitorRestaurantSpokes(
+  requests: MonitorRestaurantSpokeRequest[],
+  focusedRestaurantId: string | null | undefined,
+): MonitorRestaurantSpoke[] {
+  if (!focusedRestaurantId) return [];
+  const spokes: MonitorRestaurantSpoke[] = [];
+  for (const request of requests) {
+    if (request.restaurant_id !== focusedRestaurantId) continue;
+    if (!BUSINESS_SPOKE_STATUSES.has(request.status)) continue;
+    if (request.restaurant_lat == null || request.restaurant_lng == null) continue;
+    spokes.push({
+      requestId: request.id,
+      origin: { lat: request.restaurant_lat, lng: request.restaurant_lng },
+      destination: { lat: request.dropoff_lat, lng: request.dropoff_lng },
+    });
+  }
+  return spokes;
+}
+
+export type MonitorRestaurantRiderRequest = MonitorRestaurantSpokeRequest & {
+  assigned_driver_id: string | null;
+};
+
+export type MonitorRestaurantRiderLocation = {
+  id: string;
+  last_lat: number | null;
+  last_lng: number | null;
+};
+
+export function monitorRestaurantRiderLegs(
+  requests: MonitorRestaurantRiderRequest[],
+  drivers: MonitorRestaurantRiderLocation[],
+  focusedRestaurantId: string | null | undefined,
+): MonitorRestaurantSpoke[] {
+  if (!focusedRestaurantId) return [];
+  const byId = new Map(drivers.map((driver) => [driver.id, driver]));
+  const legs: MonitorRestaurantSpoke[] = [];
+  for (const request of requests) {
+    if (request.restaurant_id !== focusedRestaurantId) continue;
+    if (!request.assigned_driver_id) continue;
+    const driver = byId.get(request.assigned_driver_id);
+    if (driver?.last_lat == null || driver.last_lng == null) continue;
+    const rider = { lat: driver.last_lat, lng: driver.last_lng };
+    if (request.status === 'assigned') {
+      if (request.restaurant_lat == null || request.restaurant_lng == null) continue;
+      legs.push({
+        requestId: request.id,
+        origin: rider,
+        destination: { lat: request.restaurant_lat, lng: request.restaurant_lng },
+      });
+      continue;
+    }
+    if (request.status === 'picked_up' || request.status === 'in_transit') {
+      legs.push({
+        requestId: request.id,
+        origin: rider,
+        destination: { lat: request.dropoff_lat, lng: request.dropoff_lng },
+      });
+    }
+  }
+  return legs;
+}
+
+
