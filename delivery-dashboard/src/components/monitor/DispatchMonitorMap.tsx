@@ -12,7 +12,7 @@ import {
 import { liveBusinessesFromRequests } from '@/lib/dispatch/liveBusinesses';
 import { fetchRoadRoute, fetchStableRoadPath } from '@/lib/dispatch/fetchRoadRoute';
 import { shouldShowDriverOnMonitorMap } from '@/lib/dispatch/monitorMapDrivers';
-import { densifyStraightPath, resolveMonitorRoadPath } from '@/lib/dispatch/monitorRoadPath';
+import { densifyStraightPath, monitorRestaurantRiderLegs, monitorRestaurantSpokes, resolveMonitorRoadPath } from '@/lib/dispatch/monitorRoadPath';
 import { remainingPathFrom } from '@/lib/dispatch/remainingRoadPath';
 import {
   formatShortId,
@@ -598,7 +598,7 @@ export function DispatchMonitorMap({
       );
 
       for (const driver of snapshot.drivers) {
-        if (!shouldShowDriverOnMonitorMap(driver)) continue;
+        if (!shouldShowDriverOnMonitorMap(driver, driver.id === focusedDriverId)) continue;
         if (driver.last_lat == null || driver.last_lng == null) continue;
         const focused = driver.id === focusedDriverId;
         const position = { lat: driver.last_lat, lng: driver.last_lng };
@@ -724,7 +724,13 @@ export function DispatchMonitorMap({
         }
       }
 
-      const pendingRequests = itinerary
+      const restaurantSpokes = itinerary
+        ? []
+        : monitorRestaurantSpokes(snapshot.requests, focusedRestaurantId);
+      const restaurantRiderLegs = itinerary
+        ? []
+        : monitorRestaurantRiderLegs(snapshot.requests, snapshot.drivers, focusedRestaurantId);
+      const pendingRequests = itinerary || focusedRestaurantId
         ? []
         : snapshot.requests.filter(
             (request) =>
@@ -732,7 +738,7 @@ export function DispatchMonitorMap({
               request.restaurant_lat != null &&
               request.restaurant_lng != null,
           );
-      const activeRoutes = itinerary ? [] : snapshot.routes;
+      const activeRoutes = itinerary || focusedRestaurantId ? [] : snapshot.routes;
 
       const itineraryRoadPaths = itinerary
         ? itineraryLegs(itinerary).map((leg, index) => {
@@ -823,6 +829,34 @@ export function DispatchMonitorMap({
         );
       }
 
+      const restaurantSpokePaths = restaurantSpokes.map((spoke) => ({
+        requestId: spoke.requestId,
+        path: densifyStraightPath(spoke.origin, spoke.destination),
+      }));
+      for (const { path } of restaurantSpokePaths) {
+        polylinesRef.current.push(
+          new google.maps.Polyline({
+            map,
+            path,
+            ...dashedPolylineStyle(PENDING_ROUTE_COLOR, 'normal'),
+          }),
+        );
+      }
+
+      const restaurantRiderPaths = restaurantRiderLegs.map((leg) => ({
+        requestId: leg.requestId,
+        path: densifyStraightPath(leg.origin, leg.destination),
+      }));
+      for (const { path } of restaurantRiderPaths) {
+        polylinesRef.current.push(
+          new google.maps.Polyline({
+            map,
+            path,
+            ...FOCUSED_ACTIVE_ROUTE_STYLE,
+          }),
+        );
+      }
+
       for (const { route, path } of roadPaths) {
         const focused = route.request_id === focusedRequestId;
         const restaurantOwned = restaurantRequestIds.has(route.request_id);
@@ -896,15 +930,11 @@ export function DispatchMonitorMap({
 
       const focusedRestaurantPoints: google.maps.LatLngLiteral[] = [];
       if (focusedRestaurantId) {
-        for (const { request, path } of pendingRoadPaths) {
-          if (request.restaurant_id === focusedRestaurantId) {
-            focusedRestaurantPoints.push(...path);
-          }
+        for (const { path } of restaurantSpokePaths) {
+          focusedRestaurantPoints.push(...path);
         }
-        for (const { route, path } of roadPaths) {
-          if (restaurantRequestIds.has(route.request_id)) {
-            focusedRestaurantPoints.push(...path);
-          }
+        for (const { path } of restaurantRiderPaths) {
+          focusedRestaurantPoints.push(...path);
         }
         const sample = snapshot.requests.find(
           (row) => row.restaurant_id === focusedRestaurantId,
