@@ -74,6 +74,7 @@ function requestStatusLabel(status: string): string {
 function emptyAssignHint(filter: AssignDriverFilter): string {
   if (filter === 'nearby') return 'Nadie en línea con GPS fresco cerca del restaurante.';
   if (filter === 'online') return 'Nadie en línea.';
+  if (filter === 'available') return 'Nadie disponible.';
   return 'Sin repartidores.';
 }
 
