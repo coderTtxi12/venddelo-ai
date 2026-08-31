@@ -25,6 +25,20 @@ test('hides offline drivers with no active work', () => {
   );
 });
 
+test('shows a focused driver even if they are offline and idle', () => {
+  assert.equal(
+    shouldShowDriverOnMonitorMap(
+      {
+        is_online: false,
+        active_request_id: null,
+        occupied_job_count: 0,
+      },
+      true,
+    ),
+    true,
+  );
+});
+
 test('shows offline drivers with an active request', () => {
   assert.equal(
     shouldShowDriverOnMonitorMap({
