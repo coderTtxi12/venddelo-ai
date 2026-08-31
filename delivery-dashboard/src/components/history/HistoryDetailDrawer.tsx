@@ -19,6 +19,7 @@ import {
   mapsSearchUrl,
   paymentLabel,
   requestStatusLabel,
+  splitDropoffAddress,
 } from '@/lib/dispatch/monitorCopy';
 import { formatMoney } from '@/lib/pricing/tariffUtils';
 import { publicTrackingUrl } from '@/lib/dispatch/publicTrackingUrl';
@@ -125,6 +126,7 @@ export function HistoryDetailDrawer({
   const dropoffMaps = item
     ? item.dropoff_maps_url || mapsSearchUrl(item.dropoff_lat, item.dropoff_lng)
     : null;
+  const dropoff = item ? splitDropoffAddress(item.dropoff_address) : { address: '', references: '' };
   const restaurantCoords = item
     ? formatCoords(item.restaurant_lat, item.restaurant_lng)
     : null;
@@ -191,7 +193,8 @@ export function HistoryDetailDrawer({
                 )}
               </DetailRow>
               <DetailRow label="Zona">{item.zone_name}</DetailRow>
-              <DetailRow label="Entrega">{item.dropoff_address}</DetailRow>
+              <DetailRow label="Entrega">{dropoff.address}</DetailRow>
+              <DetailRow label="Referencias">{dropoff.references}</DetailRow>
               <DetailRow label="Coordenadas entrega">
                 {dropoffCoords && dropoffMaps ? (
                   <ExternalLink href={dropoffMaps}>{dropoffCoords}</ExternalLink>

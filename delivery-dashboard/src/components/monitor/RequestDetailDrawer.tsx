@@ -19,6 +19,7 @@ import {
   requestCashDenominationLine,
   requestPackageLine,
   requestStatusLabel,
+  splitDropoffAddress,
 } from '@/lib/dispatch/monitorCopy';
 import { publicTrackingUrl } from '@/lib/dispatch/publicTrackingUrl';
 import { formatPrepMinutes, requestPrepMinutes } from '@/lib/dispatch/prepTime';
@@ -118,6 +119,7 @@ export function RequestDetailDrawer({
   const dropoffMaps = request
     ? request.dropoff_maps_url || mapsSearchUrl(request.dropoff_lat, request.dropoff_lng)
     : null;
+  const dropoff = request ? splitDropoffAddress(request.dropoff_address) : { address: '', references: '' };
   const restaurantCoords = request
     ? formatCoords(request.restaurant_lat, request.restaurant_lng)
     : null;
@@ -194,7 +196,8 @@ export function RequestDetailDrawer({
                 )}
               </DetailRow>
               <DetailRow label="Zona">{request.zone_name}</DetailRow>
-              <DetailRow label="Entrega">{request.dropoff_address}</DetailRow>
+              <DetailRow label="Entrega">{dropoff.address}</DetailRow>
+              <DetailRow label="Referencias">{dropoff.references}</DetailRow>
               <DetailRow label="Coordenadas entrega">
                 {dropoffCoords && dropoffMaps ? (
                   <ExternalLink href={dropoffMaps}>{dropoffCoords}</ExternalLink>
