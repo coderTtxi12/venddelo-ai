@@ -12,7 +12,7 @@ import {
 import { liveBusinessesFromRequests } from '@/lib/dispatch/liveBusinesses';
 import { fetchRoadRoute, fetchStableRoadPath } from '@/lib/dispatch/fetchRoadRoute';
 import { shouldShowDriverOnMonitorMap } from '@/lib/dispatch/monitorMapDrivers';
-import { densifyStraightPath, monitorRestaurantRiderLegs, monitorRestaurantSpokes, resolveMonitorRoadPath } from '@/lib/dispatch/monitorRoadPath';
+import { densifyStraightPath, isMonitorPolylineVisible, monitorOverviewRoutes, monitorRestaurantRiderLegs, monitorRestaurantSpokes, resolveMonitorRoadPath } from '@/lib/dispatch/monitorRoadPath';
 import { remainingPathFrom } from '@/lib/dispatch/remainingRoadPath';
 import {
   formatShortId,
@@ -736,9 +736,17 @@ export function DispatchMonitorMap({
             (request) =>
               PENDING_REQUEST_STATUSES.has(request.status) &&
               request.restaurant_lat != null &&
-              request.restaurant_lng != null,
+              request.restaurant_lng != null &&
+              isMonitorPolylineVisible(request.id, focusedRequestId),
           );
-      const activeRoutes = itinerary || focusedRestaurantId ? [] : snapshot.routes;
+      const visibleRoutes = itinerary || focusedRestaurantId
+        ? []
+        : snapshot.routes.filter((route) =>
+            isMonitorPolylineVisible(route.request_id, focusedRequestId),
+          );
+      const activeRoutes = focusedRequestId
+        ? visibleRoutes
+        : monitorOverviewRoutes(visibleRoutes, snapshot.drivers);
 
       const itineraryRoadPaths = itinerary
         ? itineraryLegs(itinerary).map((leg, index) => {
