@@ -206,12 +206,18 @@ export function DispatchDeliveryAddressPicker({
 
       try {
         const local = parseMapsUrl(trimmed);
-        const resolved = local ?? await resolveMapsUrl(trimmed);
-        const resolvedAddress = 'address' in resolved ? resolved.address : null;
-        await applyCoordinates(resolved.latitude, resolved.longitude, {
-          mapsUrl: trimmed,
-          address: resolvedAddress ?? extractMapsQueryText(trimmed),
-        });
+        if (local) {
+          await applyCoordinates(local.latitude, local.longitude, {
+            mapsUrl: trimmed,
+            address: extractMapsQueryText(trimmed),
+          });
+        } else {
+          const resolved = await resolveMapsUrl(trimmed);
+          await applyCoordinates(resolved.latitude, resolved.longitude, {
+            mapsUrl: trimmed,
+            address: resolved.address ?? extractMapsQueryText(trimmed),
+          });
+        }
         setMapBootId((current) => current + 1);
       } catch (err) {
         setFailedMapsLink(trimmed);
