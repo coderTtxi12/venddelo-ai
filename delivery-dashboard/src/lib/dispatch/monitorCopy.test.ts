@@ -5,6 +5,7 @@ import {
   blockerLabel,
   blockersSummary,
   requestStatusLabel,
+  splitDropoffAddress,
   timelineEventTitle,
 } from './monitorCopy';
 
@@ -26,4 +27,30 @@ test('picked_up means the rider arrived at the restaurant', () => {
     timelineEventTitle({ at: null, kind: 'picked_up' }),
     'En el restaurante',
   );
+});
+
+test('splitDropoffAddress separates dispatch references after the last separator', () => {
+  assert.deepEqual(
+    splitDropoffAddress(
+      'Kiosko Rinconada San Felipe, Méx., Mexico · puerta color blanca',
+    ),
+    {
+      address: 'Kiosko Rinconada San Felipe, Méx., Mexico',
+      references: 'puerta color blanca',
+    },
+  );
+});
+
+test('splitDropoffAddress separates checkout Referencias marker', () => {
+  assert.deepEqual(splitDropoffAddress('Calle Reforma 100\nReferencias: puerta azul'), {
+    address: 'Calle Reforma 100',
+    references: 'puerta azul',
+  });
+});
+
+test('splitDropoffAddress keeps a plain address', () => {
+  assert.deepEqual(splitDropoffAddress('Calle Reforma 100'), {
+    address: 'Calle Reforma 100',
+    references: '',
+  });
 });

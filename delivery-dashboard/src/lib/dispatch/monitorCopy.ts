@@ -14,6 +14,35 @@ export function formatShortId(shortId: string | null | undefined): string {
   return value.startsWith('#') ? value : `#${value}`;
 }
 
+const CHECKOUT_REFERENCES_MARKER = '\nReferencias:';
+const DISPATCH_REFERENCES_SEP = ' · ';
+
+export function splitDropoffAddress(raw: string | null | undefined): {
+  address: string;
+  references: string;
+} {
+  const text = raw?.trim() ?? '';
+  if (!text) return { address: '', references: '' };
+
+  const checkoutIndex = text.indexOf(CHECKOUT_REFERENCES_MARKER);
+  if (checkoutIndex !== -1) {
+    return {
+      address: text.slice(0, checkoutIndex).trim(),
+      references: text.slice(checkoutIndex + CHECKOUT_REFERENCES_MARKER.length).trim(),
+    };
+  }
+
+  const sepIndex = text.lastIndexOf(DISPATCH_REFERENCES_SEP);
+  if (sepIndex !== -1) {
+    return {
+      address: text.slice(0, sepIndex).trim(),
+      references: text.slice(sepIndex + DISPATCH_REFERENCES_SEP.length).trim(),
+    };
+  }
+
+  return { address: text, references: '' };
+}
+
 export function requestStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     scheduled: 'Programado',
