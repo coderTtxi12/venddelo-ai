@@ -49,6 +49,7 @@ import {
   requestStatusLabel,
 } from '@/lib/dispatch/monitorCopy';
 import { applyDriverLocationToSnapshot, driverLocationAgeSeconds } from '@/lib/dispatch/applyDriverLocation';
+import { isDriverAvailable } from '@/lib/dispatch/assignDriverList';
 import { publicTrackingUrl } from '@/lib/dispatch/publicTrackingUrl';
 import {
   useDispatchMonitorSocket,
@@ -119,7 +120,7 @@ function MetricCard({
   return <div className={className}>{body}</div>;
 }
 
-type DriverFilter = 'all' | 'online' | 'stale' | 'offline';
+type DriverFilter = 'all' | 'online' | 'available' | 'stale' | 'offline';
 
 function isStaleGps(driver: DispatchMonitorDriver, nowMs: number): boolean {
   if (!driver.is_online) return false;
@@ -145,6 +146,7 @@ function driverMatchesFilter(
   nowMs: number,
 ): boolean {
   if (filter === 'online') return driver.is_online;
+  if (filter === 'available') return isDriverAvailable(driver);
   if (filter === 'offline') return !driver.is_online;
   if (filter === 'stale') return isStaleGps(driver, nowMs);
   return true;
@@ -541,6 +543,7 @@ function DriversList({
   const counts = {
     all: drivers.length,
     online: drivers.filter((driver) => driver.is_online).length,
+    available: drivers.filter((driver) => isDriverAvailable(driver)).length,
     stale: drivers.filter((driver) => isStaleGps(driver, nowMs)).length,
     offline: drivers.filter((driver) => !driver.is_online).length,
   };
@@ -554,6 +557,7 @@ function DriversList({
 
   const filters: { id: DriverFilter; label: string; count: number; warn?: boolean }[] = [
     { id: 'online', label: 'En línea', count: counts.online },
+    { id: 'available', label: 'Disponibles', count: counts.available },
     { id: 'stale', label: 'GPS viejo', count: counts.stale, warn: true },
     { id: 'offline', label: 'Offline', count: counts.offline },
     { id: 'all', label: 'Todos', count: counts.all },
@@ -564,9 +568,11 @@ function DriversList({
       ? 'Nadie con GPS viejo.'
       : filter === 'online'
         ? 'Nadie en línea.'
-        : filter === 'offline'
-          ? 'Nadie offline.'
-          : 'Sin repartidores.';
+        : filter === 'available'
+          ? 'Nadie disponible.'
+          : filter === 'offline'
+            ? 'Nadie offline.'
+            : 'Sin repartidores.';
 
   return (
     <>
