@@ -213,7 +213,7 @@
   width: min(17.5rem, calc(100% - 24px));
   max-height: min(58%, 22rem);
   overflow: auto;
-  padding: 0.7rem 0.75rem 0.8rem;
+  padding: 0.35rem;
   border-radius: 14px;
   background: color-mix(in srgb, #ffffff 92%, transparent);
   border: 1px solid color-mix(in srgb, #1e40af 14%, #e4e4e7);
@@ -221,16 +221,69 @@
   color: #1e3a8a;
 }
 
+.itineraryCardCollapsed {
+  max-height: none;
+  overflow: hidden;
+}
+
+.itineraryToggle {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 2.25rem;
+  margin: 0;
+  padding: 0.35rem 0.4rem 0.4rem;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.itineraryToggle:hover {
+  background: color-mix(in srgb, #2563eb 6%, transparent);
+}
+
+.itineraryToggle:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.itineraryCard > .itineraryBody {
+  padding: 0 0.4rem 0.4rem;
+}
+
 .itineraryHeading {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin: 0 0 0.55rem;
+  margin: 0 0 0.35rem;
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: -0.01em;
   color: #1e3a8a;
+}
+
+.itineraryCardCollapsed .itineraryHeading:last-child,
+.itineraryCardCollapsed .itineraryKicker {
+  margin-bottom: 0;
+}
+
+.itineraryHeadingTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itineraryHeadingMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .itineraryPlate {
@@ -238,13 +291,32 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   color: #2563eb;
+  white-space: nowrap;
+}
+
+.itineraryChevron,
+.itineraryChevronCollapsed {
+  flex-shrink: 0;
+  color: #2563eb;
+  transition: transform 180ms ease;
+}
+
+.itineraryChevronCollapsed {
+  transform: rotate(-90deg);
 }
 
 .itineraryKicker {
-  margin: -0.2rem 0 0.65rem;
+  display: block;
+  margin: -0.1rem 0 0.65rem;
   font-size: 0.72rem;
   font-weight: 600;
   color: #475569;
+}
+
+.itineraryToggle .itineraryKicker {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .itineraryEmpty {
@@ -364,5 +436,10 @@
 @media (prefers-reduced-motion: reduce) {
   .driverPinFocused {
     transform: none;
+  }
+
+  .itineraryChevron,
+  .itineraryChevronCollapsed {
+    transition: none;
   }
 }
