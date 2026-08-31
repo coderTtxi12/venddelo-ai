@@ -113,6 +113,7 @@ export type MapsUrlResolve = {
   latitude: number;
   longitude: number;
   resolved_url: string | null;
+  address?: string | null;
 };
 
 export function formatDispatchShortId(shortId: string | null | undefined): string {
