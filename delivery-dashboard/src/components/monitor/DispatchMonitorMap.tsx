@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import type { DeliveryProviderZone, DispatchMonitorSnapshot, GeoJsonPolygon } from '@/lib/api/types';
 import {
   buildDriverItinerary,
@@ -10,6 +11,8 @@ import {
 } from '@/lib/dispatch/driverItinerary';
 import { liveBusinessesFromRequests } from '@/lib/dispatch/liveBusinesses';
 import { fetchRoadRoute, fetchStableRoadPath } from '@/lib/dispatch/fetchRoadRoute';
+import { shouldShowDriverOnMonitorMap } from '@/lib/dispatch/monitorMapDrivers';
+import { densifyStraightPath, resolveMonitorRoadPath } from '@/lib/dispatch/monitorRoadPath';
 import { remainingPathFrom } from '@/lib/dispatch/remainingRoadPath';
 import {
   formatShortId,
@@ -89,7 +92,7 @@ function dashedPolylineStyle(color: string, mode: PendingDashMode): google.maps.
     strokeColor: color,
     strokeOpacity: 0,
     strokeWeight: focused ? 5 : dimmed ? 2 : 2.5,
-    geodesic: true,
+    geodesic: false,
     clickable: false,
     zIndex: focused ? 10 : dimmed ? 2 : 3,
     icons: [
@@ -112,7 +115,7 @@ function focusedDashedHaloStyle(): google.maps.PolylineOptions {
     strokeColor: '#FFFFFF',
     strokeOpacity: 0,
     strokeWeight: 8,
-    geodesic: true,
+    geodesic: false,
     clickable: false,
     zIndex: 9,
     icons: [
@@ -352,6 +355,56 @@ function zoneRingPoints(zones: DeliveryProviderZone[]): google.maps.LatLngLitera
   return points;
 }
 
+function MapOverlayCard({
+  ariaLabel,
+  heading,
+  headingMeta,
+  kicker,
+  collapsed,
+  onToggle,
+  children,
+}: {
+  ariaLabel: string;
+  heading: ReactNode;
+  headingMeta?: ReactNode;
+  kicker?: ReactNode;
+  collapsed: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const bodyId = useId();
+  return (
+    <aside
+      className={`${styles.itineraryCard} ${collapsed ? styles.itineraryCardCollapsed : ''}`}
+      aria-label={ariaLabel}
+    >
+      <button
+        type="button"
+        className={styles.itineraryToggle}
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+        aria-controls={bodyId}
+      >
+        <span className={styles.itineraryHeading}>
+          <span className={styles.itineraryHeadingTitle}>{heading}</span>
+          <span className={styles.itineraryHeadingMeta}>
+            {headingMeta ? <span className={styles.itineraryPlate}>{headingMeta}</span> : null}
+            <ExpandMoreOutlinedIcon
+              className={collapsed ? styles.itineraryChevronCollapsed : styles.itineraryChevron}
+              fontSize="small"
+              aria-hidden
+            />
+          </span>
+        </span>
+        {kicker ? <span className={styles.itineraryKicker}>{kicker}</span> : null}
+      </button>
+      <div id={bodyId} className={styles.itineraryBody} hidden={collapsed}>
+        {children}
+      </div>
+    </aside>
+  );
+}
+
 export function DispatchMonitorMap({
   snapshot,
   zones,
@@ -389,6 +442,17 @@ export function DispatchMonitorMap({
         : null,
     [focusedRequestId, snapshot],
   );
+  const overlayKey = itinerary
+    ? `driver:${itinerary.driverId}`
+    : focusedRequest
+      ? `request:${focusedRequest.id}`
+      : focusedBusiness
+        ? `business:${focusedBusiness.id}`
+        : '';
+  const [overlayCollapsed, setOverlayCollapsed] = useState(false);
+  useEffect(() => {
+    setOverlayCollapsed(false);
+  }, [overlayKey]);
   const colorByZone = selectedZoneId === ALL_ZONES_ID;
   const zoneIds = useMemo(() => zones.map((zone) => zone.id), [zones]);
   const visibleZones = useMemo(() => {
@@ -534,6 +598,7 @@ export function DispatchMonitorMap({
       );
 
       for (const driver of snapshot.drivers) {
+        if (!shouldShowDriverOnMonitorMap(driver)) continue;
         if (driver.last_lat == null || driver.last_lng == null) continue;
         const focused = driver.id === focusedDriverId;
         const position = { lat: driver.last_lat, lng: driver.last_lng };
@@ -669,7 +734,23 @@ export function DispatchMonitorMap({
           );
       const activeRoutes = itinerary ? [] : snapshot.routes;
 
-      const [pendingRoadPaths, roadPaths, itineraryRoadPaths] = await Promise.all([
+      const itineraryRoadPaths = itinerary
+        ? itineraryLegs(itinerary).map((leg, index) => {
+            if (index === 0 && itinerary.origin) {
+              const rider = { lat: itinerary.origin.lat, lng: itinerary.origin.lng };
+              return {
+                current: leg.current,
+                path: remainingPathFrom(densifyStraightPath(rider, leg.to), rider),
+              };
+            }
+            return {
+              current: leg.current,
+              path: densifyStraightPath(leg.from, leg.to),
+            };
+          })
+        : [];
+
+      const [pendingRoadPaths, roadPaths] = await Promise.all([
         Promise.all(
           pendingRequests.map(async (request) => {
             const origin = {
@@ -677,11 +758,14 @@ export function DispatchMonitorMap({
               lng: request.restaurant_lng!,
             };
             const destination = { lat: request.dropoff_lat, lng: request.dropoff_lng };
-            const road = await fetchRoadRoute(origin, destination);
-            return {
-              request,
-              path: road && road.length > 1 ? road : [origin, destination],
-            };
+            const path = await resolveMonitorRoadPath({
+              requestId: request.id,
+              focusedRequestId,
+              origin,
+              destination,
+              loadRoad: () => fetchRoadRoute(origin, destination),
+            });
+            return { request, path };
           }),
         ),
         Promise.all(
@@ -692,46 +776,29 @@ export function DispatchMonitorMap({
               driver?.last_lat != null && driver.last_lng != null
                 ? { lat: driver.last_lat, lng: driver.last_lng }
                 : { lat: route.origin_lat, lng: route.origin_lng };
-            const full = await fetchStableRoadPath(
-              `${route.request_id}:${route.status}:${destination.lat}:${destination.lng}`,
-              rider,
+            const full = await resolveMonitorRoadPath({
+              requestId: route.request_id,
+              focusedRequestId,
+              origin: rider,
               destination,
-            );
+              loadRoad: () =>
+                fetchStableRoadPath(
+                  `${route.request_id}:${route.status}:${destination.lat}:${destination.lng}`,
+                  rider,
+                  destination,
+                ),
+            });
             return {
               route,
               path: remainingPathFrom(full, rider),
             };
           }),
         ),
-        Promise.all(
-          itinerary
-            ? itineraryLegs(itinerary).map(async (leg, index) => {
-                if (index === 0 && itinerary.origin) {
-                  const rider = { lat: itinerary.origin.lat, lng: itinerary.origin.lng };
-                  const full = await fetchStableRoadPath(
-                    `${itinerary.driverId}:${leg.to.lat}:${leg.to.lng}`,
-                    rider,
-                    leg.to,
-                  );
-                  return {
-                    current: leg.current,
-                    path: remainingPathFrom(full, rider),
-                  };
-                }
-                const road = await fetchRoadRoute(leg.from, leg.to);
-                return {
-                  current: leg.current,
-                  path: road && road.length > 1 ? road : [leg.from, leg.to],
-                };
-              })
-            : [],
-        ),
       ]);
 
       if (cancelled) return;
 
       for (const { request, path } of pendingRoadPaths) {
-        const focused = request.id === focusedRequestId;
         const mode = pendingDashMode(
           request.id,
           request.restaurant_id,
@@ -752,21 +819,6 @@ export function DispatchMonitorMap({
             map,
             path,
             ...dashedPolylineStyle(PENDING_ROUTE_COLOR, mode),
-          }),
-        );
-        markersRef.current.push(
-          new AdvancedMarkerElement({
-            map,
-            position: pointAlongPath(path),
-            gmpClickable: false,
-            zIndex: focused ? 18 : mode === 'dimmed' ? 5 : 6,
-            content: createRequestLabel(
-              request.short_id,
-              true,
-              focused,
-              undefined,
-              mode === 'dimmed',
-            ),
           }),
         );
       }
@@ -916,11 +968,13 @@ export function DispatchMonitorMap({
     <div className={styles.mapWrap}>
       <div ref={mapRef} className={styles.map} aria-label="Mapa de operación" />
       {itinerary ? (
-        <aside className={styles.itineraryCard} aria-label={`Ruta de ${itinerary.driverName}`}>
-          <p className={styles.itineraryHeading}>
-            <span>{itinerary.driverName}</span>
-            <span className={styles.itineraryPlate}>{itinerary.plate}</span>
-          </p>
+        <MapOverlayCard
+          ariaLabel={`Ruta de ${itinerary.driverName}`}
+          heading={itinerary.driverName}
+          headingMeta={itinerary.plate}
+          collapsed={overlayCollapsed}
+          onToggle={() => setOverlayCollapsed((open) => !open)}
+        >
           <p className={styles.itineraryKicker}>
             Ruta fijada · arrastra para
             intercalar paradas
@@ -983,19 +1037,16 @@ export function DispatchMonitorMap({
               ))}
             </ol>
           )}
-        </aside>
+        </MapOverlayCard>
       ) : focusedRequest ? (
-        <aside
-          className={styles.itineraryCard}
-          aria-label={`Pedido ${formatShortId(focusedRequest.short_id)}`}
+        <MapOverlayCard
+          ariaLabel={`Pedido ${formatShortId(focusedRequest.short_id)}`}
+          heading={formatShortId(focusedRequest.short_id)}
+          headingMeta={requestStatusLabel(focusedRequest.status)}
+          kicker={focusedRequest.customer_name}
+          collapsed={overlayCollapsed}
+          onToggle={() => setOverlayCollapsed((open) => !open)}
         >
-          <p className={styles.itineraryHeading}>
-            <span>{formatShortId(focusedRequest.short_id)}</span>
-            <span className={styles.itineraryPlate}>
-              {requestStatusLabel(focusedRequest.status)}
-            </span>
-          </p>
-          <p className={styles.itineraryKicker}>{focusedRequest.customer_name}</p>
           <dl className={styles.requestFacts}>
             <div>
               <dt>Recoger</dt>
@@ -1037,12 +1088,19 @@ export function DispatchMonitorMap({
               </div>
             ) : null}
           </dl>
-        </aside>
+        </MapOverlayCard>
       ) : focusedBusiness ? (
-        <aside className={styles.itineraryCard} aria-label={`Negocio ${focusedBusiness.name}`}>
-          <p className={styles.itineraryHeading}>
-            <span>{focusedBusiness.name}</span>
-          </p>
+        <MapOverlayCard
+          ariaLabel={`Negocio ${focusedBusiness.name}`}
+          heading={focusedBusiness.name}
+          kicker={`${focusedBusiness.queueCount} en cola · ${focusedBusiness.activeCount} en curso${
+            focusedBusiness.unassignedCount
+              ? ` · ${focusedBusiness.unassignedCount} sin asignar`
+              : ''
+          }`}
+          collapsed={overlayCollapsed}
+          onToggle={() => setOverlayCollapsed((open) => !open)}
+        >
           {focusedBusiness.address ? (
             <p className={styles.itineraryKicker}>{focusedBusiness.address}</p>
           ) : (
@@ -1054,12 +1112,6 @@ export function DispatchMonitorMap({
           {focusedBusiness.zoneName ? (
             <p className={styles.itineraryKicker}>{focusedBusiness.zoneName}</p>
           ) : null}
-          <p className={styles.itineraryKicker}>
-            {focusedBusiness.queueCount} en cola · {focusedBusiness.activeCount} en curso
-            {focusedBusiness.unassignedCount
-              ? ` · ${focusedBusiness.unassignedCount} sin asignar`
-              : ''}
-          </p>
           <ol className={styles.itineraryList}>
             {focusedBusiness.requests.map((request) => (
               <li key={request.id} className={styles.itineraryStep}>
@@ -1073,7 +1125,7 @@ export function DispatchMonitorMap({
               </li>
             ))}
           </ol>
-        </aside>
+        </MapOverlayCard>
       ) : null}
     </div>
   );
