@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { densifyStraightPath, monitorRestaurantRiderLegs, monitorRestaurantSpokes, resolveMonitorRoadPath } from './monitorRoadPath';
+import { densifyStraightPath, isMonitorPolylineVisible, monitorOverviewRoutes, monitorRestaurantRiderLegs, monitorRestaurantSpokes, resolveMonitorRoadPath } from './monitorRoadPath';
 
 const origin = { lat: 19.43, lng: -99.13 };
 const destination = { lat: 19.44, lng: -99.14 };
@@ -217,4 +217,100 @@ test('focused business draws a straight rider leg to restaurant or dropoff', () 
   assert.equal(legs[0].origin.lat, rider.lat);
   assert.equal(legs[0].destination.lat, origin.lat);
   assert.equal(legs[1].destination.lat, destination.lat);
+});
+
+test('focused business only draws each rider current course', () => {
+  const rider = { lat: 19.42, lng: -99.125 };
+  const otherDropoff = { lat: 19.45, lng: -99.12 };
+  const drivers = [
+    {
+      id: 'drv-1',
+      last_lat: rider.lat,
+      last_lng: rider.lng,
+      itinerary: [
+        { sequence: 1, request_id: 'first', current: true },
+        { sequence: 2, request_id: 'later' },
+      ],
+    },
+  ];
+  const requests = [
+    {
+      id: 'first',
+      status: 'assigned' as const,
+      restaurant_id: 'rest-1',
+      restaurant_lat: origin.lat,
+      restaurant_lng: origin.lng,
+      dropoff_lat: destination.lat,
+      dropoff_lng: destination.lng,
+      assigned_driver_id: 'drv-1',
+    },
+    {
+      id: 'later',
+      status: 'assigned' as const,
+      restaurant_id: 'rest-1',
+      restaurant_lat: origin.lat,
+      restaurant_lng: origin.lng,
+      dropoff_lat: otherDropoff.lat,
+      dropoff_lng: otherDropoff.lng,
+      assigned_driver_id: 'drv-1',
+    },
+  ];
+
+  const legs = monitorRestaurantRiderLegs(requests, drivers, 'rest-1');
+  assert.deepEqual(
+    legs.map((row) => row.requestId),
+    ['first'],
+  );
+
+  const spokes = monitorRestaurantSpokes(requests, 'rest-1');
+  assert.deepEqual(
+    spokes.map((row) => row.requestId),
+    ['first', 'later'],
+  );
+});
+
+test('overview shows every polyline until a pedido is focused', () => {
+  assert.equal(isMonitorPolylineVisible('req-1', null), true);
+  assert.equal(isMonitorPolylineVisible('req-2', null), true);
+});
+
+test('focused pedido hides every other polyline', () => {
+  assert.equal(isMonitorPolylineVisible('req-1', 'req-1'), true);
+  assert.equal(isMonitorPolylineVisible('req-2', 'req-1'), false);
+});
+
+test('overview keeps only the current destination line per rider', () => {
+  const routes = [
+    { request_id: 'req-a', driver_id: 'drv-1' },
+    { request_id: 'req-b', driver_id: 'drv-1' },
+    { request_id: 'req-c', driver_id: 'drv-1' },
+    { request_id: 'req-d', driver_id: 'drv-2' },
+  ];
+  const visible = monitorOverviewRoutes(routes, [
+    {
+      id: 'drv-1',
+      itinerary: [
+        { sequence: 1, kind: 'dropoff', request_id: 'req-b', current: true },
+        { sequence: 2, kind: 'dropoff', request_id: 'req-a' },
+        { sequence: 3, kind: 'dropoff', request_id: 'req-c' },
+      ],
+    },
+    {
+      id: 'drv-2',
+      itinerary: [{ sequence: 1, kind: 'restaurant', request_id: 'req-d', current: true }],
+    },
+  ]);
+  assert.deepEqual(
+    visible.map((row) => row.request_id),
+    ['req-b', 'req-d'],
+  );
+});
+
+test('overview keeps every line when the rider has no itinerary', () => {
+  const routes = [
+    { request_id: 'req-a', driver_id: 'drv-1' },
+    { request_id: 'req-b', driver_id: 'drv-1' },
+  ];
+  const visible = monitorOverviewRoutes(routes, [{ id: 'drv-1' }]);
+  assert.equal(visible.length, 2);
 });
