@@ -171,7 +171,11 @@ export function RequestDeliveryForm({
   const resolveMapsUrlForPicker = useCallback(
     async (url: string) => {
       const resolved = await resolveDispatchMapsUrl(accessToken, restaurantId, url);
-      return { latitude: resolved.latitude, longitude: resolved.longitude };
+      return {
+        latitude: resolved.latitude,
+        longitude: resolved.longitude,
+        address: resolved.address,
+      };
     },
     [accessToken, restaurantId],
   );
