@@ -57,9 +57,8 @@ from app.modules.delivery_dispatch.itinerary import (
     replace_plan,
 )
 from app.modules.delivery_dispatch.maps_url import (
-    extract_maps_query_text,
-    geocode_address_text,
-    parse_maps_url,
+    MapsResolveResult,
+    resolve_maps_coordinates,
     should_follow_maps_redirect,
 )
 from app.modules.delivery_dispatch.monitor import build_dispatch_monitor_snapshot
@@ -837,8 +836,10 @@ _MANUAL_OFFERABLE_STATUSES = frozenset(
 )
 
 
+# Chrome UA gets a JS app (HTTP 200, no Location). A simple client UA gets 302.
 _MAPS_REDIRECT_HEADERS = {
-    "User-Agent": "MexyDispatch/1.0",
+    "User-Agent": "VenddeloMaps/1.0",
+    "Accept": "*/*",
 }
 _MAPS_SSL_CONTEXT = ssl.create_default_context()
 
@@ -889,7 +890,9 @@ def _follow_maps_redirects(url: str) -> str | None:
     for _ in range(5):
         try:
             status, location = _maps_http_request("HEAD", current)
-            if status not in _MAPS_REDIRECT_STATUSES and status != 200:
+            if status == 200 and not location:
+                status, location = _maps_http_request("GET", current)
+            elif status not in _MAPS_REDIRECT_STATUSES and status != 200:
                 status, location = _maps_http_request("GET", current)
             elif status in _MAPS_REDIRECT_STATUSES and not location:
                 status, location = _maps_http_request("GET", current)
@@ -1030,36 +1033,28 @@ class RestaurantDispatchService:
         ).all()
         return [self._to_dto(row) for row in rows]
 
-    def resolve_maps_url(self, url: str) -> tuple[float, float, str | None]:
+    def resolve_maps_url(self, url: str) -> MapsResolveResult:
         trimmed = url.strip()
         if not trimmed:
             raise ValidationError("El enlace de Google Maps es obligatorio")
 
-        coordinates = parse_maps_url(trimmed)
         resolved_url: str | None = None
-        if coordinates is None and should_follow_maps_redirect(trimmed):
+        if should_follow_maps_redirect(trimmed):
             resolved_url = _follow_maps_redirects(trimmed)
-            if resolved_url:
-                coordinates = parse_maps_url(resolved_url)
 
-        if coordinates is None:
-            api_key = get_settings().google_maps_api_key
-            candidates: list[str] = []
-            for candidate_url in (resolved_url, trimmed):
-                if not candidate_url:
-                    continue
-                query_text = extract_maps_query_text(candidate_url)
-                if query_text and query_text not in candidates:
-                    candidates.append(query_text)
-            if api_key:
-                for query_text in candidates:
-                    coordinates = geocode_address_text(query_text, api_key)
-                    if coordinates is not None:
-                        break
-
-        if coordinates is None:
+        result = resolve_maps_coordinates(
+            trimmed,
+            api_key=get_settings().google_maps_api_key,
+            resolved_url=resolved_url,
+        )
+        if result is None:
             raise ValidationError("No se pudo leer la ubicación del enlace")
-        return coordinates[0], coordinates[1], resolved_url
+        return MapsResolveResult(
+            latitude=result.latitude,
+            longitude=result.longitude,
+            address=result.address,
+            resolved_url=resolved_url,
+        )
 
     def list_lead_times(
         self,
@@ -1274,8 +1269,8 @@ class RestaurantDispatchService:
         if not data.dropoff_maps_url:
             raise ValidationError("La ubicación de entrega es obligatoria")
 
-        latitude, longitude, _ = self.resolve_maps_url(data.dropoff_maps_url)
-        return latitude, longitude
+        resolved = self.resolve_maps_url(data.dropoff_maps_url)
+        return resolved.latitude, resolved.longitude
 
     @staticmethod
     def _validate_payment(

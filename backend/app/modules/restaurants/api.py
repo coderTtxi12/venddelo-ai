@@ -291,11 +291,12 @@ def resolve_dispatch_maps_url(
     restaurant: RestaurantDTO = Depends(_owned_me_restaurant),
     service: RestaurantDispatchService = Depends(_dispatch_service),
 ) -> MapsUrlResolveDTO:
-    latitude, longitude, resolved_url = service.resolve_maps_url(url)
+    resolved = service.resolve_maps_url(url)
     return MapsUrlResolveDTO(
-        latitude=latitude,
-        longitude=longitude,
-        resolved_url=resolved_url,
+        latitude=resolved.latitude,
+        longitude=resolved.longitude,
+        resolved_url=resolved.resolved_url,
+        address=resolved.address,
     )
 
 

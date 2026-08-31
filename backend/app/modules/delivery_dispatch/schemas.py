@@ -219,6 +219,7 @@ class MapsUrlResolveDTO(BaseModel):
     latitude: float
     longitude: float
     resolved_url: str | None = None
+    address: str | None = None
 
 
 class DispatchPaymentUpdate(BaseModel):
