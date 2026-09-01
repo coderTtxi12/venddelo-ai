@@ -58,6 +58,8 @@ class RestaurantCreate(BaseModel):
     live_menu_social_instagram_enabled: bool = False
     live_menu_social_whatsapp_enabled: bool = False
     live_menu_social_placement: str = "footer"
+    live_menu_inventory_enabled: bool = False
+    low_stock_threshold: int = Field(default=3, ge=1)
     facebook_url: str | None = None
     instagram_url: str | None = None
     owner_contact_name: str | None = None
@@ -91,6 +93,8 @@ class RestaurantUpdate(BaseModel):
     live_menu_social_instagram_enabled: bool | None = None
     live_menu_social_whatsapp_enabled: bool | None = None
     live_menu_social_placement: str | None = None
+    live_menu_inventory_enabled: bool | None = None
+    low_stock_threshold: int | None = Field(default=None, ge=1)
     facebook_url: str | None = None
     instagram_url: str | None = None
     owner_contact_name: str | None = None
@@ -145,6 +149,8 @@ class RestaurantDTO(BaseModel):
     live_menu_social_instagram_enabled: bool = False
     live_menu_social_whatsapp_enabled: bool = False
     live_menu_social_placement: str = "footer"
+    live_menu_inventory_enabled: bool = False
+    low_stock_threshold: int = 3
     facebook_url: str | None = None
     instagram_url: str | None = None
     owner_contact_name: str | None = None
