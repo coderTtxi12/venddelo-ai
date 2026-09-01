@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -106,6 +106,10 @@ class ProductCreate(BaseModel):
     currency: str = "MXN"
     image_path: str | None = None
     status: ProductStatus = "draft"
+    inventory_qty: int | None = Field(default=None, ge=0)
+    shelf_life_days: int | None = Field(default=None, ge=1)
+    expires_on: date | None = None
+    batch_started_at: datetime | None = None
     category_ids: list[uuid.UUID] = []
 
 
@@ -116,6 +120,10 @@ class ProductUpdate(BaseModel):
     currency: str | None = None
     image_path: str | None = None
     status: ProductStatus | None = None
+    inventory_qty: int | None = Field(default=None, ge=0)
+    shelf_life_days: int | None = Field(default=None, ge=1)
+    expires_on: date | None = None
+    batch_started_at: datetime | None = None
     category_ids: list[uuid.UUID] | None = None
 
 
@@ -138,6 +146,11 @@ class ProductDTO(BaseModel):
     currency: str
     image_path: str | None = None
     status: ProductStatus
+    inventory_qty: int | None = None
+    shelf_life_days: int | None = None
+    expires_on: date | None = None
+    batch_started_at: datetime | None = None
+    show_low_stock: bool = False
     created_at: datetime
     updated_at: datetime
     category_ids: list[uuid.UUID] = []
