@@ -17,12 +17,16 @@ from app.modules.menu.schemas import FullMenuDTO
 from app.modules.menu.service import MenuService
 from app.modules.orders.schemas import OrderDTO, PublicOrderInput
 from app.modules.orders.service import OrderService
+from app.modules.coupons.pricing import compose_quote_coupon, normalize_coupon_code
+from app.modules.coupons.service import CouponService
 from app.modules.promotions.effective import resolve_timezone
 from app.modules.promotions.pricing import CartLineInput, price_cart
 from app.modules.promotions.service import PromotionService
 from app.modules.public.checkout_payments import enabled_public_payment_methods
 from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
 from app.modules.public.schemas import (
+    CartQuoteCouponDTO,
+    CartQuoteCouponErrorDTO,
     CartQuoteDTO,
     CartQuoteInput,
     CartQuoteLineDTO,
@@ -67,6 +71,10 @@ def _translated_menu(
 
 def _promotion_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> PromotionService:
     return PromotionService(uow.promotions)
+
+
+def _coupon_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> CouponService:
+    return CouponService(uow.coupons)
 
 
 def _partnership_service(
@@ -291,6 +299,7 @@ def quote_public_cart(
     data: CartQuoteInput,
     uow: SqlAlchemyUnitOfWork = Depends(get_uow),
     promo_service: PromotionService = Depends(_promotion_service),
+    coupon_service: CouponService = Depends(_coupon_service),
 ) -> CartQuoteDTO:
     restaurant = _public_restaurant(uow, subdomain)
     tz = resolve_timezone(restaurant.timezone)
@@ -326,6 +335,40 @@ def quote_public_cart(
         tz=tz,
     )
 
+    code = normalize_coupon_code(data.coupon_code)
+    resolved = (
+        coupon_service.resolve_public(restaurant.id, code, timezone=restaurant.timezone)
+        if code
+        else None
+    )
+    coupon_input = coupon_service.to_input(resolved) if resolved else None
+    composed = compose_quote_coupon(
+        lines=quote.lines,
+        products_by_id=products_by_id,
+        coupon=coupon_input,
+        coupon_code=data.coupon_code,
+        food_total_cents=quote.total_cents,
+        service_type=data.service_type,
+        delivery_fee_cents=data.delivery_fee_cents,
+        now_utc=now,
+        tz=tz,
+    )
+
+    coupon_dto = None
+    coupon_error = None
+    if composed.coupon is not None:
+        coupon_dto = CartQuoteCouponDTO(
+            code=composed.coupon.code,
+            type=composed.coupon.type,
+            discount_cents=composed.coupon.discount_cents,
+            waived_delivery_cents=composed.coupon.waived_delivery_cents,
+        )
+    if composed.coupon_error is not None:
+        coupon_error = CartQuoteCouponErrorDTO(
+            code=composed.coupon_error.code,
+            message=composed.coupon_error.message,
+        )
+
     return CartQuoteDTO(
         server_now=now,
         timezone=restaurant.timezone,
@@ -345,8 +388,11 @@ def quote_public_cart(
         ],
         subtotal_before_discount_cents=quote.subtotal_before_discount_cents,
         order_discount_cents=quote.order_discount_cents,
-        total_cents=quote.total_cents,
+        total_cents=composed.food_total_cents,
         applied_order_promotion_id=quote.applied_order_promotion_id,
+        coupon=coupon_dto,
+        coupon_error=coupon_error,
+        delivery_fee_cents=composed.delivery_fee_cents,
     )
 
 

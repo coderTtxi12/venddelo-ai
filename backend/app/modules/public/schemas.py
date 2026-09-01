@@ -54,6 +54,21 @@ class CartQuoteLineInput(BaseModel):
 
 class CartQuoteInput(BaseModel):
     items: list[CartQuoteLineInput]
+    coupon_code: str | None = None
+    service_type: str | None = None
+    delivery_fee_cents: int = 0
+
+
+class CartQuoteCouponDTO(BaseModel):
+    code: str
+    type: str
+    discount_cents: int
+    waived_delivery_cents: int
+
+
+class CartQuoteCouponErrorDTO(BaseModel):
+    code: str
+    message: str
 
 
 class CartQuoteLineDTO(BaseModel):
@@ -76,6 +91,9 @@ class CartQuoteDTO(BaseModel):
     order_discount_cents: int
     total_cents: int
     applied_order_promotion_id: uuid.UUID | None = None
+    coupon: CartQuoteCouponDTO | None = None
+    coupon_error: CartQuoteCouponErrorDTO | None = None
+    delivery_fee_cents: int = 0
 
 
 class PublicCheckoutPaymentMethodDTO(BaseModel):

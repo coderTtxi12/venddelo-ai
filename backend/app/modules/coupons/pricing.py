@@ -35,6 +35,28 @@ class CouponInput:
 
 
 @dataclass(frozen=True)
+class QuoteCouponFields:
+    code: str
+    type: str
+    discount_cents: int
+    waived_delivery_cents: int
+
+
+@dataclass(frozen=True)
+class QuoteCouponErrorFields:
+    code: str
+    message: str
+
+
+@dataclass(frozen=True)
+class QuoteCouponComposeResult:
+    food_total_cents: int
+    delivery_fee_cents: int
+    coupon: QuoteCouponFields | None = None
+    coupon_error: QuoteCouponErrorFields | None = None
+
+
+@dataclass(frozen=True)
 class CouponApplyResult:
     ok: bool
     error_code: str | None
@@ -46,6 +68,57 @@ class CouponApplyResult:
     waived_delivery_cents: int
     food_total_cents: int
     delivery_fee_cents: int
+
+
+def compose_quote_coupon(
+    *,
+    lines: list[PricedCartLine],
+    products_by_id: dict[uuid.UUID, ProductDTO],
+    coupon: CouponInput | None,
+    coupon_code: str | None,
+    food_total_cents: int,
+    service_type: str | None,
+    delivery_fee_cents: int,
+    now_utc: datetime,
+    tz: ZoneInfo,
+) -> QuoteCouponComposeResult:
+    delivery_fee = max(delivery_fee_cents, 0)
+    food_total = food_total_cents
+    code = normalize_coupon_code(coupon_code)
+    if code is None:
+        return QuoteCouponComposeResult(
+            food_total_cents=food_total,
+            delivery_fee_cents=delivery_fee,
+        )
+    applied = apply_coupon(
+        lines=lines,
+        products_by_id=products_by_id,
+        coupon=coupon,
+        food_total_cents=food_total,
+        service_type=service_type,
+        delivery_fee_cents=delivery_fee,
+        now_utc=now_utc,
+        tz=tz,
+    )
+    if applied.ok:
+        return QuoteCouponComposeResult(
+            food_total_cents=applied.food_total_cents,
+            delivery_fee_cents=applied.delivery_fee_cents,
+            coupon=QuoteCouponFields(
+                code=applied.code or code,
+                type=applied.type or "",
+                discount_cents=applied.discount_cents,
+                waived_delivery_cents=applied.waived_delivery_cents,
+            ),
+        )
+    return QuoteCouponComposeResult(
+        food_total_cents=applied.food_total_cents,
+        delivery_fee_cents=applied.delivery_fee_cents,
+        coupon_error=QuoteCouponErrorFields(
+            code=applied.error_code or "coupon_not_found",
+            message=applied.error_message or COUPON_ERROR_MESSAGES["coupon_not_found"],
+        ),
+    )
 
 
 def normalize_coupon_code(raw: str | None) -> str | None:
