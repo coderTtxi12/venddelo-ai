@@ -3,6 +3,7 @@ from uuid import UUID
 
 from app.modules.customers.grouping import (
     CustomerEvent,
+    apply_customer_filters,
     customer_stats,
     filter_by_source,
     group_customer_events,
@@ -133,7 +134,93 @@ def test_sort_customers_by_spent_and_name():
     assert by_name[0].customer_name == "Ana"
 
 
+def test_sort_customers_reverses_with_order():
+    customers = group_customer_events(
+        [
+            _event(
+                id="cheap",
+                customer_phone="1111111111",
+                total_cents=1000,
+                customer_name="Zeta",
+                created_at=datetime(2026, 8, 1, tzinfo=UTC),
+            ),
+            _event(
+                id="rich",
+                customer_phone="2222222222",
+                total_cents=9000,
+                customer_name="Ana",
+                created_at=datetime(2026, 8, 20, tzinfo=UTC),
+            ),
+        ]
+    )
+    spent_asc = sort_customers(customers, "spent", order="asc")
+    assert [item.customer_name for item in spent_asc] == ["Zeta", "Ana"]
+    name_desc = sort_customers(customers, "name", order="desc")
+    assert [item.customer_name for item in name_desc] == ["Zeta", "Ana"]
+    last_asc = sort_customers(customers, "last_at", order="asc")
+    assert [item.customer_name for item in last_asc] == ["Zeta", "Ana"]
+    visits_desc = sort_customers(customers, "visits", order="desc")
+    assert len(visits_desc) == 2
+
+
+def test_apply_customer_filters_frequency_spend_recency():
+    now = datetime(2026, 8, 22, tzinfo=UTC)
+    customers = group_customer_events(
+        [
+            _event(id="a", customer_phone="1111111111"),
+            _event(
+                id="b",
+                customer_phone="1111111111",
+                created_at=datetime(2026, 8, 20, tzinfo=UTC),
+            ),
+            _event(
+                id="c",
+                customer_phone="2222222222",
+                customer_name="Luis",
+                total_cents=0,
+                status="pending",
+            ),
+        ]
+    )
+    assert [c.phone_key for c in apply_customer_filters(customers, frequency="repeat")] == [
+        "1111111111"
+    ]
+    assert [c.phone_key for c in apply_customer_filters(customers, frequency="new")] == [
+        "2222222222"
+    ]
+    assert [c.phone_key for c in apply_customer_filters(customers, spend="none")] == [
+        "2222222222"
+    ]
+    recent = apply_customer_filters(customers, recency="7d", now=now)
+    assert [c.phone_key for c in recent] == ["1111111111"]
+    assert len(apply_customer_filters(customers, recency="30d", now=now)) == 2
+
+
 def test_order_display_id_prefers_note_ref():
     order_id = UUID("11111111-2222-3333-4444-555555555555")
     assert order_display_id("Ref. pedido #AB12C extra", order_id) == "AB12C"
     assert order_display_id(None, order_id) == "11111"
+
+
+def test_latest_delivery_address_prefers_most_recent():
+    from app.modules.customers.grouping import latest_delivery_address
+
+    events = [
+        _event(
+            id="old",
+            order_type="delivery",
+            delivery_address="Calle Vieja 1",
+            created_at=datetime(2026, 7, 1, tzinfo=UTC),
+        ),
+        _event(
+            id="new",
+            source="delivery",
+            order_type="delivery",
+            delivery_address="Av. Nueva 99",
+            delivery_maps_url="https://maps.example/new",
+            created_at=datetime(2026, 8, 20, tzinfo=UTC),
+        ),
+    ]
+    address, maps_url = latest_delivery_address(events)
+    assert address == "Av. Nueva 99"
+    assert maps_url == "https://maps.example/new"
