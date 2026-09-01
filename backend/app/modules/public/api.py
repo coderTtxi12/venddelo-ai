@@ -113,6 +113,7 @@ def _order_service(
         uow.menu,
         uow.idempotency,
         uow.promotions,
+        CouponService(uow.coupons),
         partnership=partnership,
         delivery_quotes=delivery_quotes,
     )

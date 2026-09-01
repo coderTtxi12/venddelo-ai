@@ -329,3 +329,6 @@ class CouponService:
         if dto is None:
             return None
         return self._with_status(dto, timezone)
+
+    def redeem(self, coupon_id: uuid.UUID, order_id: uuid.UUID) -> None:
+        self._repo.redeem(coupon_id, order_id)

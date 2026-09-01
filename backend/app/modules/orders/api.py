@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from app.api.deps import pagination_params, require_owned_restaurant
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
+from app.modules.coupons.service import CouponService
 from app.modules.orders.schemas import (
     KitchenBoardClearResult,
     OrderBulkStatusResult,
@@ -26,6 +27,7 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> OrderService:
         uow.menu,
         uow.idempotency,
         uow.promotions,
+        CouponService(uow.coupons),
     )
 
 

@@ -6,11 +6,11 @@ import uuid
 from datetime import UTC, datetime
 
 from app.core.config import get_settings
-from app.core.exceptions import ConflictError, NotFoundError, ValidationError
+from app.core.exceptions import ConflictError, CouponValidationError, NotFoundError, ValidationError
 from app.core.idempotency import IdempotencyRepository
 from app.core.pagination import CursorPage, PaginationParams
 from app.modules.menu.repository import MenuRepository
-from app.modules.orders.constants import (
+from app.modules.orders.coupons import should_redeem_coupon_on_transition
     ARCHIVE_ORDER_STATUSES,
     KITCHEN_BULK_STATUS_LIMIT,
     KITCHEN_ORDER_BOARDS,
@@ -26,6 +26,8 @@ from app.modules.orders.schemas import (
     OrderStatusSummaryDTO,
     PublicOrderInput,
 )
+from app.modules.coupons.pricing import CouponApplyResult, apply_coupon, normalize_coupon_code
+from app.modules.coupons.service import CouponService
 from app.modules.promotions.effective import is_promotion_effective, resolve_timezone
 from app.modules.promotions.pricing import (
     CATALOG_DISCOUNT_PREFIX,
@@ -173,6 +175,16 @@ def _snapshot_line_discounts(
     ]
 
 
+def _snapshot_coupon_discount(applied: CouponApplyResult) -> AppliedDiscountSnapshot:
+    discount_cents = applied.discount_cents or applied.waived_delivery_cents
+    return AppliedDiscountSnapshot(
+        label=f"Cupón {applied.code}",
+        badge=applied.code,
+        discount_cents=discount_cents,
+        applied=True,
+    )
+
+
 def _snapshot_order_discounts(
     order_discount_cents: int,
     order_promo_id: uuid.UUID | None,
@@ -199,6 +211,7 @@ class OrderService:
         menu: MenuRepository,
         idempotency: IdempotencyRepository,
         promotions: PromotionRepository,
+        coupons: CouponService,
         *,
         partnership: DeliveryPartnershipService | None = None,
         delivery_quotes: PublicDeliveryQuoteService | None = None,
@@ -209,6 +222,7 @@ class OrderService:
         self._menu = menu
         self._idempotency = idempotency
         self._promotions = promotions
+        self._coupons = coupons
         self._partnership = partnership
         self._delivery_quotes = delivery_quotes
         self._idempotency_ttl = (
@@ -281,6 +295,8 @@ class OrderService:
             if not reason:
                 raise ValidationError("cancellation_reason is required when cancelling an order")
             cancellation_reason = reason
+        if should_redeem_coupon_on_transition(order.status, status) and order.applied_coupon_id:
+            self._coupons.redeem(order.applied_coupon_id, order.id)
         dto = self._orders.update_status(
             order_id,
             status,
@@ -367,7 +383,18 @@ class OrderService:
 
     def _build_priced_order(
         self, restaurant_id: uuid.UUID, timezone: str, data: PublicOrderInput
-    ) -> tuple[list[OrderItemCreate], int, int, int, uuid.UUID | None, list[PromotionDTO]]:
+    ) -> tuple[
+        list[OrderItemCreate],
+        int,
+        int,
+        int,
+        uuid.UUID | None,
+        list[PromotionDTO],
+        list[PricedCartLine],
+        dict[uuid.UUID, object],
+        datetime,
+        object,
+    ]:
         if not data.items:
             raise ValidationError("Order must contain at least one item")
 
@@ -443,6 +470,10 @@ class OrderService:
             total,
             quote.applied_order_promotion_id,
             promotions,
+            quote.lines,
+            products_by_id,
+            now,
+            tz,
         )
 
     def create_public(
@@ -474,9 +505,18 @@ class OrderService:
                     return OrderDTO.model_validate(existing.response_snapshot)
 
         self._validate_payment_method(restaurant, data.type, data.payment_method)
-        order_items, subtotal_before, order_discount, lines_total, order_promo_id, promotions = (
-            self._build_priced_order(restaurant.id, restaurant.timezone, data)
-        )
+        (
+            order_items,
+            subtotal_before,
+            order_discount,
+            lines_total,
+            order_promo_id,
+            promotions,
+            priced_lines,
+            products_by_id,
+            priced_now,
+            priced_tz,
+        ) = self._build_priced_order(restaurant.id, restaurant.timezone, data)
         lines_subtotal = lines_total + order_discount
 
         delivery_fee_cents = 0
@@ -486,6 +526,49 @@ class OrderService:
             delivery_fee_cents = data.delivery_fee_cents
         elif data.delivery_fee_cents > 0:
             raise ValidationError("delivery_fee_cents is only allowed for delivery orders")
+
+        applied_coupon_id: uuid.UUID | None = None
+        applied_coupon_code: str | None = None
+        coupon_discount_cents = 0
+        coupon_waived_delivery_cents = 0
+        order_discount_snapshots = _snapshot_order_discounts(
+            order_discount,
+            order_promo_id,
+            promotions,
+        )
+        coupon_code = normalize_coupon_code(data.coupon_code)
+        if coupon_code is not None:
+            coupon_dto = self._coupons.resolve_public(
+                restaurant.id,
+                coupon_code,
+                timezone=restaurant.timezone,
+            )
+            coupon_input = self._coupons.to_input(coupon_dto) if coupon_dto is not None else None
+            applied = apply_coupon(
+                lines=priced_lines,
+                products_by_id=products_by_id,
+                coupon=coupon_input,
+                food_total_cents=lines_total,
+                service_type=data.type,
+                delivery_fee_cents=delivery_fee_cents,
+                now_utc=priced_now,
+                tz=priced_tz,
+            )
+            if not applied.ok:
+                raise CouponValidationError(
+                    applied.error_code or "coupon_not_found",
+                    applied.error_message or "Código no válido",
+                )
+            lines_total = applied.food_total_cents
+            delivery_fee_cents = applied.delivery_fee_cents
+            applied_coupon_id = applied.coupon_id
+            applied_coupon_code = applied.code
+            coupon_discount_cents = applied.discount_cents
+            coupon_waived_delivery_cents = applied.waived_delivery_cents
+            order_discount_snapshots = [
+                *order_discount_snapshots,
+                _snapshot_coupon_discount(applied),
+            ]
 
         order_total = lines_total + delivery_fee_cents
         cash_denomination_cents = _resolve_cash_denomination_cents(
@@ -508,11 +591,11 @@ class OrderService:
                 discount_cents=order_discount,
                 total_cents=order_total,
                 applied_order_promotion_id=order_promo_id,
-                applied_order_discounts=_snapshot_order_discounts(
-                    order_discount,
-                    order_promo_id,
-                    promotions,
-                ),
+                applied_order_discounts=order_discount_snapshots,
+                applied_coupon_id=applied_coupon_id,
+                applied_coupon_code=applied_coupon_code,
+                coupon_discount_cents=coupon_discount_cents,
+                coupon_waived_delivery_cents=coupon_waived_delivery_cents,
                 delivery_address=data.delivery_address,
                 delivery_latitude=delivery_latitude,
                 delivery_longitude=delivery_longitude,

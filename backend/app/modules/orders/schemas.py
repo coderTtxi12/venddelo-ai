@@ -55,6 +55,10 @@ class OrderCreate(BaseModel):
     total_cents: int
     applied_order_promotion_id: uuid.UUID | None = None
     applied_order_discounts: list[AppliedDiscountSnapshot] = Field(default_factory=list)
+    applied_coupon_id: uuid.UUID | None = None
+    applied_coupon_code: str | None = None
+    coupon_discount_cents: int = 0
+    coupon_waived_delivery_cents: int = 0
     delivery_address: str | None = None
     delivery_latitude: float | None = None
     delivery_longitude: float | None = None
@@ -88,6 +92,10 @@ class OrderDTO(BaseModel):
     total_cents: int
     applied_order_promotion_id: uuid.UUID | None = None
     applied_order_discounts: list[AppliedDiscountSnapshot] = Field(default_factory=list)
+    applied_coupon_id: uuid.UUID | None = None
+    applied_coupon_code: str | None = None
+    coupon_discount_cents: int = 0
+    coupon_waived_delivery_cents: int = 0
     status: str
     delivery_address: str | None = None
     delivery_latitude: float | None = None
@@ -121,6 +129,7 @@ class PublicOrderInput(BaseModel):
     delivery_fee_cents: int = 0
     cash_denomination_cents: int | None = None
     note: str | None = None
+    coupon_code: str | None = None
     items: list[PublicOrderItemInput]
 
 
