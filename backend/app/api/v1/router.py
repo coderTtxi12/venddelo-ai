@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.modules.analytics.api import router as analytics_router
+from app.modules.customers.api import router as customers_router
 from app.modules.assistant.api import router as assistant_router
 from app.modules.delivery_dispatch.api import router as delivery_dispatch_router
 from app.modules.delivery_dispatch.ws import router as delivery_dispatch_ws_router
@@ -34,6 +35,7 @@ api_v1_router.include_router(promotions_router)
 api_v1_router.include_router(marketing_router)
 api_v1_router.include_router(orders_router)
 api_v1_router.include_router(analytics_router)
+api_v1_router.include_router(customers_router)
 api_v1_router.include_router(orders_ws_router)
 api_v1_router.include_router(menu_ws_router)
 api_v1_router.include_router(assistant_router)
