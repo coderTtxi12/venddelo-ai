@@ -14,6 +14,25 @@ import { legacyDb as db, legacyStorage as storage } from '@/services/legacyDb';
 import { useAuth } from '@/hooks/useAuth';
 import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import { getProductCount } from '@/lib/api/menu';
+import { getRestaurant, updateRestaurant } from '@/lib/api/restaurants';
+import { ProductInventoryControls } from '@/components/products/ProductInventoryControls';
+import {
+  ProductInventoryInlineCells,
+  type InventoryInlinePatch,
+} from '@/components/products/ProductInventoryInlineCells';
+import { ProductsInventoryLiveToggle } from '@/components/products/ProductsInventoryLiveToggle';
+import { ProductsTableColumnsMenu } from '@/components/products/ProductsTableColumnsMenu';
+import {
+  productExpiryUrgency,
+  todayIsoDate,
+} from '@/components/products/productInventory';
+import {
+  DEFAULT_PRODUCT_TABLE_COLUMNS,
+  loadProductTableColumns,
+  productTableColSpan,
+  saveProductTableColumns,
+  type ProductTableColumnVisibility,
+} from '@/components/products/productTableColumns';
 import { DEFAULT_CURRENCY, formatMoney } from '@/lib/currency';
 import {
   cloneOptionGroupForProduct,
@@ -49,6 +68,7 @@ import {
   fetchSupplierProductsPage,
   saveSupplierCategory,
   updateSupplierCategoryActive,
+  patchSupplierProductInventory,
   saveSupplierProduct,
   updateSupplierProductVisibility,
   type CategoryDraft,
@@ -363,6 +383,10 @@ export default function ProductsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'categories' | 'products'>('products');
+  const [liveInventoryEnabled, setLiveInventoryEnabled] = useState(false);
+  const [lowStockThreshold, setLowStockThreshold] = useState(3);
+  const [inventorySettingsSaving, setInventorySettingsSaving] = useState(false);
+  const [inventorySettingsError, setInventorySettingsError] = useState<string | null>(null);
 
   // Categorías (todas las páginas; paginación en cliente)
   const [categories, setCategories] = useState<CategoryDraft[]>([]);
@@ -835,6 +859,54 @@ export default function ProductsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierId, accessToken, productFiltersActive]);
 
+  useEffect(() => {
+    if (!supplierId || !accessToken) return;
+    let cancelled = false;
+    void getRestaurant(accessToken, supplierId)
+      .then((restaurant) => {
+        if (cancelled) return;
+        setLiveInventoryEnabled(Boolean(restaurant.live_menu_inventory_enabled));
+        setLowStockThreshold(Math.max(1, restaurant.low_stock_threshold || 3));
+        setInventorySettingsError(null);
+      })
+      .catch((error) => {
+        console.error(error);
+        if (!cancelled) {
+          setInventorySettingsError('No se pudieron cargar los ajustes de inventario.');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [supplierId, accessToken]);
+
+  async function persistInventorySettings(next: {
+    live_menu_inventory_enabled?: boolean;
+    low_stock_threshold?: number;
+  }) {
+    if (!supplierId || !accessToken) return;
+    setInventorySettingsSaving(true);
+    setInventorySettingsError(null);
+    try {
+      const updated = await updateRestaurant(accessToken, supplierId, next);
+      if (typeof updated.live_menu_inventory_enabled === 'boolean') {
+        setLiveInventoryEnabled(updated.live_menu_inventory_enabled);
+      } else if (typeof next.live_menu_inventory_enabled === 'boolean') {
+        setLiveInventoryEnabled(next.live_menu_inventory_enabled);
+      }
+      if (typeof updated.low_stock_threshold === 'number') {
+        setLowStockThreshold(Math.max(1, updated.low_stock_threshold));
+      } else if (typeof next.low_stock_threshold === 'number') {
+        setLowStockThreshold(Math.max(1, next.low_stock_threshold));
+      }
+    } catch (error) {
+      console.error(error);
+      setInventorySettingsError('No se pudieron guardar los ajustes de inventario.');
+    } finally {
+      setInventorySettingsSaving(false);
+    }
+  }
+
   const productsFilterCatalogPending =
     productFiltersActive && productsFilterCatalogRef.current === null && productsLoading;
 
@@ -1028,6 +1100,60 @@ export default function ProductsPage() {
     } finally {
       setProductVisibilitySavingId(null);
     }
+  }
+
+  const [inventoryAnnounce, setInventoryAnnounce] = useState('');
+  const [visibleColumns, setVisibleColumns] = useState<ProductTableColumnVisibility>(
+    DEFAULT_PRODUCT_TABLE_COLUMNS,
+  );
+
+  useEffect(() => {
+    setVisibleColumns(loadProductTableColumns());
+  }, []);
+
+  function handleVisibleColumnsChange(next: ProductTableColumnVisibility) {
+    setVisibleColumns(saveProductTableColumns(next));
+  }
+
+  const tableColSpan = productTableColSpan(visibleColumns);
+
+  function mergeInventoryFields(product: ProductDraft, updated: ProductDraft): ProductDraft {
+    return {
+      ...product,
+      inventoryQty: updated.inventoryQty,
+      expiresOn: updated.expiresOn,
+      shelfLifeDays: updated.shelfLifeDays,
+      batchStartedAt: updated.batchStartedAt,
+      status: updated.status,
+      updatedAt: updated.updatedAt,
+    };
+  }
+
+  async function handleInlineInventorySave(productId: Id, patch: InventoryInlinePatch) {
+    if (!supplierId || !accessToken) return;
+    const updated =
+      patch.kind === 'qty'
+        ? await patchSupplierProductInventory(accessToken, supplierId, productId, {
+            inventoryQty: patch.inventoryQty,
+          })
+        : await patchSupplierProductInventory(accessToken, supplierId, productId, {
+            expiresOn: patch.expiresOn,
+            shelfLifeDays: patch.shelfLifeDays,
+          });
+    setProducts((prev) => {
+      const next = prev.map((product) =>
+        product.id === productId ? mergeInventoryFields(product, updated) : product,
+      );
+      if (productFiltersActive) {
+        productsFilterCatalogRef.current = next;
+      } else {
+        invalidateProductsFilterCatalog();
+      }
+      return next;
+    });
+    setEditingProductDraft((prev) =>
+      prev && prev.id === productId ? mergeInventoryFields(prev, updated) : prev,
+    );
   }
 
   const [categoryDrawerOpen, setCategoryDrawerOpen] = useState(false);
@@ -1406,6 +1532,22 @@ export default function ProductsPage() {
             />
           ) : (
             <>
+              <ProductsInventoryLiveToggle
+                enabled={liveInventoryEnabled}
+                threshold={lowStockThreshold}
+                saving={inventorySettingsSaving}
+                error={inventorySettingsError}
+                onEnabledChange={(enabled) => {
+                  setLiveInventoryEnabled(enabled);
+                  void persistInventorySettings({ live_menu_inventory_enabled: enabled });
+                }}
+                onThresholdChange={setLowStockThreshold}
+                onThresholdCommit={(next) => {
+                  void persistInventorySettings({
+                    low_stock_threshold: next ?? lowStockThreshold,
+                  });
+                }}
+              />
               <div className={styles.toolbar}>
                 <div className={styles.search}>
                   <input
@@ -1418,6 +1560,10 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div className={styles.toolbarRight}>
+                  <ProductsTableColumnsMenu
+                    visibility={visibleColumns}
+                    onChange={handleVisibleColumnsChange}
+                  />
                   {productFiltersActive ? (
                     <button type="button" className={styles.ghostBtn} onClick={clearProductTableFilters}>
                       Restablecer filtros
@@ -1468,6 +1614,9 @@ export default function ProductsPage() {
                     </div>
                   ) : null}
                   <div className={styles.tableWrap}>
+                    <p className={styles.srOnly} role="status" aria-atomic="true">
+                      {inventoryAnnounce}
+                    </p>
                     {productVisibilityError ? (
                       <div className={styles.errorBanner} role="alert">{productVisibilityError}</div>
                     ) : null}
@@ -1494,6 +1643,7 @@ export default function ProductsPage() {
                       productFiltersActive={productFiltersActive}
                       onClearFilters={clearProductTableFilters}
                     />
+                    {visibleColumns.select ? (
                     <label
                       className={`${styles.mobileSelectAll} ${
                         allPageSelected || somePageSelected ? styles.mobileSelectAllActive : ''
@@ -1519,9 +1669,11 @@ export default function ProductsPage() {
                           : 'Seleccionar todos en pantalla'}
                       </span>
                     </label>
+                    ) : null}
                     <table className={styles.table}>
                     <thead>
                       <tr className={styles.headerLabelRow}>
+                        {visibleColumns.select ? (
                         <th className={`${styles.thDashboard} ${styles.selectHead}`} scope="col">
                           <input
                             type="checkbox"
@@ -1536,7 +1688,9 @@ export default function ProductsPage() {
                             onChange={(e) => setPageSelection(e.target.checked)}
                           />
                         </th>
+                        ) : null}
                         <th className={styles.thDashboard}>Producto</th>
+                        {visibleColumns.categories ? (
                         <th className={`${styles.thDashboard} ${styles.thFilterColumn}`}>
                           <div className={styles.thFilterHead}>
                             <button
@@ -1603,6 +1757,8 @@ export default function ProductsPage() {
                             </div>
                           ) : null}
                         </th>
+                        ) : null}
+                        {visibleColumns.price ? (
                         <th className={styles.thDashboard}>
                           <button
                             type="button"
@@ -1639,6 +1795,8 @@ export default function ProductsPage() {
                             </span>
                           </button>
                         </th>
+                        ) : null}
+                        {visibleColumns.discount ? (
                         <th className={styles.thDashboard}>
                           <button
                             type="button"
@@ -1675,6 +1833,8 @@ export default function ProductsPage() {
                             </span>
                           </button>
                         </th>
+                        ) : null}
+                        {visibleColumns.total ? (
                         <th className={styles.thDashboard}>
                           <button
                             type="button"
@@ -1711,6 +1871,14 @@ export default function ProductsPage() {
                             </span>
                           </button>
                         </th>
+                        ) : null}
+                        {visibleColumns.stock ? (
+                          <th className={`${styles.thDashboard} ${styles.inventoryHead}`}>Stock</th>
+                        ) : null}
+                        {visibleColumns.expiry ? (
+                          <th className={`${styles.thDashboard} ${styles.inventoryHead}`}>Caducidad</th>
+                        ) : null}
+                        {visibleColumns.status ? (
                         <th className={`${styles.thDashboard} ${styles.thFilterColumn}`}>
                           <div className={styles.thFilterHead}>
                             <button
@@ -1758,13 +1926,16 @@ export default function ProductsPage() {
                             </div>
                           ) : null}
                         </th>
+                        ) : null}
+                        {visibleColumns.actions ? (
                         <th className={`${styles.thDashboard} ${styles.actionsHead}`}>Acciones</th>
+                        ) : null}
                       </tr>
                     </thead>
                     <tbody>
                       {paginatedProducts.items.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className={styles.filterNoResults}>
+                          <td colSpan={tableColSpan} className={styles.filterNoResults}>
                             <div className={styles.filterNoResultsInner}>
                               {productsFilterCatalogPending ? (
                                 <p>Buscando productos…</p>
@@ -1786,12 +1957,15 @@ export default function ProductsPage() {
                         const productCategories = p.categoryIds
                           .map((id) => categoryById.get(id))
                           .filter((category): category is CategoryDraft => Boolean(category));
+                        const expiresToday = productExpiryUrgency(p, todayIsoDate()) === 'today';
                         return (
                           <tr
                             key={p.id}
                             className={`${styles.rowHover} ${styles.clickableRow} ${
                               selectedProductIds.has(p.id) ? styles.rowSelected : ''
-                            } ${p.status !== 'inactive' ? '' : styles.rowInactive}`}
+                            } ${p.status !== 'inactive' ? '' : styles.rowInactive}${
+                              expiresToday ? ` ${styles.rowExpiresToday}` : ''
+                            }`}
                             tabIndex={0}
                             onClick={() => openEditProduct(p.id)}
                             onKeyDown={(e) => {
@@ -1801,6 +1975,7 @@ export default function ProductsPage() {
                               }
                             }}
                           >
+                            {visibleColumns.select ? (
                             <td
                               className={styles.selectCell}
                               onClick={(event) => event.stopPropagation()}
@@ -1823,17 +1998,24 @@ export default function ProductsPage() {
                                 }}
                               />
                             </td>
+                            ) : null}
                             <td className={styles.productPrimaryCell}>
                               <div className={styles.productCell}>
                                 <div className={styles.productThumb}>
                                   {p.image ? <img src={p.image.previewUrl} alt="" /> : <div className={styles.thumbEmpty}>Sin imagen</div>}
                                 </div>
                                 <div className={styles.productMeta}>
-                                  <div className={styles.productName}>{p.name}</div>
+                                  <div className={styles.productNameRow}>
+                                    <div className={styles.productName}>{p.name}</div>
+                                    {expiresToday ? (
+                                      <span className={styles.expiryTodayChip}>Caduca hoy</span>
+                                    ) : null}
+                                  </div>
                                   <div className={styles.productDesc}>{p.description || '—'}</div>
                                 </div>
                               </div>
                             </td>
+                            {visibleColumns.categories ? (
                             <td className={`${styles.labeledCell} ${styles.categoryCell}`} data-label="Categorías">
                               <div className={styles.chips}>
                                 {productCategories.length > 0 ? (
@@ -1845,15 +2027,31 @@ export default function ProductsPage() {
                                 )}
                               </div>
                             </td>
+                            ) : null}
+                            {visibleColumns.price ? (
                             <td className={`${styles.labeledCell} ${styles.priceCell}`} data-label="Precio">
                               {formatMoney(p.price.amount, p.price.currency)}
                             </td>
+                            ) : null}
+                            {visibleColumns.discount ? (
                             <td className={`${styles.labeledCell} ${styles.priceCell} ${styles.discountCell}`} data-label="Descuento">
                               {p.discountUsd > 0 ? `-${formatMoney(p.discountUsd, p.price.currency)}` : '—'}
                             </td>
+                            ) : null}
+                            {visibleColumns.total ? (
                             <td className={`${styles.labeledCell} ${styles.priceCell} ${styles.totalCell}`} data-label="Total">
                               {formatMoney(productLineTotal(p), p.price.currency)}
                             </td>
+                            ) : null}
+                            <ProductInventoryInlineCells
+                              product={p}
+                              disabled={!supplierId || !accessToken}
+                              showStock={visibleColumns.stock}
+                              showExpiry={visibleColumns.expiry}
+                              onPersist={(patch) => handleInlineInventorySave(p.id, patch)}
+                              onAnnounce={setInventoryAnnounce}
+                            />
+                            {visibleColumns.status ? (
                             <td
                               className={`${styles.labeledCell} ${styles.statusCell}`}
                               data-label="Estado"
@@ -1869,6 +2067,8 @@ export default function ProductsPage() {
                                 }}
                               />
                             </td>
+                            ) : null}
+                            {visibleColumns.actions ? (
                             <td
                               className={`${styles.labeledCell} ${styles.actionsCell}`}
                               data-label="Acciones"
@@ -1898,6 +2098,7 @@ export default function ProductsPage() {
                                 <span>Eliminar</span>
                               </button>
                             </td>
+                            ) : null}
                           </tr>
                         );
                       })}
@@ -2080,6 +2281,9 @@ export default function ProductsPage() {
                         ...payload,
                         existingOptionGroups: productDraft?.optionGroups,
                         catalogPromotions: catalogPromotionsRef.current ?? undefined,
+                        inventoryQty: payload.inventoryQty,
+                        shelfLifeDays: payload.shelfLifeDays,
+                        expiresOn: payload.expiresOn,
                       },
                     );
                     catalogPromotionsRef.current = catalogPromotions;
@@ -2387,6 +2591,9 @@ function ProductEditor({
     image: ImageDraft | null;
     categoryIds: Id[];
     optionGroups: OptionGroupDraft[];
+    inventoryQty: number | null;
+    shelfLifeDays: number | null;
+    expiresOn: string | null;
   }) => Promise<void>;
   supplierId: string | null;
   supplierIdError: string | null;
@@ -2404,6 +2611,11 @@ function ProductEditor({
   const [dropGroupId, setDropGroupId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [inventoryQty, setInventoryQty] = useState(
+    initial?.inventoryQty == null ? '' : String(initial.inventoryQty),
+  );
+  const [shelfLifeDays, setShelfLifeDays] = useState<number | null>(initial?.shelfLifeDays ?? null);
+  const [expiresOn, setExpiresOn] = useState(initial?.expiresOn ?? '');
 
   useEffect(() => {
     setName(initial?.name ?? '');
@@ -2417,6 +2629,9 @@ function ProductEditor({
     setImage(initial?.image ?? null);
     setCategoryIds(initial?.categoryIds ?? []);
     setOptionGroups(initial?.optionGroups ?? []);
+    setInventoryQty(initial?.inventoryQty == null ? '' : String(initial.inventoryQty));
+    setShelfLifeDays(initial?.shelfLifeDays ?? null);
+    setExpiresOn(initial?.expiresOn ?? '');
     setDragGroupId(null);
     setDropGroupId(null);
     setError(null);
@@ -2537,6 +2752,9 @@ function ProductEditor({
               image,
               categoryIds,
               optionGroups: normalizeOptionGroups(optionGroups),
+              inventoryQty: inventoryQty.trim() === '' ? null : Math.max(0, Number.parseInt(inventoryQty, 10) || 0),
+              shelfLifeDays: expiresOn ? null : shelfLifeDays,
+              expiresOn: expiresOn || null,
             });
           } catch (err) {
             console.error(err);
@@ -2696,6 +2914,15 @@ function ProductEditor({
         </div>
       </div>
 
+      <ProductInventoryControls
+        inventoryQty={inventoryQty}
+        shelfLifeDays={shelfLifeDays}
+        expiresOn={expiresOn}
+        onInventoryQtyChange={setInventoryQty}
+        onShelfLifeDaysChange={setShelfLifeDays}
+        onExpiresOnChange={setExpiresOn}
+      />
+
       <div className={styles.field}>
         <label className={styles.label}>Imagen (opcional)</label>
         <ImagePicker
@@ -2721,7 +2948,7 @@ function ProductEditor({
               ...prev,
               {
                 id: uid('og'),
-                title: 'Nuevo grupo de opciones',
+                title: 'Título del grupo',
                 required: false,
                 selection: 'multi',
                 maxSelections: null,
