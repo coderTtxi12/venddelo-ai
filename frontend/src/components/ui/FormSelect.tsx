@@ -19,6 +19,9 @@ type FormSelectProps = {
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  variant?: 'default' | 'compact';
+  active?: boolean;
+  wrapClassName?: string;
   'aria-labelledby'?: string;
   'aria-describedby'?: string;
 };
@@ -30,6 +33,9 @@ export function FormSelect({
   onChange,
   disabled = false,
   placeholder = 'Selecciona una opción',
+  variant = 'default',
+  active = false,
+  wrapClassName,
   'aria-labelledby': ariaLabelledBy,
   'aria-describedby': ariaDescribedBy,
 }: FormSelectProps) {
@@ -129,11 +135,14 @@ export function FormSelect({
   const activeId = activeOption ? `${listId}-${activeOption.value}` : undefined;
 
   return (
-    <div ref={wrapRef} className={styles.wrap}>
+    <div
+      ref={wrapRef}
+      className={`${styles.wrap} ${variant === 'compact' ? styles.wrapCompact : ''} ${wrapClassName ?? ''}`.trim()}
+    >
       <button
         id={id}
         type="button"
-        className={`${styles.trigger} ${open ? styles.triggerOpen : ''}`.trim()}
+        className={`${styles.trigger} ${variant === 'compact' ? styles.triggerCompact : ''} ${active ? styles.triggerActive : ''} ${open ? styles.triggerOpen : ''}`.trim()}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -159,7 +168,7 @@ export function FormSelect({
       {open ? (
         <ul
           id={listId}
-          className={styles.menu}
+          className={`${styles.menu} ${variant === 'compact' ? styles.menuCompact : ''}`.trim()}
           role="listbox"
           aria-labelledby={ariaLabelledBy}
           aria-activedescendant={activeId}

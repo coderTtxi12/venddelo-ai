@@ -3,6 +3,11 @@
   width: 100%;
 }
 
+.wrapCompact {
+  width: auto;
+  min-width: 9.5rem;
+}
+
 .trigger {
   display: flex;
   align-items: center;
@@ -34,6 +39,26 @@
 .trigger:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.triggerCompact {
+  min-height: 2.25rem;
+  padding: 0.42rem 0.55rem;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  background: color-mix(in srgb, var(--color-text) 2.5%, var(--color-surface));
+}
+
+.triggerActive {
+  border-color: color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.triggerActive .chevron {
+  color: var(--color-text);
 }
 
 .value {
@@ -74,6 +99,11 @@
   background: var(--color-surface);
   box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text) 8%, transparent);
   scrollbar-width: thin;
+}
+
+.menuCompact {
+  min-width: 100%;
+  width: max(100%, 11.5rem);
 }
 
 .option {
@@ -149,5 +179,18 @@
 
   .chevron {
     transition: transform 180ms ease;
+  }
+}
+
+@media (max-width: 767px) {
+  .wrapCompact {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .triggerCompact {
+    min-height: 2.75rem;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.875rem;
   }
 }
