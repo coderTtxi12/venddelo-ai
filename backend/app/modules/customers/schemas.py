@@ -9,6 +9,10 @@ from app.core.pagination import CursorPage
 
 CustomerSource = Literal["menu", "delivery"]
 CustomerSort = Literal["last_at", "visits", "spent", "name"]
+CustomerSortOrder = Literal["asc", "desc"]
+CustomerFrequency = Literal["new", "repeat"]
+CustomerSpend = Literal["spent", "none"]
+CustomerRecency = Literal["7d", "30d", "90d"]
 
 
 class RestaurantCustomer(BaseModel):
@@ -33,6 +37,7 @@ class RestaurantCustomerStats(BaseModel):
 
 class RestaurantCustomerList(CursorPage[RestaurantCustomer]):
     stats: RestaurantCustomerStats = Field(default_factory=RestaurantCustomerStats)
+    total: int = 0
 
 
 class RestaurantCustomerActivityItem(BaseModel):
@@ -43,6 +48,9 @@ class RestaurantCustomerActivityItem(BaseModel):
     status: str
     order_type: str | None = None
     display_id: str
+    item_quantity: int = 0
+    delivery_address: str | None = None
+    delivery_maps_url: str | None = None
 
 
 class RestaurantCustomerActivity(BaseModel):
@@ -50,3 +58,5 @@ class RestaurantCustomerActivity(BaseModel):
     customer_name: str
     customer_phone: str
     items: list[RestaurantCustomerActivityItem] = Field(default_factory=list)
+    last_delivery_address: str | None = None
+    last_delivery_maps_url: str | None = None
