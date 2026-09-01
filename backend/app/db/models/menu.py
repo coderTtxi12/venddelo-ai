@@ -1,9 +1,12 @@
 import uuid
+from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Date,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -77,6 +80,12 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="MXN")
     image_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="draft")
+    inventory_qty: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    shelf_life_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    expires_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    batch_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     categories: Mapped[list["Category"]] = relationship(
         secondary=product_categories, back_populates="products"
@@ -91,6 +100,14 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint(
             "status IN ('active','inactive','draft')",
             name="status_allowed",
+        ),
+        CheckConstraint(
+            "inventory_qty IS NULL OR inventory_qty >= 0",
+            name="ck_products_inventory_qty_nonneg",
+        ),
+        CheckConstraint(
+            "shelf_life_days IS NULL OR shelf_life_days >= 1",
+            name="ck_products_shelf_life_days_pos",
         ),
         Index("ix_products_status", "restaurant_id", "status"),
     )

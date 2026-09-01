@@ -9,6 +9,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Index,
+    Integer,
     SmallInteger,
     String,
     Text,
@@ -65,6 +66,12 @@ class Restaurant(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     live_menu_social_placement: Mapped[str] = mapped_column(
         String(32), nullable=False, server_default="footer"
     )
+    live_menu_inventory_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    low_stock_threshold: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="3"
+    )
     facebook_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     instagram_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     owner_contact_name: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -109,6 +116,10 @@ class Restaurant(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
         CheckConstraint(
             "status IN ('draft','published','suspended')",
             name="status_allowed",
+        ),
+        CheckConstraint(
+            "low_stock_threshold >= 1",
+            name="ck_restaurants_low_stock_threshold_pos",
         ),
         Index("ix_restaurants_owner_id", "owner_id"),
     )
