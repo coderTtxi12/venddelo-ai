@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlined';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import CheckBoxOutlinedIcon from '@mui/icons-material/CheckBoxOutlined';
@@ -60,6 +61,13 @@ import {
   kitchenClosedCount,
 } from '@/lib/orders/kitchenBoard';
 import { formatOrderCustomerPhone } from '@/lib/digital-menu/checkout/customerPhone';
+import {
+  couponRemainingQty,
+  formatKitchenCouponBanner,
+  formatKitchenCouponChip,
+  formatKitchenCouponDialogLine,
+  orderHasCouponStockWarning,
+} from '@/lib/orders/kitchenCouponWarning';
 import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import { publicMenuOrigin } from '@/lib/restaurantSubdomain';
 import styles from './OrdersKitchen.module.css';
@@ -356,6 +364,14 @@ function OrderDetailContent({
     [order.items, productsById, promotions],
   );
 
+  const couponChip = formatKitchenCouponChip(order);
+  const couponRemaining = couponRemainingQty(order.coupon_stock_qty, order.coupon_redeemed_count);
+  const couponWarning =
+    order.applied_coupon_code &&
+    orderHasCouponStockWarning(order, couponRemaining, order.coupon_stock_qty)
+      ? formatKitchenCouponBanner(order.applied_coupon_code)
+      : null;
+
   const showActions = meta.nextActionLabel || canCancelOrder(order.status);
 
   return (
@@ -418,6 +434,16 @@ function OrderDetailContent({
           ) : null}
         </div>
 
+        {couponWarning ? (
+          <div className={styles.stockWarning} role="status" aria-atomic="true">
+            <WarningAmberOutlinedIcon sx={{ fontSize: 22 }} aria-hidden />
+            <div>
+              <p className={styles.stockWarningTitle}>Cupón sin existencias</p>
+              <p className={styles.stockWarningText}>{couponWarning}</p>
+            </div>
+          </div>
+        ) : null}
+
         <section className={styles.itemsSection} aria-label="Artículos del pedido">
           <h3 className={styles.sectionTitle}>
             Detalle ({itemCount === 1 ? '1 artículo' : `${itemCount} artículos`})
@@ -468,6 +494,18 @@ function OrderDetailContent({
             <div className={`${styles.totalRow} ${styles.totalRowDiscount}`}>
               <span>Descuento del pedido</span>
               <span>-{formatCents(totals.orderDiscountCents)}</span>
+            </div>
+          ) : null}
+          {couponChip ? (
+            <div className={`${styles.totalRow} ${styles.totalRowDiscount}`}>
+              <span>{couponChip}</span>
+              <span>
+                {(order.coupon_waived_delivery_cents ?? 0) > 0
+                  ? 'Envío gratis'
+                  : order.coupon_discount_cents > 0
+                    ? `-${formatCents(order.coupon_discount_cents)}`
+                    : '—'}
+              </span>
             </div>
           ) : null}
           <div className={`${styles.totalRow} ${styles.totalRowRestaurant}`}>
@@ -611,6 +649,7 @@ export function KitchenOrdersView() {
   const [multiSelectOpen, setMultiSelectOpen] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [couponWarningOpen, setCouponWarningOpen] = useState(false);
   const [dispatchOrder, setDispatchOrder] = useState<Order | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [isMobile, setIsMobile] = useState(false);
@@ -739,6 +778,36 @@ export function KitchenOrdersView() {
     if (!selectedOrder) return;
     const next = ORDER_STATUS_META[selectedOrder.status].nextStatus;
     if (!next) return;
+    if (next === 'confirmed') {
+      const remaining = couponRemainingQty(
+        selectedOrder.coupon_stock_qty,
+        selectedOrder.coupon_redeemed_count,
+      );
+      if (
+        orderHasCouponStockWarning(selectedOrder, remaining, selectedOrder.coupon_stock_qty)
+      ) {
+        setCouponWarningOpen(true);
+        return;
+      }
+    }
+    if (next === 'confirmed' && kitchenConfirmOpensDispatch(selectedOrder)) {
+      setDispatchOrder(selectedOrder);
+      return;
+    }
+    const updated = await patchOrder(selectedOrder.id, next);
+    if (updated && next === 'confirmed') {
+      const printed = await printOrder(updated, 'confirm', productsById);
+      if (printed.status === 'failed') {
+        setActionError(`Pedido confirmado, pero no se imprimió el ticket: ${printed.error}`);
+      }
+    }
+  };
+
+  const handleCouponWarningConfirm = async () => {
+    if (!selectedOrder) return;
+    const next = ORDER_STATUS_META[selectedOrder.status].nextStatus;
+    if (!next) return;
+    setCouponWarningOpen(false);
     if (next === 'confirmed' && kitchenConfirmOpensDispatch(selectedOrder)) {
       setDispatchOrder(selectedOrder);
       return;
@@ -1122,6 +1191,21 @@ export function KitchenOrdersView() {
           setCancelTargetIds([]);
         }}
         onConfirm={(reason) => void handleCancelConfirm(reason)}
+      />
+
+      <ConfirmDialog
+        open={couponWarningOpen}
+        title="Cupón sin existencias"
+        stepHint="Aviso"
+        description={
+          selectedOrder?.applied_coupon_code
+            ? `Puedes confirmar el pedido igual. El cupón se respeta. ${formatKitchenCouponDialogLine(selectedOrder.applied_coupon_code)}`
+            : 'Puedes confirmar el pedido igual. El cupón se respeta.'
+        }
+        confirmLabel="Confirmar igual"
+        cancelLabel="Revisar pedido"
+        onConfirm={() => void handleCouponWarningConfirm()}
+        onCancel={() => setCouponWarningOpen(false)}
       />
 
       <ConfirmDialog

@@ -96,6 +96,8 @@ class OrderDTO(BaseModel):
     applied_coupon_code: str | None = None
     coupon_discount_cents: int = 0
     coupon_waived_delivery_cents: int = 0
+    coupon_stock_qty: int | None = None
+    coupon_redeemed_count: int | None = None
     status: str
     delivery_address: str | None = None
     delivery_latitude: float | None = None

@@ -11,6 +11,7 @@ from app.core.idempotency import IdempotencyRepository
 from app.core.pagination import CursorPage, PaginationParams
 from app.modules.menu.repository import MenuRepository
 from app.modules.orders.coupons import should_redeem_coupon_on_transition
+from app.modules.orders.constants import (
     ARCHIVE_ORDER_STATUSES,
     KITCHEN_BULK_STATUS_LIMIT,
     KITCHEN_ORDER_BOARDS,
@@ -235,6 +236,23 @@ class OrderService:
             {"type": event_type, "order": order.model_dump(mode="json")},
         )
 
+    def _enrich_coupon_stock(self, order: OrderDTO) -> OrderDTO:
+        if order.applied_coupon_id is None:
+            return order
+        try:
+            coupon = self._coupons.get(order.restaurant_id, order.applied_coupon_id)
+        except NotFoundError:
+            return order
+        return order.model_copy(
+            update={
+                "coupon_stock_qty": coupon.stock_qty,
+                "coupon_redeemed_count": coupon.redeemed_count,
+            }
+        )
+
+    def _enrich_coupon_stock_batch(self, orders: list[OrderDTO]) -> list[OrderDTO]:
+        return [self._enrich_coupon_stock(order) for order in orders]
+
     def list_for_restaurant(
         self,
         restaurant_id: uuid.UUID,
@@ -255,13 +273,15 @@ class OrderService:
                 raise ValidationError("History only includes closed orders")
             if status is not None and status not in ARCHIVE_ORDER_STATUSES:
                 raise ValidationError("History only includes delivered or cancelled orders")
-        return self._orders.list_by_restaurant(
+        page = self._orders.list_by_restaurant(
             restaurant_id,
             params,
             status=status,
             view=view,
             board=board,
         )
+        page.items = self._enrich_coupon_stock_batch(page.items)
+        return page
 
     def get_status_summary(
         self,
@@ -277,7 +297,7 @@ class OrderService:
         dto = self._orders.get(order_id)
         if dto is None or dto.restaurant_id != restaurant_id:
             raise NotFoundError("Order not found")
-        return dto
+        return self._enrich_coupon_stock(dto)
 
     def update_status(
         self,
@@ -304,6 +324,7 @@ class OrderService:
         )
         if dto is None:
             raise NotFoundError("Order not found")
+        dto = self._enrich_coupon_stock(dto)
         self._publish_order_event(restaurant_id, "order.updated", dto)
         return dto
 
@@ -614,5 +635,5 @@ class OrderService:
                 order.model_dump(mode="json"),
                 self._idempotency_ttl,
             )
-        self._publish_order_event(restaurant.id, "order.created", order)
-        return order
+        self._publish_order_event(restaurant.id, "order.created", self._enrich_coupon_stock(order))
+        return self._enrich_coupon_stock(order)
