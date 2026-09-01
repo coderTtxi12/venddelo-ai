@@ -54,3 +54,4 @@ export {
   type SaveSupplierProductPayload,
   type SaveSupplierProductResult,
 } from './supplierProducts';
+export { patchSupplierProductInventory } from './supplierProductInventory';

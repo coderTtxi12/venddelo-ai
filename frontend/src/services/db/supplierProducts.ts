@@ -168,6 +168,9 @@ export type SaveSupplierProductPayload = {
   /** Estado previo de grupos al editar; evita un GET extra antes de sincronizar. */
   existingOptionGroups?: OptionGroupDraft[];
   catalogPromotions?: Promotion[];
+  inventoryQty?: number | null;
+  shelfLifeDays?: number | null;
+  expiresOn?: string | null;
 };
 
 export type SaveSupplierProductResult = {
@@ -499,11 +502,17 @@ export async function saveSupplierProduct(
       price_cents: number;
       category_ids: string[];
       image_path?: string | null;
+      inventory_qty?: number | null;
+      shelf_life_days?: number | null;
+      expires_on?: string | null;
     } = {
       name: payload.name,
       description,
       price_cents: priceCents,
       category_ids: payload.categoryIds,
+      inventory_qty: payload.inventoryQty ?? null,
+      shelf_life_days: payload.shelfLifeDays ?? null,
+      expires_on: payload.expiresOn ?? null,
     };
     if (imagePath !== undefined) {
       body.image_path = imagePath;
@@ -548,6 +557,9 @@ export async function saveSupplierProduct(
     price_cents: priceCents,
     category_ids: payload.categoryIds,
     image_path: imagePath ?? null,
+    inventory_qty: payload.inventoryQty ?? null,
+    shelf_life_days: payload.shelfLifeDays ?? null,
+    expires_on: payload.expiresOn ?? null,
   });
 
   const [syncedGroups, catalogPromotions] = await Promise.all([

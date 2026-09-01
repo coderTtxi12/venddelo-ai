@@ -50,6 +50,10 @@ export type ProductDraft = {
   categoryIds: Id[];
   optionGroups: OptionGroupDraft[];
   status: ProductStatus;
+  inventoryQty?: number | null;
+  shelfLifeDays?: number | null;
+  expiresOn?: string | null;
+  batchStartedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
