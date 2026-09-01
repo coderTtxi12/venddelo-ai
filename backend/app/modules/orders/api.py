@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query
 
+from app.api.cache_helpers import invalidate_restaurant_menu_cache
 from app.api.deps import pagination_params, require_owned_restaurant
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
@@ -26,6 +27,9 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> OrderService:
         uow.menu,
         uow.idempotency,
         uow.promotions,
+        inventory_changed=lambda restaurant_id: invalidate_restaurant_menu_cache(
+            uow, restaurant_id
+        ),
     )
 
 

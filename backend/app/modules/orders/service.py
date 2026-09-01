@@ -3,18 +3,25 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from app.core.config import get_settings
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.core.idempotency import IdempotencyRepository
 from app.core.pagination import CursorPage, PaginationParams
+from app.infra.realtime.order_hub import get_order_realtime_hub
+from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
 from app.modules.menu.repository import MenuRepository
 from app.modules.orders.constants import (
     ARCHIVE_ORDER_STATUSES,
     KITCHEN_BULK_STATUS_LIMIT,
     KITCHEN_ORDER_BOARDS,
     KITCHEN_ORDER_VIEWS,
+)
+from app.modules.orders.inventory import (
+    quantities_to_consume,
+    should_consume_inventory_on_transition,
 )
 from app.modules.orders.repository import OrderRepository
 from app.modules.orders.schemas import (
@@ -38,12 +45,10 @@ from app.modules.promotions.pricing import (
 )
 from app.modules.promotions.repository import PromotionRepository
 from app.modules.promotions.schemas import PromotionDTO
-from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
 from app.modules.public.checkout_payments import is_public_payment_method_enabled
 from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
 from app.modules.restaurants.repository import RestaurantRepository
 from app.modules.restaurants.schemas import RestaurantDTO
-from app.infra.realtime.order_hub import get_order_realtime_hub
 
 _BLOCKED_PUBLIC_ORDER_STATUSES = frozenset({"suspended"})
 _ALLOWED_ORDER_TYPES = {"takeout", "delivery"}
@@ -202,6 +207,7 @@ class OrderService:
         *,
         partnership: DeliveryPartnershipService | None = None,
         delivery_quotes: PublicDeliveryQuoteService | None = None,
+        inventory_changed: Callable[[uuid.UUID], None] | None = None,
         idempotency_ttl_seconds: int | None = None,
     ) -> None:
         self._orders = orders
@@ -211,6 +217,7 @@ class OrderService:
         self._promotions = promotions
         self._partnership = partnership
         self._delivery_quotes = delivery_quotes
+        self._inventory_changed = inventory_changed
         self._idempotency_ttl = (
             idempotency_ttl_seconds or get_settings().order_idempotency_ttl_seconds
         )
@@ -281,6 +288,8 @@ class OrderService:
             if not reason:
                 raise ValidationError("cancellation_reason is required when cancelling an order")
             cancellation_reason = reason
+        if should_consume_inventory_on_transition(order.status, status):
+            self._consume_inventory_for_order(order)
         dto = self._orders.update_status(
             order_id,
             status,
@@ -327,6 +336,22 @@ class OrderService:
                 {"type": "kitchen.board_cleared", "cleared_count": cleared_count},
             )
         return cleared_count
+
+    def _consume_inventory_for_order(self, order: OrderDTO) -> None:
+        restaurant = self._restaurants.get(order.restaurant_id)
+        if restaurant is None:
+            raise NotFoundError("Restaurant not found")
+        if not restaurant.live_menu_inventory_enabled:
+            return
+        consumed = False
+        for product_id, quantity in quantities_to_consume(order.items):
+            consumed |= self._menu.consume_inventory(
+                product_id,
+                quantity,
+                live_menu_inventory_enabled=restaurant.live_menu_inventory_enabled,
+            )
+        if consumed and self._inventory_changed is not None:
+            self._inventory_changed(order.restaurant_id)
 
     def _validate_payment_method(
         self,

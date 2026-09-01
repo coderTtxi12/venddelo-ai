@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, Query, status
 
+from app.api.cache_helpers import invalidate_restaurant_menu_cache
 from app.core.exceptions import NotFoundError
 from app.core.pagination import PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
@@ -107,6 +108,9 @@ def _order_service(
         uow.promotions,
         partnership=partnership,
         delivery_quotes=delivery_quotes,
+        inventory_changed=lambda restaurant_id: invalidate_restaurant_menu_cache(
+            uow, restaurant_id
+        ),
     )
 
 
