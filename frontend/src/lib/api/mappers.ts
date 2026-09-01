@@ -52,6 +52,10 @@ export function mapProductToDraft(product: Product, discountUsd = 0): ProductDra
       .sort((a, b) => a.sort_index - b.sort_index)
       .map(mapOptionGroupToDraft),
     status: product.status,
+    inventoryQty: product.inventory_qty ?? null,
+    shelfLifeDays: product.shelf_life_days ?? null,
+    expiresOn: product.expires_on ?? null,
+    batchStartedAt: product.batch_started_at ?? null,
     createdAt: product.created_at,
     updatedAt: product.updated_at,
   };

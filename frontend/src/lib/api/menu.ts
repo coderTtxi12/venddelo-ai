@@ -131,6 +131,9 @@ export function createProduct(
     image_path?: string | null;
     status?: ProductStatus;
     category_ids: string[];
+    inventory_qty?: number | null;
+    shelf_life_days?: number | null;
+    expires_on?: string | null;
   },
 ) {
   return apiRequest<Product>(`/restaurants/${restaurantId}/products`, {
@@ -157,6 +160,9 @@ export function updateProduct(
     image_path?: string | null;
     status?: ProductStatus;
     category_ids?: string[];
+    inventory_qty?: number | null;
+    shelf_life_days?: number | null;
+    expires_on?: string | null;
   },
 ) {
   return apiRequest<Product>(

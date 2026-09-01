@@ -50,6 +50,8 @@ export type Restaurant = {
   live_menu_social_instagram_enabled: boolean;
   live_menu_social_whatsapp_enabled: boolean;
   live_menu_social_placement: string;
+  live_menu_inventory_enabled?: boolean;
+  low_stock_threshold?: number;
   facebook_url: string | null;
   instagram_url: string | null;
   owner_contact_name: string | null;
@@ -221,6 +223,11 @@ export type Product = {
   category_ids: string[];
   category_sort_indices?: Record<string, number>;
   option_groups: OptionGroup[];
+  inventory_qty?: number | null;
+  shelf_life_days?: number | null;
+  expires_on?: string | null;
+  batch_started_at?: string | null;
+  show_low_stock?: boolean;
 };
 
 export type Promotion = {

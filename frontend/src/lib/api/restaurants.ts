@@ -172,6 +172,8 @@ export function updateRestaurant(
       | 'live_menu_social_instagram_enabled'
       | 'live_menu_social_whatsapp_enabled'
       | 'live_menu_social_placement'
+      | 'live_menu_inventory_enabled'
+      | 'low_stock_threshold'
       | 'facebook_url'
       | 'instagram_url'
       | 'color_palette'
