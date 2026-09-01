@@ -18,6 +18,58 @@ _ALLOWED_SCOPES = {"all", "category", "product"}
 _DEFAULT_TIMEZONE = "America/Mexico_City"
 
 
+def merge_coupon_update(existing: CouponDTO, data: CouponUpdate) -> CouponCreate:
+    merged_type = data.type if data.type is not None else existing.type
+    merged_scope = data.scope if data.scope is not None else existing.scope
+
+    if merged_scope == "all":
+        product_ids: list[uuid.UUID] = []
+        category_ids: list[uuid.UUID] = []
+    elif merged_scope == "product":
+        product_ids = (
+            data.product_ids
+            if "product_ids" in data.model_fields_set
+            else existing.product_ids
+        )
+        category_ids = []
+    else:
+        category_ids = (
+            data.category_ids
+            if "category_ids" in data.model_fields_set
+            else existing.category_ids
+        )
+        product_ids = []
+
+    percent = data.percent if "percent" in data.model_fields_set else existing.percent
+    amount_cents = (
+        data.amount_cents if "amount_cents" in data.model_fields_set else existing.amount_cents
+    )
+
+    if merged_type == "percent":
+        amount_cents = None
+    elif merged_type == "amount":
+        percent = None
+    elif merged_type == "free_shipping":
+        percent = None
+        amount_cents = None
+
+    return CouponCreate(
+        code=data.code if data.code is not None else existing.code,
+        name=data.name if data.name is not None else existing.name,
+        type=merged_type,
+        percent=percent,
+        amount_cents=amount_cents,
+        scope=merged_scope,
+        stock_qty=data.stock_qty if "stock_qty" in data.model_fields_set else existing.stock_qty,
+        expires_on=(
+            data.expires_on if "expires_on" in data.model_fields_set else existing.expires_on
+        ),
+        is_active=data.is_active if data.is_active is not None else existing.is_active,
+        product_ids=product_ids,
+        category_ids=category_ids,
+    )
+
+
 class CouponService:
     def __init__(self, repo: CouponRepository) -> None:
         self._repo = repo
@@ -166,33 +218,7 @@ class CouponService:
         timezone: str | None = None,
     ) -> CouponDTO:
         existing = self.get(restaurant_id, coupon_id, timezone=timezone)
-        merged_scope = data.scope if data.scope is not None else existing.scope
-        merged_type = data.type if data.type is not None else existing.type
-        validate_payload = CouponCreate(
-            code=data.code if data.code is not None else existing.code,
-            name=data.name if data.name is not None else existing.name,
-            type=merged_type,
-            percent=data.percent if "percent" in data.model_fields_set else existing.percent,
-            amount_cents=(
-                data.amount_cents if "amount_cents" in data.model_fields_set else existing.amount_cents
-            ),
-            scope=merged_scope,
-            stock_qty=data.stock_qty if "stock_qty" in data.model_fields_set else existing.stock_qty,
-            expires_on=(
-                data.expires_on if "expires_on" in data.model_fields_set else existing.expires_on
-            ),
-            is_active=data.is_active if data.is_active is not None else existing.is_active,
-            product_ids=(
-                data.product_ids
-                if "product_ids" in data.model_fields_set
-                else existing.product_ids
-            ),
-            category_ids=(
-                data.category_ids
-                if "category_ids" in data.model_fields_set
-                else existing.category_ids
-            ),
-        )
+        validate_payload = merge_coupon_update(existing, data)
         self._validate(validate_payload)
 
         update_fields: dict = {}
