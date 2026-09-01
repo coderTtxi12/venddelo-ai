@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from sqlalchemy import case, delete, func, insert, select, tuple_, update
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.exceptions import NotFoundError
 from app.core.pagination import (
     CursorPage,
     PaginationParams,
@@ -14,12 +15,13 @@ from app.core.pagination import (
 )
 from app.db.models.menu import Category, OptionGroup, OptionItem, Product, product_categories
 from app.infra.storage.factory import build_storage
+from app.modules.menu.inventory import apply_inventory_consume
 from app.modules.menu.repository import MenuRepository
 from app.modules.menu.schemas import (
     CategoryCreate,
     CategoryDTO,
-    CategoryUpdate,
     CategoryProductOrderUpdate,
+    CategoryUpdate,
     FullMenuDTO,
     OptionGroupCreate,
     OptionGroupDTO,
@@ -162,6 +164,11 @@ def _product_to_dto(
         image_path=obj.image_path,
         image_url=_product_image_url(obj.image_path),
         status=obj.status,
+        inventory_qty=obj.inventory_qty,
+        shelf_life_days=obj.shelf_life_days,
+        expires_on=obj.expires_on,
+        batch_started_at=obj.batch_started_at,
+        show_low_stock=False,
         created_at=obj.created_at,
         updated_at=obj.updated_at,
         category_ids=[category.id for category in obj.categories],
@@ -436,6 +443,39 @@ class SqlAlchemyMenuRepository(MenuRepository):
         self._session.flush()
         self._session.refresh(obj)
         return _product_to_dto(obj, self._session)
+
+    def consume_inventory(
+        self,
+        product_id: uuid.UUID,
+        quantity: int,
+        *,
+        live_menu_inventory_enabled: bool,
+    ) -> bool:
+        # populate_existing is required: pricing already loaded this product into the
+        # identity map, so without it the locked row would be discarded and stale
+        # attributes reused, letting concurrent orders oversell.
+        stmt = (
+            select(Product)
+            .where(Product.id == product_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        obj = self._session.scalar(stmt)
+        if obj is None:
+            raise NotFoundError(f"Product {product_id} not found")
+        new_qty, new_status, consumed = apply_inventory_consume(
+            inventory_qty=obj.inventory_qty,
+            quantity=quantity,
+            live_menu_inventory_enabled=live_menu_inventory_enabled,
+            status=obj.status,
+        )
+        if not consumed:
+            return False
+        obj.inventory_qty = new_qty
+        if new_status is not None:
+            obj.status = new_status
+        self._session.flush()
+        return True
 
     def soft_delete_product(self, id: uuid.UUID) -> bool:
         obj = self._session.get(Product, id)

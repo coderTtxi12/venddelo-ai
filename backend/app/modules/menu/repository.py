@@ -80,6 +80,15 @@ class MenuRepository(ABC):
     def update_product(self, id: uuid.UUID, data: ProductUpdate) -> ProductDTO | None: ...
 
     @abstractmethod
+    def consume_inventory(
+        self,
+        product_id: uuid.UUID,
+        quantity: int,
+        *,
+        live_menu_inventory_enabled: bool,
+    ) -> bool: ...
+
+    @abstractmethod
     def set_category_product_order(
         self, category_id: uuid.UUID, product_ids: list[uuid.UUID]
     ) -> None: ...
