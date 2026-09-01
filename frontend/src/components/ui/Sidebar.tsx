@@ -15,6 +15,7 @@ import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
 import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import { useAssistantChat } from '@/contexts/AssistantChatContext';
 import { MOBILE_DRAWER_MAX_WIDTH, useMobileSidebar } from '@/contexts/MobileSidebarContext';
@@ -37,6 +38,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Órdenes', path: '/orders', icon: <ShoppingBagOutlinedIcon fontSize="small" /> },
   { label: 'Historial', path: '/history', icon: <HistoryOutlinedIcon fontSize="small" /> },
+  { label: 'Clientes', path: '/clientes', icon: <PeopleOutlinedIcon fontSize="small" /> },
   { label: 'Impresora', path: '/printer', icon: <PrintOutlinedIcon fontSize="small" /> },
   { label: 'Productos', path: '/products', icon: <Inventory2OutlinedIcon fontSize="small" /> },
   { label: 'Menú Digital', path: '/digital-menu', icon: <QrCode2OutlinedIcon fontSize="small" /> },

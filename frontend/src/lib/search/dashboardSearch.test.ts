@@ -69,6 +69,14 @@ describe('searchDashboard', () => {
     });
 
     expect(hits.some((hit) => hit.title === 'Analíticas')).toBe(true);
+    expect(
+      searchDashboard({
+        query: 'clientes',
+        products: [],
+        categories: [],
+        orders: [],
+      }).some((hit) => hit.title === 'Clientes'),
+    ).toBe(true);
   });
 
   it('finds products and orders from live data', () => {

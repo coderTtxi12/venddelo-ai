@@ -7,6 +7,7 @@ import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
 import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined';
+import ContactPhoneOutlinedIcon from '@mui/icons-material/ContactPhoneOutlined';
 import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
@@ -32,6 +33,7 @@ import styles from './DashboardSearch.module.css';
 
 function kindIcon(kind: DashboardSearchItemKind, item: DashboardSearchItem): ReactNode {
   if (item.id === 'page:dashboard') return <HomeOutlinedIcon fontSize="small" />;
+  if (item.id === 'page:clientes') return <ContactPhoneOutlinedIcon fontSize="small" />;
   if (item.id === 'page:orders' || item.kind === 'order') return <ShoppingBagOutlinedIcon fontSize="small" />;
   if (item.id === 'page:products' || item.kind === 'product') return <Inventory2OutlinedIcon fontSize="small" />;
   if (item.id === 'page:digital-menu') return <QrCode2OutlinedIcon fontSize="small" />;
