@@ -3,11 +3,13 @@ import test from 'node:test';
 
 import {
   activityKindLabel,
+  customerFiltersActive,
   customerInitials,
   customerWhatsAppHref,
   filterCustomers,
   matchesCustomerQuery,
   sortCustomers,
+  toggleCustomerColumnSort,
   visitSummary,
 } from './display.ts';
 
@@ -52,15 +54,49 @@ test('customerWhatsAppHref skips legacy placeholder', () => {
 
 test('filterCustomers matches name, digits and source', () => {
   const all = [maria, luis];
-  assert.equal(filterCustomers(all, 'maría', 'all').length, 1);
-  assert.equal(filterCustomers(all, '551234', 'all')[0]?.phone_key, '5512345678');
-  assert.equal(filterCustomers(all, '', 'delivery').length, 1);
+  assert.equal(filterCustomers(all, { query: 'maría' }).length, 1);
+  assert.equal(filterCustomers(all, { query: '551234' })[0]?.phone_key, '5512345678');
+  assert.equal(filterCustomers(all, { source: 'delivery' }).length, 1);
   assert.equal(matchesCustomerQuery(maria, 'pedro'), false);
+});
+
+test('filterCustomers supports frequency, spend and recency', () => {
+  const all = [maria, luis];
+  assert.equal(filterCustomers(all, { frequency: 'repeat' })[0]?.phone_key, '5512345678');
+  assert.equal(filterCustomers(all, { frequency: 'new' })[0]?.phone_key, '5550001111');
+  assert.equal(filterCustomers(all, { spend: 'none' }).length, 0);
+  assert.equal(
+    filterCustomers(all, { recency: '7d' }, Date.parse('2026-08-22T12:00:00Z')).length,
+    2,
+  );
+  assert.equal(
+    filterCustomers(all, { recency: '7d' }, Date.parse('2026-09-10T12:00:00Z')).length,
+    0,
+  );
+  assert.equal(customerFiltersActive({ frequency: 'repeat' }), true);
+  assert.equal(customerFiltersActive({}), false);
 });
 
 test('sortCustomers by spent then recency', () => {
   const sorted = sortCustomers([luis, maria], 'spent');
   assert.equal(sorted[0]?.phone_key, '5512345678');
+});
+
+test('sortCustomers respects ascending order', () => {
+  assert.equal(sortCustomers([luis, maria], 'spent', 'asc')[0]?.phone_key, '5550001111');
+  assert.equal(sortCustomers([luis, maria], 'name', 'desc')[0]?.customer_name, 'María López');
+  assert.equal(sortCustomers([luis, maria], 'visits', 'asc')[0]?.phone_key, '5550001111');
+  assert.equal(sortCustomers([luis, maria], 'last_at', 'asc')[0]?.phone_key, '5512345678');
+});
+
+test('toggleCustomerColumnSort switches column then direction', () => {
+  const toVisits = toggleCustomerColumnSort({ sort: 'last_at', order: 'desc' }, 'visits');
+  assert.deepEqual(toVisits, { sort: 'visits', order: 'desc' });
+  assert.deepEqual(toggleCustomerColumnSort(toVisits, 'visits'), { sort: 'visits', order: 'asc' });
+  assert.deepEqual(toggleCustomerColumnSort({ sort: 'visits', order: 'asc' }, 'name'), {
+    sort: 'name',
+    order: 'asc',
+  });
 });
 
 test('visit and activity labels', () => {

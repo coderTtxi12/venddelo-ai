@@ -1,5 +1,6 @@
 import type {
   CustomerSort,
+  CustomerSortOrder,
   CustomerSource,
   RestaurantCustomer,
 } from '@/lib/api/customers';
@@ -16,6 +17,39 @@ export const CUSTOMER_SORT_LABELS: Record<CustomerSort, string> = {
   spent: 'Mayor gasto',
   name: 'Nombre A–Z',
 };
+
+export type CustomerFrequencyFilter = 'all' | 'new' | 'repeat';
+export type CustomerSpendFilter = 'all' | 'spent' | 'none';
+export type CustomerRecencyFilter = 'all' | '7d' | '30d' | '90d';
+
+export type CustomerListFilters = {
+  query?: string;
+  source?: CustomerSource | 'all';
+  frequency?: CustomerFrequencyFilter;
+  spend?: CustomerSpendFilter;
+  recency?: CustomerRecencyFilter;
+};
+
+export const CUSTOMER_FREQUENCY_LABELS: Record<CustomerFrequencyFilter, string> = {
+  all: 'Todos',
+  new: 'Nuevos',
+  repeat: 'Recurrentes',
+};
+
+export const CUSTOMER_SPEND_LABELS: Record<CustomerSpendFilter, string> = {
+  all: 'Todos',
+  spent: 'Con gasto',
+  none: 'Sin gasto',
+};
+
+export const CUSTOMER_RECENCY_LABELS: Record<CustomerRecencyFilter, string> = {
+  all: 'Cualquier fecha',
+  '7d': 'Últimos 7 días',
+  '30d': 'Últimos 30 días',
+  '90d': 'Últimos 90 días',
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const DISPATCH_STATUS_LABELS: Record<string, string> = {
   scheduled: 'Cocinando',
@@ -69,13 +103,39 @@ export function matchesCustomerQuery(customer: RestaurantCustomer, query: string
   ].some((haystack) => haystack.includes(needle));
 }
 
+export function customerFiltersActive(filters: CustomerListFilters): boolean {
+  return Boolean(
+    (filters.query ?? '').trim() ||
+      (filters.source && filters.source !== 'all') ||
+      (filters.frequency && filters.frequency !== 'all') ||
+      (filters.spend && filters.spend !== 'all') ||
+      (filters.recency && filters.recency !== 'all'),
+  );
+}
+
 export function filterCustomers(
   customers: RestaurantCustomer[],
-  query: string,
-  source: CustomerSource | 'all',
+  filters: CustomerListFilters = {},
+  now = Date.now(),
 ): RestaurantCustomer[] {
+  const query = filters.query ?? '';
+  const source = filters.source ?? 'all';
+  const frequency = filters.frequency ?? 'all';
+  const spend = filters.spend ?? 'all';
+  const recency = filters.recency ?? 'all';
+
   return customers.filter((customer) => {
     if (source !== 'all' && !customer.sources.includes(source)) return false;
+    if (frequency === 'new' && customer.visit_count !== 1) return false;
+    if (frequency === 'repeat' && customer.visit_count < 2) return false;
+    if (spend === 'spent' && customer.total_spent_cents <= 0) return false;
+    if (spend === 'none' && customer.total_spent_cents > 0) return false;
+    if (recency !== 'all') {
+      const lastAt = new Date(customer.last_order_at).getTime();
+      if (Number.isNaN(lastAt)) return false;
+      const days = recency === '7d' ? 7 : recency === '30d' ? 30 : 90;
+      if (now - lastAt > days * DAY_MS) return false;
+    }
     return matchesCustomerQuery(customer, query);
   });
 }
@@ -83,22 +143,35 @@ export function filterCustomers(
 export function sortCustomers(
   customers: RestaurantCustomer[],
   sort: CustomerSort,
+  order?: CustomerSortOrder,
 ): RestaurantCustomer[] {
+  const descending = order ? order === 'desc' : sort !== 'name';
   const copy = [...customers];
-  if (sort === 'visits') {
-    return copy.sort((a, b) => b.visit_count - a.visit_count || b.last_order_at.localeCompare(a.last_order_at));
+  copy.sort((a, b) => {
+    let cmp = 0;
+    if (sort === 'visits') {
+      cmp = a.visit_count - b.visit_count || a.last_order_at.localeCompare(b.last_order_at);
+    } else if (sort === 'spent') {
+      cmp =
+        a.total_spent_cents - b.total_spent_cents || a.last_order_at.localeCompare(b.last_order_at);
+    } else if (sort === 'name') {
+      cmp = a.customer_name.localeCompare(b.customer_name, 'es-MX', { sensitivity: 'base' });
+    } else {
+      cmp = a.last_order_at.localeCompare(b.last_order_at);
+    }
+    return descending ? -cmp : cmp;
+  });
+  return copy;
+}
+
+export function toggleCustomerColumnSort(
+  current: { sort: CustomerSort; order: CustomerSortOrder },
+  column: CustomerSort,
+): { sort: CustomerSort; order: CustomerSortOrder } {
+  if (current.sort !== column) {
+    return { sort: column, order: column === 'name' ? 'asc' : 'desc' };
   }
-  if (sort === 'spent') {
-    return copy.sort(
-      (a, b) => b.total_spent_cents - a.total_spent_cents || b.last_order_at.localeCompare(a.last_order_at),
-    );
-  }
-  if (sort === 'name') {
-    return copy.sort((a, b) =>
-      a.customer_name.localeCompare(b.customer_name, 'es-MX', { sensitivity: 'base' }),
-    );
-  }
-  return copy.sort((a, b) => b.last_order_at.localeCompare(a.last_order_at));
+  return { sort: column, order: current.order === 'desc' ? 'asc' : 'desc' };
 }
 
 export function activityStatusLabel(kind: CustomerSource, status: string): string {
