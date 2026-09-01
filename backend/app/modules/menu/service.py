@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.pagination import CursorPage, PaginationParams
+from app.modules.menu.inventory import apply_stock_write_side_effects
 from app.modules.menu.repository import MenuRepository
 from app.modules.menu.schemas import (
     CategoryCreate,
@@ -23,11 +25,41 @@ from app.modules.menu.schemas import (
     ProductOptionGroupOrderUpdate,
     ProductUpdate,
 )
+from app.modules.restaurants.repository import RestaurantRepository
 
 
 class MenuService:
-    def __init__(self, repo: MenuRepository) -> None:
+    def __init__(
+        self,
+        repo: MenuRepository,
+        restaurants: RestaurantRepository | None = None,
+    ) -> None:
         self._repo = repo
+        self._restaurants = restaurants
+
+    def _live_inventory_enabled(self, restaurant_id: uuid.UUID) -> bool:
+        if self._restaurants is None:
+            return False
+        restaurant = self._restaurants.get(restaurant_id)
+        return bool(restaurant and restaurant.live_menu_inventory_enabled)
+
+    def _with_stock_side_effects(
+        self,
+        restaurant_id: uuid.UUID,
+        previous_qty: int | None,
+        previous_status: str,
+        data: ProductCreate | ProductUpdate,
+    ) -> ProductCreate | ProductUpdate:
+        if "inventory_qty" not in data.model_fields_set:
+            return data
+        extras = apply_stock_write_side_effects(
+            previous_qty=previous_qty,
+            new_qty=data.inventory_qty,
+            live_menu_inventory_enabled=self._live_inventory_enabled(restaurant_id),
+            current_status=previous_status,
+            now=datetime.now(UTC),
+        )
+        return data.model_copy(update=extras) if extras else data
 
     def _ensure_categories_in_restaurant(
         self, restaurant_id: uuid.UUID, category_ids: list[uuid.UUID]
@@ -95,7 +127,13 @@ class MenuService:
     def create_product(self, restaurant_id: uuid.UUID, data: ProductCreate) -> ProductDTO:
         if data.category_ids:
             self._ensure_categories_in_restaurant(restaurant_id, data.category_ids)
-        payload = data.model_copy(update={"restaurant_id": restaurant_id})
+        payload = self._with_stock_side_effects(
+            restaurant_id,
+            None,
+            data.status,
+            data,
+        )
+        payload = payload.model_copy(update={"restaurant_id": restaurant_id})
         return self._repo.add_product(payload)
 
     def get_product(self, restaurant_id: uuid.UUID, product_id: uuid.UUID) -> ProductDTO:
@@ -150,6 +188,12 @@ class MenuService:
             if len(data.category_ids) < 1:
                 raise ValidationError("Product must belong to at least one category")
             self._ensure_categories_in_restaurant(restaurant_id, data.category_ids)
+        data = self._with_stock_side_effects(
+            restaurant_id,
+            prod.inventory_qty,
+            prod.status,
+            data,
+        )
         dto = self._repo.update_product(product_id, data)
         if dto is None:
             raise NotFoundError("Product not found")

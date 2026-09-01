@@ -33,7 +33,7 @@ router = APIRouter(tags=["menu"])
 
 
 def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> MenuService:
-    return MenuService(uow.menu)
+    return MenuService(uow.menu, uow.restaurants)
 
 
 MAX_ASSET_BYTES = 2 * 1024 * 1024

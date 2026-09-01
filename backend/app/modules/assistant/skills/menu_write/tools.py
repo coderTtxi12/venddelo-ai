@@ -1632,7 +1632,7 @@ class MenuWriteSkill:
         ]
 
     def execute(self, tool_name: str, args: dict[str, Any], ctx: AgentContext) -> ToolResult:
-        service = MenuService(ctx.uow.menu)
+        service = MenuService(ctx.uow.menu, ctx.uow.restaurants)
         restaurant_id = ctx.restaurant_id
 
         if tool_name == "create_category":

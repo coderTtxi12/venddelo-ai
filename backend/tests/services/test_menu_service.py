@@ -5,6 +5,7 @@ import pytest
 
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.pagination import CursorPage
+from app.modules.menu.inventory import apply_inventory_consume
 from app.modules.menu.repository import MenuRepository
 from app.modules.menu.schemas import (
     CategoryCreate,
@@ -83,7 +84,15 @@ class FakeMenuRepo(MenuRepository):
         return self.categories.pop(id, None) is not None
 
     def add_product(self, data: ProductCreate) -> ProductDTO:
-        p = _product(name=data.name, category_ids=data.category_ids)
+        p = _product(
+            name=data.name,
+            category_ids=data.category_ids,
+            status=data.status,
+            inventory_qty=data.inventory_qty,
+            shelf_life_days=data.shelf_life_days,
+            expires_on=data.expires_on,
+            batch_started_at=data.batch_started_at,
+        )
         self.products[p.id] = p
         return p
 
@@ -103,10 +112,35 @@ class FakeMenuRepo(MenuRepository):
         p = self.products.get(id)
         if p is None:
             return None
-        if data.status is not None:
-            p = p.model_copy(update={"status": data.status})
+        updates = data.model_dump(exclude_unset=True)
+        updates.pop("category_ids", None)
+        p = p.model_copy(update=updates)
         self.products[id] = p
         return p
+
+    def consume_inventory(
+        self,
+        product_id: uuid.UUID,
+        quantity: int,
+        *,
+        live_menu_inventory_enabled: bool,
+    ) -> bool:
+        p = self.products.get(product_id)
+        if p is None:
+            return False
+        next_qty, next_status, consumed = apply_inventory_consume(
+            inventory_qty=p.inventory_qty,
+            quantity=quantity,
+            live_menu_inventory_enabled=live_menu_inventory_enabled,
+            status=p.status,
+        )
+        if not consumed:
+            return False
+        extras: dict = {"inventory_qty": next_qty}
+        if next_status is not None:
+            extras["status"] = next_status
+        self.products[product_id] = p.model_copy(update=extras)
+        return True
 
     def set_category_product_order(
         self, category_id: uuid.UUID, product_ids: list[uuid.UUID]

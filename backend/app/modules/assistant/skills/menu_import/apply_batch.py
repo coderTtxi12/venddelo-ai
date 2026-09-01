@@ -416,7 +416,7 @@ def apply_import_batch(
         new_category_refs=_new_category_refs(batch.categories, reconciliation),
     )
 
-    menu = MenuService(ctx.uow.menu)
+    menu = MenuService(ctx.uow.menu, ctx.uow.restaurants)
     promo_service = PromotionService(ctx.uow.promotions)
     ref_map = _accumulated_ref_map(draft_batches)
 

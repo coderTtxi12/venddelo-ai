@@ -195,7 +195,7 @@ class MenuMediaSkill:
         ]
 
     def execute(self, tool_name: str, args: dict[str, Any], ctx: AgentContext) -> ToolResult:
-        service = MenuService(ctx.uow.menu)
+        service = MenuService(ctx.uow.menu, ctx.uow.restaurants)
 
         if tool_name == "generate_food_product_image":
             product, resolve_error = _resolve_product_for_media(service, ctx, args)
