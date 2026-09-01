@@ -85,7 +85,8 @@
 }
 
 .confirmBtn:disabled,
-.confirmPrimary:disabled {
+.confirmPrimary:disabled,
+.confirmWarning:disabled {
   opacity: 0.65;
   cursor: not-allowed;
 }
@@ -107,11 +108,38 @@
   background: #1d4ed8;
 }
 
+.confirmWarning {
+  border: none;
+  border-radius: 999px;
+  background: #b45309;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  min-height: 44px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 180ms ease;
+}
+
+.confirmWarning:hover:not(:disabled) {
+  background: #92400e;
+}
+
 .cancelBtn:focus-visible,
 .confirmBtn:focus-visible,
-.confirmPrimary:focus-visible {
+.confirmPrimary:focus-visible,
+.confirmWarning:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
+}
+
+.confirmWarning:focus-visible {
+  outline-color: #b45309;
+}
+
+.dialog:focus-visible {
+  outline: none;
 }
 
 .confirmBtn:focus-visible {
@@ -149,7 +177,8 @@
 
   .cancelBtn,
   .confirmBtn,
-  .confirmPrimary {
+  .confirmPrimary,
+  .confirmWarning {
     width: 100%;
     min-height: 44px;
     justify-content: center;
@@ -165,7 +194,8 @@
 
   .cancelBtn,
   .confirmBtn,
-  .confirmPrimary {
+  .confirmPrimary,
+  .confirmWarning {
     min-height: 44px;
     padding-inline: 1.15rem;
   }
@@ -174,7 +204,8 @@
 @media (prefers-reduced-motion: reduce) {
   .cancelBtn,
   .confirmBtn,
-  .confirmPrimary {
+  .confirmPrimary,
+  .confirmWarning {
     transition: none;
   }
 }

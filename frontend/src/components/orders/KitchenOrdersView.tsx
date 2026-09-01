@@ -8,6 +8,7 @@ import CheckBoxOutlinedIcon from '@mui/icons-material/CheckBoxOutlined';
 import DoneAllOutlinedIcon from '@mui/icons-material/DoneAllOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -43,6 +44,11 @@ import {
   type OrderStatusFilterOption,
   type OrderStatusMeta,
 } from '@/lib/orders/orderStatus';
+import {
+  formatKitchenInventoryBanner,
+  formatKitchenInventoryDialogBody,
+  kitchenInventoryShortfalls,
+} from '@/lib/orders/kitchenInventoryWarning';
 import { useKitchenOrderProducts } from '@/lib/orders/useKitchenOrderProducts';
 import { useKitchenOrdersInfiniteScroll } from '@/lib/orders/useKitchenOrdersInfiniteScroll';
 import { OrderDispatchDrawer } from '@/components/dispatch/OrderDispatchDrawer';
@@ -332,6 +338,7 @@ function OrderDetailContent({
   onCancel,
   onPrint,
   trackingUrl,
+  liveInventoryEnabled,
 }: {
   order: Order;
   productsById: ReadonlyMap<string, Product>;
@@ -345,6 +352,7 @@ function OrderDetailContent({
   onCancel: () => void;
   onPrint?: () => void;
   trackingUrl?: string | null;
+  liveInventoryEnabled?: boolean;
 }) {
   const meta = ORDER_STATUS_META[order.status];
   const itemCount = countOrderItems(order.items);
@@ -357,6 +365,11 @@ function OrderDetailContent({
   );
 
   const showActions = meta.nextActionLabel || canCancelOrder(order.status);
+  const stockShortfalls =
+    liveInventoryEnabled && order.status === 'pending'
+      ? kitchenInventoryShortfalls(order.items, productsById)
+      : [];
+  const stockWarning = formatKitchenInventoryBanner(stockShortfalls);
 
   return (
     <>
@@ -417,6 +430,16 @@ function OrderDetailContent({
             <OrderTrackingLink trackingUrl={trackingUrl} shortId={order.dispatch.short_id} />
           ) : null}
         </div>
+
+        {stockWarning ? (
+          <div className={styles.stockWarning} role="status" aria-atomic="true">
+            <WarningAmberOutlinedIcon sx={{ fontSize: 22 }} aria-hidden />
+            <div>
+              <p className={styles.stockWarningTitle}>Stock insuficiente</p>
+              <p className={styles.stockWarningText}>{stockWarning}</p>
+            </div>
+          </div>
+        ) : null}
 
         <section className={styles.itemsSection} aria-label="Artículos del pedido">
           <h3 className={styles.sectionTitle}>
@@ -494,10 +517,14 @@ function OrderDetailContent({
             <button
               type="button"
               className={styles.actionPrimary}
-              disabled={updating}
+              disabled={updating || (order.status === 'pending' && productsLoading)}
               onClick={onAdvance}
             >
-              {updating ? 'Actualizando…' : meta.nextActionLabel}
+              {updating
+                ? 'Actualizando…'
+                : order.status === 'pending' && productsLoading
+                  ? 'Revisando stock…'
+                  : meta.nextActionLabel}
             </button>
           ) : null}
           {onPrint ? (
@@ -535,6 +562,7 @@ function OrderDetailPanel({
   onCancel,
   onPrint,
   trackingUrl,
+  liveInventoryEnabled,
 }: {
   order: Order | null;
   productsById: ReadonlyMap<string, Product>;
@@ -548,6 +576,7 @@ function OrderDetailPanel({
   onCancel: () => void;
   onPrint?: () => void;
   trackingUrl?: string | null;
+  liveInventoryEnabled?: boolean;
 }) {
   return (
     <section className={styles.detailPanel} aria-label="Detalle del pedido">
@@ -565,6 +594,7 @@ function OrderDetailPanel({
           onCancel={onCancel}
           onPrint={onPrint}
           trackingUrl={trackingUrl}
+          liveInventoryEnabled={liveInventoryEnabled}
         />
       ) : (
         <div className={styles.detailEmpty}>
@@ -612,6 +642,7 @@ export function KitchenOrdersView() {
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [dispatchOrder, setDispatchOrder] = useState<Order | null>(null);
+  const [stockWarningOpen, setStockWarningOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [isMobile, setIsMobile] = useState(false);
 
@@ -663,6 +694,10 @@ export function KitchenOrdersView() {
         .subdomain ?? '',
     [accessibleRestaurants, restaurantId],
   );
+  const liveInventoryEnabled = Boolean(
+    accessibleRestaurants.find((item) => item.restaurant.id === restaurantId)?.restaurant
+      .live_menu_inventory_enabled,
+  );
   const trackingUrl =
     selectedOrder?.dispatch?.tracking_token && restaurantSubdomain
       ? `${publicMenuOrigin(restaurantSubdomain)}/rastreo/${selectedOrder.dispatch.tracking_token}`
@@ -676,6 +711,10 @@ export function KitchenOrdersView() {
     setSelectedIds([]);
     setMultiSelectOpen(false);
   }, [kitchenFilter]);
+
+  useEffect(() => {
+    setStockWarningOpen(false);
+  }, [selectedOrderId]);
 
   const { productsById, isLoading: productsLoading } = useKitchenOrderProducts(
     accessToken,
@@ -728,14 +767,26 @@ export function KitchenOrdersView() {
       return updated;
     } catch (error) {
       console.error(error);
-      setActionError('No se pudo actualizar el estado del pedido.');
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'No se pudo actualizar el estado del pedido.';
+      setActionError(message || 'No se pudo actualizar el estado del pedido.');
       return null;
     } finally {
       setUpdating(false);
     }
   };
 
-  const handleAdvance = async () => {
+  const selectedStockShortfalls = useMemo(
+    () =>
+      liveInventoryEnabled && selectedOrder?.status === 'pending'
+        ? kitchenInventoryShortfalls(selectedOrder.items, productsById)
+        : [],
+    [liveInventoryEnabled, productsById, selectedOrder],
+  );
+
+  const advanceSelectedOrder = async () => {
     if (!selectedOrder) return;
     const next = ORDER_STATUS_META[selectedOrder.status].nextStatus;
     if (!next) return;
@@ -750,6 +801,22 @@ export function KitchenOrdersView() {
         setActionError(`Pedido confirmado, pero no se imprimió el ticket: ${printed.error}`);
       }
     }
+  };
+
+  const handleAdvance = () => {
+    if (!selectedOrder) return;
+    const next = ORDER_STATUS_META[selectedOrder.status].nextStatus;
+    if (!next) return;
+    if (next === 'confirmed' && selectedStockShortfalls.length > 0) {
+      setStockWarningOpen(true);
+      return;
+    }
+    void advanceSelectedOrder();
+  };
+
+  const handleStockWarningConfirm = () => {
+    setStockWarningOpen(false);
+    void advanceSelectedOrder();
   };
 
   const handleCancelRequest = () => {
@@ -1086,6 +1153,7 @@ export function KitchenOrdersView() {
                   : undefined
               }
               trackingUrl={trackingUrl}
+              liveInventoryEnabled={liveInventoryEnabled}
             />
           </div>
         ) : null}
@@ -1108,6 +1176,7 @@ export function KitchenOrdersView() {
               void printOrder(selectedOrder, 'manual', productsById);
             }}
             trackingUrl={trackingUrl}
+            liveInventoryEnabled={liveInventoryEnabled}
           />
         </div>
       ) : null}
@@ -1122,6 +1191,18 @@ export function KitchenOrdersView() {
           setCancelTargetIds([]);
         }}
         onConfirm={(reason) => void handleCancelConfirm(reason)}
+      />
+
+      <ConfirmDialog
+        open={stockWarningOpen}
+        title="No alcanza el stock"
+        stepHint="Aviso"
+        description={formatKitchenInventoryDialogBody(selectedStockShortfalls)}
+        confirmLabel="Confirmar igual"
+        cancelLabel="Revisar pedido"
+        variant="warning"
+        onConfirm={handleStockWarningConfirm}
+        onCancel={() => setStockWarningOpen(false)}
       />
 
       <ConfirmDialog
