@@ -224,7 +224,7 @@
 
 .table {
   width: 100%;
-  min-width: 44rem;
+  min-width: 48rem;
   border-collapse: collapse;
 }
 
@@ -296,6 +296,36 @@
 .table td:nth-child(4),
 .table td:nth-child(5) {
   text-align: right;
+}
+
+.whatsappCol {
+  width: 3rem;
+  text-align: center;
+}
+
+.whatsappIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  color: #16a34a;
+  text-decoration: none;
+}
+
+.whatsappIconBtn:hover {
+  background: color-mix(in srgb, #16a34a 12%, transparent);
+}
+
+.whatsappIconBtn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.whatsappEmpty {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
 }
 
 .tableRow {
