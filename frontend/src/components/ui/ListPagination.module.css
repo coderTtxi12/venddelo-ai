@@ -95,9 +95,11 @@
 
   .navBtn {
     flex: 1;
+    min-height: 2.75rem;
   }
 
   .pageIndicator {
     flex: 0 0 auto;
+    min-height: 2.75rem;
   }
 }

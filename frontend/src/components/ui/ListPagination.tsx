@@ -13,6 +13,7 @@ type ListPaginationProps = {
   pageSize: number;
   itemLabel: string;
   loading?: boolean;
+  className?: string;
   onPageChange: (page: number) => void;
 };
 
@@ -25,6 +26,7 @@ export function ListPagination({
   pageSize,
   itemLabel,
   loading = false,
+  className,
   onPageChange,
 }: ListPaginationProps) {
   if (totalItems === 0) return null;
@@ -40,7 +42,10 @@ export function ListPagination({
         : `Mostrando ${rangeStart}–${rangeEnd} de ${totalItems} ${itemLabel}`;
 
   return (
-    <nav className={styles.bar} aria-label={`Paginación de ${itemLabel}`}>
+    <nav
+      className={[styles.bar, className].filter(Boolean).join(' ')}
+      aria-label={`Paginación de ${itemLabel}`}
+    >
       <div className={styles.meta}>
         <span className={styles.range}>{rangeText}</span>
         <span className={styles.pageSize}>{pageSize} por página</span>
