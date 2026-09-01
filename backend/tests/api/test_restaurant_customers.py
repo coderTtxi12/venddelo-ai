@@ -59,6 +59,7 @@ def test_list_restaurant_customers_groups_by_phone(client, engine):
     body = response.json()
     assert body["stats"]["unique_customers"] == 1
     assert body["stats"]["repeat_customers"] == 1
+    assert body["total"] == 1
     assert len(body["items"]) == 1
     customer = body["items"][0]
     assert customer["phone_key"] == "5512345678"

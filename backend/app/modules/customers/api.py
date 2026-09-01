@@ -5,8 +5,12 @@ from app.core.pagination import PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.modules.customers.adapters import SqlAlchemyCustomerRepository
 from app.modules.customers.schemas import (
+    CustomerFrequency,
+    CustomerRecency,
     CustomerSort,
+    CustomerSortOrder,
     CustomerSource,
+    CustomerSpend,
     RestaurantCustomerActivity,
     RestaurantCustomerList,
 )
@@ -26,9 +30,14 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> CustomerService:
 )
 def list_restaurant_customers(
     params: PaginationParams = Depends(pagination_params),
+    page: int = Query(default=1, ge=1),
     q: str | None = Query(default=None),
     source: CustomerSource | None = Query(default=None),
+    frequency: CustomerFrequency | None = Query(default=None),
+    spend: CustomerSpend | None = Query(default=None),
+    recency: CustomerRecency | None = Query(default=None),
     sort: CustomerSort = Query(default="last_at"),
+    order: CustomerSortOrder | None = Query(default=None),
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: CustomerService = Depends(_service),
 ) -> RestaurantCustomerList:
@@ -37,7 +46,12 @@ def list_restaurant_customers(
         params,
         query=q,
         source=source,
+        frequency=frequency,
+        spend=spend,
+        recency=recency,
         sort=sort,
+        order=order,
+        page=page,
     )
 
 

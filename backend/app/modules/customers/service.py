@@ -6,8 +6,12 @@ from app.core.exceptions import NotFoundError
 from app.core.pagination import PaginationParams
 from app.modules.customers.adapters import SqlAlchemyCustomerRepository
 from app.modules.customers.schemas import (
+    CustomerFrequency,
+    CustomerRecency,
     CustomerSort,
+    CustomerSortOrder,
     CustomerSource,
+    CustomerSpend,
     RestaurantCustomerActivity,
     RestaurantCustomerList,
 )
@@ -30,7 +34,12 @@ class CustomerService:
         *,
         query: str | None = None,
         source: CustomerSource | None = None,
+        frequency: CustomerFrequency | None = None,
+        spend: CustomerSpend | None = None,
+        recency: CustomerRecency | None = None,
         sort: CustomerSort = "last_at",
+        order: CustomerSortOrder | None = None,
+        page: int = 1,
     ) -> RestaurantCustomerList:
         self._require_restaurant(restaurant_id)
         return self._customers.list_for_restaurant(
@@ -38,7 +47,12 @@ class CustomerService:
             params,
             query=query,
             source=source,
+            frequency=frequency,
+            spend=spend,
+            recency=recency,
             sort=sort,
+            order=order,
+            page=page,
         )
 
     def activity_for_phone(

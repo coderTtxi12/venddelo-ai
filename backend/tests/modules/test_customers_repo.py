@@ -75,6 +75,7 @@ def test_list_customers_search_and_pagination(session):
     )
     assert [item.customer_name for item in first.items] == ["Ana", "Beto"]
     assert first.has_more is True
+    assert first.total == 3
 
     second = customers.list_for_restaurant(
         restaurant.id,
@@ -84,6 +85,16 @@ def test_list_customers_search_and_pagination(session):
     assert [item.customer_name for item in second.items] == ["Carla"]
     assert second.has_more is False
 
+    by_page = customers.list_for_restaurant(
+        restaurant.id,
+        PaginationParams(limit=2),
+        sort="name",
+        page=2,
+    )
+    assert [item.customer_name for item in by_page.items] == ["Carla"]
+    assert by_page.total == 3
+    assert by_page.has_more is False
+
     searched = customers.list_for_restaurant(
         restaurant.id,
         PaginationParams(limit=20),
@@ -91,6 +102,7 @@ def test_list_customers_search_and_pagination(session):
     )
     assert len(searched.items) == 1
     assert searched.items[0].customer_name == "Beto"
+    assert searched.total == 1
 
 
 @requires_db
