@@ -70,6 +70,31 @@ def merge_coupon_update(existing: CouponDTO, data: CouponUpdate) -> CouponCreate
     )
 
 
+def apply_coupon_update_scope_links(
+    update_fields: dict,
+    *,
+    data: CouponUpdate,
+    existing: CouponDTO,
+    effective_scope: str,
+) -> None:
+    if "product_ids" in data.model_fields_set:
+        update_fields["product_ids"] = (
+            data.product_ids if effective_scope == "product" else []
+        )
+    elif effective_scope != existing.scope:
+        update_fields["product_ids"] = (
+            existing.product_ids if effective_scope == "product" else []
+        )
+    if "category_ids" in data.model_fields_set:
+        update_fields["category_ids"] = (
+            data.category_ids if effective_scope == "category" else []
+        )
+    elif effective_scope != existing.scope:
+        update_fields["category_ids"] = (
+            existing.category_ids if effective_scope == "category" else []
+        )
+
+
 class CouponService:
     def __init__(self, repo: CouponRepository) -> None:
         self._repo = repo
@@ -260,19 +285,13 @@ class CouponService:
             update_fields["amount_cents"] = None
 
         effective_scope = update_fields.get("scope", existing.scope)
+        apply_coupon_update_scope_links(
+            update_fields,
+            data=data,
+            existing=existing,
+            effective_scope=effective_scope,
+        )
         patch = CouponUpdate(**update_fields)
-        if "product_ids" in data.model_fields_set:
-            patch.product_ids = (
-                data.product_ids if effective_scope == "product" else []
-            )
-        elif effective_scope != existing.scope:
-            patch.product_ids = existing.product_ids if effective_scope == "product" else []
-        if "category_ids" in data.model_fields_set:
-            patch.category_ids = (
-                data.category_ids if effective_scope == "category" else []
-            )
-        elif effective_scope != existing.scope:
-            patch.category_ids = existing.category_ids if effective_scope == "category" else []
 
         dto = self._repo.update(coupon_id, patch)
         if dto is None:
