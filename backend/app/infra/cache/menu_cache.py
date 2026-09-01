@@ -6,11 +6,48 @@ import uuid
 from app.core.cache import CachePort
 from app.core.config import get_settings
 from app.core.exceptions import NotFoundError
+from app.modules.menu.inventory import show_low_stock
 from app.modules.menu.schemas import FullMenuDTO
 from app.modules.menu.service import MenuService
 from app.modules.restaurants.repository import RestaurantRepository
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_public_menu(
+    menu: FullMenuDTO,
+    *,
+    live_menu_inventory_enabled: bool,
+    low_stock_threshold: int,
+) -> FullMenuDTO:
+    products = []
+    for product in menu.products:
+        low_stock = (
+            live_menu_inventory_enabled
+            and product.status == "active"
+            and (
+                product.show_low_stock
+                if product.inventory_qty is None
+                else show_low_stock(
+                    live_menu_inventory_enabled=live_menu_inventory_enabled,
+                    inventory_qty=product.inventory_qty,
+                    threshold=low_stock_threshold,
+                    status=product.status,
+                )
+            )
+        )
+        products.append(
+            product.model_copy(
+                update={
+                    "show_low_stock": low_stock,
+                    "inventory_qty": None,
+                    "shelf_life_days": None,
+                    "expires_on": None,
+                    "batch_started_at": None,
+                }
+            )
+        )
+    return menu.model_copy(update={"products": products})
 
 
 def menu_cache_key(subdomain: str, locale: str) -> str:
@@ -32,17 +69,27 @@ class MenuCacheService:
         self._ttl = ttl_seconds or get_settings().menu_cache_ttl_seconds
 
     def get_public_menu(self, subdomain: str, locale: str = "default") -> FullMenuDTO:
+        restaurant = self._restaurants.get_by_subdomain(subdomain)
+        if restaurant is None:
+            raise NotFoundError("Restaurant not found")
+        return sanitize_public_menu(
+            self.get_raw_menu(subdomain, locale),
+            live_menu_inventory_enabled=restaurant.live_menu_inventory_enabled,
+            low_stock_threshold=restaurant.low_stock_threshold,
+        )
+
+    def get_raw_menu(self, subdomain: str, locale: str = "default") -> FullMenuDTO:
         key = menu_cache_key(subdomain, locale)
+        restaurant = self._restaurants.get_by_subdomain(subdomain)
+        if restaurant is None:
+            raise NotFoundError("Restaurant not found")
+
         cached = self._cache.get(key)
         if cached is not None:
             logger.info("menu cache hit subdomain=%s locale=%s", subdomain, locale)
             return FullMenuDTO.model_validate_json(cached)
 
         logger.info("menu cache miss subdomain=%s locale=%s", subdomain, locale)
-        restaurant = self._restaurants.get_by_subdomain(subdomain)
-        if restaurant is None:
-            raise NotFoundError("Restaurant not found")
-
         menu = self._menu.get_full_menu(restaurant.id)
         self._cache.set(key, menu.model_dump_json(), self._ttl)
         logger.info(

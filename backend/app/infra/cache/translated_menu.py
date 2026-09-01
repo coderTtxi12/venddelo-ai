@@ -6,7 +6,11 @@ from app.core.cache import CachePort
 from app.core.config import get_settings
 from app.core.exceptions import NotFoundError
 from app.core.palettes import normalize_locale
-from app.infra.cache.menu_cache import MenuCacheService, menu_cache_key
+from app.infra.cache.menu_cache import (
+    MenuCacheService,
+    menu_cache_key,
+    sanitize_public_menu,
+)
 from app.modules.menu.schemas import FullMenuDTO
 from app.modules.restaurants.repository import RestaurantRepository
 from app.modules.translations.service import TranslationService
@@ -49,14 +53,18 @@ class TranslatedMenuService:
                 subdomain,
                 effective_locale,
             )
-            return FullMenuDTO.model_validate_json(cached)
+            return sanitize_public_menu(
+                FullMenuDTO.model_validate_json(cached),
+                live_menu_inventory_enabled=restaurant.live_menu_inventory_enabled,
+                low_stock_threshold=restaurant.low_stock_threshold,
+            )
 
         logger.info(
             "translated menu cache miss subdomain=%s locale=%s",
             subdomain,
             effective_locale,
         )
-        base = self._menu_cache.get_public_menu(subdomain, "default")
+        base = self._menu_cache.get_raw_menu(subdomain, "default")
         translated = self._translation.translate_menu(base, restaurant, effective_locale)
         self._cache.set(key, translated.model_dump_json(), self._ttl)
         logger.info(
@@ -65,4 +73,8 @@ class TranslatedMenuService:
             effective_locale,
             self._ttl,
         )
-        return translated
+        return sanitize_public_menu(
+            translated,
+            live_menu_inventory_enabled=restaurant.live_menu_inventory_enabled,
+            low_stock_threshold=restaurant.low_stock_threshold,
+        )
