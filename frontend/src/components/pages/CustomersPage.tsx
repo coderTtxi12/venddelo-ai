@@ -2,7 +2,6 @@
 
 import {
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -10,40 +9,47 @@ import {
   type ReactNode,
 } from 'react';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import ChevronRightOutlinedIcon from '@mui/icons-material/ChevronRightOutlined';
 import ReplayOutlinedIcon from '@mui/icons-material/ReplayOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import { CustomerDetailDrawer } from '@/components/customers/CustomerDetailDrawer';
 import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import { useAuth } from '@/hooks/useAuth';
 import {
   getRestaurantCustomerActivity,
-  listAllRestaurantCustomers,
+  listRestaurantCustomers,
   type CustomerSort,
+  type CustomerSortOrder,
   type CustomerSource,
   type RestaurantCustomer,
-  type RestaurantCustomerActivityItem,
+  type RestaurantCustomerActivity,
   type RestaurantCustomerStats,
 } from '@/lib/api/customers';
 import { ApiError } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
 import {
-  CUSTOMER_SORT_LABELS,
+  CUSTOMER_FREQUENCY_LABELS,
+  CUSTOMER_RECENCY_LABELS,
   CUSTOMER_SOURCE_LABELS,
-  activityKindLabel,
-  activityStatusLabel,
+  CUSTOMER_SPEND_LABELS,
+  customerFiltersActive,
   customerInitials,
   customerWhatsAppHref,
-  filterCustomers,
-  sortCustomers,
-  visitSummary,
+  toggleCustomerColumnSort,
+  type CustomerFrequencyFilter,
+  type CustomerRecencyFilter,
+  type CustomerSpendFilter,
 } from '@/lib/customers/display';
 import { formatOrderCustomerPhone } from '@/lib/digital-menu/checkout/customerPhone';
-import { formatOrderDateTime, formatOrderElapsed } from '@/lib/orders/orderDisplay';
-import { paginateItems } from '@/lib/paginate';
+import { formatOrderElapsed } from '@/lib/orders/orderDisplay';
 import { ListPagination } from '@/components/ui/ListPagination';
+import { ToolbarSelect } from '@/components/ui/ToolbarSelect';
 import styles from './CustomersPage.module.css';
 
 const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 250;
 const EMPTY_STATS: RestaurantCustomerStats = {
   unique_customers: 0,
   repeat_customers: 0,
@@ -51,17 +57,124 @@ const EMPTY_STATS: RestaurantCustomerStats = {
   delivery_customers: 0,
 };
 
+const CHANNEL_FILTER_LABELS: Record<CustomerSource | 'all', string> = {
+  all: 'Todos',
+  menu: CUSTOMER_SOURCE_LABELS.menu,
+  delivery: CUSTOMER_SOURCE_LABELS.delivery,
+};
+
+const MOBILE_SORT_OPTIONS: Record<string, string> = {
+  'last_at:desc': 'Más recientes',
+  'last_at:asc': 'Más antiguos',
+  'visits:desc': 'Más pedidos',
+  'visits:asc': 'Menos pedidos',
+  'spent:desc': 'Mayor gasto',
+  'spent:asc': 'Menor gasto',
+  'name:asc': 'Nombre A–Z',
+  'name:desc': 'Nombre Z–A',
+};
+
 function formatCents(cents: number) {
   return formatMoney(cents / 100);
 }
 
-function sourceFilterLabel(source: CustomerSource | 'all'): string {
-  if (source === 'all') return 'Todos';
-  return CUSTOMER_SOURCE_LABELS[source];
-}
-
 function sourceLine(customer: RestaurantCustomer): string {
   return customer.sources.map((item) => CUSTOMER_SOURCE_LABELS[item]).join(' · ');
+}
+
+const SORT_COLUMN_LABELS: Record<CustomerSort, string> = {
+  name: 'Cliente',
+  visits: 'Pedidos',
+  spent: 'Gastado',
+  last_at: 'Último',
+};
+
+function SortHeader({
+  column,
+  sort,
+  order,
+  align = 'left',
+  onToggle,
+}: {
+  column: CustomerSort;
+  sort: CustomerSort;
+  order: CustomerSortOrder;
+  align?: 'left' | 'right';
+  onToggle: (column: CustomerSort) => void;
+}) {
+  const active = sort === column;
+  const label = SORT_COLUMN_LABELS[column];
+  const nextDirection = !active
+    ? column === 'name'
+      ? 'ascendente'
+      : 'descendente'
+    : order === 'desc'
+      ? 'ascendente'
+      : 'descendente';
+  return (
+    <th aria-sort={active ? (order === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button
+        type="button"
+        className={`${styles.sortBtn} ${align === 'right' ? styles.sortBtnRight : ''} ${
+          active ? styles.sortBtnOn : ''
+        }`}
+        aria-label={`Ordenar ${label.toLowerCase()} de forma ${nextDirection}`}
+        onClick={() => onToggle(column)}
+      >
+        <span>{label}</span>
+        <span className={styles.sortDir} aria-hidden>
+          <span className={active && order === 'asc' ? styles.sortDirActive : styles.sortDirIdle}>
+            ↑
+          </span>
+          <span className={active && order === 'desc' ? styles.sortDirActive : styles.sortDirIdle}>
+            ↓
+          </span>
+        </span>
+      </button>
+    </th>
+  );
+}
+
+function CustomerCard({
+  customer,
+  selected,
+  onSelect,
+}: {
+  customer: RestaurantCustomer;
+  selected: boolean;
+  onSelect: (customer: RestaurantCustomer) => void;
+}) {
+  const displayName = customer.customer_name || 'Sin nombre';
+  const spent = formatCents(customer.total_spent_cents);
+  return (
+    <button
+      type="button"
+      className={`${styles.customerCard} ${selected ? styles.customerCardSelected : ''}`}
+      aria-pressed={selected}
+      aria-label={`${displayName}, ${spent} gastado, ${customer.visit_count} pedidos`}
+      onClick={() => onSelect(customer)}
+    >
+      <span className={styles.customerCardMain}>
+        <span className={styles.avatar} aria-hidden>
+          {customerInitials(customer.customer_name)}
+        </span>
+        <span className={styles.customerCardCopy}>
+          <span className={styles.name}>{customer.customer_name || 'Sin nombre'}</span>
+          <span className={styles.customerCardPhone}>
+            {formatOrderCustomerPhone(customer.customer_phone)}
+          </span>
+          <span className={styles.customerCardMeta}>
+            {sourceLine(customer) || 'Sin canal'} · {customer.visit_count} pedidos
+          </span>
+        </span>
+      </span>
+      <span className={styles.customerCardAside}>
+        <span className={styles.customerCardSpent}>{formatCents(customer.total_spent_cents)}</span>
+        <span className={styles.customerCardWhen}>{formatOrderElapsed(customer.last_order_at)}</span>
+        <ChevronRightOutlinedIcon className={styles.customerCardChevron} fontSize="small" aria-hidden />
+      </span>
+    </button>
+  );
 }
 
 function Drawer({
@@ -108,6 +221,7 @@ function Drawer({
         aria-modal="true"
         aria-label={title}
       >
+        <div className={styles.drawerHandle} aria-hidden />
         <div className={styles.drawerHeader}>
           <h2 className={styles.drawerTitle}>{title}</h2>
           <button
@@ -131,41 +245,91 @@ export default function CustomersPage() {
   const { selectedRestaurantId } = useRestaurantAccess();
   const [customers, setCustomers] = useState<RestaurantCustomer[]>([]);
   const [stats, setStats] = useState<RestaurantCustomerStats>(EMPTY_STATS);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const deferredQuery = useDeferredValue(query);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [source, setSource] = useState<CustomerSource | 'all'>('all');
+  const [frequency, setFrequency] = useState<CustomerFrequencyFilter>('all');
+  const [spend, setSpend] = useState<CustomerSpendFilter>('all');
+  const [recency, setRecency] = useState<CustomerRecencyFilter>('all');
   const [sort, setSort] = useState<CustomerSort>('last_at');
+  const [order, setOrder] = useState<CustomerSortOrder>('desc');
   const [page, setPage] = useState(1);
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<RestaurantCustomer | null>(null);
   const [activityByKey, setActivityByKey] = useState<
-    Record<string, RestaurantCustomerActivityItem[] | 'loading' | 'error'>
+    Record<string, RestaurantCustomerActivity | 'loading' | 'error'>
   >({});
+  const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  const listFilters = useMemo(
+    () => ({ query: debouncedQuery, source, frequency, spend, recency }),
+    [debouncedQuery, frequency, recency, source, spend],
+  );
+  const filtersActive = customerFiltersActive(listFilters);
 
   const loadCustomers = useCallback(async () => {
     if (!accessToken || !selectedRestaurantId) {
       setCustomers([]);
       setStats(EMPTY_STATS);
+      setTotal(0);
       setLoading(false);
+      setHasLoaded(true);
       return;
     }
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
-      const result = await listAllRestaurantCustomers(accessToken, selectedRestaurantId);
+      const result = await listRestaurantCustomers(accessToken, selectedRestaurantId, PAGE_SIZE, {
+        q: debouncedQuery.trim() || undefined,
+        source: source === 'all' ? undefined : source,
+        frequency: frequency === 'all' ? undefined : frequency,
+        spend: spend === 'all' ? undefined : spend,
+        recency: recency === 'all' ? undefined : recency,
+        sort,
+        order,
+        page,
+      });
+      if (requestId !== requestIdRef.current) return;
       setCustomers(result.items);
       setStats(result.stats);
+      setTotal(result.total);
+      setHasLoaded(true);
+      if (result.total > 0 && result.items.length === 0 && page > 1) {
+        setPage(1);
+      }
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       setError(
         err instanceof ApiError ? err.message : 'No se pudo cargar la lista de clientes.',
       );
       setCustomers([]);
       setStats(EMPTY_STATS);
+      setTotal(0);
+      setHasLoaded(true);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [accessToken, selectedRestaurantId]);
+  }, [
+    accessToken,
+    debouncedQuery,
+    frequency,
+    page,
+    recency,
+    selectedRestaurantId,
+    sort,
+    order,
+    source,
+    spend,
+  ]);
 
   useEffect(() => {
     void loadCustomers();
@@ -173,24 +337,11 @@ export default function CustomersPage() {
 
   useEffect(() => {
     setPage(1);
-    setSelectedKey(null);
+    setSelectedCustomer(null);
+    setHasLoaded(false);
   }, [selectedRestaurantId]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [deferredQuery, source, sort]);
-
-  const visible = useMemo(
-    () => sortCustomers(filterCustomers(customers, deferredQuery, source), sort),
-    [customers, deferredQuery, source, sort],
-  );
-  const slice = paginateItems(visible, page, PAGE_SIZE);
-  const selectedCustomer = useMemo(
-    () => customers.find((customer) => customer.phone_key === selectedKey) ?? null,
-    [customers, selectedKey],
-  );
-
-  const closeDrawer = useCallback(() => setSelectedKey(null), []);
+  const closeDrawer = useCallback(() => setSelectedCustomer(null), []);
 
   const loadActivity = useCallback(
     async (phoneKey: string) => {
@@ -202,7 +353,7 @@ export default function CustomersPage() {
           selectedRestaurantId,
           phoneKey,
         );
-        setActivityByKey((prev) => ({ ...prev, [phoneKey]: activity.items }));
+        setActivityByKey((prev) => ({ ...prev, [phoneKey]: activity }));
       } catch {
         setActivityByKey((prev) => ({ ...prev, [phoneKey]: 'error' }));
       }
@@ -210,21 +361,42 @@ export default function CustomersPage() {
     [accessToken, selectedRestaurantId],
   );
 
-  function selectCustomer(phoneKey: string) {
-    const next = selectedKey === phoneKey ? null : phoneKey;
-    setSelectedKey(next);
-    if (next && activityByKey[next] == null) {
-      void loadActivity(next);
+  function selectCustomer(customer: RestaurantCustomer) {
+    const next = selectedCustomer?.phone_key === customer.phone_key ? null : customer;
+    setSelectedCustomer(next);
+    if (next && activityByKey[next.phone_key] == null) {
+      void loadActivity(next.phone_key);
     }
   }
 
-  const searching = deferredQuery.trim().length > 0;
-  const emptyAll = !loading && !error && customers.length === 0;
-  const emptySearch = !loading && !error && customers.length > 0 && visible.length === 0;
-  const selectedActivity = selectedKey ? activityByKey[selectedKey] : null;
-  const whatsappHref = selectedCustomer
-    ? customerWhatsAppHref(selectedCustomer.customer_phone, selectedCustomer.customer_name)
-    : null;
+  function goToFirstPage() {
+    setPage(1);
+  }
+
+  function toggleSort(column: CustomerSort) {
+    const next = toggleCustomerColumnSort({ sort, order }, column);
+    setSort(next.sort);
+    setOrder(next.order);
+    setPage(1);
+  }
+
+  function clearFilters() {
+    setQuery('');
+    setDebouncedQuery('');
+    setSource('all');
+    setFrequency('all');
+    setSpend('all');
+    setRecency('all');
+    setPage(1);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = total === 0 ? 0 : Math.min(page * PAGE_SIZE, total);
+  const showFullLoading = loading && !hasLoaded;
+  const emptyAll = hasLoaded && !error && stats.unique_customers === 0;
+  const emptySearch = hasLoaded && !error && stats.unique_customers > 0 && total === 0;
+  const selectedActivity = selectedCustomer ? activityByKey[selectedCustomer.phone_key] : null;
 
   return (
     <div className={styles.page}>
@@ -254,49 +426,104 @@ export default function CustomersPage() {
       </header>
 
       <div className={styles.toolbar}>
-        <label className={styles.search}>
-          <SearchOutlinedIcon fontSize="small" aria-hidden />
-          <span className={styles.srOnly}>Buscar clientes</span>
-          <input
-            className={styles.searchInput}
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Nombre o celular"
-            autoComplete="off"
-            aria-label="Buscar clientes"
-          />
-        </label>
-        <div className={styles.tabs} role="group" aria-label="Canal">
-          {(['all', 'menu', 'delivery'] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={source === value}
-              className={`${styles.tab} ${source === value ? styles.tabActive : ''}`}
-              onClick={() => setSource(value)}
-            >
-              {sourceFilterLabel(value)}
-            </button>
-          ))}
-        </div>
-        <label className={styles.sort}>
-          <span className={styles.srOnly}>Ordenar</span>
-          <select
-            className={styles.sortSelect}
-            value={sort}
-            onChange={(event) => setSort(event.target.value as CustomerSort)}
-          >
-            {(Object.keys(CUSTOMER_SORT_LABELS) as CustomerSort[]).map((value) => (
-              <option key={value} value={value}>
-                {CUSTOMER_SORT_LABELS[value]}
-              </option>
-            ))}
-          </select>
+        <label className={styles.searchField} htmlFor="customers-search">
+          <span className={styles.searchLabel}>Buscar</span>
+          <div className={`${styles.searchWrap} ${query ? styles.searchWrapActive : ''}`}>
+            <SearchOutlinedIcon className={styles.searchIcon} fontSize="small" aria-hidden />
+            <input
+              id="customers-search"
+              className={styles.searchInput}
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                goToFirstPage();
+              }}
+              placeholder="Nombre o celular"
+              autoComplete="off"
+            />
+            {query ? (
+              <button
+                type="button"
+                className={styles.searchClear}
+                aria-label="Limpiar búsqueda"
+                onClick={() => {
+                  setQuery('');
+                  setDebouncedQuery('');
+                  goToFirstPage();
+                }}
+              >
+                <CloseRoundedIcon sx={{ fontSize: 18 }} aria-hidden />
+              </button>
+            ) : null}
+          </div>
         </label>
       </div>
 
-      {loading ? (
+      <div className={styles.filters} role="group" aria-label="Filtros de clientes">
+        <div className={styles.mobileSort}>
+          <ToolbarSelect
+            label="Ordenar"
+            value={`${sort}:${order}`}
+            options={MOBILE_SORT_OPTIONS}
+            onChange={(value) => {
+              const [nextSort, nextOrder] = value.split(':') as [CustomerSort, CustomerSortOrder];
+              setSort(nextSort);
+              setOrder(nextOrder);
+              goToFirstPage();
+            }}
+          />
+        </div>
+        <ToolbarSelect
+          label="Canal"
+          value={source}
+          options={CHANNEL_FILTER_LABELS}
+          active={source !== 'all'}
+          onChange={(value) => {
+            setSource(value);
+            goToFirstPage();
+          }}
+        />
+        <ToolbarSelect
+          label="Pedidos"
+          value={frequency}
+          options={CUSTOMER_FREQUENCY_LABELS}
+          active={frequency !== 'all'}
+          onChange={(value) => {
+            setFrequency(value);
+            goToFirstPage();
+          }}
+        />
+        <ToolbarSelect
+          label="Gastado"
+          value={spend}
+          options={CUSTOMER_SPEND_LABELS}
+          active={spend !== 'all'}
+          onChange={(value) => {
+            setSpend(value);
+            goToFirstPage();
+          }}
+        />
+        <ToolbarSelect
+          label="Último"
+          value={recency}
+          options={CUSTOMER_RECENCY_LABELS}
+          active={recency !== 'all'}
+          onChange={(value) => {
+            setRecency(value);
+            goToFirstPage();
+          }}
+        />
+        {filtersActive ? (
+          <button type="button" className={styles.clearFilters} onClick={clearFilters}>
+            Limpiar filtros
+          </button>
+        ) : null}
+      </div>
+
+      {showFullLoading ? (
         <div className={styles.stateBox}>
           <p className={styles.stateTitle}>Cargando clientes…</p>
           <p className={styles.stateText}>Agrupamos pedidos del menú y envíos manuales por celular.</p>
@@ -323,42 +550,61 @@ export default function CustomersPage() {
         <div className={styles.empty}>
           <h2 className={styles.emptyTitle}>Sin coincidencias</h2>
           <p className={styles.emptyText}>
-            Prueba con el nombre o los últimos dígitos del celular.
+            Prueba otro nombre, celular o quita los filtros.
           </p>
         </div>
       ) : (
         <>
           <p className={styles.counter}>
-            {searching || source !== 'all'
-              ? `${visible.length} de ${customers.length}`
-              : `${visible.length} clientes`}
+            {filtersActive
+              ? `${total} de ${stats.unique_customers}`
+              : `${total} clientes`}
           </p>
-          <div className={styles.tableWrap}>
+          <div className={`${styles.tableWrap} ${loading ? styles.tableLoading : ''}`}>
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Cliente</th>
+                  <SortHeader column="name" sort={sort} order={order} onToggle={toggleSort} />
                   <th>Celular</th>
                   <th>Canal</th>
-                  <th>Pedidos</th>
-                  <th>Gastado</th>
-                  <th>Último</th>
+                  <SortHeader
+                    column="visits"
+                    sort={sort}
+                    order={order}
+                    align="right"
+                    onToggle={toggleSort}
+                  />
+                  <SortHeader
+                    column="spent"
+                    sort={sort}
+                    order={order}
+                    align="right"
+                    onToggle={toggleSort}
+                  />
+                  <SortHeader column="last_at" sort={sort} order={order} onToggle={toggleSort} />
+                  <th className={styles.whatsappCol} aria-label="WhatsApp">
+                    <span className={styles.srOnly}>WhatsApp</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {slice.items.map((customer) => {
-                  const selected = selectedKey === customer.phone_key;
+                {customers.map((customer) => {
+                  const selected = selectedCustomer?.phone_key === customer.phone_key;
+                  const whatsappHref = customerWhatsAppHref(
+                    customer.customer_phone,
+                    customer.customer_name,
+                  );
                   return (
                     <tr
                       key={customer.phone_key}
                       className={`${styles.tableRow} ${selected ? styles.tableRowSelected : ''}`}
                       tabIndex={0}
                       aria-selected={selected}
-                      onClick={() => selectCustomer(customer.phone_key)}
+                      onClick={() => selectCustomer(customer)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
-                          selectCustomer(customer.phone_key);
+                          selectCustomer(customer);
                         }
                       }}
                     >
@@ -377,23 +623,55 @@ export default function CustomersPage() {
                       </td>
                       <td className={styles.muted}>{sourceLine(customer) || '—'}</td>
                       <td className={styles.numeric}>{customer.visit_count}</td>
-                      <td className={styles.spent}>{formatCents(customer.total_spent_cents)}</td>
+                      <td className={styles.spent} title="Solo pedidos entregados">
+                        {formatCents(customer.total_spent_cents)}
+                      </td>
                       <td className={styles.muted}>{formatOrderElapsed(customer.last_order_at)}</td>
+                      <td className={styles.whatsappCol}>
+                        {whatsappHref ? (
+                          <a
+                            className={styles.whatsappIconBtn}
+                            href={whatsappHref}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={`WhatsApp ${customer.customer_name || 'cliente'}`}
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <WhatsAppIcon fontSize="small" aria-hidden />
+                          </a>
+                        ) : (
+                          <span className={styles.whatsappEmpty} aria-hidden>
+                            —
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
+          <div className={`${styles.cardList} ${loading ? styles.tableLoading : ''}`}>
+            {customers.map((customer) => (
+              <CustomerCard
+                key={customer.phone_key}
+                customer={customer}
+                selected={selectedCustomer?.phone_key === customer.phone_key}
+                onSelect={selectCustomer}
+              />
+            ))}
+          </div>
           <ListPagination
-            page={slice.page}
-            totalPages={slice.totalPages}
-            totalItems={slice.totalItems}
-            rangeStart={slice.rangeStart}
-            rangeEnd={slice.rangeEnd}
+            page={page}
+            totalPages={totalPages}
+            totalItems={total}
+            rangeStart={rangeStart}
+            rangeEnd={rangeEnd}
             pageSize={PAGE_SIZE}
             itemLabel="clientes"
+            loading={loading}
             onPageChange={setPage}
+            className={styles.pagination}
           />
         </>
       )}
@@ -404,87 +682,11 @@ export default function CustomersPage() {
         onClose={closeDrawer}
       >
         {selectedCustomer ? (
-          <div className={styles.detail}>
-            <div className={styles.detailHero}>
-              <span className={styles.detailAvatar} aria-hidden>
-                {customerInitials(selectedCustomer.customer_name)}
-              </span>
-              <div className={styles.detailHeroCopy}>
-                <p className={styles.detailPhone}>
-                  {formatOrderCustomerPhone(selectedCustomer.customer_phone)}
-                </p>
-                <p className={styles.detailChannels}>{sourceLine(selectedCustomer) || '—'}</p>
-              </div>
-              {whatsappHref ? (
-                <a
-                  className={styles.whatsapp}
-                  href={whatsappHref}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <WhatsAppIcon fontSize="small" aria-hidden />
-                  WhatsApp
-                </a>
-              ) : null}
-            </div>
-
-            <dl className={styles.detailStats}>
-              <div>
-                <dt>Pedidos</dt>
-                <dd>{visitSummary(selectedCustomer)}</dd>
-              </div>
-              <div>
-                <dt>Gastado</dt>
-                <dd>{formatCents(selectedCustomer.total_spent_cents)}</dd>
-              </div>
-              <div>
-                <dt>Primero</dt>
-                <dd>{formatOrderDateTime(selectedCustomer.first_order_at)}</dd>
-              </div>
-              <div>
-                <dt>Último</dt>
-                <dd>{formatOrderDateTime(selectedCustomer.last_order_at)}</dd>
-              </div>
-            </dl>
-
-            <section className={styles.history}>
-              <h3 className={styles.historyTitle}>Historial</h3>
-              {selectedActivity === 'loading' || selectedActivity == null ? (
-                <p className={styles.activityHint}>Cargando pedidos…</p>
-              ) : selectedActivity === 'error' ? (
-                <div className={styles.activityError}>
-                  <p>No se pudo cargar el historial.</p>
-                  <button
-                    type="button"
-                    className={styles.retryButton}
-                    onClick={() => void loadActivity(selectedCustomer.phone_key)}
-                  >
-                    Reintentar
-                  </button>
-                </div>
-              ) : selectedActivity.length === 0 ? (
-                <p className={styles.activityHint}>Este cliente no tiene pedidos recientes.</p>
-              ) : (
-                <ul className={styles.activityList}>
-                  {selectedActivity.map((item) => (
-                    <li key={`${item.kind}-${item.id}`} className={styles.activityItem}>
-                      <span className={styles.activityId}>#{item.display_id}</span>
-                      <span className={styles.activityKind}>
-                        {activityKindLabel(item.kind, item.order_type)}
-                      </span>
-                      <span className={styles.activityStatus}>
-                        {activityStatusLabel(item.kind, item.status)}
-                      </span>
-                      <span className={styles.activityAmount}>{formatCents(item.total_cents)}</span>
-                      <span className={styles.activityWhen}>
-                        {formatOrderDateTime(item.created_at)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </div>
+          <CustomerDetailDrawer
+            customer={selectedCustomer}
+            activity={selectedActivity}
+            onRetryActivity={() => void loadActivity(selectedCustomer.phone_key)}
+          />
         ) : null}
       </Drawer>
     </div>
