@@ -59,6 +59,12 @@ type PublicMenuCheckoutSummaryProps = {
   currency: string;
   fulfillment: CheckoutFulfillment;
   onFulfillmentChange: (next: CheckoutFulfillment) => void;
+  couponDraft: string;
+  onCouponDraftChange: (value: string) => void;
+  appliedCouponCode: string | null;
+  onApplyCoupon: () => void | Promise<void>;
+  onRemoveCoupon: () => void | Promise<void>;
+  quoteLoading: boolean;
   onBack: () => void;
   onOrderSent: () => void;
   isTabletLayout?: boolean;
@@ -223,8 +229,11 @@ function TotalsPanel({
   lineDiscountTotal,
   orderDiscount,
   orderPromoLabel,
+  couponDiscount,
+  couponLabel,
   total,
   deliveryFee = 0,
+  deliveryFeeWaived = false,
   variant,
 }: {
   currency: string;
@@ -233,8 +242,11 @@ function TotalsPanel({
   lineDiscountTotal: number;
   orderDiscount: number;
   orderPromoLabel: string | null;
+  couponDiscount: number;
+  couponLabel: string | null;
   total: number;
   deliveryFee?: number;
+  deliveryFeeWaived?: boolean;
   variant: 'mobile' | 'desktop';
 }) {
   const itemLabel = itemCount === 1 ? '1 artículo' : `${itemCount} artículos`;
@@ -287,10 +299,24 @@ function TotalsPanel({
           </div>
         ) : null}
 
-        {deliveryFee > 0 ? (
+        {couponDiscount > 0 && couponLabel ? (
+          <div className={styles.totalsRow}>
+            <span className={styles.totalsRowLabel}>
+              Cupón
+              <span className={styles.totalsRowHint}>{couponLabel}</span>
+            </span>
+            <span className={`${styles.totalsRowValue} ${styles.totalsRowDiscount}`}>
+              -{formatMoney(couponDiscount, currency)}
+            </span>
+          </div>
+        ) : null}
+
+        {deliveryFee > 0 || deliveryFeeWaived ? (
           <div className={styles.totalsRow}>
             <span className={styles.totalsRowLabel}>Envío</span>
-            <span className={styles.totalsRowValue}>{formatMoney(deliveryFee, currency)}</span>
+            <span className={deliveryFeeWaived ? styles.priceRowValueFree : styles.totalsRowValue}>
+              {deliveryFeeWaived ? 'Gratis' : formatMoney(deliveryFee, currency)}
+            </span>
           </div>
         ) : null}
       </div>
@@ -474,6 +500,12 @@ export function PublicMenuCheckoutSummary({
   currency,
   fulfillment,
   onFulfillmentChange,
+  couponDraft,
+  onCouponDraftChange,
+  appliedCouponCode,
+  onApplyCoupon,
+  onRemoveCoupon,
+  quoteLoading,
   onBack,
   onOrderSent,
   isTabletLayout = false,
@@ -521,11 +553,18 @@ export function PublicMenuCheckoutSummary({
     ? promotionsById.get(quote.applied_order_promotion_id)
     : undefined;
   const orderPromoLabel = promotionDisplayName(orderPromo);
-  const deliveryFee =
-    fulfillment.serviceType === 'delivery' && fulfillment.deliveryFeeCents != null
-      ? fulfillment.deliveryFeeCents / 100
+  const deliveryFeeCents =
+    fulfillment.serviceType === 'delivery'
+      ? quote.delivery_fee_cents ?? fulfillment.deliveryFeeCents ?? 0
       : 0;
-  const orderTotalCents = quote.total_cents + (fulfillment.deliveryFeeCents ?? 0);
+  const deliveryFee = deliveryFeeCents / 100;
+  const deliveryFeeWaived =
+    fulfillment.serviceType === 'delivery' &&
+    (quote.coupon?.type === 'free_shipping' || (quote.coupon?.waived_delivery_cents ?? 0) > 0);
+  const couponDiscountCents = quote.coupon?.discount_cents ?? 0;
+  const couponDiscount = couponDiscountCents / 100;
+  const couponLabel = quote.coupon?.code ?? appliedCouponCode;
+  const orderTotalCents = quote.total_cents + deliveryFeeCents;
   const showCashDenomination = needsCashDenomination(fulfillment);
   const cashDenominationValid =
     !showCashDenomination ||
@@ -605,7 +644,12 @@ export function PublicMenuCheckoutSummary({
       promotionsById,
       itemCount,
     });
-    const payload = buildPublicOrderInput(lines, fulfillment, orderId);
+    const payload = buildPublicOrderInput(
+      lines,
+      fulfillment,
+      orderId,
+      quote.coupon?.code ?? null,
+    );
 
     submitPublicOrderBackground(subdomain, payload, idempotencyKey);
     openWhatsAppOrder(whatsappPhone, message);
@@ -633,6 +677,56 @@ export function PublicMenuCheckoutSummary({
 
       <div className={styles.body}>
         <FulfillmentSummary fulfillment={fulfillment} currency={currency} />
+
+        <section className={styles.couponSection} aria-label="Código de cupón">
+          <label className={styles.couponLabel} htmlFor="checkout-coupon-code">
+            Código de cupón
+          </label>
+          <div className={styles.couponRow}>
+            <input
+              id="checkout-coupon-code"
+              className={styles.couponInput}
+              value={couponDraft}
+              onChange={(event) => onCouponDraftChange(event.target.value)}
+              placeholder="Ej. PIZZA20"
+              autoComplete="off"
+              disabled={quoteLoading}
+            />
+            <button
+              type="button"
+              className={styles.couponApplyBtn}
+              disabled={quoteLoading || !couponDraft.trim()}
+              onClick={() => void onApplyCoupon()}
+            >
+              {quoteLoading ? '…' : 'Aplicar'}
+            </button>
+          </div>
+          {quote.coupon_error ? (
+            <p className={styles.couponError} role="alert">
+              {quote.coupon_error.message}
+            </p>
+          ) : null}
+          {quote.coupon ? (
+            <div className={styles.couponChipRow}>
+              <span className={styles.couponChip}>
+                {quote.coupon.type === 'free_shipping'
+                  ? `Cupón ${quote.coupon.code} · Envío gratis`
+                  : `Cupón ${quote.coupon.code} · −${formatMoney(
+                      (quote.coupon.discount_cents + quote.coupon.waived_delivery_cents) / 100,
+                      currency,
+                    )}`}
+              </span>
+              <button
+                type="button"
+                className={styles.couponRemoveBtn}
+                onClick={() => void onRemoveCoupon()}
+                disabled={quoteLoading}
+              >
+                Quitar
+              </button>
+            </div>
+          ) : null}
+        </section>
 
         {showCashDenomination ? (
           <div className={styles.cashDenominationInline}>
@@ -665,8 +759,11 @@ export function PublicMenuCheckoutSummary({
               lineDiscountTotal={lineDiscountTotal}
               orderDiscount={orderDiscount}
               orderPromoLabel={orderPromoLabel}
+              couponDiscount={couponDiscount}
+              couponLabel={couponLabel}
               total={total}
               deliveryFee={deliveryFee}
+              deliveryFeeWaived={deliveryFeeWaived}
               variant="desktop"
             />
             {showCashDenomination ? (
@@ -695,8 +792,11 @@ export function PublicMenuCheckoutSummary({
           lineDiscountTotal={lineDiscountTotal}
           orderDiscount={orderDiscount}
           orderPromoLabel={orderPromoLabel}
+          couponDiscount={couponDiscount}
+          couponLabel={couponLabel}
           total={total}
           deliveryFee={deliveryFee}
+          deliveryFeeWaived={deliveryFeeWaived}
           variant="mobile"
         />
         <SendOrderButton

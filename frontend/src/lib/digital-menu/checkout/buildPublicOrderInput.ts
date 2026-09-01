@@ -10,6 +10,7 @@ export function buildPublicOrderInput(
   lines: PublicMenuCartLine[],
   fulfillment: CheckoutFulfillment,
   orderId?: string,
+  couponCode?: string | null,
 ): PublicOrderInput {
   const noteParts: string[] = [];
 
@@ -34,6 +35,8 @@ export function buildPublicOrderInput(
       ? fulfillment.deliveryFeeCents
       : 0;
 
+  const normalizedCoupon = couponCode?.trim().toUpperCase();
+
   return {
     type: fulfillment.serviceType,
     customer_name: fulfillment.customerName.trim(),
@@ -50,6 +53,7 @@ export function buildPublicOrderInput(
         ? fulfillment.cashDenominationCents
         : undefined,
     note: noteParts.length > 0 ? noteParts.join(' | ') : undefined,
+    coupon_code: normalizedCoupon ? normalizedCoupon : undefined,
     items: lines.map((line) => ({
       product_id: line.productId,
       quantity: line.quantity,

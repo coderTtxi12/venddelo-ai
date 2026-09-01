@@ -231,6 +231,18 @@ export function PublicMenuCart({
   const [availabilityChecked, setAvailabilityChecked] = useState(false);
   const [displayedIssues, setDisplayedIssues] = useState<CartAvailabilityIssue[]>([]);
   const [continueLoading, setContinueLoading] = useState(false);
+  const [couponDraft, setCouponDraft] = useState('');
+  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
+
+  const quoteContext = useMemo(() => {
+    if (checkoutStep === 'cart') return undefined;
+    return {
+      couponCode: appliedCouponCode,
+      serviceType: fulfillment.serviceType,
+      deliveryFeeCents:
+        fulfillment.serviceType === 'delivery' ? fulfillment.deliveryFeeCents ?? 0 : 0,
+    };
+  }, [appliedCouponCode, checkoutStep, fulfillment.deliveryFeeCents, fulfillment.serviceType]);
 
   const handleFulfillmentChange = (next: CheckoutFulfillment) => {
     setFulfillment(next);
@@ -245,7 +257,7 @@ export function PublicMenuCart({
     loading: quoteLoading,
     error: quoteError,
     applyPromotions,
-  } = useCheckoutCartQuote(subdomain, lines, validProductIds);
+  } = useCheckoutCartQuote(subdomain, lines, validProductIds, quoteContext);
 
   const subtotal = displaySubtotalCents / 100;
   const subtotalBefore =
@@ -288,7 +300,14 @@ export function PublicMenuCart({
     setAvailabilityChecked(false);
     setDisplayedIssues([]);
     setContinueLoading(false);
+    setCouponDraft('');
+    setAppliedCouponCode(null);
   }, [linesKey, subdomain]);
+
+  useEffect(() => {
+    if (checkoutStep !== 'summary' || !promosApplied) return;
+    void applyPromotions();
+  }, [checkoutStep, quoteContext, promosApplied, applyPromotions]);
 
   const revealAvailabilityIssues = (issues: CartAvailabilityIssue[]) => {
     setDisplayedIssues(issues);
@@ -380,6 +399,31 @@ export function PublicMenuCart({
         currency={currency}
         fulfillment={fulfillment}
         onFulfillmentChange={handleFulfillmentChange}
+        couponDraft={couponDraft}
+        onCouponDraftChange={setCouponDraft}
+        appliedCouponCode={appliedCouponCode}
+        onApplyCoupon={async () => {
+          const nextCode = couponDraft.trim().toUpperCase();
+          if (!nextCode) return;
+          setAppliedCouponCode(nextCode);
+          await applyPromotions({
+            couponCode: nextCode,
+            serviceType: fulfillment.serviceType,
+            deliveryFeeCents:
+              fulfillment.serviceType === 'delivery' ? fulfillment.deliveryFeeCents ?? 0 : 0,
+          });
+        }}
+        onRemoveCoupon={async () => {
+          setCouponDraft('');
+          setAppliedCouponCode(null);
+          await applyPromotions({
+            couponCode: null,
+            serviceType: fulfillment.serviceType,
+            deliveryFeeCents:
+              fulfillment.serviceType === 'delivery' ? fulfillment.deliveryFeeCents ?? 0 : 0,
+          });
+        }}
+        quoteLoading={quoteLoading}
         onBack={() => setCheckoutStep('fulfillment')}
         onOrderSent={onOrderSent}
         isTabletLayout={isTabletLayout}
