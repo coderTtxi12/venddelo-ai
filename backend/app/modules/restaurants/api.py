@@ -3,7 +3,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.api.cache_helpers import notify_digital_menu_preview_changed
+from app.api.cache_helpers import (
+    invalidate_restaurant_menu_cache,
+    notify_digital_menu_preview_changed,
+)
 from app.api.deps import (
     get_synced_user,
     pagination_params,
@@ -36,13 +39,6 @@ from app.modules.restaurants.network_printer import (
     send_raw_escpos,
     validate_printer_target,
 )
-from app.modules.restaurants.system_printer import (
-    SystemPrinterDiscoverDTO,
-    SystemPrinterPrintRequest,
-    list_system_printers,
-    send_to_system_printer,
-    validate_system_printer_name,
-)
 from app.modules.restaurants.schemas import (
     PaymentMethodCreate,
     PaymentMethodDTO,
@@ -60,6 +56,13 @@ from app.modules.restaurants.schemas import (
     SubdomainAvailabilityDTO,
 )
 from app.modules.restaurants.service import RestaurantService
+from app.modules.restaurants.system_printer import (
+    SystemPrinterDiscoverDTO,
+    SystemPrinterPrintRequest,
+    list_system_printers,
+    send_to_system_printer,
+    validate_system_printer_name,
+)
 from app.modules.users.schemas import UserDTO
 
 router = APIRouter(prefix="/restaurants", tags=["restaurants"])
@@ -363,10 +366,18 @@ def update_restaurant(
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: RestaurantService = Depends(_service),
     partnership: DeliveryPartnershipService = Depends(_partnership_service),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> RestaurantDTO:
     updated = service.update(restaurant.id, data)
     _maybe_request_mexy_delivery_on_enable(restaurant, updated, partnership)
-    notify_digital_menu_preview_changed(restaurant.id)
+    inventory_settings_changed = (
+        restaurant.live_menu_inventory_enabled != updated.live_menu_inventory_enabled
+        or restaurant.low_stock_threshold != updated.low_stock_threshold
+    )
+    if inventory_settings_changed:
+        invalidate_restaurant_menu_cache(uow, restaurant.id)
+    else:
+        notify_digital_menu_preview_changed(restaurant.id)
     return updated
 
 
