@@ -1146,6 +1146,37 @@
   white-space: pre-wrap;
 }
 
+.stockWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  border-left: 4px solid #b45309;
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  background: color-mix(in srgb, #b45309 10%, var(--color-surface));
+  color: var(--color-text);
+}
+
+.stockWarning svg {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  color: #b45309;
+}
+
+.stockWarningTitle {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.stockWarningText {
+  margin: 0.2rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--color-text);
+}
+
 .detailActions {
   flex-shrink: 0;
   display: flex;

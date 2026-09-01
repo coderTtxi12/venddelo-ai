@@ -177,6 +177,36 @@
   color: #475569;
 }
 
+.codeCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.iconGhostBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 0.15rem;
+  border-radius: 8px;
+}
+
+.iconGhostBtn:hover {
+  color: var(--color-primary);
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.copiedHint {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #15803d;
+}
+
 .empty {
   border: 1px dashed var(--color-border);
   border-radius: 14px;

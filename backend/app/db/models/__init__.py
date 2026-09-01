@@ -34,6 +34,12 @@ from app.db.models.menu import (
     Product,
     product_categories,
 )
+from app.db.models.coupons import (
+    Coupon,
+    CouponRedemption,
+    coupon_categories,
+    coupon_products,
+)
 from app.db.models.orders import Order, OrderItem
 from app.db.models.promotions import (
     Promotion,
@@ -69,6 +75,10 @@ __all__ = [
     "Promotion",
     "promotion_products",
     "promotion_categories",
+    "Coupon",
+    "CouponRedemption",
+    "coupon_products",
+    "coupon_categories",
     "Order",
     "OrderItem",
     "DeliveryProvider",

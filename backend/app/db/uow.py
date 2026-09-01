@@ -19,6 +19,7 @@ from app.modules.digital_menu_themes.repository import DigitalMenuThemeRepositor
 from app.modules.marketing.adapters import SqlAlchemyMarketingRepository
 from app.modules.menu.adapters import SqlAlchemyMenuRepository
 from app.modules.orders.adapters import SqlAlchemyOrderRepository
+from app.modules.coupons.adapters import SqlAlchemyCouponRepository
 from app.modules.promotions.adapters import SqlAlchemyPromotionRepository
 from app.modules.restaurants.adapters import SqlAlchemyRestaurantRepository
 from app.modules.translations.adapters import SqlAlchemyTranslationRepository
@@ -60,6 +61,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.orders = SqlAlchemyOrderRepository(self.session)
         self.analytics = SqlAlchemyAnalyticsRepository(self.session)
         self.promotions = SqlAlchemyPromotionRepository(self.session)
+        self.coupons = SqlAlchemyCouponRepository(self.session)
         self.marketing = SqlAlchemyMarketingRepository(self.session)
         self.translations = SqlAlchemyTranslationRepository(self.session)
         self.digital_menu_themes = DigitalMenuThemeRepository(self.session)

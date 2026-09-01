@@ -28,8 +28,12 @@ const sampleOrder: Order = {
   discount_cents: 0,
   total_cents: 12000,
   applied_order_promotion_id: null,
-  applied_order_discounts: [],
-  status: 'pending',
+    applied_order_discounts: [],
+    applied_coupon_id: null,
+    applied_coupon_code: null,
+    coupon_discount_cents: 0,
+    coupon_waived_delivery_cents: 0,
+    status: 'pending',
   delivery_address: null,
   delivery_latitude: null,
   delivery_longitude: null,
@@ -99,6 +103,17 @@ describe('searchDashboard', () => {
     });
 
     expect(hits.some((hit) => hit.kind === 'order')).toBe(true);
+  });
+
+  it('finds cupones page', () => {
+    const hits = searchDashboard({
+      query: 'cupones',
+      products: [],
+      categories: [],
+      orders: [],
+    });
+
+    expect(hits.some((hit) => hit.href === '/cupones')).toBe(true);
   });
 
   it('returns empty results for blank query', () => {

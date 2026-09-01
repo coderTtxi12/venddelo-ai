@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { quoteCart, type CartQuote } from '@/lib/api/public';
 import { ApiError } from '@/lib/api/types';
-import { cartLinesToQuoteInput } from './cartQuotePayload';
+import { cartLinesToQuoteInput, type CartQuoteContext } from './cartQuotePayload';
 import { cartSubtotalCents } from './cartMath';
 import type { PublicMenuCartLine } from './types';
 
@@ -20,6 +20,7 @@ export function useCheckoutCartQuote(
   subdomain: string,
   lines: PublicMenuCartLine[],
   validProductIds: ReadonlySet<string> | null,
+  quoteContext?: CartQuoteContext,
 ) {
   const [quote, setQuote] = useState<CartQuote | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,33 +46,41 @@ export function useCheckoutCartQuote(
     [lines],
   );
 
+  const contextKey = useMemo(() => JSON.stringify(quoteContext ?? {}), [quoteContext]);
+
   useEffect(() => {
     setQuote(null);
     setError(null);
     setLoading(false);
   }, [linesKey]);
 
-  const applyPromotions = useCallback(async (): Promise<CartQuote | null> => {
-    if (lines.length === 0) return null;
+  const applyPromotions = useCallback(
+    async (contextOverride?: CartQuoteContext): Promise<CartQuote | null> => {
+      if (lines.length === 0) return null;
 
-    setLoading(true);
-    setError(null);
+      setLoading(true);
+      setError(null);
 
-    try {
-      const result = await quoteCart(subdomain, cartLinesToQuoteInput(lines));
-      setQuote(result);
-      setLoading(false);
-      return result;
-    } catch (err: unknown) {
-      if (!(err instanceof ApiError && err.httpStatus === 404)) {
-        console.error(err);
+      try {
+        const result = await quoteCart(
+          subdomain,
+          cartLinesToQuoteInput(lines, contextOverride ?? quoteContext),
+        );
+        setQuote(result);
+        setLoading(false);
+        return result;
+      } catch (err: unknown) {
+        if (!(err instanceof ApiError && err.httpStatus === 404)) {
+          console.error(err);
+        }
+        setQuote(null);
+        setError(quoteErrorMessage(err));
+        setLoading(false);
+        return null;
       }
-      setQuote(null);
-      setError(quoteErrorMessage(err));
-      setLoading(false);
-      return null;
-    }
-  }, [lines, subdomain]);
+    },
+    [contextKey, lines, quoteContext, subdomain],
+  );
 
   const quotedLineTotalsCents = useMemo(() => {
     if (!quote) return null;

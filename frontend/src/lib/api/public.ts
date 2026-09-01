@@ -55,6 +55,18 @@ export type CartQuoteLine = {
   promo_warnings?: string[];
 };
 
+export type CartQuoteCoupon = {
+  code: string;
+  type: CouponType;
+  discount_cents: number;
+  waived_delivery_cents: number;
+};
+
+export type CartQuoteCouponError = {
+  code: string;
+  message: string;
+};
+
 export type CartQuote = {
   server_now: string;
   timezone: string;
@@ -63,6 +75,9 @@ export type CartQuote = {
   order_discount_cents: number;
   total_cents: number;
   applied_order_promotion_id: string | null;
+  delivery_fee_cents?: number;
+  coupon: CartQuoteCoupon | null;
+  coupon_error: CartQuoteCouponError | null;
 };
 
 export type CartQuoteInput = {
@@ -71,6 +86,9 @@ export type CartQuoteInput = {
     quantity: number;
     selected_options?: Record<string, string[]>;
   }[];
+  coupon_code?: string | null;
+  service_type?: 'takeout' | 'delivery' | null;
+  delivery_fee_cents?: number;
 };
 
 export type PublicCheckoutPaymentMethod = {
@@ -129,6 +147,7 @@ export type PublicOrderInput = {
   cash_denomination_cents?: number;
   note?: string;
   items: PublicOrderItemInput[];
+  coupon_code?: string | null;
 };
 
 export function getPublicRestaurant(subdomain: string, requestOptions?: RequestOptions) {

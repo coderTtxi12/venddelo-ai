@@ -137,6 +137,14 @@ const STATIC_ITEMS: Omit<DashboardSearchItem, 'score'>[] = [
     href: '/marketing',
   },
   {
+    id: 'page:cupones',
+    kind: 'page',
+    title: 'Cupones',
+    subtitle: 'Códigos de descuento',
+    keywords: ['cupones', 'cupon', 'codigo', 'descuento', 'coupon', 'codes'],
+    href: '/cupones',
+  },
+  {
     id: 'page:settings',
     kind: 'page',
     title: 'Configuración',

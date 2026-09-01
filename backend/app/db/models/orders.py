@@ -46,6 +46,16 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("promotions.id", ondelete="SET NULL"),
         nullable=True,
     )
+    applied_coupon_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("coupons.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    applied_coupon_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    coupon_discount_cents: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    coupon_waived_delivery_cents: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
     applied_order_discounts: Mapped[list[Any]] = mapped_column(
         JSONB, nullable=False, server_default="[]"
     )

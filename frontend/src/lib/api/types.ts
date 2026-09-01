@@ -261,6 +261,31 @@ export type Promotion = {
   option_item_ids?: string[];
 };
 
+export type CouponType = 'percent' | 'amount' | 'free_shipping';
+export type CouponScope = 'all' | 'category' | 'product';
+export type CouponEffectiveStatus = 'active' | 'inactive' | 'expired' | 'sold_out';
+
+export type Coupon = {
+  id: string;
+  restaurant_id: string;
+  code: string;
+  name: string;
+  type: CouponType;
+  percent: number | null;
+  amount_cents: number | null;
+  scope: CouponScope;
+  stock_qty: number | null;
+  expires_on: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  product_ids: string[];
+  category_ids: string[];
+  redeemed_count: number;
+  remaining_qty: number | null;
+  effective_status: CouponEffectiveStatus | null;
+};
+
 export type OrderStatus =
   | 'pending'
   | 'confirmed'
@@ -321,6 +346,12 @@ export type Order = {
   total_cents: number;
   applied_order_promotion_id: string | null;
   applied_order_discounts: AppliedOrderDiscount[];
+  applied_coupon_id: string | null;
+  applied_coupon_code: string | null;
+  coupon_discount_cents: number;
+  coupon_waived_delivery_cents: number;
+  coupon_stock_qty?: number | null;
+  coupon_redeemed_count?: number | null;
   status: OrderStatus;
   delivery_address: string | null;
   delivery_latitude: number | null;

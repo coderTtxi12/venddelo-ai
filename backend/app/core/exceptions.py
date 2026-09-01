@@ -30,3 +30,9 @@ class ConflictError(DomainError):
 class ValidationError(DomainError):
     http_status = 400
     code = "validation_error"
+
+
+class CouponValidationError(ValidationError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
