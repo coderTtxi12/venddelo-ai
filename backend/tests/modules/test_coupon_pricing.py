@@ -48,9 +48,11 @@ def _coupon(**overrides) -> CouponInput:
         product_ids=[],
         category_ids=[],
         stock_qty=None,
+        starts_on=None,
         expires_on=None,
         is_active=True,
         redemption_count=0,
+        recurrence_weekdays=None,
     )
     data.update(overrides)
     return CouponInput(**data)
@@ -58,6 +60,7 @@ def _coupon(**overrides) -> CouponInput:
 
 def test_normalize_coupon_code_upper_and_trim():
     assert normalize_coupon_code("  pizza20 ") == "PIZZA20"
+    assert normalize_coupon_code("pi zza 20") == "PIZZA20"
     assert normalize_coupon_code("") is None
     assert normalize_coupon_code(None) is None
 
@@ -203,3 +206,57 @@ def test_inactive_and_not_applicable():
     )
     assert scoped.error_code == "coupon_not_applicable"
     assert scoped.error_message == "Este cupón no aplica a los productos de tu carrito"
+
+
+def test_weekday_restriction_blocks_wrong_day():
+    pizza = _product()
+    coupon = _coupon(recurrence_weekdays=[0])  # Monday only
+    # 2026-09-01 is a Tuesday in America/Mexico_City
+    result = apply_coupon(
+        lines=[_line(pizza.id, 10000)],
+        products_by_id={pizza.id: pizza},
+        coupon=coupon,
+        food_total_cents=10000,
+        service_type="takeout",
+        delivery_fee_cents=0,
+        now_utc=datetime(2026, 9, 1, 18, 0, tzinfo=UTC),
+        tz=ZoneInfo("America/Mexico_City"),
+    )
+    assert result.ok is False
+    assert result.error_code == "coupon_wrong_day"
+    assert result.error_message == "Este cupón solo aplica el lunes"
+
+
+def test_starts_on_blocks_before_start_date():
+    pizza = _product()
+    coupon = _coupon(starts_on=date(2026, 9, 5))
+    result = apply_coupon(
+        lines=[_line(pizza.id, 10000)],
+        products_by_id={pizza.id: pizza},
+        coupon=coupon,
+        food_total_cents=10000,
+        service_type="takeout",
+        delivery_fee_cents=0,
+        now_utc=datetime(2026, 9, 1, 18, 0, tzinfo=UTC),
+        tz=ZoneInfo("America/Mexico_City"),
+    )
+    assert result.ok is False
+    assert result.error_code == "coupon_not_started"
+    assert result.error_message == "Este cupón inicia el 05/09/2026"
+
+
+def test_starts_on_allows_on_or_after_start_date():
+    pizza = _product()
+    coupon = _coupon(recurrence_weekdays=[1])  # Tuesday
+    result = apply_coupon(
+        lines=[_line(pizza.id, 10000)],
+        products_by_id={pizza.id: pizza},
+        coupon=coupon,
+        food_total_cents=10000,
+        service_type="takeout",
+        delivery_fee_cents=0,
+        now_utc=datetime(2026, 9, 1, 18, 0, tzinfo=UTC),
+        tz=ZoneInfo("America/Mexico_City"),
+    )
+    assert result.ok is True
+    assert result.discount_cents == 2000

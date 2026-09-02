@@ -58,6 +58,8 @@ def _coupon(**overrides) -> CouponInput:
         expires_on=None,
         is_active=True,
         redemption_count=0,
+        recurrence_weekdays=None,
+        starts_on=None,
     )
     data.update(overrides)
     return CouponInput(**data)

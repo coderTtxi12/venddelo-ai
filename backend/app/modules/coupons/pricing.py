@@ -15,7 +15,42 @@ COUPON_ERROR_MESSAGES = {
     "coupon_sold_out": "Este cupón ya no tiene existencias",
     "coupon_not_applicable": "Este cupón no aplica a los productos de tu carrito",
     "coupon_delivery_only": "Este cupón es solo para envío a domicilio",
+    "coupon_wrong_day": "Este cupón no aplica hoy",
+    "coupon_not_started": "Este cupón aún no está vigente",
 }
+
+_WEEKDAY_NAMES_ES = [
+    "lunes",
+    "martes",
+    "miércoles",
+    "jueves",
+    "viernes",
+    "sábado",
+    "domingo",
+]
+
+
+def format_weekday_list_es(weekdays: list[int]) -> str:
+    names = [_WEEKDAY_NAMES_ES[day] for day in sorted(weekdays) if 0 <= day <= 6]
+    if not names:
+        return ""
+    if len(names) == 1:
+        return f"el {names[0]}"
+    if len(names) == 2:
+        return f"los {names[0]} y {names[1]}"
+    return f"los {', '.join(names[:-1])} y {names[-1]}"
+
+
+def coupon_not_started_message(starts_on: date) -> str:
+    formatted = starts_on.strftime("%d/%m/%Y")
+    return f"Este cupón inicia el {formatted}"
+
+
+def coupon_wrong_day_message(weekdays: list[int]) -> str:
+    days = format_weekday_list_es(weekdays)
+    if not days:
+        return COUPON_ERROR_MESSAGES["coupon_wrong_day"]
+    return f"Este cupón solo aplica {days}"
 
 
 @dataclass(frozen=True)
@@ -29,7 +64,9 @@ class CouponInput:
     product_ids: list[uuid.UUID]
     category_ids: list[uuid.UUID]
     stock_qty: int | None
+    starts_on: date | None
     expires_on: date | None
+    recurrence_weekdays: list[int] | None
     is_active: bool
     redemption_count: int
 
@@ -124,15 +161,21 @@ def compose_quote_coupon(
 def normalize_coupon_code(raw: str | None) -> str | None:
     if raw is None:
         return None
-    code = raw.strip().upper()
+    code = "".join(raw.split()).upper()
     return code or None
 
 
-def _fail(code: str, food_total_cents: int, delivery_fee_cents: int) -> CouponApplyResult:
+def _fail(
+    code: str,
+    food_total_cents: int,
+    delivery_fee_cents: int,
+    *,
+    message: str | None = None,
+) -> CouponApplyResult:
     return CouponApplyResult(
         ok=False,
         error_code=code,
-        error_message=COUPON_ERROR_MESSAGES[code],
+        error_message=message or COUPON_ERROR_MESSAGES[code],
         coupon_id=None,
         code=None,
         type=None,
@@ -183,9 +226,25 @@ def apply_coupon(
     if not coupon.is_active:
         return _fail("coupon_inactive", food_total_cents, delivery_fee_cents)
     aware = now_utc if now_utc.tzinfo else now_utc.replace(tzinfo=UTC)
-    local_day = aware.astimezone(tz).date()
+    local = aware.astimezone(tz)
+    local_day = local.date()
+    if coupon.starts_on is not None and local_day < coupon.starts_on:
+        return _fail(
+            "coupon_not_started",
+            food_total_cents,
+            delivery_fee_cents,
+            message=coupon_not_started_message(coupon.starts_on),
+        )
     if coupon.expires_on is not None and local_day > coupon.expires_on:
         return _fail("coupon_expired", food_total_cents, delivery_fee_cents)
+    weekdays = coupon.recurrence_weekdays or []
+    if weekdays and local.weekday() not in weekdays:
+        return _fail(
+            "coupon_wrong_day",
+            food_total_cents,
+            delivery_fee_cents,
+            message=coupon_wrong_day_message(weekdays),
+        )
     if coupon.stock_qty is not None and coupon.redemption_count >= coupon.stock_qty:
         return _fail("coupon_sold_out", food_total_cents, delivery_fee_cents)
     eligible = 0
