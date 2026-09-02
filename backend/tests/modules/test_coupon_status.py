@@ -5,10 +5,12 @@ from app.modules.coupons.status import coupon_effective_status, remaining_qty
 
 def test_status_priority():
     today = date(2026, 9, 1)
-    assert coupon_effective_status(False, None, None, 0, today) == "inactive"
-    assert coupon_effective_status(True, date(2026, 8, 31), None, 0, today) == "expired"
-    assert coupon_effective_status(True, None, 10, 10, today) == "sold_out"
-    assert coupon_effective_status(True, date(2026, 9, 1), 10, 3, today) == "active"
+    assert coupon_effective_status(False, None, None, None, 0, today) == "inactive"
+    assert coupon_effective_status(True, None, date(2026, 8, 31), None, 0, today) == "expired"
+    assert coupon_effective_status(True, date(2026, 9, 2), None, None, 0, today) == "scheduled"
+    assert coupon_effective_status(True, None, None, 10, 10, today) == "sold_out"
+    assert coupon_effective_status(True, date(2026, 9, 1), date(2026, 9, 1), 10, 3, today) == "active"
+    assert coupon_effective_status(True, date(2026, 8, 31), None, None, 0, today) == "active"
 
 
 def test_remaining_qty():

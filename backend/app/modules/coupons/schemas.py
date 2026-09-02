@@ -17,7 +17,9 @@ class CouponCreate(BaseModel):
     amount_cents: int | None = None
     scope: str
     stock_qty: int | None = None
+    starts_on: date | None = None
     expires_on: date | None = None
+    recurrence_weekdays: list[int] | None = None
     is_active: bool = True
     product_ids: list[uuid.UUID] = Field(default_factory=list)
     category_ids: list[uuid.UUID] = Field(default_factory=list)
@@ -31,7 +33,9 @@ class CouponUpdate(BaseModel):
     amount_cents: int | None = None
     scope: str | None = None
     stock_qty: int | None = None
+    starts_on: date | None = None
     expires_on: date | None = None
+    recurrence_weekdays: list[int] | None = None
     is_active: bool | None = None
     product_ids: list[uuid.UUID] | None = None
     category_ids: list[uuid.UUID] | None = None
@@ -49,7 +53,9 @@ class CouponDTO(BaseModel):
     amount_cents: int | None = None
     scope: str
     stock_qty: int | None = None
+    starts_on: date | None = None
     expires_on: date | None = None
+    recurrence_weekdays: list[int] | None = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -58,3 +64,14 @@ class CouponDTO(BaseModel):
     redeemed_count: int = 0
     remaining_qty: int | None = None
     effective_status: CouponEffectiveStatus | None = None
+
+
+class CouponApplicationDTO(BaseModel):
+    order_id: uuid.UUID
+    customer_name: str
+    customer_phone: str
+    status: str
+    total_cents: int
+    coupon_discount_cents: int
+    created_at: datetime
+    redeemed: bool = False
