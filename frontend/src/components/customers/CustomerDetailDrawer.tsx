@@ -258,7 +258,7 @@ function DeliveryActivityDetail({
           </div>
         ) : null}
         <p className={styles.deliveryDetailHint}>
-          Los envíos manuales no incluyen detalle de productos como los pedidos del menú digital.
+          Los pedidos manuales no incluyen detalle de productos como los del menú digital.
         </p>
       </div>
     </div>
@@ -546,7 +546,7 @@ export function CustomerDetailDrawer({
               <div
                 className={styles.splitBar}
                 role="img"
-                aria-label={`${summary.menuCount} del menú digital y ${summary.deliveryCount} de delivery manual`}
+                aria-label={`${summary.menuCount} del menú digital y ${summary.deliveryCount} de pedido manual`}
               >
                 <span
                   className={styles.splitMenu}

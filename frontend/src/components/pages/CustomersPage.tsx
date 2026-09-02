@@ -406,7 +406,7 @@ export default function CustomersPage() {
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Clientes</h1>
-          <p className={styles.subtitle}>Agrupados por celular, del menú digital y de delivery.</p>
+          <p className={styles.subtitle}>Agrupados por celular, del menú digital y pedidos manuales.</p>
         </div>
         <section className={styles.metrics} aria-label="Resumen de clientes">
           <div className={styles.metric}>
@@ -423,7 +423,7 @@ export default function CustomersPage() {
           </div>
           <div className={styles.metric}>
             <span className={styles.metricValue}>{stats.delivery_customers}</span>
-            <span className={styles.metricLabel}>Delivery</span>
+            <span className={styles.metricLabel}>Manual</span>
           </div>
         </section>
       </header>
@@ -546,7 +546,7 @@ export default function CustomersPage() {
         <div className={styles.empty}>
           <h2 className={styles.emptyTitle}>Aún no hay clientes</h2>
           <p className={styles.emptyText}>
-            Cuando alguien pida por el menú digital o envíes un delivery, aparecerá aquí.
+            Cuando alguien pida por el menú digital o registres un pedido manual, aparecerá aquí.
           </p>
         </div>
       ) : emptySearch ? (
