@@ -114,6 +114,15 @@
   background: color-mix(in srgb, var(--color-text) 4%, transparent);
 }
 
+.addressActionBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.addressActionBtn:disabled:hover {
+  background: transparent;
+}
+
 .addressText {
   margin: 0;
   font-size: 0.86rem;
@@ -337,14 +346,6 @@
 }
 
 .chartModeToggle {
-  display: inline-flex;
-  padding: 0.15rem;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-text) 2%, var(--color-surface));
-}
-
-.chartModeBtn {
   border: none;
   background: transparent;
   color: var(--color-text-secondary);
@@ -355,10 +356,29 @@
   cursor: pointer;
 }
 
-.chartModeBtnOn {
-  background: var(--color-surface);
-  color: var(--color-text);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 8%, transparent);
+.chartModeGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  width: 100%;
+}
+
+.chartModeGroup :global(.MuiToggleButtonGroup-grouped) {
+  border: 1px solid var(--color-border) !important;
+  border-radius: 999px !important;
+  margin: 0 !important;
+  min-height: 2.25rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: none;
+  color: var(--color-text-secondary);
+}
+
+.chartModeGroup :global(.MuiToggleButton-root.Mui-selected) {
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface)) !important;
+  color: var(--color-text) !important;
 }
 
 .rangeFields {
@@ -400,13 +420,19 @@
 
 .activityChart {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(2.4rem, 1fr);
   gap: 0.35rem;
   align-items: end;
   overflow-x: auto;
   padding-bottom: 0.15rem;
   -webkit-overflow-scrolling: touch;
+  min-width: 100%;
+}
+
+.activityChartCompact .chartLabel {
+  font-size: 0.58rem;
+  line-height: 1.1;
+  white-space: normal;
+  max-width: 2.75rem;
 }
 
 .chartCol {
@@ -464,7 +490,10 @@
   font-weight: 500;
   color: var(--color-text-secondary);
   text-align: center;
-  white-space: nowrap;
+  line-height: 1.15;
+  max-width: 4.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chartHint,
@@ -481,18 +510,216 @@
 
 .historyHeader {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+
+.historyHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
 }
 
 .historyHeader .historyTitle {
   margin: 0;
 }
 
-.historySort {
-  min-width: 9rem;
+.historyMeta {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.historySortSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.historySortLabel {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.historySortGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.historySortGroup :global(.MuiToggleButtonGroup-grouped) {
+  border: 1px solid var(--color-border) !important;
+  border-radius: 999px !important;
+  margin: 0 !important;
+  min-height: 2.5rem;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-transform: none;
+  color: var(--color-text-secondary);
+}
+
+.historySortGroup :global(.MuiToggleButton-root.Mui-selected) {
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface)) !important;
+  color: var(--color-text) !important;
+}
+
+.historySortToggle {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  flex: 1 1 calc(50% - 0.2rem);
+  min-width: 0;
+}
+
+.historySortTextLong,
+.historySortTextShort {
+  line-height: 1.1;
+}
+
+.historySortTextShort {
+  display: none;
+}
+
+@media (min-width: 560px) {
+  .historySortToggle {
+    flex: 1 1 auto;
+  }
+}
+
+.historyPagination {
+  margin-top: 0.75rem;
+}
+
+.activityItem {
+  width: 100%;
+  padding: 0.75rem 0;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.activityItem:hover {
+  background: color-mix(in srgb, var(--color-text) 3%, transparent);
+}
+
+.activityChevron {
+  margin-left: 0.25rem;
+  vertical-align: middle;
+  color: var(--color-text-secondary);
+}
+
+.orderDetailShell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.orderDetailNav {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.orderDetailBack {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.orderDetailHeading {
+  min-width: 0;
+}
+
+.orderDetailTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.orderDetailSub {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.deliveryDetailCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.deliveryDetailRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.deliveryDetailBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.deliveryDetailLabel {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.deliveryDetailAddress {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.deliveryDetailMaps {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: fit-content;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.deliveryDetailHint {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--color-text-secondary);
 }
 
 .history {
@@ -505,11 +732,6 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-}
-
-.activityItem {
-  padding: 0.75rem 0;
-  border-top: 1px solid var(--color-border);
 }
 
 .activityTop,
@@ -675,9 +897,17 @@
     align-items: stretch;
   }
 
-  .historySort {
-    min-width: 0;
-    width: 100%;
+  .historySortToggle {
+    flex: 1 1 calc(50% - 0.2rem);
+    min-height: 2.75rem;
+  }
+
+  .historySortTextLong {
+    display: none;
+  }
+
+  .historySortTextShort {
+    display: inline;
   }
 
   .rangeFields {

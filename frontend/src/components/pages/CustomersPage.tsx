@@ -18,13 +18,11 @@ import { CustomerDetailDrawer } from '@/components/customers/CustomerDetailDrawe
 import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  getRestaurantCustomerActivity,
   listRestaurantCustomers,
   type CustomerSort,
   type CustomerSortOrder,
   type CustomerSource,
   type RestaurantCustomer,
-  type RestaurantCustomerActivity,
   type RestaurantCustomerStats,
 } from '@/lib/api/customers';
 import { ApiError } from '@/lib/api/types';
@@ -257,11 +255,10 @@ export default function CustomersPage() {
   const [recency, setRecency] = useState<CustomerRecencyFilter>('all');
   const [sort, setSort] = useState<CustomerSort>('last_at');
   const [order, setOrder] = useState<CustomerSortOrder>('desc');
-  const [page, setPage] = useState(1);
+  const [listCursor, setListCursor] = useState<string | null>(null);
+  const [cursorStack, setCursorStack] = useState<(string | null)[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<RestaurantCustomer | null>(null);
-  const [activityByKey, setActivityByKey] = useState<
-    Record<string, RestaurantCustomerActivity | 'loading' | 'error'>
-  >({});
   const requestIdRef = useRef(0);
 
   useEffect(() => {
@@ -274,6 +271,12 @@ export default function CustomersPage() {
     [debouncedQuery, frequency, recency, source, spend],
   );
   const filtersActive = customerFiltersActive(listFilters);
+
+  const resetPagination = useCallback(() => {
+    setListCursor(null);
+    setCursorStack([]);
+    setNextCursor(null);
+  }, []);
 
   const loadCustomers = useCallback(async () => {
     if (!accessToken || !selectedRestaurantId) {
@@ -296,15 +299,16 @@ export default function CustomersPage() {
         recency: recency === 'all' ? undefined : recency,
         sort,
         order,
-        page,
+        cursor: listCursor,
       });
       if (requestId !== requestIdRef.current) return;
       setCustomers(result.items);
       setStats(result.stats);
       setTotal(result.total);
+      setNextCursor(result.next_cursor);
       setHasLoaded(true);
-      if (result.total > 0 && result.items.length === 0 && page > 1) {
-        setPage(1);
+      if (result.total > 0 && result.items.length === 0 && listCursor) {
+        resetPagination();
       }
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
@@ -322,13 +326,14 @@ export default function CustomersPage() {
     accessToken,
     debouncedQuery,
     frequency,
-    page,
+    listCursor,
     recency,
     selectedRestaurantId,
     sort,
     order,
     source,
     spend,
+    resetPagination,
   ]);
 
   useEffect(() => {
@@ -336,48 +341,46 @@ export default function CustomersPage() {
   }, [loadCustomers]);
 
   useEffect(() => {
-    setPage(1);
+    resetPagination();
     setSelectedCustomer(null);
     setHasLoaded(false);
-  }, [selectedRestaurantId]);
+  }, [selectedRestaurantId, resetPagination]);
 
   const closeDrawer = useCallback(() => setSelectedCustomer(null), []);
-
-  const loadActivity = useCallback(
-    async (phoneKey: string) => {
-      if (!accessToken || !selectedRestaurantId) return;
-      setActivityByKey((prev) => ({ ...prev, [phoneKey]: 'loading' }));
-      try {
-        const activity = await getRestaurantCustomerActivity(
-          accessToken,
-          selectedRestaurantId,
-          phoneKey,
-        );
-        setActivityByKey((prev) => ({ ...prev, [phoneKey]: activity }));
-      } catch {
-        setActivityByKey((prev) => ({ ...prev, [phoneKey]: 'error' }));
-      }
-    },
-    [accessToken, selectedRestaurantId],
-  );
 
   function selectCustomer(customer: RestaurantCustomer) {
     const next = selectedCustomer?.phone_key === customer.phone_key ? null : customer;
     setSelectedCustomer(next);
-    if (next && activityByKey[next.phone_key] == null) {
-      void loadActivity(next.phone_key);
-    }
   }
 
   function goToFirstPage() {
-    setPage(1);
+    resetPagination();
+  }
+
+  function goToNextPage() {
+    if (!nextCursor) return;
+    setCursorStack((stack) => [...stack, listCursor]);
+    setListCursor(nextCursor);
+  }
+
+  function goToPreviousPage() {
+    if (cursorStack.length === 0) return;
+    const previousCursor = cursorStack[cursorStack.length - 1] ?? null;
+    setCursorStack((stack) => stack.slice(0, -1));
+    setListCursor(previousCursor);
+  }
+
+  function handlePageChange(nextPage: number) {
+    const currentPage = cursorStack.length + 1;
+    if (nextPage < currentPage) goToPreviousPage();
+    else if (nextPage > currentPage) goToNextPage();
   }
 
   function toggleSort(column: CustomerSort) {
     const next = toggleCustomerColumnSort({ sort, order }, column);
     setSort(next.sort);
     setOrder(next.order);
-    setPage(1);
+    resetPagination();
   }
 
   function clearFilters() {
@@ -387,16 +390,16 @@ export default function CustomersPage() {
     setFrequency('all');
     setSpend('all');
     setRecency('all');
-    setPage(1);
+    resetPagination();
   }
 
+  const page = cursorStack.length + 1;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const rangeEnd = total === 0 ? 0 : Math.min(page * PAGE_SIZE, total);
+  const rangeEnd = total === 0 ? 0 : Math.min((page - 1) * PAGE_SIZE + customers.length, total);
   const showFullLoading = loading && !hasLoaded;
   const emptyAll = hasLoaded && !error && stats.unique_customers === 0;
   const emptySearch = hasLoaded && !error && stats.unique_customers > 0 && total === 0;
-  const selectedActivity = selectedCustomer ? activityByKey[selectedCustomer.phone_key] : null;
 
   return (
     <div className={styles.page}>
@@ -670,7 +673,7 @@ export default function CustomersPage() {
             pageSize={PAGE_SIZE}
             itemLabel="clientes"
             loading={loading}
-            onPageChange={setPage}
+            onPageChange={handlePageChange}
             className={styles.pagination}
           />
         </>
@@ -681,11 +684,12 @@ export default function CustomersPage() {
         title={selectedCustomer?.customer_name || 'Sin nombre'}
         onClose={closeDrawer}
       >
-        {selectedCustomer ? (
+        {selectedCustomer && accessToken && selectedRestaurantId ? (
           <CustomerDetailDrawer
+            key={selectedCustomer.phone_key}
             customer={selectedCustomer}
-            activity={selectedActivity}
-            onRetryActivity={() => void loadActivity(selectedCustomer.phone_key)}
+            accessToken={accessToken}
+            restaurantId={selectedRestaurantId}
           />
         ) : null}
       </Drawer>
