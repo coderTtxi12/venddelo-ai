@@ -1,7 +1,7 @@
 'use client';
 
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Category, Product } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
@@ -14,6 +14,10 @@ import {
   WEEKDAY_SHORT,
 } from '@/lib/promotions/promotionDraft';
 import type { PromotionTemplate } from '@/lib/promotions/templates';
+import {
+  productDiscountMenuSummary,
+  resolveProductDiscountScope,
+} from '@/lib/promotions/productDiscountScope';
 import { WEEKDAY_LABELS } from '@/lib/restaurantScheduleHours';
 import {
   CategoryProductPicker,
@@ -21,7 +25,79 @@ import {
   menuEligibleProducts,
   normalizeCategorySelection,
 } from './CategoryProductPicker';
-import styles from '../pages/MarketingPage.module.css';
+import styles from './PromotionForm.module.css';
+
+const FORM_ID = 'promotion-form';
+
+function FormSection({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className={styles.section}>
+      <div className={styles.sectionHeader}>
+        <h3 className={styles.sectionTitle}>{title}</h3>
+        {hint ? <p className={styles.sectionHint}>{hint}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function SectionShell({
+  asCard,
+  title,
+  hint,
+  children,
+}: {
+  asCard: boolean;
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  if (asCard) {
+    return (
+      <FormSection title={title} hint={hint}>
+        {children}
+      </FormSection>
+    );
+  }
+  return (
+    <fieldset className={styles.fieldset}>
+      <legend className={styles.legend}>{title}</legend>
+      {children}
+    </fieldset>
+  );
+}
+
+function ChipOption({
+  selected,
+  disabled,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className={`${styles.chip} ${selected ? styles.chipActive : ''}`}
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={selected}
+    >
+      {children}
+    </button>
+  );
+}
 
 function clampNumber(n: number, min: number, max: number): number {
   if (Number.isNaN(n)) return min;
@@ -45,6 +121,7 @@ type PromotionFormProps = {
   mode?: 'create' | 'edit';
   template?: PromotionTemplate;
   initialValues?: PromotionFormSubmitPayload | null;
+  onBackToTemplates?: () => void;
   onCancel: () => void;
   onSubmit: (payload: PromotionFormSubmitPayload) => Promise<void>;
 };
@@ -186,6 +263,7 @@ export function PromotionForm({
   mode = 'create',
   template = 'bundle',
   initialValues = null,
+  onBackToTemplates,
   onCancel,
   onSubmit,
 }: PromotionFormProps) {
@@ -236,10 +314,7 @@ export function PromotionForm({
     }
 
     if (template === 'product_discount') {
-      if (form.scope === 'product' && form.productIds.length === 0) return false;
-      if (form.scope === 'category' && !hasMenuSelection(form.categoryIds, form.productIds)) {
-        return false;
-      }
+      if (!hasMenuSelection(form.categoryIds, form.productIds)) return false;
       if (form.kind === 'percent' && (form.percent < 1 || form.percent > 100)) return false;
       if (form.kind === 'amount' && form.amount <= 0) return false;
     }
@@ -287,6 +362,16 @@ export function PromotionForm({
     return `${form.percent}%`;
   }, [form, template]);
 
+  const hasProductDiscountScope = useMemo(() => {
+    if (template !== 'product_discount') return true;
+    return hasMenuSelection(form.categoryIds, form.productIds);
+  }, [form.categoryIds, form.productIds, template]);
+
+  const productDiscountScopeSummary = useMemo(() => {
+    if (template !== 'product_discount') return null;
+    return productDiscountMenuSummary(form.categoryIds, form.productIds);
+  }, [form.categoryIds, form.productIds, template]);
+
   const promoImageUrl = storagePublicUrl(form.imagePath);
 
   async function handleImageUpload(file: File) {
@@ -303,9 +388,12 @@ export function PromotionForm({
   }
 
   return (
-    <form
-      className={styles.form}
-      onSubmit={(e) => {
+    <div className={styles.shell}>
+      <div className={styles.scroll}>
+        <form
+          id={FORM_ID}
+          className={styles.form}
+          onSubmit={(e) => {
         e.preventDefault();
         const normalized =
           form.scope === 'category'
@@ -341,6 +429,11 @@ export function PromotionForm({
                 ? {
                     ...normalized,
                     kind: normalized.kind === 'amount' ? 'amount' : 'percent',
+                    ...resolveProductDiscountScope(
+                      normalized.categoryIds,
+                      normalized.productIds,
+                      products,
+                    ),
                   }
                 : {
                     ...normalized,
@@ -350,6 +443,12 @@ export function PromotionForm({
         void onSubmit(payload as PromotionFormSubmitPayload);
       }}
     >
+      {onBackToTemplates ? (
+        <button type="button" className={styles.backLink} onClick={onBackToTemplates}>
+          ← Cambiar tipo de promoción
+        </button>
+      ) : null}
+
       <div className={styles.infoBanner} role="status">
         {template === 'bundle'
           ? 'Configura días, horarios, ofertas N×M y complementos. La promoción se aplicará en el menú público y en el carrito.'
@@ -357,19 +456,39 @@ export function PromotionForm({
             ? 'El descuento aplica cuando el cliente lleva todos los productos del combo en el carrito.'
             : template === 'order_threshold'
               ? 'El beneficio aplica al superar el monto mínimo del carrito.'
-              : 'El descuento aplica a los productos seleccionados en el menú y el carrito.'}
+              : 'El precio con descuento se muestra en el menú y se aplica automáticamente en el carrito.'}
       </div>
 
-      <div className={styles.previewCard}>
+      <div
+        className={
+          template === 'product_discount' && !hasProductDiscountScope
+            ? `${styles.previewCard} ${styles.previewCardAttention}`
+            : styles.previewCard
+        }
+      >
         <span className={styles.previewLabel}>Vista previa</span>
         <strong className={styles.previewValue}>{previewLabel}</strong>
+        {template === 'product_discount' && productDiscountScopeSummary ? (
+          <span className={styles.previewMeta}>{productDiscountScopeSummary}</span>
+        ) : null}
         {form.schedule.useWeekdays && form.schedule.weekdays.length > 0 ? (
           <span className={styles.previewMeta}>
             {form.schedule.weekdays.map((d: number) => WEEKDAY_LABELS[d]).join(' · ')}
           </span>
         ) : null}
+        {template === 'product_discount' && !hasProductDiscountScope ? (
+          <span className={styles.previewHint}>Selecciona productos o categorías abajo.</span>
+        ) : null}
       </div>
 
+      <FormSection
+        title="Identidad"
+        hint={
+          template === 'product_discount'
+            ? 'Nombre e imagen del banner que verán tus clientes en el menú.'
+            : 'Nombre e imagen que verán tus clientes en el menú.'
+        }
+      >
       <div className={styles.field}>
         <label className={styles.label} htmlFor="promo-name">
           Nombre de la promoción
@@ -379,7 +498,11 @@ export function PromotionForm({
           className={styles.input}
           value={form.name}
           onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-          placeholder="Ej. Miércoles pizza 2×1, Happy hour bebidas"
+          placeholder={
+            template === 'product_discount'
+              ? 'Ej. 20% en hamburguesas, Promo postres'
+              : 'Ej. Miércoles pizza 2×1, Happy hour bebidas'
+          }
         />
       </div>
 
@@ -446,77 +569,99 @@ export function PromotionForm({
       </div>
 
       {template !== 'order_threshold' ? (
-        <div className={styles.field}>
-          <label className={styles.label}>
-            <input
-              type="checkbox"
-              checked={form.showBanner}
-              onChange={(e) => setForm((prev) => ({ ...prev, showBanner: e.target.checked }))}
-            />{' '}
-            Mostrar banner en el menú digital
-          </label>
-        </div>
+        <label className={styles.toggleRow}>
+          <span className={styles.toggleCopy}>
+            <span className={styles.toggleLabel}>Banner en menú digital</span>
+            <span className={styles.toggleHint}>
+              Muestra un acceso directo en la portada del menú público.
+            </span>
+          </span>
+          <input
+            className={styles.toggleInput}
+            type="checkbox"
+            checked={form.showBanner}
+            onChange={(e) => setForm((prev) => ({ ...prev, showBanner: e.target.checked }))}
+          />
+        </label>
       ) : null}
+      </FormSection>
 
       {template === 'product_discount' ? (
-        <div className={styles.field}>
-          <p className={styles.label}>Tipo de descuento</p>
-          <div className={styles.presetRow}>
+        <FormSection title="Beneficio" hint="Cuánto descuentas en cada producto elegido del menú.">
+          <div className={styles.chipGrid} role="group" aria-label="Tipo de descuento">
             {(['percent', 'amount'] as const).map((kind) => (
-              <button
+              <ChipOption
                 key={kind}
-                type="button"
-                className={
-                  form.kind === kind ? `${styles.presetBtn} ${styles.presetBtnActive}` : styles.presetBtn
-                }
+                selected={form.kind === kind}
+                disabled={saving}
                 onClick={() => setForm((prev) => ({ ...prev, kind }))}
               >
                 {kind === 'percent' ? 'Porcentaje' : 'Monto fijo'}
-              </button>
+              </ChipOption>
             ))}
           </div>
           {form.kind === 'percent' ? (
-            <input
-              className={styles.input}
-              type="number"
-              min={1}
-              max={100}
-              value={form.percent}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  percent: clampNumber(Number(e.target.value), 1, 100),
-                }))
-              }
-            />
+            <label className={styles.field} htmlFor="product-discount-percent">
+              <span className={styles.label}>Porcentaje de descuento</span>
+              <div className={styles.inputWithSuffix}>
+                <input
+                  id="product-discount-percent"
+                  className={`${styles.input} ${styles.inputSuffixField}`}
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={100}
+                  value={form.percent}
+                  disabled={saving}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      percent: clampNumber(Number(e.target.value), 1, 100),
+                    }))
+                  }
+                />
+                <span className={styles.inputSuffix} aria-hidden>
+                  %
+                </span>
+              </div>
+              <p className={styles.helpText}>Entre 1% y 100%.</p>
+            </label>
           ) : (
-            <input
-              className={styles.input}
-              type="number"
-              min={0}
-              step="0.01"
-              value={form.amount}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  amount: Math.max(0, Number(e.target.value)),
-                }))
-              }
-            />
+            <label className={styles.field} htmlFor="product-discount-amount">
+              <span className={styles.label}>Monto en pesos (MXN)</span>
+              <input
+                id="product-discount-amount"
+                className={styles.input}
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                placeholder="50"
+                value={form.amount}
+                disabled={saving}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    amount: Math.max(0, Number(e.target.value)),
+                  }))
+                }
+              />
+              <p className={styles.helpText}>Se resta del precio de cada producto incluido.</p>
+            </label>
           )}
-        </div>
+        </FormSection>
       ) : null}
 
-      {template === 'combo' ? (
+      {template === 'product_discount' ? null : template === 'combo' ? (
         <div className={styles.field}>
           <p className={styles.label}>Beneficio del combo</p>
-          <div className={styles.presetRow}>
+          <div className={`${styles.chipGrid} ${styles.chipGridThree}`}>
             {(['percent', 'amount', 'free_shipping'] as const).map((kind) => (
               <button
                 key={kind}
                 type="button"
                 className={
-                  form.kind === kind ? `${styles.presetBtn} ${styles.presetBtnActive}` : styles.presetBtn
+                  form.kind === kind ? `${styles.chip} ${styles.chipActive}` : styles.chip
                 }
                 onClick={() => setForm((prev) => ({ ...prev, kind }))}
               >
@@ -560,13 +705,13 @@ export function PromotionForm({
       {template === 'order_threshold' ? (
         <div className={styles.field}>
           <p className={styles.label}>Beneficio al superar el mínimo</p>
-          <div className={styles.presetRow}>
+          <div className={`${styles.chipGrid} ${styles.chipGridThree}`}>
             {(['percent', 'amount', 'free_shipping'] as const).map((kind) => (
               <button
                 key={kind}
                 type="button"
                 className={
-                  form.kind === kind ? `${styles.presetBtn} ${styles.presetBtnActive}` : styles.presetBtn
+                  form.kind === kind ? `${styles.chip} ${styles.chipActive}` : styles.chip
                 }
                 onClick={() => setForm((prev) => ({ ...prev, kind }))}
               >
@@ -643,15 +788,15 @@ export function PromotionForm({
           <p className={styles.helpText}>
             El cliente lleva {form.bundle.getQuantity} y paga {form.bundle.payQuantity}.
           </p>
-          <div className={styles.presetRow}>
+          <div className={styles.chipGrid}>
             {BUNDLE_PRESETS.map((preset) => (
               <button
                 key={preset.label}
                 type="button"
                 className={
                   bundleMatchesPreset(form.bundle, preset)
-                    ? `${styles.presetBtn} ${styles.presetBtnActive}`
-                    : styles.presetBtn
+                    ? `${styles.chip} ${styles.chipActive}`
+                    : styles.chip
                 }
                 onClick={() =>
                   setForm((prev) => ({
@@ -717,11 +862,38 @@ export function PromotionForm({
         </div>
       ) : null}
 
-      {template !== 'order_threshold' ? (
+      {template === 'product_discount' ? (
+        <FormSection
+          title="Menú incluido"
+          hint="Marca categorías completas o productos específicos. El descuento se verá en el menú y el carrito."
+        >
+          <div className={styles.pickerWrap}>
+            <CategoryProductPicker
+              categories={categories}
+              products={products}
+              categoryIds={form.categoryIds}
+              productIds={form.productIds}
+              headerLabel="Categorías y productos"
+              helpText="Puedes seleccionar una categoría entera o expandirla para elegir productos."
+              searchPlaceholder="Buscar categoría o producto…"
+              searchInputId="product-discount-scope-search"
+              onSelectionChange={(categoryIds, productIds) =>
+                setForm((prev) => ({ ...prev, categoryIds, productIds }))
+              }
+            />
+          </div>
+
+          {!hasProductDiscountScope ? (
+            <p className={styles.scopeHint} role="status">
+              Selecciona al menos un producto o categoría para poder guardar.
+            </p>
+          ) : null}
+        </FormSection>
+      ) : template !== 'order_threshold' ? (
       <>
       <fieldset className={styles.fieldset}>
         <legend className={styles.legend}>Aplica a</legend>
-        <div className={styles.segment} role="group" aria-label="Alcance de la promoción">
+        <div className={styles.chipGrid} role="group" aria-label="Alcance de la promoción">
           {(
             template === 'combo'
               ? ([['product', 'Productos del combo']] as const)
@@ -734,7 +906,7 @@ export function PromotionForm({
               key={value}
               type="button"
               className={
-                form.scope === value ? `${styles.segmentBtn} ${styles.segmentBtnActive}` : styles.segmentBtn
+                form.scope === value ? `${styles.chip} ${styles.chipActive}` : styles.chip
               }
               onClick={() =>
                 setForm((prev) => ({
@@ -927,11 +1099,25 @@ export function PromotionForm({
         </fieldset>
       ) : null}
 
-      <fieldset className={styles.fieldset}>
-        <legend className={styles.legend}>Horario recurrente</legend>
+      <SectionShell
+        asCard={template === 'product_discount'}
+        title="Horario recurrente"
+        hint={
+          template === 'product_discount'
+            ? 'Opcional. Limita la promoción a días u horas específicas.'
+            : undefined
+        }
+      >
 
         <label className={styles.toggleRow}>
+          <span className={styles.toggleCopy}>
+            <span className={styles.toggleLabel}>Repetir en días específicos</span>
+            <span className={styles.toggleHint}>
+              Si está desactivado, aplica todos los días de la semana.
+            </span>
+          </span>
           <input
+            className={styles.toggleInput}
             type="checkbox"
             checked={form.schedule.useWeekdays}
             onChange={(e) =>
@@ -945,7 +1131,6 @@ export function PromotionForm({
               }))
             }
           />
-          <span>Repetir solo en días específicos</span>
         </label>
 
         {form.schedule.useWeekdays ? (
@@ -977,11 +1162,16 @@ export function PromotionForm({
             })}
           </div>
         ) : (
-          <p className={styles.helpText}>Si está desactivado, aplica todos los días de la semana.</p>
+          <p className={styles.helpText}>Selecciona los días en los que estará activa.</p>
         )}
 
         <label className={styles.toggleRow}>
+          <span className={styles.toggleCopy}>
+            <span className={styles.toggleLabel}>Limitar horario del día</span>
+            <span className={styles.toggleHint}>Por ejemplo, happy hour de 17:00 a 20:00.</span>
+          </span>
           <input
+            className={styles.toggleInput}
             type="checkbox"
             checked={form.schedule.useTimeWindow}
             onChange={(e) =>
@@ -991,7 +1181,6 @@ export function PromotionForm({
               }))
             }
           />
-          <span>Limitar a un horario del día</span>
         </label>
 
         {form.schedule.useTimeWindow ? (
@@ -1032,14 +1221,23 @@ export function PromotionForm({
             </div>
           </div>
         ) : null}
-      </fieldset>
+      </SectionShell>
 
-      <fieldset className={styles.fieldset}>
-        <legend className={styles.legend}>Vigencia de campaña</legend>
+      <SectionShell
+        asCard={template === 'product_discount'}
+        title="Vigencia de campaña"
+        hint={
+          template === 'product_discount'
+            ? 'Opcional. Define el periodo en que la promoción puede estar activa.'
+            : undefined
+        }
+      >
+        {template === 'product_discount' ? null : (
         <p className={styles.helpText}>
           Opcional. Ajusta cuándo puede estar activa la promoción (independiente de los días u
           horarios de arriba). Si no se especifica, la promoción estará activa siempre.
         </p>
+        )}
         <div className={styles.grid2}>
           <div>
             <label className={styles.label} htmlFor="campaign-starts">
@@ -1068,22 +1266,32 @@ export function PromotionForm({
             />
           </div>
         </div>
-      </fieldset>
+      </SectionShell>
 
-      {error ? (
-        <div className={styles.errorBanner} role="alert">
-          {error}
-        </div>
-      ) : null}
-
-      <div className={styles.formActions}>
-        <button type="button" className={styles.secondaryBtn} onClick={onCancel} disabled={saving}>
-          Cancelar
-        </button>
-        <button type="submit" className={styles.primaryBtn} disabled={!canSave || saving}>
-          {saving ? 'Guardando…' : mode === 'edit' ? 'Guardar cambios' : 'Crear promoción'}
-        </button>
+        </form>
       </div>
-    </form>
+
+      <footer className={styles.footer}>
+        {error ? <div className={styles.footerError}>{error}</div> : null}
+        <div className={styles.footerActions}>
+          <button
+            type="button"
+            className={styles.footerSecondaryBtn}
+            onClick={onCancel}
+            disabled={saving}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            form={FORM_ID}
+            className={styles.primaryBtn}
+            disabled={!canSave || saving}
+          >
+            {saving ? 'Guardando…' : mode === 'edit' ? 'Guardar cambios' : 'Crear promoción'}
+          </button>
+        </div>
+      </footer>
+    </div>
   );
 }
