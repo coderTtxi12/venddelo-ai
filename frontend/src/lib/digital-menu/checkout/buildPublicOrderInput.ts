@@ -1,4 +1,5 @@
 import type { PublicOrderInput } from '@/lib/api/public';
+import { normalizeCouponCodeForApi } from '@/lib/coupons/code';
 import { selectionsToQuoteApi } from '@/lib/digital-menu/cart/cartQuotePayload';
 import type { PublicMenuCartLine } from '@/lib/digital-menu/cart/types';
 import { buildCheckoutCustomerPhoneE164 } from '@/lib/digital-menu/checkout/customerPhone';
@@ -35,7 +36,7 @@ export function buildPublicOrderInput(
       ? fulfillment.deliveryFeeCents
       : 0;
 
-  const normalizedCoupon = couponCode?.trim().toUpperCase();
+  const normalizedCoupon = normalizeCouponCodeForApi(couponCode);
 
   return {
     type: fulfillment.serviceType,

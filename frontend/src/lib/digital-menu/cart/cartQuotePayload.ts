@@ -1,5 +1,6 @@
 import type { OptionSelections } from '@/components/digital-menu/productOptionSelection';
 import type { CartQuoteInput } from '@/lib/api/public';
+import { normalizeCouponCodeForApi } from '@/lib/coupons/code';
 import type { PublicMenuCartLine } from './types';
 
 export type CartQuoteContext = {
@@ -19,9 +20,7 @@ export function selectionsToQuoteApi(selections: OptionSelections): Record<strin
 }
 
 function normalizeCouponCode(raw: string | null | undefined): string | undefined {
-  const trimmed = raw?.trim();
-  if (!trimmed) return undefined;
-  return trimmed.toUpperCase();
+  return normalizeCouponCodeForApi(raw);
 }
 
 export function cartLinesToQuoteInput(

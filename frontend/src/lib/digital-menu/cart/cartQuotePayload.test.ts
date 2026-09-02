@@ -17,7 +17,7 @@ test('includes coupon and fulfillment', () => {
         unitPriceCents: 1000,
       },
     ],
-    { couponCode: 'pizza20', serviceType: 'delivery', deliveryFeeCents: 4500 },
+    { couponCode: 'piz za20', serviceType: 'delivery', deliveryFeeCents: 4500 },
   );
   assert.equal(payload.coupon_code, 'PIZZA20');
   assert.equal(payload.service_type, 'delivery');

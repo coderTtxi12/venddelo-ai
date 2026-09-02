@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import type { CartQuote } from '@/lib/api/public';
 import type { Product, Promotion, RestaurantSchedule } from '@/lib/api/types';
 import {
@@ -35,6 +36,11 @@ import type { CheckoutFulfillment } from '@/lib/digital-menu/checkout/fulfillmen
 import { isCustomerContactComplete } from '@/lib/digital-menu/checkout/fulfillment';
 import { submitPublicOrderBackground } from '@/lib/digital-menu/checkout/submitPublicOrderBackground';
 import { promoWarningLabel } from '@/lib/promotions/bundlePromoEligibility';
+import {
+  listUnmetOrderThresholdHints,
+  quoteEligibleSubtotalCents,
+  type OrderThresholdHint,
+} from '@/lib/promotions/orderThresholdHints';
 import { formatMoney } from '@/lib/currency';
 import {
   PAYMENT_METHOD_LABELS,
@@ -43,6 +49,7 @@ import { RESTAURANT_SERVICE_LABELS } from '@/lib/restaurantServices';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
 import { CheckoutCashDenominationSection } from '@/components/digital-menu/CheckoutCashDenominationSection';
+import { formatCouponCodeInput } from '@/lib/coupons/code';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import styles from './PublicMenuCheckoutSummary.module.css';
 
@@ -84,12 +91,103 @@ function WhatsappIcon({ className }: { className?: string }) {
   );
 }
 
+function CouponSection({
+  couponDraft,
+  onCouponDraftChange,
+  quote,
+  currency,
+  quoteLoading,
+  onApplyCoupon,
+  onRemoveCoupon,
+  variant,
+}: {
+  couponDraft: string;
+  onCouponDraftChange: (value: string) => void;
+  quote: CartQuote;
+  currency: string;
+  quoteLoading: boolean;
+  onApplyCoupon: () => void | Promise<void>;
+  onRemoveCoupon: () => void | Promise<void>;
+  variant: 'mobile' | 'desktop';
+}) {
+  const inputId =
+    variant === 'desktop' ? 'checkout-coupon-code-desktop' : 'checkout-coupon-code-mobile';
+  const sectionClass =
+    variant === 'desktop'
+      ? `${styles.couponSection} ${styles.couponSectionDesktop}`
+      : `${styles.couponSection} ${styles.couponSectionMobile}`;
+
+  return (
+    <section className={sectionClass} aria-label="Código de cupón">
+      <div className={styles.couponHeader}>
+        <LocalOfferOutlinedIcon sx={{ fontSize: variant === 'desktop' ? 20 : 18 }} aria-hidden />
+        <div className={styles.couponHeaderCopy}>
+          <p className={styles.couponTitle}>
+            {quote.coupon ? 'Cupón aplicado' : '¿Tienes un cupón?'}
+          </p>
+          {variant === 'desktop' && !quote.coupon ? (
+            <p className={styles.couponHint}>Aplícalo antes de enviar tu pedido</p>
+          ) : null}
+        </div>
+      </div>
+
+      {quote.coupon ? (
+        <div className={styles.couponAppliedRow}>
+          <span className={styles.couponChip}>
+            {quote.coupon.type === 'free_shipping'
+              ? `${quote.coupon.code} · Envío gratis`
+              : `${quote.coupon.code} · −${formatMoney(
+                  (quote.coupon.discount_cents + quote.coupon.waived_delivery_cents) / 100,
+                  currency,
+                )}`}
+          </span>
+          <button
+            type="button"
+            className={styles.couponRemoveBtn}
+            onClick={() => void onRemoveCoupon()}
+            disabled={quoteLoading}
+          >
+            Quitar
+          </button>
+        </div>
+      ) : (
+        <div className={styles.couponRow}>
+          <input
+            id={inputId}
+            className={styles.couponInput}
+            value={couponDraft}
+            onChange={(event) => onCouponDraftChange(formatCouponCodeInput(event.target.value))}
+            placeholder="Código"
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            disabled={quoteLoading}
+            aria-describedby={quote.coupon_error ? `${inputId}-error` : undefined}
+          />
+          <button
+            type="button"
+            className={styles.couponApplyBtn}
+            disabled={quoteLoading || !couponDraft.trim()}
+            onClick={() => void onApplyCoupon()}
+          >
+            {quoteLoading ? '…' : 'Aplicar'}
+          </button>
+        </div>
+      )}
+
+      {quote.coupon_error ? (
+        <p id={`${inputId}-error`} className={styles.couponError} role="alert">
+          {quote.coupon_error.message}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 function FulfillmentSummary({
   fulfillment,
-  currency,
 }: {
   fulfillment: CheckoutFulfillment;
-  currency: string;
 }) {
   return (
     <section className={styles.fulfillmentCard} aria-label="Detalles de entrega y pago">
@@ -123,14 +221,6 @@ function FulfillmentSummary({
             <dt className={styles.fulfillmentLabel}>Referencias</dt>
             <dd className={styles.fulfillmentValue}>
               {fulfillment.deliveryAddressDetails.trim()}
-            </dd>
-          </div>
-        ) : null}
-        {fulfillment.serviceType === 'delivery' && fulfillment.deliveryFeeCents != null ? (
-          <div className={styles.fulfillmentRow}>
-            <dt className={styles.fulfillmentLabel}>Envío</dt>
-            <dd className={styles.fulfillmentValue}>
-              {formatMoney(fulfillment.deliveryFeeCents / 100, currency)}
             </dd>
           </div>
         ) : null}
@@ -234,6 +324,10 @@ function TotalsPanel({
   total,
   deliveryFee = 0,
   deliveryFeeWaived = false,
+  couponDeliveryWaived = false,
+  promoFreeShippingLabel = null,
+  thresholdHints = [],
+  isDelivery = false,
   variant,
 }: {
   currency: string;
@@ -247,10 +341,18 @@ function TotalsPanel({
   total: number;
   deliveryFee?: number;
   deliveryFeeWaived?: boolean;
+  couponDeliveryWaived?: boolean;
+  promoFreeShippingLabel?: string | null;
+  thresholdHints?: OrderThresholdHint[];
+  isDelivery?: boolean;
   variant: 'mobile' | 'desktop';
 }) {
   const itemLabel = itemCount === 1 ? '1 artículo' : `${itemCount} artículos`;
   const grandTotal = total + deliveryFee;
+  const showCouponRow = Boolean(
+    couponLabel && (couponDiscount > 0 || couponDeliveryWaived),
+  );
+  const showDeliveryRow = isDelivery;
   const cardClass =
     variant === 'desktop'
       ? `${styles.totalsCard} ${styles.totalsCardDesktop}`
@@ -258,17 +360,11 @@ function TotalsPanel({
 
   return (
     <div className={cardClass}>
-      {variant === 'desktop' ? <h2 className={styles.totalsTitle}>Total del pedido</h2> : null}
-
-      {variant === 'mobile' ? (
-        <div className={styles.mobileTotalsHeader}>
-          <div>
-            <p className={styles.totalsFinalLabel}>Total final</p>
-            <p className={styles.totalsFinalValue}>{formatMoney(grandTotal, currency)}</p>
-          </div>
-          <span className={styles.totalsRowValue}>{itemLabel}</span>
-        </div>
-      ) : null}
+      {variant === 'desktop' ? (
+        <h2 className={styles.totalsTitle}>Total del pedido</h2>
+      ) : (
+        <h3 className={styles.mobileTotalsTitle}>Resumen de costos</h3>
+      )}
 
       <div className={styles.totalsRows}>
         <div className={styles.totalsRow}>
@@ -299,41 +395,84 @@ function TotalsPanel({
           </div>
         ) : null}
 
-        {couponDiscount > 0 && couponLabel ? (
+        {promoFreeShippingLabel ? (
+          <div className={styles.totalsRow}>
+            <span className={styles.totalsRowLabel}>
+              Promoción
+              <span className={styles.totalsRowHint}>{promoFreeShippingLabel}</span>
+            </span>
+            <span className={`${styles.totalsRowValue} ${styles.totalsRowDiscount}`}>
+              Envío gratis
+            </span>
+          </div>
+        ) : null}
+
+        {showCouponRow ? (
           <div className={styles.totalsRow}>
             <span className={styles.totalsRowLabel}>
               Cupón
               <span className={styles.totalsRowHint}>{couponLabel}</span>
             </span>
             <span className={`${styles.totalsRowValue} ${styles.totalsRowDiscount}`}>
-              -{formatMoney(couponDiscount, currency)}
+              {couponDeliveryWaived && couponDiscount <= 0
+                ? 'Envío gratis'
+                : `-${formatMoney(couponDiscount, currency)}`}
             </span>
           </div>
         ) : null}
 
-        {deliveryFee > 0 || deliveryFeeWaived ? (
+        {showDeliveryRow ? (
           <div className={styles.totalsRow}>
-            <span className={styles.totalsRowLabel}>Envío</span>
+            <span className={styles.totalsRowLabel}>Costo de envío</span>
             <span className={deliveryFeeWaived ? styles.priceRowValueFree : styles.totalsRowValue}>
-              {deliveryFeeWaived ? 'Gratis' : formatMoney(deliveryFee, currency)}
+              {deliveryFeeWaived
+                ? 'Gratis'
+                : deliveryFee > 0
+                  ? formatMoney(deliveryFee, currency)
+                  : 'Por confirmar'}
             </span>
           </div>
         ) : null}
       </div>
 
-      {variant === 'desktop' ? (
-        <>
-          <div className={styles.totalsDivider} aria-hidden />
-          <div>
-            <p className={styles.totalsFinalLabel}>Total final</p>
-            <p className={styles.totalsFinalValue}>{formatMoney(grandTotal, currency)}</p>
-          </div>
-          <p className={styles.totalsNote}>
-            {deliveryFee > 0
-              ? 'El envío ya está incluido en el total final.'
-              : 'El costo de envío se confirma al enviar el pedido.'}
-          </p>
-        </>
+      {thresholdHints.length > 0 ? (
+        <div className={styles.thresholdHints} role="status">
+          {thresholdHints.map((hint) => (
+            <p key={hint.promotionId} className={styles.thresholdHint}>
+              {hint.message}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
+      <div className={styles.totalsDivider} aria-hidden />
+
+      {variant === 'mobile' ? (
+        <div className={styles.mobileTotalsFooter}>
+          <p className={styles.totalsFinalLabel}>Total a pagar</p>
+          <p className={styles.totalsFinalValue}>{formatMoney(grandTotal, currency)}</p>
+        </div>
+      ) : (
+        <div>
+          <p className={styles.totalsFinalLabel}>Total final</p>
+          <p className={styles.totalsFinalValue}>{formatMoney(grandTotal, currency)}</p>
+        </div>
+      )}
+
+      {variant === 'desktop' && (deliveryFee > 0 || deliveryFeeWaived || isDelivery) ? (
+        <p className={styles.totalsNote}>
+          {deliveryFee > 0 || deliveryFeeWaived
+            ? 'El envío ya está incluido en el total final.'
+            : 'El costo de envío se confirma al enviar el pedido.'}
+        </p>
+      ) : isDelivery ? (
+        <p className={styles.totalsNoteMobile}>
+          {deliveryFeeWaived
+            ? 'El envío va incluido en tu total.'
+            : deliveryFee > 0
+              ? 'El envío ya está incluido en el total.'
+              : 'Revisa el total antes de enviar.'}
+        </p>
       ) : null}
     </div>
   );
@@ -553,14 +692,41 @@ export function PublicMenuCheckoutSummary({
     ? promotionsById.get(quote.applied_order_promotion_id)
     : undefined;
   const orderPromoLabel = promotionDisplayName(orderPromo);
+  const freeShippingPromo = quote.applied_free_shipping_promotion_id
+    ? promotionsById.get(quote.applied_free_shipping_promotion_id)
+    : undefined;
+  const promoFreeShippingLabel = promotionDisplayName(freeShippingPromo);
+  const thresholdHints = useMemo(
+    () =>
+      listUnmetOrderThresholdHints(
+        promotions,
+        quoteEligibleSubtotalCents(quote),
+        quoteNow,
+        quote.timezone,
+        {
+          serviceType: fulfillment.serviceType,
+          appliedOrderPromotionId: quote.applied_order_promotion_id,
+          appliedFreeShippingPromotionId: quote.applied_free_shipping_promotion_id ?? null,
+        },
+      ),
+    [
+      promotions,
+      quote,
+      quoteNow,
+      fulfillment.serviceType,
+    ],
+  );
   const deliveryFeeCents =
     fulfillment.serviceType === 'delivery'
       ? quote.delivery_fee_cents ?? fulfillment.deliveryFeeCents ?? 0
       : 0;
   const deliveryFee = deliveryFeeCents / 100;
-  const deliveryFeeWaived =
+  const deliveryWaivedByCoupon =
     fulfillment.serviceType === 'delivery' &&
     (quote.coupon?.type === 'free_shipping' || (quote.coupon?.waived_delivery_cents ?? 0) > 0);
+  const deliveryFeeWaived =
+    fulfillment.serviceType === 'delivery' &&
+    (Boolean(freeShippingPromo) || deliveryWaivedByCoupon);
   const couponDiscountCents = quote.coupon?.discount_cents ?? 0;
   const couponDiscount = couponDiscountCents / 100;
   const couponLabel = quote.coupon?.code ?? appliedCouponCode;
@@ -676,57 +842,7 @@ export function PublicMenuCheckoutSummary({
       </header>
 
       <div className={styles.body}>
-        <FulfillmentSummary fulfillment={fulfillment} currency={currency} />
-
-        <section className={styles.couponSection} aria-label="Código de cupón">
-          <label className={styles.couponLabel} htmlFor="checkout-coupon-code">
-            Código de cupón
-          </label>
-          <div className={styles.couponRow}>
-            <input
-              id="checkout-coupon-code"
-              className={styles.couponInput}
-              value={couponDraft}
-              onChange={(event) => onCouponDraftChange(event.target.value)}
-              placeholder="Ej. PIZZA20"
-              autoComplete="off"
-              disabled={quoteLoading}
-            />
-            <button
-              type="button"
-              className={styles.couponApplyBtn}
-              disabled={quoteLoading || !couponDraft.trim()}
-              onClick={() => void onApplyCoupon()}
-            >
-              {quoteLoading ? '…' : 'Aplicar'}
-            </button>
-          </div>
-          {quote.coupon_error ? (
-            <p className={styles.couponError} role="alert">
-              {quote.coupon_error.message}
-            </p>
-          ) : null}
-          {quote.coupon ? (
-            <div className={styles.couponChipRow}>
-              <span className={styles.couponChip}>
-                {quote.coupon.type === 'free_shipping'
-                  ? `Cupón ${quote.coupon.code} · Envío gratis`
-                  : `Cupón ${quote.coupon.code} · −${formatMoney(
-                      (quote.coupon.discount_cents + quote.coupon.waived_delivery_cents) / 100,
-                      currency,
-                    )}`}
-              </span>
-              <button
-                type="button"
-                className={styles.couponRemoveBtn}
-                onClick={() => void onRemoveCoupon()}
-                disabled={quoteLoading}
-              >
-                Quitar
-              </button>
-            </div>
-          ) : null}
-        </section>
+        <FulfillmentSummary fulfillment={fulfillment} />
 
         {showCashDenomination ? (
           <div className={styles.cashDenominationInline}>
@@ -752,6 +868,16 @@ export function PublicMenuCheckoutSummary({
 
         <aside className={styles.totalsAside} aria-label="Total del pedido">
           <div className={styles.sidebarStack}>
+            <CouponSection
+              variant="desktop"
+              couponDraft={couponDraft}
+              onCouponDraftChange={onCouponDraftChange}
+              quote={quote}
+              currency={currency}
+              quoteLoading={quoteLoading}
+              onApplyCoupon={onApplyCoupon}
+              onRemoveCoupon={onRemoveCoupon}
+            />
             <TotalsPanel
               currency={currency}
               itemCount={itemCount}
@@ -764,6 +890,10 @@ export function PublicMenuCheckoutSummary({
               total={total}
               deliveryFee={deliveryFee}
               deliveryFeeWaived={deliveryFeeWaived}
+              couponDeliveryWaived={deliveryWaivedByCoupon}
+              promoFreeShippingLabel={promoFreeShippingLabel}
+              thresholdHints={thresholdHints}
+              isDelivery={fulfillment.serviceType === 'delivery'}
               variant="desktop"
             />
             {showCashDenomination ? (
@@ -785,6 +915,16 @@ export function PublicMenuCheckoutSummary({
       </div>
 
       <footer className={styles.totalsBarMobile} aria-label="Total del pedido">
+        <CouponSection
+          variant="mobile"
+          couponDraft={couponDraft}
+          onCouponDraftChange={onCouponDraftChange}
+          quote={quote}
+          currency={currency}
+          quoteLoading={quoteLoading}
+          onApplyCoupon={onApplyCoupon}
+          onRemoveCoupon={onRemoveCoupon}
+        />
         <TotalsPanel
           currency={currency}
           itemCount={itemCount}
@@ -797,6 +937,10 @@ export function PublicMenuCheckoutSummary({
           total={total}
           deliveryFee={deliveryFee}
           deliveryFeeWaived={deliveryFeeWaived}
+          couponDeliveryWaived={deliveryWaivedByCoupon}
+          promoFreeShippingLabel={promoFreeShippingLabel}
+          thresholdHints={thresholdHints}
+          isDelivery={fulfillment.serviceType === 'delivery'}
           variant="mobile"
         />
         <SendOrderButton

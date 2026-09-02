@@ -38,6 +38,7 @@ import {
   EMPTY_DELIVERY_LOCATION,
 } from '@/lib/digital-menu/checkout/fulfillment';
 import { DEFAULT_CHECKOUT_PHONE_COUNTRY_ISO } from '@/lib/digital-menu/checkout/customerPhone';
+import { formatCouponCodeInput } from '@/lib/coupons/code';
 import {
   readCheckoutPreferencesFromStorage,
   toStoredCheckoutPreferences,
@@ -403,7 +404,7 @@ export function PublicMenuCart({
         onCouponDraftChange={setCouponDraft}
         appliedCouponCode={appliedCouponCode}
         onApplyCoupon={async () => {
-          const nextCode = couponDraft.trim().toUpperCase();
+          const nextCode = formatCouponCodeInput(couponDraft);
           if (!nextCode) return;
           setAppliedCouponCode(nextCode);
           await applyPromotions({
