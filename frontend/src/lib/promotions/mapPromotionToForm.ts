@@ -11,6 +11,12 @@ function toDatetimeLocalValue(iso: string | null | undefined): string {
 }
 
 function mapKind(promotion: Promotion): PromotionFormSubmitPayload['kind'] {
+  if (promotion.type === 'free_shipping') return 'free_shipping';
+  if (promotion.type === 'combo') {
+    if (promotion.amount_cents != null) return 'amount';
+    if (promotion.percent != null) return 'percent';
+    return 'free_shipping';
+  }
   if (promotion.type === 'bundle' || promotion.type === '2x1') return 'bundle';
   if (promotion.type === 'percent') return 'percent';
   if (promotion.type === 'amount') return 'amount';
@@ -60,6 +66,7 @@ export function mapPromotionToForm(promotion: Promotion): PromotionFormSubmitPay
     campaignStartsAt: toDatetimeLocalValue(promotion.starts_at),
     campaignEndsAt: toDatetimeLocalValue(promotion.ends_at),
     imagePath: promotion.image_path ?? null,
+    showBanner: promotion.show_banner !== false,
   };
 }
 

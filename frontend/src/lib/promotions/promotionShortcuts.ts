@@ -3,8 +3,8 @@ import { isPromotionEffective } from './effective';
 import { PRODUCT_CATALOG_DISCOUNT_PREFIX } from './productCatalogDiscount';
 
 export function isPromotionShortcutCandidate(promotion: Promotion): boolean {
+  if (promotion.show_banner === false) return false;
   if (promotion.name.startsWith(PRODUCT_CATALOG_DISCOUNT_PREFIX)) return false;
-  if (promotion.scope === 'order') return false;
   if (!promotion.image_path?.trim()) return false;
   return true;
 }
@@ -13,6 +13,10 @@ export function productsParticipatingInPromotion(
   products: Product[],
   promotion: Promotion,
 ): Product[] {
+  if (promotion.scope === 'order') {
+    return products;
+  }
+
   if (promotion.scope === 'product') {
     const ids = new Set(promotion.product_ids);
     return products.filter((product) => ids.has(product.id));
@@ -43,6 +47,9 @@ export function listLivePromotionShortcuts(
   return promotions
     .filter(isPromotionShortcutCandidate)
     .filter((promotion) => isPromotionEffective(promotion, now, timezone))
-    .filter((promotion) => productsParticipatingInPromotion(products, promotion).length > 0)
+    .filter((promotion) => {
+      if (promotion.scope === 'order') return true;
+      return productsParticipatingInPromotion(products, promotion).length > 0;
+    })
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }

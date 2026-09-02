@@ -8,6 +8,7 @@ function toUpdateBody(api: CreateManualPromotionInput): Partial<CreateManualProm
   return {
     name: api.name,
     image_path: api.image_path,
+    show_banner: api.show_banner,
     type: api.type,
     scope: api.scope,
     percent: api.percent,

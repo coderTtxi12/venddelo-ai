@@ -24,6 +24,12 @@ export function isCatalogProductDiscountPromotion(
   return promotion.product_ids.length === 1 && promotion.product_ids[0] === productId;
 }
 
+export function catalogPromotionProductId(promotion: Promotion): string | null {
+  if (!promotion.name.startsWith(PRODUCT_CATALOG_DISCOUNT_PREFIX)) return null;
+  if (promotion.product_ids.length !== 1) return null;
+  return promotion.product_ids[0] ?? null;
+}
+
 export function discountUsdFromPromotion(promotion: Promotion, priceUsd: number): number {
   if (promotion.type === 'amount' && promotion.amount_cents != null) {
     return promotion.amount_cents / 100;
@@ -131,6 +137,7 @@ export async function syncProductCatalogDiscount(
       type: 'percent',
       percent,
       amount_cents: null,
+      show_banner: false,
       product_ids: [productId],
     });
     return [...promotions, created];
@@ -163,6 +170,7 @@ export async function syncProductCatalogDiscount(
     type: 'amount',
     amount_cents: amountCents,
     percent: null,
+    show_banner: false,
     product_ids: [productId],
   });
   return [...promotions, created];

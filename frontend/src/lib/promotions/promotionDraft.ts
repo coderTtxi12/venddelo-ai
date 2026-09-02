@@ -1,8 +1,8 @@
 import type { PromotionScope } from '@/lib/api/promotions';
 import { WEEKDAY_LABELS } from '@/lib/restaurantScheduleHours';
 
-/** Tipos de descuento soportados en el borrador (UI). La API aún no persiste todos. */
-export type PromotionDraftKind = 'percent' | 'amount' | 'bundle' | 'combo';
+/** Tipos de descuento soportados en el borrador (UI). */
+export type PromotionDraftKind = 'percent' | 'amount' | 'bundle' | 'combo' | 'free_shipping';
 
 export type BundlePairingMode = 'cross_product' | 'same_product';
 
@@ -52,6 +52,7 @@ export type PromotionDraft = {
   campaignStartsAt: string;
   campaignEndsAt: string;
   imagePath: string | null;
+  showBanner: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -96,6 +97,7 @@ export function createEmptyPromotionDraft(): Omit<
     campaignStartsAt: '',
     campaignEndsAt: '',
     imagePath: null,
+    showBanner: true,
   };
 }
 
