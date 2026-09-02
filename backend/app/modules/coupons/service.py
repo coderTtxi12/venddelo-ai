@@ -8,7 +8,7 @@ from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.core.pagination import CursorPage, PaginationParams
 from app.modules.coupons.pricing import CouponInput, normalize_coupon_code
 from app.modules.coupons.repository import CouponRepository
-from app.modules.coupons.schemas import CouponCreate, CouponDTO, CouponUpdate
+from app.modules.coupons.schemas import CouponApplicationDTO, CouponCreate, CouponDTO, CouponUpdate
 from app.modules.coupons.status import coupon_effective_status, remaining_qty
 from app.modules.promotions.effective import resolve_timezone
 
@@ -16,6 +16,21 @@ _CODE_PATTERN = re.compile(r"^[A-Za-z0-9_-]{3,32}$")
 _ALLOWED_TYPES = {"amount", "percent", "free_shipping"}
 _ALLOWED_SCOPES = {"all", "category", "product"}
 _DEFAULT_TIMEZONE = "America/Mexico_City"
+
+
+def normalize_recurrence_weekdays(weekdays: list[int] | None) -> list[int] | None:
+    if not weekdays:
+        return None
+    normalized = sorted({day for day in weekdays if 0 <= day <= 6})
+    return normalized or None
+
+
+def validate_recurrence_weekdays(weekdays: list[int] | None) -> None:
+    if weekdays is None:
+        return
+    for day in weekdays:
+        if not (0 <= day <= 6):
+            raise ValidationError("weekday must be 0-6")
 
 
 def merge_coupon_update(existing: CouponDTO, data: CouponUpdate) -> CouponCreate:
@@ -61,8 +76,16 @@ def merge_coupon_update(existing: CouponDTO, data: CouponUpdate) -> CouponCreate
         amount_cents=amount_cents,
         scope=merged_scope,
         stock_qty=data.stock_qty if "stock_qty" in data.model_fields_set else existing.stock_qty,
+        starts_on=(
+            data.starts_on if "starts_on" in data.model_fields_set else existing.starts_on
+        ),
         expires_on=(
             data.expires_on if "expires_on" in data.model_fields_set else existing.expires_on
+        ),
+        recurrence_weekdays=(
+            data.recurrence_weekdays
+            if "recurrence_weekdays" in data.model_fields_set
+            else existing.recurrence_weekdays
         ),
         is_active=data.is_active if data.is_active is not None else existing.is_active,
         product_ids=product_ids,
@@ -162,12 +185,22 @@ class CouponService:
                 if scope == "all":
                     raise ValidationError("all scope must not have category links")
 
+        if isinstance(data, CouponCreate):
+            validate_recurrence_weekdays(data.recurrence_weekdays)
+            if (
+                data.starts_on is not None
+                and data.expires_on is not None
+                and data.starts_on > data.expires_on
+            ):
+                raise ValidationError("starts_on must be on or before expires_on")
+
     def _with_status(self, dto: CouponDTO, timezone: str | None) -> CouponDTO:
         tz = resolve_timezone(timezone or _DEFAULT_TIMEZONE)
         today = datetime.now(UTC).astimezone(tz).date()
         dto.remaining_qty = remaining_qty(dto.stock_qty, dto.redeemed_count)
         dto.effective_status = coupon_effective_status(
             dto.is_active,
+            dto.starts_on,
             dto.expires_on,
             dto.stock_qty,
             dto.redeemed_count,
@@ -181,7 +214,7 @@ class CouponService:
         if code is None:
             raise ValidationError("Invalid coupon code")
         if self._repo.get_by_code(restaurant_id, code):
-            raise ConflictError("Coupon code already exists")
+            raise ConflictError("Ya existe un cupón con ese código")
         product_ids = data.product_ids if data.scope == "product" else []
         category_ids = data.category_ids if data.scope == "category" else []
         payload: dict = {
@@ -191,7 +224,9 @@ class CouponService:
             "type": data.type,
             "scope": data.scope,
             "stock_qty": data.stock_qty,
+            "starts_on": data.starts_on,
             "expires_on": data.expires_on,
+            "recurrence_weekdays": normalize_recurrence_weekdays(data.recurrence_weekdays),
             "is_active": data.is_active,
             "product_ids": product_ids,
             "category_ids": category_ids,
@@ -252,7 +287,7 @@ class CouponService:
             if code is None:
                 raise ValidationError("Invalid coupon code")
             if code != existing.code and self._repo.get_by_code(restaurant_id, code):
-                raise ConflictError("Coupon code already exists")
+                raise ConflictError("Ya existe un cupón con ese código")
             update_fields["code"] = code
         if data.name is not None:
             update_fields["name"] = data.name.strip()
@@ -266,8 +301,14 @@ class CouponService:
             update_fields["scope"] = data.scope
         if "stock_qty" in data.model_fields_set:
             update_fields["stock_qty"] = data.stock_qty
+        if "starts_on" in data.model_fields_set:
+            update_fields["starts_on"] = data.starts_on
         if "expires_on" in data.model_fields_set:
             update_fields["expires_on"] = data.expires_on
+        if "recurrence_weekdays" in data.model_fields_set:
+            update_fields["recurrence_weekdays"] = normalize_recurrence_weekdays(
+                data.recurrence_weekdays
+            )
         if data.is_active is not None:
             update_fields["is_active"] = data.is_active
 
@@ -314,7 +355,9 @@ class CouponService:
             product_ids=list(dto.product_ids),
             category_ids=list(dto.category_ids),
             stock_qty=dto.stock_qty,
+            starts_on=dto.starts_on,
             expires_on=dto.expires_on,
+            recurrence_weekdays=dto.recurrence_weekdays,
             is_active=dto.is_active,
             redemption_count=dto.redeemed_count,
         )
@@ -332,3 +375,14 @@ class CouponService:
 
     def redeem(self, coupon_id: uuid.UUID, order_id: uuid.UUID) -> None:
         self._repo.redeem(coupon_id, order_id)
+
+    def list_applications(
+        self,
+        restaurant_id: uuid.UUID,
+        coupon_id: uuid.UUID,
+        params: PaginationParams,
+    ) -> CursorPage[CouponApplicationDTO]:
+        dto = self._repo.get(coupon_id)
+        if dto is None or dto.restaurant_id != restaurant_id:
+            raise NotFoundError("Coupon not found")
+        return self._repo.list_applications(coupon_id, params)
