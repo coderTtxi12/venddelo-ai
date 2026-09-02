@@ -56,6 +56,7 @@ class CartQuoteResult:
     order_discount_cents: int
     total_cents: int
     applied_order_promotion_id: uuid.UUID | None = None
+    applied_free_shipping_promotion_id: uuid.UUID | None = None
 
 
 @dataclass
@@ -374,6 +375,51 @@ def _line_discount_for_promo(
     return line_subtotal, 0, None
 
 
+def _combo_is_satisfied(
+    lines: list[CartLineInput],
+    product_ids: list[uuid.UUID],
+) -> bool:
+    if len(product_ids) < 2:
+        return False
+    required = set(product_ids)
+    cart_counts: dict[uuid.UUID, int] = {}
+    for line in lines:
+        if line.product_id in required:
+            cart_counts[line.product_id] = cart_counts.get(line.product_id, 0) + line.quantity
+    return all(cart_counts.get(product_id, 0) >= 1 for product_id in required)
+
+
+def _combo_eligible_subtotal(
+    lines: list[CartLineInput],
+    priced_lines: list[PricedCartLine],
+    combo_product_ids: set[uuid.UUID],
+) -> int:
+    total = 0
+    for line, priced in zip(lines, priced_lines, strict=True):
+        if line.product_id in combo_product_ids:
+            total += priced.line_total_cents
+    return total
+
+
+def _combo_discount_for_promo(
+    promo: PromotionDTO,
+    lines: list[CartLineInput],
+    priced_lines: list[PricedCartLine],
+) -> int:
+    if not _combo_is_satisfied(lines, promo.product_ids):
+        return 0
+    subtotal = _combo_eligible_subtotal(lines, priced_lines, set(promo.product_ids))
+    if promo.type == "percent" and promo.percent is not None:
+        return round(subtotal * promo.percent / 100)
+    if promo.type == "amount" and promo.amount_cents is not None:
+        return min(promo.amount_cents, subtotal)
+    return 0
+
+
+def _combo_grants_free_shipping(promo: PromotionDTO) -> bool:
+    return promo.type == "combo" and promo.percent is None and promo.amount_cents is None
+
+
 def price_cart(
     *,
     lines: list[CartLineInput],
@@ -392,7 +438,13 @@ def price_cart(
         for p in effective
         if p.scope in ("product", "category") and p.type not in ("combo", "two_for_one")
     ]
-    order_promos = [p for p in effective if p.scope == "order" and p.type in ("percent", "amount")]
+    order_promos = [
+        p for p in effective if p.scope == "order" and p.type in ("percent", "amount")
+    ]
+    combo_promos = [p for p in effective if p.type == "combo" and p.scope == "product"]
+    free_shipping_promos = [
+        p for p in effective if p.scope == "order" and p.type == "free_shipping"
+    ]
 
     best_cross: dict[int, tuple[int, int, str | None, uuid.UUID, list[str]]] = {}
     best_cross_cart_total: int | None = None
@@ -475,6 +527,21 @@ def price_cart(
     best_order_discount = 0
     best_order_promo_id: uuid.UUID | None = None
 
+    for promo in combo_promos:
+        discount = _combo_discount_for_promo(promo, lines, priced_lines)
+        if discount > best_order_discount:
+            best_order_discount = discount
+            best_order_promo_id = promo.id
+
+    applied_free_shipping_promotion_id: uuid.UUID | None = None
+    for promo in combo_promos:
+        if not _combo_grants_free_shipping(promo):
+            continue
+        if not _combo_is_satisfied(lines, promo.product_ids):
+            continue
+        applied_free_shipping_promotion_id = promo.id
+        break
+
     for promo in order_promos:
         if promo.min_order_cents is not None and lines_subtotal < promo.min_order_cents:
             continue
@@ -488,6 +555,13 @@ def price_cart(
             best_order_discount = discount
             best_order_promo_id = promo.id
 
+    if applied_free_shipping_promotion_id is None:
+        for promo in free_shipping_promos:
+            if promo.min_order_cents is not None and lines_subtotal < promo.min_order_cents:
+                continue
+            applied_free_shipping_promotion_id = promo.id
+            break
+
     total = lines_subtotal - best_order_discount
 
     return CartQuoteResult(
@@ -496,4 +570,5 @@ def price_cart(
         order_discount_cents=best_order_discount,
         total_cents=total,
         applied_order_promotion_id=best_order_promo_id,
+        applied_free_shipping_promotion_id=applied_free_shipping_promotion_id,
     )

@@ -528,3 +528,157 @@ def test_excluded_complement_disqualifies_bundle_line():
     assert quote.lines[0].line_total_cents == 40000
     assert quote.lines[0].badge is None
     assert quote.lines[0].promo_warnings == ["complement_excluded"]
+
+
+def _combo_promo(product_ids: list[uuid.UUID], percent: int | None = 20) -> PromotionDTO:
+    return PromotionDTO(
+        id=uuid.uuid4(),
+        restaurant_id=uuid.uuid4(),
+        name="Combo",
+        type="combo",
+        scope="product",
+        percent=percent,
+        amount_cents=None,
+        min_order_cents=None,
+        starts_at=None,
+        ends_at=None,
+        bundle_get_quantity=None,
+        bundle_pay_quantity=None,
+        recurrence_weekdays=None,
+        recurrence_start_time=None,
+        recurrence_end_time=None,
+        is_active=True,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        product_ids=product_ids,
+        category_ids=[],
+        option_item_ids=[],
+    )
+
+
+def test_combo_requires_all_products_in_cart():
+    product_a = _product(10000)
+    product_b = _product(8000)
+    promo = _combo_promo([product_a.id, product_b.id], percent=10)
+    tz = resolve_timezone("America/Mexico_City")
+    now = datetime.now(UTC)
+
+    missing = price_cart(
+        lines=[CartLineInput(product_id=product_a.id, quantity=1)],
+        products_by_id={product_a.id: product_a, product_b.id: product_b},
+        promotions=[promo],
+        now_utc=now,
+        tz=tz,
+    )
+    assert missing.order_discount_cents == 0
+
+    complete = price_cart(
+        lines=[
+            CartLineInput(product_id=product_a.id, quantity=1),
+            CartLineInput(product_id=product_b.id, quantity=1),
+        ],
+        products_by_id={product_a.id: product_a, product_b.id: product_b},
+        promotions=[promo],
+        now_utc=now,
+        tz=tz,
+    )
+    assert complete.order_discount_cents == 1800
+    assert complete.applied_order_promotion_id == promo.id
+
+
+def test_order_free_shipping_threshold():
+    product = _product(10000)
+    promo = PromotionDTO(
+        id=uuid.uuid4(),
+        restaurant_id=uuid.uuid4(),
+        name="Envío gratis",
+        type="free_shipping",
+        scope="order",
+        percent=None,
+        amount_cents=None,
+        min_order_cents=15000,
+        starts_at=None,
+        ends_at=None,
+        bundle_get_quantity=None,
+        bundle_pay_quantity=None,
+        recurrence_weekdays=None,
+        recurrence_start_time=None,
+        recurrence_end_time=None,
+        is_active=True,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        product_ids=[],
+        category_ids=[],
+        option_item_ids=[],
+    )
+    tz = resolve_timezone("America/Mexico_City")
+    now = datetime.now(UTC)
+
+    below = price_cart(
+        lines=[CartLineInput(product_id=product.id, quantity=1)],
+        products_by_id={product.id: product},
+        promotions=[promo],
+        now_utc=now,
+        tz=tz,
+    )
+    assert below.applied_free_shipping_promotion_id is None
+
+    above = price_cart(
+        lines=[CartLineInput(product_id=product.id, quantity=2)],
+        products_by_id={product.id: product},
+        promotions=[promo],
+        now_utc=now,
+        tz=tz,
+    )
+    assert above.applied_free_shipping_promotion_id == promo.id
+
+
+def test_combo_free_shipping_when_complete():
+    product_a = _product(10000)
+    product_b = _product(8000)
+    promo = PromotionDTO(
+        id=uuid.uuid4(),
+        restaurant_id=uuid.uuid4(),
+        name="Combo envío",
+        type="combo",
+        scope="product",
+        percent=None,
+        amount_cents=None,
+        min_order_cents=None,
+        starts_at=None,
+        ends_at=None,
+        bundle_get_quantity=None,
+        bundle_pay_quantity=None,
+        recurrence_weekdays=None,
+        recurrence_start_time=None,
+        recurrence_end_time=None,
+        is_active=True,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        product_ids=[product_a.id, product_b.id],
+        category_ids=[],
+        option_item_ids=[],
+    )
+    tz = resolve_timezone("America/Mexico_City")
+    now = datetime.now(UTC)
+
+    incomplete = price_cart(
+        lines=[CartLineInput(product_id=product_a.id, quantity=1)],
+        products_by_id={product_a.id: product_a, product_b.id: product_b},
+        promotions=[promo],
+        now_utc=now,
+        tz=tz,
+    )
+    assert incomplete.applied_free_shipping_promotion_id is None
+
+    complete = price_cart(
+        lines=[
+            CartLineInput(product_id=product_a.id, quantity=1),
+            CartLineInput(product_id=product_b.id, quantity=1),
+        ],
+        products_by_id={product_a.id: product_a, product_b.id: product_b},
+        promotions=[promo],
+        now_utc=now,
+        tz=tz,
+    )
+    assert complete.applied_free_shipping_promotion_id == promo.id
