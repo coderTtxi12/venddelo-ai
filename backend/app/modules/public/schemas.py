@@ -91,6 +91,7 @@ class CartQuoteDTO(BaseModel):
     order_discount_cents: int
     total_cents: int
     applied_order_promotion_id: uuid.UUID | None = None
+    applied_free_shipping_promotion_id: uuid.UUID | None = None
     coupon: CartQuoteCouponDTO | None = None
     coupon_error: CartQuoteCouponErrorDTO | None = None
     delivery_fee_cents: int = 0

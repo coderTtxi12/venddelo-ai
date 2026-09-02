@@ -347,6 +347,12 @@ def quote_public_cart(
         else None
     )
     coupon_input = coupon_service.to_input(resolved) if resolved else None
+    delivery_fee_input = max(data.delivery_fee_cents, 0)
+    if (
+        quote.applied_free_shipping_promotion_id is not None
+        and data.service_type == "delivery"
+    ):
+        delivery_fee_input = 0
     composed = compose_quote_coupon(
         lines=quote.lines,
         products_by_id=products_by_id,
@@ -354,7 +360,7 @@ def quote_public_cart(
         coupon_code=data.coupon_code,
         food_total_cents=quote.total_cents,
         service_type=data.service_type,
-        delivery_fee_cents=data.delivery_fee_cents,
+        delivery_fee_cents=delivery_fee_input,
         now_utc=now,
         tz=tz,
     )
@@ -395,6 +401,7 @@ def quote_public_cart(
         order_discount_cents=quote.order_discount_cents,
         total_cents=composed.food_total_cents,
         applied_order_promotion_id=quote.applied_order_promotion_id,
+        applied_free_shipping_promotion_id=quote.applied_free_shipping_promotion_id,
         coupon=coupon_dto,
         coupon_error=coupon_error,
         delivery_fee_cents=composed.delivery_fee_cents,
