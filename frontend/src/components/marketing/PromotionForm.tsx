@@ -13,6 +13,7 @@ import {
   type PromotionDraft,
   WEEKDAY_SHORT,
 } from '@/lib/promotions/promotionDraft';
+import type { PromotionTemplate } from '@/lib/promotions/templates';
 import { WEEKDAY_LABELS } from '@/lib/restaurantScheduleHours';
 import {
   CategoryProductPicker,
@@ -42,6 +43,7 @@ type PromotionFormProps = {
   saving: boolean;
   error: string | null;
   mode?: 'create' | 'edit';
+  template?: PromotionTemplate;
   initialValues?: PromotionFormSubmitPayload | null;
   onCancel: () => void;
   onSubmit: (payload: PromotionFormSubmitPayload) => Promise<void>;
@@ -182,6 +184,7 @@ export function PromotionForm({
   saving,
   error,
   mode = 'create',
+  template = 'bundle',
   initialValues = null,
   onCancel,
   onSubmit,
@@ -192,12 +195,7 @@ export function PromotionForm({
   const [imageError, setImageError] = useState<string | null>(null);
 
   useEffect(() => {
-    const base = initialValues ?? createEmptyPromotionDraft();
-    setForm({
-      ...base,
-      kind: 'bundle',
-      bundle: { ...base.bundle, pairingMode: 'same_product' },
-    });
+    setForm(initialValues ?? createEmptyPromotionDraft());
     setProductSearch('');
     setImageError(null);
   }, [initialValues]);
@@ -225,15 +223,38 @@ export function PromotionForm({
 
   const canSave = useMemo(() => {
     if (!form.name.trim()) return false;
-    if (!form.imagePath?.trim()) return false;
+    if (form.showBanner && !form.imagePath?.trim()) return false;
 
-    if (form.bundle.getQuantity < 2) return false;
-    if (form.bundle.payQuantity < 1) return false;
-    if (form.bundle.payQuantity >= form.bundle.getQuantity) return false;
+    if (template === 'bundle') {
+      if (form.bundle.getQuantity < 2) return false;
+      if (form.bundle.payQuantity < 1) return false;
+      if (form.bundle.payQuantity >= form.bundle.getQuantity) return false;
+      if (form.scope === 'product' && form.productIds.length === 0) return false;
+      if (form.scope === 'category' && !hasMenuSelection(form.categoryIds, form.productIds)) {
+        return false;
+      }
+    }
 
-    if (form.scope === 'product' && form.productIds.length === 0) return false;
-    if (form.scope === 'category' && !hasMenuSelection(form.categoryIds, form.productIds)) {
-      return false;
+    if (template === 'product_discount') {
+      if (form.scope === 'product' && form.productIds.length === 0) return false;
+      if (form.scope === 'category' && !hasMenuSelection(form.categoryIds, form.productIds)) {
+        return false;
+      }
+      if (form.kind === 'percent' && (form.percent < 1 || form.percent > 100)) return false;
+      if (form.kind === 'amount' && form.amount <= 0) return false;
+    }
+
+    if (template === 'combo') {
+      if (form.productIds.length < 2) return false;
+      if (form.kind === 'percent' && (form.percent < 1 || form.percent > 100)) return false;
+      if (form.kind === 'amount' && form.amount <= 0) return false;
+      if (form.kind === 'free_shipping') return true;
+    }
+
+    if (template === 'order_threshold') {
+      if (form.minOrderAmount <= 0) return false;
+      if (form.kind === 'percent' && (form.percent < 1 || form.percent > 100)) return false;
+      if (form.kind === 'amount' && form.amount <= 0) return false;
     }
 
     if (form.schedule.useWeekdays && form.schedule.weekdays.length === 0) return false;
@@ -248,9 +269,23 @@ export function PromotionForm({
     }
 
     return true;
-  }, [form]);
+  }, [form, template]);
 
-  const previewLabel = useMemo(() => formatBundleLabel(form.bundle), [form.bundle]);
+  const previewLabel = useMemo(() => {
+    if (template === 'bundle') return formatBundleLabel(form.bundle);
+    if (template === 'combo') {
+      if (form.kind === 'free_shipping') return 'Combo · Envío gratis';
+      if (form.kind === 'amount') return `Combo ${formatMoney(form.amount)}`;
+      return `Combo ${form.percent}%`;
+    }
+    if (template === 'order_threshold') {
+      if (form.kind === 'free_shipping') return 'Envío gratis';
+      if (form.kind === 'amount') return formatMoney(form.amount);
+      return `${form.percent}%`;
+    }
+    if (form.kind === 'amount') return formatMoney(form.amount);
+    return `${form.percent}%`;
+  }, [form, template]);
 
   const promoImageUrl = storagePublicUrl(form.imagePath);
 
@@ -272,25 +307,57 @@ export function PromotionForm({
       className={styles.form}
       onSubmit={(e) => {
         e.preventDefault();
-        const payload =
+        const normalized =
           form.scope === 'category'
             ? {
                 ...form,
-                kind: 'bundle' as const,
-                bundle: { ...form.bundle, pairingMode: 'same_product' as const },
                 ...normalizeCategorySelection(form.categoryIds, form.productIds, products),
               }
-            : {
-                ...form,
-                kind: 'bundle' as const,
-                bundle: { ...form.bundle, pairingMode: 'same_product' as const },
-              };
-        void onSubmit(payload);
+            : form;
+        const payload =
+          template === 'combo'
+            ? {
+                ...normalized,
+                kind:
+                  normalized.kind === 'free_shipping'
+                    ? 'free_shipping'
+                    : normalized.kind === 'amount'
+                      ? 'amount'
+                      : 'percent',
+                scope: 'product' as const,
+              }
+            : template === 'order_threshold'
+              ? {
+                  ...normalized,
+                  scope: 'order' as const,
+                  kind:
+                    normalized.kind === 'free_shipping'
+                      ? 'free_shipping'
+                      : normalized.kind === 'amount'
+                        ? 'amount'
+                        : 'percent',
+                }
+              : template === 'product_discount'
+                ? {
+                    ...normalized,
+                    kind: normalized.kind === 'amount' ? 'amount' : 'percent',
+                  }
+                : {
+                    ...normalized,
+                    kind: 'bundle' as const,
+                    bundle: { ...normalized.bundle, pairingMode: 'same_product' as const },
+                  };
+        void onSubmit(payload as PromotionFormSubmitPayload);
       }}
     >
       <div className={styles.infoBanner} role="status">
-        Configura días, horarios, ofertas N×M y complementos. La promoción se aplicará en el menú
-        público y en el carrito según la vigencia y el horario del restaurante.
+        {template === 'bundle'
+          ? 'Configura días, horarios, ofertas N×M y complementos. La promoción se aplicará en el menú público y en el carrito.'
+          : template === 'combo'
+            ? 'El descuento aplica cuando el cliente lleva todos los productos del combo en el carrito.'
+            : template === 'order_threshold'
+              ? 'El beneficio aplica al superar el monto mínimo del carrito.'
+              : 'El descuento aplica a los productos seleccionados en el menú y el carrito.'}
       </div>
 
       <div className={styles.previewCard}>
@@ -318,11 +385,12 @@ export function PromotionForm({
 
       <div className={styles.field}>
         <label className={styles.label} htmlFor="promo-image">
-          Imagen promocional <span className={styles.requiredMark}>*</span>
+          Imagen promocional {form.showBanner ? <span className={styles.requiredMark}>*</span> : null}
         </label>
         <p className={styles.helpText} id="promo-image-help">
-          Banner del acceso directo en el menú público. Muestra los platillos participantes al
-          tocarla.
+          {form.showBanner
+            ? 'Banner del acceso directo en el menú público.'
+            : 'Opcional: esta promoción no se mostrará como banner en el menú.'}
         </p>
         <div className={styles.promoImageRow}>
           {promoImageUrl ? (
@@ -377,6 +445,186 @@ export function PromotionForm({
         ) : null}
       </div>
 
+      {template !== 'order_threshold' ? (
+        <div className={styles.field}>
+          <label className={styles.label}>
+            <input
+              type="checkbox"
+              checked={form.showBanner}
+              onChange={(e) => setForm((prev) => ({ ...prev, showBanner: e.target.checked }))}
+            />{' '}
+            Mostrar banner en el menú digital
+          </label>
+        </div>
+      ) : null}
+
+      {template === 'product_discount' ? (
+        <div className={styles.field}>
+          <p className={styles.label}>Tipo de descuento</p>
+          <div className={styles.presetRow}>
+            {(['percent', 'amount'] as const).map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                className={
+                  form.kind === kind ? `${styles.presetBtn} ${styles.presetBtnActive}` : styles.presetBtn
+                }
+                onClick={() => setForm((prev) => ({ ...prev, kind }))}
+              >
+                {kind === 'percent' ? 'Porcentaje' : 'Monto fijo'}
+              </button>
+            ))}
+          </div>
+          {form.kind === 'percent' ? (
+            <input
+              className={styles.input}
+              type="number"
+              min={1}
+              max={100}
+              value={form.percent}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  percent: clampNumber(Number(e.target.value), 1, 100),
+                }))
+              }
+            />
+          ) : (
+            <input
+              className={styles.input}
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.amount}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  amount: Math.max(0, Number(e.target.value)),
+                }))
+              }
+            />
+          )}
+        </div>
+      ) : null}
+
+      {template === 'combo' ? (
+        <div className={styles.field}>
+          <p className={styles.label}>Beneficio del combo</p>
+          <div className={styles.presetRow}>
+            {(['percent', 'amount', 'free_shipping'] as const).map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                className={
+                  form.kind === kind ? `${styles.presetBtn} ${styles.presetBtnActive}` : styles.presetBtn
+                }
+                onClick={() => setForm((prev) => ({ ...prev, kind }))}
+              >
+                {kind === 'percent' ? 'Porcentaje' : kind === 'amount' ? 'Monto fijo' : 'Envío gratis'}
+              </button>
+            ))}
+          </div>
+          {form.kind === 'percent' ? (
+            <input
+              className={styles.input}
+              type="number"
+              min={1}
+              max={100}
+              value={form.percent}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  percent: clampNumber(Number(e.target.value), 1, 100),
+                }))
+              }
+            />
+          ) : null}
+          {form.kind === 'amount' ? (
+            <input
+              className={styles.input}
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.amount}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  amount: Math.max(0, Number(e.target.value)),
+                }))
+              }
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      {template === 'order_threshold' ? (
+        <div className={styles.field}>
+          <p className={styles.label}>Beneficio al superar el mínimo</p>
+          <div className={styles.presetRow}>
+            {(['percent', 'amount', 'free_shipping'] as const).map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                className={
+                  form.kind === kind ? `${styles.presetBtn} ${styles.presetBtnActive}` : styles.presetBtn
+                }
+                onClick={() => setForm((prev) => ({ ...prev, kind }))}
+              >
+                {kind === 'percent' ? 'Porcentaje' : kind === 'amount' ? 'Monto fijo' : 'Envío gratis'}
+              </button>
+            ))}
+          </div>
+          {form.kind === 'percent' ? (
+            <input
+              className={styles.input}
+              type="number"
+              min={1}
+              max={100}
+              value={form.percent}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  percent: clampNumber(Number(e.target.value), 1, 100),
+                }))
+              }
+            />
+          ) : null}
+          {form.kind === 'amount' ? (
+            <input
+              className={styles.input}
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.amount}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  amount: Math.max(0, Number(e.target.value)),
+                }))
+              }
+            />
+          ) : null}
+          <label className={styles.label} htmlFor="promo-min-order">
+            Monto mínimo del carrito
+          </label>
+          <input
+            id="promo-min-order"
+            className={styles.input}
+            type="number"
+            min={0}
+            step="0.01"
+            value={form.minOrderAmount}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                minOrderAmount: Math.max(0, Number(e.target.value)),
+              }))
+            }
+          />
+        </div>
+      ) : null}
+
+      {template === 'bundle' ? (
       <div className={styles.field}>
         <p className={styles.label}>¿Cómo se combinan los productos?</p>
           <p className={styles.helpText}>
@@ -467,15 +715,20 @@ export function PromotionForm({
             </div>
           </div>
         </div>
+      ) : null}
 
+      {template !== 'order_threshold' ? (
+      <>
       <fieldset className={styles.fieldset}>
         <legend className={styles.legend}>Aplica a</legend>
         <div className={styles.segment} role="group" aria-label="Alcance de la promoción">
           {(
-            [
-              ['product', 'Productos'],
-              ['category', 'Categorías'],
-            ] as const
+            template === 'combo'
+              ? ([['product', 'Productos del combo']] as const)
+              : ([
+                  ['product', 'Productos'],
+                  ['category', 'Categorías'],
+                ] as const)
           ).map(([value, label]) => (
             <button
               key={value}
@@ -502,7 +755,9 @@ export function PromotionForm({
       {form.scope === 'product' ? (
         <div className={styles.field}>
           <div className={styles.menuPickerHeader}>
-            <span className={styles.label}>Productos incluidos</span>
+            <span className={styles.label}>
+              {template === 'combo' ? 'Productos del combo' : 'Productos incluidos'}
+            </span>
             {form.productIds.length > 0 ? (
               <span className={styles.menuPickerCount}>
                 {form.productIds.length} seleccionado{form.productIds.length === 1 ? '' : 's'}
@@ -582,8 +837,10 @@ export function PromotionForm({
           }
         />
       ) : null}
+      </>
+      ) : null}
 
-      {complementProducts.length > 0 ? (
+      {template === 'bundle' && complementProducts.length > 0 ? (
         <fieldset className={styles.fieldset}>
           <legend className={styles.legend}>
             Complementos que participan

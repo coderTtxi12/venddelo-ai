@@ -68,7 +68,17 @@
   padding: 0.35rem 0.5rem;
 }
 
+.clientsGhostBtn {
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+}
+
 .editGhostBtn:hover,
+.clientsGhostBtn:hover,
 .dangerGhostBtn:hover {
   text-decoration: underline;
 }
@@ -227,6 +237,56 @@
   border-radius: 12px;
   padding: 0.75rem 0.85rem;
   font-size: 0.88rem;
+}
+
+.errorBannerTitle {
+  margin: 0 0 0.35rem;
+  font-weight: 800;
+}
+
+.errorBannerList {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.fieldError {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.inputInvalid {
+  border-color: rgba(239, 68, 68, 0.65);
+  background: rgba(254, 242, 242, 0.65);
+}
+
+.inputInvalid:focus-visible {
+  outline-color: #ef4444;
+}
+
+.formActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+.formActionsError {
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(254, 226, 226, 0.65);
+  color: #991b1b;
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.88rem;
+}
+
+.formActionsRow {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
 }
 
 .drawerBackdrop {
@@ -427,13 +487,6 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.88rem;
-}
-
-.formActions {
-  display: flex;
-  gap: 0.6rem;
-  justify-content: flex-end;
-  padding-top: 0.5rem;
 }
 
 .grid2 {
