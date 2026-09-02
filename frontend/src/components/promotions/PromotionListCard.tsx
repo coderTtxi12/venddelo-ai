@@ -55,11 +55,11 @@ export function PromotionListCard({ promotion, onEdit, onDelete }: PromotionList
         </span>
       </button>
       <div className={styles.couponCardActions} role="group" aria-label="Acciones de promoción">
-        <Tooltip title={catalog ? 'Editar descuento en el producto' : 'Editar'}>
+        <Tooltip title={catalog ? 'Ver detalles' : 'Editar'}>
           <span>
             <IconButton
               size="small"
-              aria-label={catalog ? 'Editar descuento en el producto' : 'Editar promoción'}
+              aria-label={catalog ? 'Ver detalles de la promoción' : 'Editar promoción'}
               onClick={() => onEdit(promotion)}
             >
               <EditOutlinedIcon fontSize="small" />

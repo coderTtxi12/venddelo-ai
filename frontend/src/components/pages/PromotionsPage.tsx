@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
@@ -44,6 +43,7 @@ import {
 } from '@/lib/promotions/filters';
 import { mapPromotionToForm } from '@/lib/promotions/mapPromotionToForm';
 import { persistPromotion } from '@/lib/promotions/persistPromotion';
+import { templateFromPromotion } from '@/lib/promotions/templates';
 import type { PromotionTemplate } from '@/lib/promotions/templates';
 import { templateFromPromotion } from '@/lib/promotions/templates';
 import type { PromotionFormSubmitPayload } from '@/components/marketing/PromotionForm';
@@ -51,8 +51,6 @@ import PromotionSheet from '@/components/promotions/PromotionSheet';
 import { PromotionListCard } from '@/components/promotions/PromotionListCard';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { ToolbarSelect } from '@/components/ui/ToolbarSelect';
-import { catalogPromotionProductId } from '@/lib/promotions/productCatalogDiscount';
-import { buildProductEditHref } from '@/lib/search/productsPageFilter';
 
 const SEARCH_DEBOUNCE_MS = 250;
 
@@ -111,7 +109,6 @@ function SortHeader({
 }
 
 export default function PromotionsPage() {
-  const router = useRouter();
   const { accessToken } = useAuth();
   const { selectedRestaurantId, loading: accessLoading } = useRestaurantAccess();
 
@@ -122,6 +119,7 @@ export default function PromotionsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
+  const [catalogPromotion, setCatalogPromotion] = useState<Promotion | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<PromotionTemplate | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -182,21 +180,24 @@ export default function PromotionsPage() {
 
   const openCreateSheet = () => {
     setEditingPromotion(null);
+    setCatalogPromotion(null);
     setSelectedTemplate(null);
     setFormError(null);
     setSheetOpen(true);
   };
 
   const openEditSheet = (promotion: Promotion) => {
-    const catalogProductId = catalogPromotionProductId(promotion);
-    if (catalogProductId) {
-      router.push(buildProductEditHref(catalogProductId));
+    setFormError(null);
+    if (isCatalogPromotion(promotion)) {
+      setEditingPromotion(null);
+      setSelectedTemplate(null);
+      setCatalogPromotion(promotion);
+      setSheetOpen(true);
       return;
     }
-    if (isCatalogPromotion(promotion)) return;
+    setCatalogPromotion(null);
     setEditingPromotion(promotion);
     setSelectedTemplate(templateFromPromotion(promotion));
-    setFormError(null);
     setSheetOpen(true);
   };
 
@@ -204,6 +205,7 @@ export default function PromotionsPage() {
     if (saving) return;
     setSheetOpen(false);
     setEditingPromotion(null);
+    setCatalogPromotion(null);
     setSelectedTemplate(null);
   };
 
@@ -212,11 +214,15 @@ export default function PromotionsPage() {
     setSaving(true);
     setFormError(null);
     try {
+      const template =
+        selectedTemplate ??
+        (editingPromotion ? templateFromPromotion(editingPromotion) : 'product_discount');
       const saved = await persistPromotion(
         accessToken,
         selectedRestaurantId,
         payload,
         editingPromotion?.id,
+        template,
       );
       setPromotions((prev) => {
         const exists = prev.some((item) => item.id === saved.id);
@@ -394,18 +400,12 @@ export default function PromotionsPage() {
                       <td>{formatPromotionDateRange(promotion.starts_at, promotion.ends_at)}</td>
                       <td>
                         <div className={styles.actionsInner}>
-                          <Tooltip
-                            title={
-                              catalog
-                                ? 'Editar descuento en el producto'
-                                : 'Editar'
-                            }
-                          >
+                          <Tooltip title={catalog ? 'Ver detalles' : 'Editar'}>
                             <span>
                               <IconButton
                                 size="small"
                                 aria-label={
-                                  catalog ? 'Editar descuento en el producto' : 'Editar promoción'
+                                  catalog ? 'Ver detalles de la promoción' : 'Editar promoción'
                                 }
                                 onClick={() => openEditSheet(promotion)}
                               >
@@ -448,6 +448,7 @@ export default function PromotionsPage() {
         open={sheetOpen}
         mode={editingPromotion ? 'edit' : 'create'}
         template={selectedTemplate}
+        catalogPromotion={catalogPromotion}
         initialValues={editingPromotion ? mapPromotionToForm(editingPromotion) : null}
         restaurantId={selectedRestaurantId ?? ''}
         accessToken={accessToken ?? ''}
