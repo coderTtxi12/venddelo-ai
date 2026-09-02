@@ -54,7 +54,7 @@ import { ListPagination } from '@/components/ui/ListPagination';
 import { buildDeleteConfirmCopy } from '@/lib/menu/deleteConfirmCopy';
 import { paginateItems } from '@/lib/paginate';
 import { normalizeSearchText, tokenizeQuery } from '@/lib/search/fuzzyMatch';
-import { parseProductsPageFilter } from '@/lib/search/productsPageFilter';
+import { parseProductsPageFilter, PRODUCTS_PAGE_EDIT_PARAM } from '@/lib/search/productsPageFilter';
 import {
   CATEGORIES_PAGE_SIZE,
   deleteSupplierCategory,
@@ -596,6 +596,7 @@ export default function ProductsPage() {
   const [categorySearch, setCategorySearch] = useState('');
   const [productNameFilter, setProductNameFilter] = useState('');
   const appliedProductsPageFilterRef = useRef<string | null>(null);
+  const appliedProductEditRef = useRef<string | null>(null);
 
   useEffect(() => {
     const filter = parseProductsPageFilter(searchParams);
@@ -1220,6 +1221,15 @@ export default function ProductsPage() {
         setEditingProductLoading(false);
       });
   }
+
+  useEffect(() => {
+    const editId = searchParams.get(PRODUCTS_PAGE_EDIT_PARAM)?.trim();
+    if (!editId || !supplierId || !accessToken) return;
+    if (appliedProductEditRef.current === editId) return;
+    appliedProductEditRef.current = editId;
+    openEditProduct(editId);
+    router.replace('/products', { scroll: false });
+  }, [searchParams, supplierId, accessToken, router]);
 
   useEffect(() => {
     if (!productDrawerOpen || !supplierId || !accessToken || copySourceProducts) return;

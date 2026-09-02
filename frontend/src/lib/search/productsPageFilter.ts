@@ -5,6 +5,7 @@ export type ProductsPageFilter = {
 
 export const PRODUCTS_PAGE_FILTER_QUERY_PARAM = 'q';
 export const PRODUCTS_PAGE_FILTER_TAB_PARAM = 'tab';
+export const PRODUCTS_PAGE_EDIT_PARAM = 'edit';
 
 export function buildProductsPageHref(filter: ProductsPageFilter): string {
   const params = new URLSearchParams();
@@ -23,4 +24,10 @@ export function parseProductsPageFilter(searchParams: Pick<URLSearchParams, 'get
   }
 
   return { tab: 'products', query };
+}
+
+export function buildProductEditHref(productId: string): string {
+  const params = new URLSearchParams();
+  params.set(PRODUCTS_PAGE_EDIT_PARAM, productId);
+  return `/products?${params.toString()}`;
 }
