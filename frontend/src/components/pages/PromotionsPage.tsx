@@ -43,9 +43,7 @@ import {
 } from '@/lib/promotions/filters';
 import { mapPromotionToForm } from '@/lib/promotions/mapPromotionToForm';
 import { persistPromotion } from '@/lib/promotions/persistPromotion';
-import { templateFromPromotion } from '@/lib/promotions/templates';
-import type { PromotionTemplate } from '@/lib/promotions/templates';
-import { templateFromPromotion } from '@/lib/promotions/templates';
+import { templateFromPromotion, type PromotionTemplate } from '@/lib/promotions/templates';
 import type { PromotionFormSubmitPayload } from '@/components/marketing/PromotionForm';
 import PromotionSheet from '@/components/promotions/PromotionSheet';
 import { PromotionListCard } from '@/components/promotions/PromotionListCard';

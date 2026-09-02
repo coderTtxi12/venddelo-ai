@@ -9,6 +9,7 @@ import type { Category, Product, Promotion } from '@/lib/api/types';
 import { deletePromotion, listAllPromotions } from '@/lib/api/promotions';
 import { mapPromotionToForm, PROMOTION_STATUS_HELP } from '@/lib/promotions/mapPromotionToForm';
 import { persistPromotion } from '@/lib/promotions/persistPromotion';
+import { templateFromPromotion } from '@/lib/promotions/templates';
 import { PRODUCT_CATALOG_DISCOUNT_PREFIX } from '@/lib/promotions/productCatalogDiscount';
 import {
   deletePromotionDraft,
@@ -245,11 +246,13 @@ export default function MarketingPage() {
     setSaving(true);
     setFormError(null);
     try {
+      const template = editingPromotion ? templateFromPromotion(editingPromotion) : 'bundle';
       const saved = await persistPromotion(
         accessToken,
         supplierId,
         payload,
         editingPromotion?.id ?? null,
+        template,
       );
       setPromotions((prev) => {
         const index = prev.findIndex((promotion) => promotion.id === saved.id);

@@ -3,6 +3,7 @@ import type { CreateManualPromotionInput } from '@/lib/api/promotions';
 import { createPromotion, updatePromotion } from '@/lib/api/promotions';
 import type { Promotion } from '@/lib/api/types';
 import { mapPromotionFormToApi } from '@/lib/promotions/mapPromotionForm';
+import type { PromotionTemplate } from '@/lib/promotions/templates';
 
 function toUpdateBody(api: CreateManualPromotionInput): Partial<CreateManualPromotionInput> {
   return {
@@ -30,8 +31,9 @@ export async function persistPromotion(
   restaurantId: string,
   payload: PromotionFormSubmitPayload,
   editingPromotionId?: string | null,
+  template: PromotionTemplate = 'bundle',
 ): Promise<Promotion> {
-  const api = mapPromotionFormToApi(payload);
+  const api = mapPromotionFormToApi(payload, template);
 
   if (editingPromotionId) {
     return updatePromotion(token, restaurantId, editingPromotionId, toUpdateBody(api));
