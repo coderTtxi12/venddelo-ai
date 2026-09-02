@@ -81,4 +81,43 @@ def test_customer_activity_endpoint(client, engine):
     body = response.json()
     assert body["phone_key"] == "5512345678"
     assert len(body["items"]) == 2
+    assert body["total"] == 2
+    assert body["has_more"] is False
+    assert body["summary"]["menu_count"] == 2
+    assert len(body["summary"]["timeline"]) == 2
     assert {item["kind"] for item in body["items"]} == {"menu"}
+
+
+@requires_db
+def test_customer_activity_endpoint_pagination(client, engine):
+    restaurant_id = _seed_customers(engine, "api-cust-3")
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restaurant = uow.restaurants.get(restaurant_id)
+        assert restaurant is not None
+        for cents in (3000, 4000, 5000):
+            uow.orders.add(
+                OrderCreate(
+                    restaurant_id=restaurant.id,
+                    type="takeout",
+                    customer_name="María López",
+                    customer_phone="+525512345678",
+                    payment_method="cash",
+                    subtotal_cents=cents,
+                    total_cents=cents,
+                    status="delivered",
+                    items=[],
+                )
+            )
+        uow.commit()
+
+    response = client.get(
+        f"/api/v1/restaurants/{restaurant_id}/customers/5512345678/activity?limit=2&sort=amount-desc",
+        headers=AUTH,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert len(body["items"]) == 2
+    assert body["total"] >= 2
+    assert body["has_more"] is True
+    assert body["next_cursor"]

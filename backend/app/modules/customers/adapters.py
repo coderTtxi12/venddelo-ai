@@ -14,14 +14,17 @@ from app.modules.customers.grouping import (
     CustomerEvent,
     activity_items,
     apply_customer_filters,
+    build_activity_summary,
     customer_stats,
     group_customer_events,
     latest_delivery_address,
     order_display_id,
+    sort_activity_items,
     sort_customers,
 )
 from app.modules.customers.phone import customer_phone_key
 from app.modules.customers.schemas import (
+    ActivityHistorySort,
     CustomerFrequency,
     CustomerRecency,
     CustomerSort,
@@ -84,6 +87,9 @@ class SqlAlchemyCustomerRepository:
         self,
         restaurant_id: uuid.UUID,
         phone_key: str,
+        params: PaginationParams,
+        *,
+        sort: ActivityHistorySort = "date-desc",
     ) -> RestaurantCustomerActivity | None:
         events = [
             event
@@ -95,11 +101,24 @@ class SqlAlchemyCustomerRepository:
         customers = group_customer_events(events)
         customer = customers[0]
         last_address, last_maps_url = latest_delivery_address(events)
+        all_items = activity_items(events)
+        summary = build_activity_summary(all_items)
+        ordered = sort_activity_items(all_items, sort)
+
+        offset = _decode_offset(params.cursor)
+        page_items = ordered[offset : offset + params.limit]
+        next_offset = offset + len(page_items)
+        has_more = next_offset < len(ordered)
+
         return RestaurantCustomerActivity(
             phone_key=customer.phone_key,
             customer_name=customer.customer_name,
             customer_phone=customer.customer_phone,
-            items=activity_items(events),
+            summary=summary,
+            items=page_items,
+            total=len(ordered),
+            has_more=has_more,
+            next_cursor=encode_cursor(str(next_offset)) if has_more else None,
             last_delivery_address=last_address,
             last_delivery_maps_url=last_maps_url,
         )

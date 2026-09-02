@@ -6,6 +6,7 @@ from app.core.exceptions import NotFoundError
 from app.core.pagination import PaginationParams
 from app.modules.customers.adapters import SqlAlchemyCustomerRepository
 from app.modules.customers.schemas import (
+    ActivityHistorySort,
     CustomerFrequency,
     CustomerRecency,
     CustomerSort,
@@ -59,9 +60,17 @@ class CustomerService:
         self,
         restaurant_id: uuid.UUID,
         phone_key: str,
+        params: PaginationParams,
+        *,
+        sort: ActivityHistorySort = "date-desc",
     ) -> RestaurantCustomerActivity:
         self._require_restaurant(restaurant_id)
-        activity = self._customers.activity_for_phone(restaurant_id, phone_key)
+        activity = self._customers.activity_for_phone(
+            restaurant_id,
+            phone_key,
+            params,
+            sort=sort,
+        )
         if activity is None:
             raise NotFoundError("Cliente no encontrado")
         return activity

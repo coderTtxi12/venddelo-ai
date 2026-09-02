@@ -13,6 +13,7 @@ CustomerSortOrder = Literal["asc", "desc"]
 CustomerFrequency = Literal["new", "repeat"]
 CustomerSpend = Literal["spent", "none"]
 CustomerRecency = Literal["7d", "30d", "90d"]
+ActivityHistorySort = Literal["date-desc", "date-asc", "amount-desc", "amount-asc"]
 
 
 class RestaurantCustomer(BaseModel):
@@ -53,10 +54,28 @@ class RestaurantCustomerActivityItem(BaseModel):
     delivery_maps_url: str | None = None
 
 
+class RestaurantCustomerActivitySummary(BaseModel):
+    menu_count: int = 0
+    delivery_count: int = 0
+    status_delivered: int = 0
+    status_cancelled: int = 0
+    status_in_progress: int = 0
+    status_other: int = 0
+    timeline: list[datetime] = Field(default_factory=list)
+    avg_ticket_cents: int | None = None
+    avg_item_quantity: float | None = None
+
+
 class RestaurantCustomerActivity(BaseModel):
     phone_key: str
     customer_name: str
     customer_phone: str
+    summary: RestaurantCustomerActivitySummary = Field(
+        default_factory=RestaurantCustomerActivitySummary,
+    )
     items: list[RestaurantCustomerActivityItem] = Field(default_factory=list)
+    total: int = 0
+    has_more: bool = False
+    next_cursor: str | None = None
     last_delivery_address: str | None = None
     last_delivery_maps_url: str | None = None

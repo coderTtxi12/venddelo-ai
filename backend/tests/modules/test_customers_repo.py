@@ -1,5 +1,5 @@
 from app.core.pagination import PaginationParams
-from app.modules.customers.adapters import SqlAlchemyCustomerRepository
+from app.core.pagination import PaginationParams
 from app.modules.orders.adapters import SqlAlchemyOrderRepository
 from app.modules.orders.schemas import OrderCreate
 from app.modules.restaurants.adapters import SqlAlchemyRestaurantRepository
@@ -115,9 +115,56 @@ def test_customer_activity_lists_orders_for_phone_key(session):
     orders.add(_order(restaurant.id, customer_phone="5512345678", total_cents=7000))
     orders.add(_order(restaurant.id, customer_phone="5559990000", customer_name="Otro"))
 
-    activity = customers.activity_for_phone(restaurant.id, "5512345678")
+    activity = customers.activity_for_phone(
+        restaurant.id,
+        "5512345678",
+        PaginationParams(limit=20),
+    )
     assert activity is not None
     assert len(activity.items) == 2
+    assert activity.total == 2
+    assert activity.has_more is False
+    assert activity.summary.menu_count == 2
+    assert len(activity.summary.timeline) == 2
     assert any(item.display_id == "AB12C" for item in activity.items)
     assert activity.phone_key == "5512345678"
     assert first.id is not None
+
+
+@requires_db
+def test_customer_activity_pagination_and_sort(session):
+    restaurant = _restaurant(session, "cust-act-page")
+    orders = SqlAlchemyOrderRepository(session)
+    customers = SqlAlchemyCustomerRepository(session)
+
+    for cents in (1000, 2000, 3000, 4000, 5000):
+        orders.add(
+            _order(
+                restaurant.id,
+                customer_phone="5512345678",
+                total_cents=cents,
+                status="delivered",
+            )
+        )
+
+    first_page = customers.activity_for_phone(
+        restaurant.id,
+        "5512345678",
+        PaginationParams(limit=2),
+        sort="amount-desc",
+    )
+    assert first_page is not None
+    assert len(first_page.items) == 2
+    assert first_page.total == 5
+    assert first_page.has_more is True
+    assert first_page.items[0].total_cents == 5000
+
+    second_page = customers.activity_for_phone(
+        restaurant.id,
+        "5512345678",
+        PaginationParams(limit=2, cursor=first_page.next_cursor),
+        sort="amount-desc",
+    )
+    assert second_page is not None
+    assert len(second_page.items) == 2
+    assert second_page.items[0].total_cents == 4000

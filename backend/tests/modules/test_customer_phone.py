@@ -224,3 +224,23 @@ def test_latest_delivery_address_prefers_most_recent():
     address, maps_url = latest_delivery_address(events)
     assert address == "Av. Nueva 99"
     assert maps_url == "https://maps.example/new"
+
+
+def test_latest_delivery_address_prefers_coordinates_over_text_maps_url():
+    from app.modules.customers.grouping import latest_delivery_address
+
+    events = [
+        _event(
+            id="new",
+            source="delivery",
+            order_type="delivery",
+            delivery_address="Av. Nueva 99",
+            delivery_latitude=19.635,
+            delivery_longitude=-99.095,
+            delivery_maps_url="https://maps.example/search?q=Av+Nueva",
+            created_at=datetime(2026, 8, 20, tzinfo=UTC),
+        ),
+    ]
+    address, maps_url = latest_delivery_address(events)
+    assert address == "Av. Nueva 99"
+    assert maps_url == "https://www.google.com/maps?q=19.635,-99.095"

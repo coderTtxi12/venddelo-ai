@@ -5,6 +5,7 @@ from app.core.pagination import PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.modules.customers.adapters import SqlAlchemyCustomerRepository
 from app.modules.customers.schemas import (
+    ActivityHistorySort,
     CustomerFrequency,
     CustomerRecency,
     CustomerSort,
@@ -61,7 +62,9 @@ def list_restaurant_customers(
 )
 def get_restaurant_customer_activity(
     phone_key: str,
+    params: PaginationParams = Depends(pagination_params),
+    sort: ActivityHistorySort = Query(default="date-desc"),
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: CustomerService = Depends(_service),
 ) -> RestaurantCustomerActivity:
-    return service.activity_for_phone(restaurant.id, phone_key)
+    return service.activity_for_phone(restaurant.id, phone_key, params, sort=sort)

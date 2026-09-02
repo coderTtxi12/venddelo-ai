@@ -7,6 +7,7 @@ from uuid import UUID
 
 from app.modules.customers.phone import LEGACY_WHATSAPP_KEY, customer_phone_key
 from app.modules.customers.schemas import (
+    ActivityHistorySort,
     CustomerFrequency,
     CustomerRecency,
     CustomerSort,
@@ -15,6 +16,7 @@ from app.modules.customers.schemas import (
     CustomerSpend,
     RestaurantCustomer,
     RestaurantCustomerActivityItem,
+    RestaurantCustomerActivitySummary,
     RestaurantCustomerStats,
 )
 
@@ -111,15 +113,24 @@ def _is_delivery_event(event: CustomerEvent) -> bool:
     return event.source == "delivery" or event.order_type == "delivery"
 
 
+def google_maps_coordinate_url(latitude: float, longitude: float) -> str:
+    return f"https://www.google.com/maps?q={latitude},{longitude}"
+
+
 def latest_delivery_address(events: list[CustomerEvent]) -> tuple[str | None, str | None]:
     ordered = sorted(events, key=lambda event: event.created_at, reverse=True)
     for event in ordered:
-        address = (event.delivery_address or "").strip()
-        if not address or not _is_delivery_event(event):
+        if not _is_delivery_event(event):
             continue
-        maps_url = (event.delivery_maps_url or "").strip() or None
-        if maps_url is None and event.delivery_latitude is not None and event.delivery_longitude is not None:
-            maps_url = f"https://www.google.com/maps?q={event.delivery_latitude},{event.delivery_longitude}"
+        address = (event.delivery_address or "").strip() or None
+        lat = event.delivery_latitude
+        lng = event.delivery_longitude
+        if lat is not None and lng is not None:
+            maps_url = google_maps_coordinate_url(lat, lng)
+        else:
+            maps_url = (event.delivery_maps_url or "").strip() or None
+        if not address and not maps_url:
+            continue
         return address, maps_url
     return None, None
 
@@ -147,6 +158,103 @@ def activity_items(
         )
         for event in ordered
     ]
+
+
+_IN_PROGRESS_STATUSES = frozenset(
+    {
+        "pending",
+        "confirmed",
+        "preparing",
+        "ready",
+        "scheduled",
+        "searching",
+        "offered",
+        "assigned",
+        "picked_up",
+        "in_transit",
+        "unassigned",
+    }
+)
+
+
+def _activity_status_bucket(status: str) -> str:
+    if status == "delivered":
+        return "delivered"
+    if status == "cancelled":
+        return "cancelled"
+    if status in _IN_PROGRESS_STATUSES:
+        return "in_progress"
+    return "other"
+
+
+def sort_activity_items(
+    items: list[RestaurantCustomerActivityItem],
+    sort: ActivityHistorySort = "date-desc",
+) -> list[RestaurantCustomerActivityItem]:
+    if sort == "date-desc":
+        return sorted(items, key=lambda item: item.created_at.timestamp(), reverse=True)
+    if sort == "date-asc":
+        return sorted(items, key=lambda item: item.created_at.timestamp())
+    if sort == "amount-desc":
+        return sorted(
+            items,
+            key=lambda item: (item.total_cents, item.created_at.timestamp()),
+            reverse=True,
+        )
+    return sorted(items, key=lambda item: (item.total_cents, item.created_at.timestamp()))
+
+
+def build_activity_summary(
+    items: list[RestaurantCustomerActivityItem],
+) -> RestaurantCustomerActivitySummary:
+    menu_count = sum(1 for item in items if item.kind == "menu")
+    delivery_count = sum(1 for item in items if item.kind == "delivery")
+    status_delivered = 0
+    status_cancelled = 0
+    status_in_progress = 0
+    status_other = 0
+    delivered: list[RestaurantCustomerActivityItem] = []
+    with_items: list[RestaurantCustomerActivityItem] = []
+
+    for item in items:
+        bucket = _activity_status_bucket(item.status)
+        if bucket == "delivered":
+            status_delivered += 1
+            delivered.append(item)
+        elif bucket == "cancelled":
+            status_cancelled += 1
+        elif bucket == "in_progress":
+            status_in_progress += 1
+        else:
+            status_other += 1
+        if item.item_quantity > 0:
+            with_items.append(item)
+
+    avg_ticket_cents: int | None = None
+    if delivered:
+        avg_ticket_cents = round(
+            sum(item.total_cents for item in delivered) / len(delivered),
+        )
+
+    avg_item_quantity: float | None = None
+    if with_items:
+        avg_item_quantity = round(
+            sum(item.item_quantity for item in with_items) / len(with_items),
+            1,
+        )
+
+    timeline = sorted((item.created_at for item in items), reverse=True)
+    return RestaurantCustomerActivitySummary(
+        menu_count=menu_count,
+        delivery_count=delivery_count,
+        status_delivered=status_delivered,
+        status_cancelled=status_cancelled,
+        status_in_progress=status_in_progress,
+        status_other=status_other,
+        timeline=timeline,
+        avg_ticket_cents=avg_ticket_cents,
+        avg_item_quantity=avg_item_quantity,
+    )
 
 
 def matches_query(customer: RestaurantCustomer, query: str) -> bool:
