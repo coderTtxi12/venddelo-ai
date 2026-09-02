@@ -8,7 +8,7 @@ import { isLegacyWhatsAppPendingPhone } from '@/lib/digital-menu/checkout/custom
 
 export const CUSTOMER_SOURCE_LABELS: Record<CustomerSource, string> = {
   menu: 'Menú digital',
-  delivery: 'Delivery',
+  delivery: 'Pedido manual',
 };
 
 export const CUSTOMER_SORT_LABELS: Record<CustomerSort, string> = {
@@ -194,7 +194,7 @@ export function activityStatusLabel(kind: CustomerSource, status: string): strin
 }
 
 export function activityKindLabel(kind: CustomerSource, orderType: string | null): string {
-  if (kind === 'delivery') return 'Delivery manual';
+  if (kind === 'delivery') return 'Pedido manual';
   if (orderType === 'delivery') return 'Menú · Domicilio';
   if (orderType === 'takeout') return 'Menú · Para llevar';
   return 'Menú digital';

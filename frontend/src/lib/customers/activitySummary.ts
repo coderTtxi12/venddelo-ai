@@ -161,5 +161,5 @@ export function activityItemCountsTowardSpend(status: string): boolean {
 }
 
 export function channelLabel(source: CustomerSource): string {
-  return source === 'menu' ? 'Menú digital' : 'Delivery manual';
+  return source === 'menu' ? 'Menú digital' : 'Pedido manual';
 }

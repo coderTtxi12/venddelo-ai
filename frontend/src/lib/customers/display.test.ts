@@ -113,5 +113,5 @@ test('toggleCustomerColumnSort switches column then direction', () => {
 test('visit and activity labels', () => {
   assert.equal(visitSummary(maria), '2 pedidos · 1 delivery');
   assert.equal(activityKindLabel('menu', 'takeout'), 'Menú · Para llevar');
-  assert.equal(activityKindLabel('delivery', 'delivery'), 'Delivery manual');
+  assert.equal(activityKindLabel('delivery', 'delivery'), 'Pedido manual');
 });
