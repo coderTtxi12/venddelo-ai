@@ -1,5 +1,5 @@
 import { apiRequest, type RequestOptions } from './client';
-import type { Category, Product, Promotion, RestaurantSchedule } from './types';
+import type { Category, Product, Promotion, RestaurantSchedule, CouponType } from './types';
 import type { PaymentMethodKey } from '@/lib/restaurantPaymentConfig';
 import type { RestaurantServiceType } from '@/lib/restaurantServices';
 import type { PublicRestaurantSocialLinks } from '@/lib/digital-menu/restaurantSocialLinks';
@@ -75,6 +75,7 @@ export type CartQuote = {
   order_discount_cents: number;
   total_cents: number;
   applied_order_promotion_id: string | null;
+  applied_free_shipping_promotion_id?: string | null;
   delivery_fee_cents?: number;
   coupon: CartQuoteCoupon | null;
   coupon_error: CartQuoteCouponError | null;

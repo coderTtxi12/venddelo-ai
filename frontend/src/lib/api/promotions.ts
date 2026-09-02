@@ -3,7 +3,7 @@ import type { CursorPage, Promotion } from './types';
 
 export const PROMOTIONS_PAGE_SIZE = 20;
 
-export type PromotionType = 'percent' | 'amount' | 'combo' | 'bundle';
+export type PromotionType = 'percent' | 'amount' | 'combo' | 'bundle' | 'free_shipping';
 export type PromotionScope = 'product' | 'category' | 'order';
 
 export type PromotionScheduleInput = {
@@ -22,6 +22,7 @@ export type PromotionBundleInput = {
 export type CreateManualPromotionInput = {
   name: string;
   image_path?: string | null;
+  show_banner?: boolean;
   type: PromotionType;
   scope: PromotionScope;
   percent?: number | null;

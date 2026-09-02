@@ -235,7 +235,8 @@ export type Promotion = {
   restaurant_id: string;
   name: string;
   image_path: string | null;
-  type: 'percent' | 'amount' | 'combo' | 'bundle' | '2x1';
+  show_banner?: boolean;
+  type: 'percent' | 'amount' | 'combo' | 'bundle' | '2x1' | 'free_shipping';
   scope: 'product' | 'category' | 'order';
   percent: number | null;
   amount_cents: number | null;
@@ -263,7 +264,7 @@ export type Promotion = {
 
 export type CouponType = 'percent' | 'amount' | 'free_shipping';
 export type CouponScope = 'all' | 'category' | 'product';
-export type CouponEffectiveStatus = 'active' | 'inactive' | 'expired' | 'sold_out';
+export type CouponEffectiveStatus = 'active' | 'inactive' | 'expired' | 'scheduled' | 'sold_out';
 
 export type Coupon = {
   id: string;
@@ -275,7 +276,9 @@ export type Coupon = {
   amount_cents: number | null;
   scope: CouponScope;
   stock_qty: number | null;
+  starts_on: string | null;
   expires_on: string | null;
+  recurrence_weekdays: number[] | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -284,6 +287,17 @@ export type Coupon = {
   redeemed_count: number;
   remaining_qty: number | null;
   effective_status: CouponEffectiveStatus | null;
+};
+
+export type CouponApplication = {
+  order_id: string;
+  customer_name: string;
+  customer_phone: string;
+  status: OrderStatus;
+  total_cents: number;
+  coupon_discount_cents: number;
+  created_at: string;
+  redeemed: boolean;
 };
 
 export type OrderStatus =
