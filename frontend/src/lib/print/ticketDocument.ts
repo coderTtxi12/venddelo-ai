@@ -212,11 +212,23 @@ export function buildKitchenTicketDocument(opts: {
       value: `-${formatCents(totals.lineDiscountCents)}`,
     });
   }
-  if (totals.orderDiscountCents > 0) {
+  if (totals.promoOrderDiscountCents > 0) {
     lines.push({
       kind: 'total',
       label: 'Descuento del pedido',
-      value: `-${formatCents(totals.orderDiscountCents)}`,
+      value: `-${formatCents(totals.promoOrderDiscountCents)}`,
+    });
+  }
+  if (totals.appliedCouponCode) {
+    lines.push({
+      kind: 'total',
+      label: `Cupón ${totals.appliedCouponCode}`,
+      value:
+        totals.couponWaivedDeliveryCents > 0
+          ? 'Envío gratis'
+          : totals.couponDiscountCents > 0
+            ? `-${formatCents(totals.couponDiscountCents)}`
+            : '—',
     });
   }
   if (totals.deliveryFeeCents > 0) {

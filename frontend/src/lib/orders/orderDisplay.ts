@@ -167,8 +167,19 @@ export function sumOrderLineDiscountCents(order: Order): number {
 }
 
 export function resolveOrderLevelDiscounts(order: Order): AppliedOrderDiscount[] {
+  return resolvePromoOrderLevelDiscounts(order);
+}
+
+const COUPON_DISCOUNT_LABEL_PREFIX = /^Cupón\s+/i;
+
+export function isCouponAppliedOrderDiscount(discount: AppliedOrderDiscount): boolean {
+  return COUPON_DISCOUNT_LABEL_PREFIX.test(discount.label);
+}
+
+export function resolvePromoOrderLevelDiscounts(order: Order): AppliedOrderDiscount[] {
   const applied = (order.applied_order_discounts ?? []).filter(
-    (discount) => discount.applied && discount.discount_cents > 0,
+    (discount) =>
+      discount.applied && discount.discount_cents > 0 && !isCouponAppliedOrderDiscount(discount),
   );
   if (applied.length > 0) return applied;
   if (order.discount_cents <= 0) return [];
@@ -182,18 +193,43 @@ export function resolveOrderLevelDiscounts(order: Order): AppliedOrderDiscount[]
   ];
 }
 
-export function sumOrderLevelDiscountCents(order: Order): number {
-  const fromSnapshots = resolveOrderLevelDiscounts(order).reduce(
+export function resolveCouponSavingsCents(order: Order): {
+  code: string | null;
+  discountCents: number;
+  waivedDeliveryCents: number;
+} {
+  const code = order.applied_coupon_code?.trim() || null;
+  if (!code) {
+    return { code: null, discountCents: 0, waivedDeliveryCents: 0 };
+  }
+  return {
+    code,
+    discountCents: order.coupon_discount_cents ?? 0,
+    waivedDeliveryCents: order.coupon_waived_delivery_cents ?? 0,
+  };
+}
+
+export function sumPromoOrderLevelDiscountCents(order: Order): number {
+  return resolvePromoOrderLevelDiscounts(order).reduce(
     (sum, discount) => sum + discount.discount_cents,
     0,
   );
-  if (fromSnapshots > 0) return fromSnapshots;
-  return Math.max(0, order.discount_cents);
+}
+
+export function sumOrderLevelDiscountCents(order: Order): number {
+  const coupon = resolveCouponSavingsCents(order);
+  return sumPromoOrderLevelDiscountCents(order) + coupon.discountCents;
 }
 
 export type OrderTotalsBreakdown = {
   subtotalBeforeCents: number;
   lineDiscountCents: number;
+  /** Descuentos de promoción a nivel pedido (sin cupón). */
+  promoOrderDiscountCents: number;
+  couponDiscountCents: number;
+  couponWaivedDeliveryCents: number;
+  appliedCouponCode: string | null;
+  /** @deprecated Usa promoOrderDiscountCents. */
   orderDiscountCents: number;
   /** Productos del restaurante tras descuentos, sin envío. */
   restaurantSubtotalCents: number;
@@ -203,24 +239,29 @@ export type OrderTotalsBreakdown = {
 
 export function buildOrderTotalsBreakdown(order: Order): OrderTotalsBreakdown {
   const lineDiscountCents = sumOrderLineDiscountCents(order);
-  const orderDiscountCents = sumOrderLevelDiscountCents(order);
+  const promoOrderDiscountCents = sumPromoOrderLevelDiscountCents(order);
+  const coupon = resolveCouponSavingsCents(order);
+  const orderLevelDiscountCents = promoOrderDiscountCents + coupon.discountCents;
   const subtotalBeforeCents =
     order.subtotal_before_discount_cents > 0
       ? order.subtotal_before_discount_cents
       : order.subtotal_cents + lineDiscountCents;
 
-  const restaurantFromOrder = Math.max(0, order.subtotal_cents - orderDiscountCents);
   const restaurantComputed = Math.max(
     0,
-    subtotalBeforeCents - lineDiscountCents - orderDiscountCents,
+    subtotalBeforeCents - lineDiscountCents - orderLevelDiscountCents,
   );
   const restaurantSubtotalCents =
-    restaurantFromOrder > 0 ? restaurantFromOrder : restaurantComputed;
+    order.subtotal_cents > 0 ? order.subtotal_cents : restaurantComputed;
 
   return {
     subtotalBeforeCents,
     lineDiscountCents,
-    orderDiscountCents,
+    promoOrderDiscountCents,
+    couponDiscountCents: coupon.discountCents,
+    couponWaivedDeliveryCents: coupon.waivedDeliveryCents,
+    appliedCouponCode: coupon.code,
+    orderDiscountCents: promoOrderDiscountCents,
     restaurantSubtotalCents,
     deliveryFeeCents: order.delivery_fee_cents,
     totalCents: order.total_cents,

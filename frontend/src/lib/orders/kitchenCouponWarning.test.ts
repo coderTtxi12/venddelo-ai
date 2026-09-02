@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   formatKitchenCouponBanner,
+  formatKitchenCouponChip,
   formatKitchenCouponDialogLine,
   joinKitchenWarningBanners,
   orderHasCouponStockWarning,
@@ -41,6 +42,19 @@ test('warning only pending exhausted stock', () => {
     ),
     false,
   );
+});
+
+test('formatKitchenCouponChip shows code only', () => {
+  assert.equal(
+    formatKitchenCouponChip({ applied_coupon_code: 'ENVIOGRATIS' }),
+    'Cupón ENVIOGRATIS',
+  );
+  assert.equal(
+    formatKitchenCouponChip({ applied_coupon_code: 'PIZZA20' }),
+    'Cupón PIZZA20',
+  );
+  assert.equal(formatKitchenCouponChip({ applied_coupon_code: null }), null);
+  assert.equal(formatKitchenCouponChip({ applied_coupon_code: '  ' }), null);
 });
 
 test('joinKitchenWarningBanners drops empty', () => {

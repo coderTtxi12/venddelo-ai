@@ -1,5 +1,3 @@
-import { formatMoney } from '@/lib/currency';
-
 export type KitchenCouponOrder = {
   status: string;
   applied_coupon_id?: string | null;
@@ -38,16 +36,8 @@ export function couponRemainingQty(
 
 export function formatKitchenCouponChip(order: {
   applied_coupon_code?: string | null;
-  coupon_discount_cents?: number;
-  coupon_waived_delivery_cents?: number;
 }): string | null {
-  if (!order.applied_coupon_code) return null;
-  const code = order.applied_coupon_code;
-  if ((order.coupon_waived_delivery_cents ?? 0) > 0) {
-    return `Cupón ${code} · Envío gratis`;
-  }
-  if ((order.coupon_discount_cents ?? 0) > 0) {
-    return `Cupón ${code} · −${formatMoney((order.coupon_discount_cents ?? 0) / 100)}`;
-  }
+  const code = order.applied_coupon_code?.trim();
+  if (!code) return null;
   return `Cupón ${code}`;
 }

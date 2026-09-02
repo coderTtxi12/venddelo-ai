@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { Order, OrderItem, Product } from '@/lib/api/types';
-import { formatOrderDisplayId, resolveOrderItemOptions } from './orderDisplay.ts';
+import {
+  buildOrderTotalsBreakdown,
+  formatOrderDisplayId,
+  resolveOrderItemOptions,
+} from './orderDisplay.ts';
 
 const GROUP_ID = '11111111-1111-1111-1111-111111111111';
 const OPTION_ID = '22222222-2222-2222-2222-222222222222';
@@ -144,4 +148,80 @@ test('formatOrderDisplayId shortens legacy 8-character refs and uuid prefixes', 
     } as Order),
     'ABCDE',
   );
+});
+
+function baseOrder(overrides: Partial<Order> = {}): Order {
+  return {
+    id: '11111111-2222-3333-4444-555555555555',
+    restaurant_id: 'rest-1',
+    type: 'delivery',
+    customer_name: 'Cliente',
+    customer_phone: '+525512345678',
+    payment_method: 'cash',
+    subtotal_cents: 9000,
+    subtotal_before_discount_cents: 11000,
+    discount_cents: 0,
+    total_cents: 12500,
+    applied_order_promotion_id: null,
+    applied_order_discounts: [
+      {
+        label: 'Cupón MXY20',
+        badge: 'MXY20',
+        discount_cents: 2000,
+        applied: true,
+      },
+    ],
+    applied_coupon_id: 'coupon-1',
+    applied_coupon_code: 'MXY20',
+    coupon_discount_cents: 2000,
+    coupon_waived_delivery_cents: 0,
+    status: 'pending',
+    delivery_address: 'Calle 1',
+    delivery_latitude: null,
+    delivery_longitude: null,
+    delivery_fee_cents: 3500,
+    cash_denomination_cents: null,
+    cancellation_reason: null,
+    idempotency_key: null,
+    note: null,
+    kds_cleared_at: null,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    items: [],
+    ...overrides,
+  };
+}
+
+test('buildOrderTotalsBreakdown separates promo and coupon discounts', () => {
+  const totals = buildOrderTotalsBreakdown(baseOrder());
+  assert.equal(totals.promoOrderDiscountCents, 0);
+  assert.equal(totals.couponDiscountCents, 2000);
+  assert.equal(totals.restaurantSubtotalCents, 9000);
+});
+
+test('buildOrderTotalsBreakdown keeps promo order discount separate from coupon', () => {
+  const totals = buildOrderTotalsBreakdown(
+    baseOrder({
+      discount_cents: 1500,
+      subtotal_cents: 7500,
+      total_cents: 11000,
+      applied_order_discounts: [
+        {
+          label: '2x1 en bebidas',
+          badge: null,
+          discount_cents: 1500,
+          applied: true,
+        },
+        {
+          label: 'Cupón MXY20',
+          badge: 'MXY20',
+          discount_cents: 2000,
+          applied: true,
+        },
+      ],
+    }),
+  );
+  assert.equal(totals.promoOrderDiscountCents, 1500);
+  assert.equal(totals.couponDiscountCents, 2000);
+  assert.equal(totals.restaurantSubtotalCents, 7500);
 });

@@ -20,6 +20,10 @@ function takeoutOrder(overrides: Partial<Order> = {}): Order {
     total_cents: 18000,
     applied_order_promotion_id: null,
     applied_order_discounts: [],
+    applied_coupon_id: null,
+    applied_coupon_code: null,
+    coupon_discount_cents: 0,
+    coupon_waived_delivery_cents: 0,
     status: 'pending',
     delivery_address: null,
     delivery_latitude: null,
@@ -234,6 +238,77 @@ test('buildKitchenTicketDocument includes complements when the product catalog i
         line.kind === 'option' &&
         line.text.includes('Personaliza tu bebida') &&
         line.text.includes('Deslactosada'),
+    ),
+  );
+});
+
+test('buildKitchenTicketDocument shows coupon savings without duplicating order discount', () => {
+  const doc = buildKitchenTicketDocument({
+    order: takeoutOrder({
+      type: 'delivery',
+      subtotal_cents: 9000,
+      subtotal_before_discount_cents: 11000,
+      discount_cents: 0,
+      total_cents: 12500,
+      delivery_fee_cents: 3500,
+      applied_coupon_id: 'coupon-1',
+      applied_coupon_code: 'MXY20',
+      coupon_discount_cents: 2000,
+      coupon_waived_delivery_cents: 0,
+      applied_order_discounts: [
+        {
+          label: 'Cupón MXY20',
+          badge: 'MXY20',
+          discount_cents: 2000,
+          applied: true,
+        },
+      ],
+    }),
+    settings: DEFAULT_TICKET_PRINT_SETTINGS,
+    restaurantName: 'Taquería El Sol',
+  });
+
+  assert.equal(
+    doc.lines.some((line) => line.kind === 'total' && line.label === 'Descuento del pedido'),
+    false,
+  );
+  assert.ok(
+    doc.lines.some(
+      (line) =>
+        line.kind === 'total' && line.label === 'Cupón MXY20' && line.value === '-$20.00',
+    ),
+  );
+});
+
+test('buildKitchenTicketDocument shows free shipping coupon on ticket', () => {
+  const doc = buildKitchenTicketDocument({
+    order: takeoutOrder({
+      type: 'delivery',
+      subtotal_cents: 11000,
+      subtotal_before_discount_cents: 11000,
+      total_cents: 11000,
+      delivery_fee_cents: 0,
+      applied_coupon_id: 'coupon-2',
+      applied_coupon_code: 'ENVIO0',
+      coupon_discount_cents: 0,
+      coupon_waived_delivery_cents: 3500,
+      applied_order_discounts: [
+        {
+          label: 'Cupón ENVIO0',
+          badge: 'ENVIO0',
+          discount_cents: 3500,
+          applied: true,
+        },
+      ],
+    }),
+    settings: DEFAULT_TICKET_PRINT_SETTINGS,
+    restaurantName: 'Taquería El Sol',
+  });
+
+  assert.ok(
+    doc.lines.some(
+      (line) =>
+        line.kind === 'total' && line.label === 'Cupón ENVIO0' && line.value === 'Envío gratis',
     ),
   );
 });

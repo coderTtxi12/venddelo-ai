@@ -9,7 +9,6 @@ import CheckBoxOutlinedIcon from '@mui/icons-material/CheckBoxOutlined';
 import DoneAllOutlinedIcon from '@mui/icons-material/DoneAllOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import { useRestaurantOrders } from '@/contexts/RestaurantOrdersContext';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -512,10 +511,10 @@ function OrderDetailContent({
                   <span>-{formatCents(totals.lineDiscountCents)}</span>
                 </div>
               ) : null}
-          {totals.orderDiscountCents > 0 ? (
+          {totals.promoOrderDiscountCents > 0 ? (
             <div className={`${styles.totalRow} ${styles.totalRowDiscount}`}>
               <span>Descuento del pedido</span>
-              <span>-{formatCents(totals.orderDiscountCents)}</span>
+              <span>-{formatCents(totals.promoOrderDiscountCents)}</span>
             </div>
           ) : null}
           {couponChip ? (
