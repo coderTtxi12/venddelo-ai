@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    SmallInteger,
     String,
     Table,
     Text,
@@ -16,7 +17,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import ARRAY, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -69,7 +70,11 @@ class Coupon(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     amount_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     scope: Mapped[str] = mapped_column(String, nullable=False)
     stock_qty: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    starts_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     expires_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    recurrence_weekdays: Mapped[list[int] | None] = mapped_column(
+        ARRAY(SmallInteger), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint("type IN ('amount','percent','free_shipping')", name="coupon_type_allowed"),
