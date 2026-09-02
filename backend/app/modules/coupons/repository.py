@@ -4,7 +4,7 @@ import uuid
 from abc import ABC, abstractmethod
 
 from app.core.pagination import CursorPage, PaginationParams
-from app.modules.coupons.schemas import CouponCreate, CouponDTO, CouponUpdate
+from app.modules.coupons.schemas import CouponCreate, CouponApplicationDTO, CouponDTO, CouponUpdate
 
 
 class CouponRepository(ABC):
@@ -39,3 +39,8 @@ class CouponRepository(ABC):
 
     @abstractmethod
     def redemption_count(self, coupon_id: uuid.UUID) -> int: ...
+
+    @abstractmethod
+    def list_applications(
+        self, coupon_id: uuid.UUID, params: PaginationParams
+    ) -> CursorPage[CouponApplicationDTO]: ...

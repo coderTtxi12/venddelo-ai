@@ -21,8 +21,9 @@ from app.db.models.coupons import (
     coupon_categories,
     coupon_products,
 )
+from app.db.models.orders import Order
 from app.modules.coupons.repository import CouponRepository
-from app.modules.coupons.schemas import CouponCreate, CouponDTO, CouponUpdate
+from app.modules.coupons.schemas import CouponApplicationDTO, CouponCreate, CouponDTO, CouponUpdate
 
 
 class SqlAlchemyCouponRepository(CouponRepository):
@@ -125,7 +126,7 @@ class SqlAlchemyCouponRepository(CouponRepository):
             self._session.flush()
         except IntegrityError as exc:
             self._session.rollback()
-            raise ConflictError("Coupon code already exists") from exc
+            raise ConflictError("Ya existe un cupón con ese código") from exc
         if data.product_ids:
             self.set_products(obj.id, data.product_ids)
         if data.category_ids:
@@ -193,7 +194,7 @@ class SqlAlchemyCouponRepository(CouponRepository):
             self._session.flush()
         except IntegrityError as exc:
             self._session.rollback()
-            raise ConflictError("Coupon code already exists") from exc
+            raise ConflictError("Ya existe un cupón con ese código") from exc
         return self._to_dto(obj)
 
     def soft_delete(self, id: uuid.UUID) -> bool:
@@ -244,3 +245,43 @@ class SqlAlchemyCouponRepository(CouponRepository):
             )
             or 0
         )
+
+    def _redeemed_order_ids(self, order_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+        if not order_ids:
+            return set()
+        rows = self._session.scalars(
+            select(CouponRedemption.order_id).where(CouponRedemption.order_id.in_(order_ids))
+        )
+        return set(rows)
+
+    def list_applications(
+        self, coupon_id: uuid.UUID, params: PaginationParams
+    ) -> CursorPage[CouponApplicationDTO]:
+        stmt = (
+            select(Order)
+            .where(Order.applied_coupon_id == coupon_id)
+            .order_by(Order.created_at.desc(), Order.id.desc())
+            .limit(params.limit + 1)
+        )
+        if params.cursor:
+            created_at, last_id = decode_keyset_cursor(params.cursor)
+            stmt = stmt.where(tuple_(Order.created_at, Order.id) < (created_at, last_id))
+        rows = list(self._session.scalars(stmt))
+        has_more = len(rows) > params.limit
+        rows = rows[: params.limit]
+        redeemed_ids = self._redeemed_order_ids([row.id for row in rows])
+        items = [
+            CouponApplicationDTO(
+                order_id=row.id,
+                customer_name=row.customer_name,
+                customer_phone=row.customer_phone,
+                status=row.status,
+                total_cents=row.total_cents,
+                coupon_discount_cents=row.coupon_discount_cents,
+                created_at=row.created_at,
+                redeemed=row.id in redeemed_ids,
+            )
+            for row in rows
+        ]
+        next_cursor = encode_keyset_cursor(rows[-1].created_at, rows[-1].id) if has_more else None
+        return CursorPage(items=items, next_cursor=next_cursor, has_more=has_more)

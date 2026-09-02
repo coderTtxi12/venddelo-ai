@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 from app.api.deps import pagination_params, require_owned_restaurant
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
-from app.modules.coupons.schemas import CouponCreate, CouponDTO, CouponUpdate
+from app.modules.coupons.schemas import CouponApplicationDTO, CouponCreate, CouponDTO, CouponUpdate
 from app.modules.coupons.service import CouponService
 from app.modules.restaurants.schemas import RestaurantDTO
 
@@ -52,6 +52,19 @@ def update_coupon(
     service: CouponService = Depends(_service),
 ) -> CouponDTO:
     return service.update(restaurant.id, coupon_id, data, timezone=restaurant.timezone)
+
+
+@router.get(
+    "/restaurants/{restaurant_id}/coupons/{coupon_id}/applications",
+    response_model=CursorPage[CouponApplicationDTO],
+)
+def list_coupon_applications(
+    coupon_id: uuid.UUID,
+    params: PaginationParams = Depends(pagination_params),
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: CouponService = Depends(_service),
+) -> CursorPage[CouponApplicationDTO]:
+    return service.list_applications(restaurant.id, coupon_id, params)
 
 
 @router.delete(
