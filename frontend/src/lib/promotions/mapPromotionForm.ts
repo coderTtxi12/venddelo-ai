@@ -1,5 +1,6 @@
 import type { PromotionFormSubmitPayload } from '@/components/marketing/PromotionForm';
 import type { CreateManualPromotionInput, PromotionType } from '@/lib/api/promotions';
+import type { PromotionTemplate } from '@/lib/promotions/templates';
 
 function toIsoOrNull(value: string): string | null {
   const trimmed = value.trim();
@@ -9,15 +10,13 @@ function toIsoOrNull(value: string): string | null {
   return date.toISOString();
 }
 
-function resolvePromotionType(payload: PromotionFormSubmitPayload): PromotionType {
-  if (payload.kind === 'bundle') return 'bundle';
-  if (
-    payload.scope === 'product' &&
-    payload.productIds.length >= 2 &&
-    payload.kind !== 'bundle'
-  ) {
-    return 'combo';
-  }
+export function resolvePromotionType(
+  payload: PromotionFormSubmitPayload,
+  template: PromotionTemplate,
+): PromotionType {
+  if (template === 'bundle' || payload.kind === 'bundle') return 'bundle';
+  if (template === 'combo') return 'combo';
+  if (template === 'order_threshold' && payload.kind === 'free_shipping') return 'free_shipping';
   if (payload.kind === 'free_shipping') return 'free_shipping';
   if (payload.kind === 'amount') return 'amount';
   return 'percent';
@@ -25,10 +24,11 @@ function resolvePromotionType(payload: PromotionFormSubmitPayload): PromotionTyp
 
 export function mapPromotionFormToApi(
   payload: PromotionFormSubmitPayload,
+  template: PromotionTemplate,
 ): CreateManualPromotionInput {
   const schedule = payload.schedule;
   const useWeekdays = schedule.useWeekdays && schedule.weekdays.length > 0;
-  const type = resolvePromotionType(payload);
+  const type = resolvePromotionType(payload, template);
 
   const input: CreateManualPromotionInput = {
     name: payload.name.trim(),
