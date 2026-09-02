@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, time
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
@@ -83,6 +84,7 @@ class Promotion(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     image_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    show_banner: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     type: Mapped[str] = mapped_column(String, nullable=False)
     percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
     amount_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -103,7 +105,7 @@ class Promotion(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            "type IN ('percent','amount','combo','two_for_one')",
+            "type IN ('percent','amount','combo','two_for_one','free_shipping')",
             name="promotion_type_allowed",
         ),
         CheckConstraint(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-STORAGE_TYPES = frozenset({"percent", "amount", "combo", "two_for_one"})
-API_TYPES = frozenset({"percent", "amount", "combo", "bundle", "2x1"})
+STORAGE_TYPES = frozenset({"percent", "amount", "combo", "two_for_one", "free_shipping"})
+API_TYPES = frozenset({"percent", "amount", "combo", "bundle", "2x1", "free_shipping"})
 
 
 def normalize_promotion_type(value: str | None) -> str | None:

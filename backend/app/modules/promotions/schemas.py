@@ -43,6 +43,7 @@ class PromotionCreate(BaseModel):
     restaurant_id: uuid.UUID
     name: str
     image_path: str | None = None
+    show_banner: bool = True
     type: str
     scope: str
     percent: int | None = None
@@ -77,6 +78,7 @@ class PromotionCreate(BaseModel):
 class PromotionUpdate(BaseModel):
     name: str | None = None
     image_path: str | None = None
+    show_banner: bool | None = None
     type: str | None = None
     scope: str | None = None
     percent: int | None = None
@@ -122,6 +124,7 @@ class PromotionDTO(BaseModel):
     restaurant_id: uuid.UUID
     name: str
     image_path: str | None = None
+    show_banner: bool = True
     type: str
     scope: str
     percent: int | None = None

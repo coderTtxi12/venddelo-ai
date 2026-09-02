@@ -16,7 +16,7 @@ from app.modules.promotions.schemas import (
 from app.modules.promotions.pricing import CATALOG_DISCOUNT_PREFIX
 from app.modules.promotions.types import normalize_promotion_type
 
-_STORAGE_TYPES = {"percent", "amount", "combo", "two_for_one"}
+_STORAGE_TYPES = {"percent", "amount", "combo", "two_for_one", "free_shipping"}
 _ALLOWED_SCOPES = {"product", "category", "order"}
 
 
@@ -32,6 +32,10 @@ class PromotionService:
         starts_at = getattr(data, "starts_at", None)
         ends_at = getattr(data, "ends_at", None)
         bundle = getattr(data, "bundle", None)
+        show_banner = getattr(data, "show_banner", None)
+        min_order_cents = getattr(data, "min_order_cents", None)
+        product_ids = getattr(data, "product_ids", None)
+        category_ids = getattr(data, "category_ids", None)
 
         if ptype is not None:
             try:
@@ -56,6 +60,30 @@ class PromotionService:
                 raise ValidationError("pay_quantity must be less than get_quantity")
             if scope == "order":
                 raise ValidationError("NxM promotions must apply to products or categories")
+
+        if ptype == "combo":
+            if scope != "product":
+                raise ValidationError("Combo promotions must apply to products")
+            if isinstance(data, PromotionCreate):
+                if len(data.product_ids) < 2:
+                    raise ValidationError("Combo promotions require at least two products")
+            elif isinstance(data, PromotionUpdate) and "product_ids" in data.model_fields_set:
+                if not product_ids or len(product_ids) < 2:
+                    raise ValidationError("Combo promotions require at least two products")
+            if percent is not None and amount_cents is not None:
+                raise ValidationError("Combo promotions cannot have both percent and amount_cents")
+
+        if ptype == "free_shipping":
+            if percent is not None or amount_cents is not None:
+                raise ValidationError("free_shipping promotions must not have percent or amount_cents")
+            if scope != "order":
+                raise ValidationError("free_shipping promotions must apply to the whole order")
+            if min_order_cents is None or min_order_cents <= 0:
+                raise ValidationError("free_shipping promotions require min_order_cents")
+
+        if scope == "order" and ptype in ("percent", "amount"):
+            if min_order_cents is None or min_order_cents <= 0:
+                raise ValidationError("Order threshold promotions require min_order_cents")
 
         # Product/category links on create only; updates may send ids in the same PATCH.
         if isinstance(data, PromotionCreate) and ptype == "two_for_one" and scope in (
@@ -89,7 +117,10 @@ class PromotionService:
 
         name = getattr(data, "name", None)
         is_catalog = bool(name and str(name).startswith(CATALOG_DISCOUNT_PREFIX))
-        if not is_catalog:
+        effective_show_banner = show_banner if show_banner is not None else True
+        if is_catalog:
+            effective_show_banner = False
+        if effective_show_banner:
             if isinstance(data, PromotionCreate):
                 image_path = getattr(data, "image_path", None)
                 if not image_path or not str(image_path).strip():
@@ -106,6 +137,8 @@ class PromotionService:
         return enrich_promotion_dto(dto)
 
     def create(self, restaurant_id: uuid.UUID, data: PromotionCreate) -> PromotionDTO:
+        if data.name.startswith(CATALOG_DISCOUNT_PREFIX):
+            data = data.model_copy(update={"show_banner": False})
         self._validate(data)
         payload = data.model_copy(update={"restaurant_id": restaurant_id})
         return self._repo.add(payload)
