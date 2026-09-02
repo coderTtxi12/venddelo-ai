@@ -46,13 +46,37 @@ export type RestaurantCustomerActivityItem = {
   delivery_maps_url?: string | null;
 };
 
+export type RestaurantCustomerActivitySummary = {
+  menu_count: number;
+  delivery_count: number;
+  status_delivered: number;
+  status_cancelled: number;
+  status_in_progress: number;
+  status_other: number;
+  timeline: string[];
+  avg_ticket_cents: number | null;
+  avg_item_quantity: number | null;
+};
+
 export type RestaurantCustomerActivity = {
   phone_key: string;
   customer_name: string;
   customer_phone: string;
+  summary?: RestaurantCustomerActivitySummary;
   items: RestaurantCustomerActivityItem[];
+  total: number;
+  has_more: boolean;
+  next_cursor: string | null;
   last_delivery_address?: string | null;
   last_delivery_maps_url?: string | null;
+};
+
+export type ActivityHistorySort = 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc';
+
+export type GetRestaurantCustomerActivityQuery = {
+  cursor?: string | null;
+  limit?: number;
+  sort?: ActivityHistorySort;
 };
 
 export type ListRestaurantCustomersQuery = {
@@ -63,7 +87,7 @@ export type ListRestaurantCustomersQuery = {
   recency?: CustomerRecency;
   sort?: CustomerSort;
   order?: CustomerSortOrder;
-  page?: number;
+  cursor?: string | null;
 };
 
 export function listRestaurantCustomers(
@@ -74,8 +98,8 @@ export function listRestaurantCustomers(
 ) {
   const params = new URLSearchParams({
     limit: String(limit),
-    page: String(query?.page ?? 1),
   });
+  if (query?.cursor) params.set('cursor', query.cursor);
   if (query?.q) params.set('q', query.q);
   if (query?.source) params.set('source', query.source);
   if (query?.frequency) params.set('frequency', query.frequency);
@@ -93,9 +117,15 @@ export function getRestaurantCustomerActivity(
   token: string,
   restaurantId: string,
   phoneKey: string,
+  query?: GetRestaurantCustomerActivityQuery,
 ) {
+  const params = new URLSearchParams();
+  const limit = query?.limit ?? 15;
+  params.set('limit', String(limit));
+  if (query?.cursor) params.set('cursor', query.cursor);
+  if (query?.sort) params.set('sort', query.sort);
   return apiRequest<RestaurantCustomerActivity>(
-    `/restaurants/${restaurantId}/customers/${encodeURIComponent(phoneKey)}/activity`,
+    `/restaurants/${restaurantId}/customers/${encodeURIComponent(phoneKey)}/activity?${params}`,
     { token },
   );
 }

@@ -1,10 +1,15 @@
 import type { RestaurantCustomerActivityItem } from '@/lib/api/customers';
 
-export type ActivityChartMode = 'week' | 'custom';
+export type ActivityChartMode = '7d' | 'week' | 'month' | 'custom';
+
+export type ActivityTimelinePoint = {
+  created_at: string;
+};
 
 export type ActivityChartBucket = {
   key: string;
   label: string;
+  shortLabel: string;
   count: number;
   start: Date;
   end: Date;
@@ -14,9 +19,11 @@ export type ActivityHistorySort = 'date-desc' | 'date-asc' | 'amount-desc' | 'am
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_COUNT = 8;
+const MONTH_COUNT = 6;
 
 const DAY_LABEL = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' });
 const WEEK_LABEL = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' });
+const MONTH_LABEL = new Intl.DateTimeFormat('es-MX', { month: 'short' });
 
 function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -38,9 +45,24 @@ function endOfWeek(date: Date): Date {
   return new Date(start.getTime() + 7 * DAY_MS - 1);
 }
 
-function formatDayLabel(date: Date): string {
-  const label = DAY_LABEL.format(date);
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function endOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+function capitalizeLabel(label: string): string {
   return label.charAt(0).toLocaleUpperCase('es-MX') + label.slice(1);
+}
+
+function formatDayLabel(date: Date): string {
+  return capitalizeLabel(DAY_LABEL.format(date));
+}
+
+function formatDayShortLabel(date: Date): string {
+  return String(date.getDate());
 }
 
 function formatWeekLabel(start: Date, end: Date): string {
@@ -51,22 +73,63 @@ function formatWeekLabel(start: Date, end: Date): string {
   return `${formatDayLabel(start)}–${formatDayLabel(end)}`;
 }
 
-function itemInRange(item: RestaurantCustomerActivityItem, start: Date, end: Date): boolean {
-  const created = new Date(item.created_at);
+function formatWeekShortLabel(start: Date): string {
+  return formatDayLabel(start);
+}
+
+function formatMonthLabel(date: Date): string {
+  return capitalizeLabel(MONTH_LABEL.format(date));
+}
+
+function parseDateInput(value: string): Date {
+  return startOfDay(new Date(`${value}T12:00:00`));
+}
+
+function itemInRange(point: ActivityTimelinePoint, start: Date, end: Date): boolean {
+  const created = new Date(point.created_at);
   if (Number.isNaN(created.getTime())) return false;
   return created >= start && created <= end;
 }
 
-function countItemsInRange(
-  items: RestaurantCustomerActivityItem[],
+function countPointsInRange(
+  points: ActivityTimelinePoint[],
   start: Date,
   end: Date,
 ): number {
-  return items.filter((item) => itemInRange(item, start, end)).length;
+  return points.filter((point) => itemInRange(point, start, end)).length;
+}
+
+export function timelineFromItems(
+  items: RestaurantCustomerActivityItem[],
+): ActivityTimelinePoint[] {
+  return items.map((item) => ({ created_at: item.created_at }));
+}
+
+export function buildLast7DaysBuckets(
+  points: ActivityTimelinePoint[],
+  now = new Date(),
+): ActivityChartBucket[] {
+  const anchor = startOfDay(now);
+  const buckets: ActivityChartBucket[] = [];
+
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const start = new Date(anchor.getTime() - offset * DAY_MS);
+    const end = endOfDay(start);
+    buckets.push({
+      key: start.toISOString().slice(0, 10),
+      label: formatDayLabel(start),
+      shortLabel: formatDayShortLabel(start),
+      count: countPointsInRange(points, start, end),
+      start,
+      end,
+    });
+  }
+
+  return buckets;
 }
 
 export function buildWeeklyActivityBuckets(
-  items: RestaurantCustomerActivityItem[],
+  points: ActivityTimelinePoint[],
   now = new Date(),
 ): ActivityChartBucket[] {
   const anchor = startOfWeek(now);
@@ -78,7 +141,31 @@ export function buildWeeklyActivityBuckets(
     buckets.push({
       key: start.toISOString().slice(0, 10),
       label: formatWeekLabel(start, end),
-      count: countItemsInRange(items, start, end),
+      shortLabel: formatWeekShortLabel(start),
+      count: countPointsInRange(points, start, end),
+      start,
+      end,
+    });
+  }
+
+  return buckets;
+}
+
+export function buildMonthlyActivityBuckets(
+  points: ActivityTimelinePoint[],
+  now = new Date(),
+): ActivityChartBucket[] {
+  const anchor = startOfMonth(now);
+  const buckets: ActivityChartBucket[] = [];
+
+  for (let offset = MONTH_COUNT - 1; offset >= 0; offset -= 1) {
+    const start = new Date(anchor.getFullYear(), anchor.getMonth() - offset, 1);
+    const end = endOfMonth(start);
+    buckets.push({
+      key: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
+      label: formatMonthLabel(start),
+      shortLabel: formatMonthLabel(start).slice(0, 3),
+      count: countPointsInRange(points, start, end),
       start,
       end,
     });
@@ -88,12 +175,12 @@ export function buildWeeklyActivityBuckets(
 }
 
 export function buildCustomActivityBuckets(
-  items: RestaurantCustomerActivityItem[],
+  points: ActivityTimelinePoint[],
   rangeStart: string,
   rangeEnd: string,
 ): ActivityChartBucket[] {
-  const start = startOfDay(new Date(rangeStart));
-  const end = endOfDay(new Date(rangeEnd));
+  const start = parseDateInput(rangeStart);
+  const end = endOfDay(parseDateInput(rangeEnd));
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
     return [];
   }
@@ -108,7 +195,8 @@ export function buildCustomActivityBuckets(
       buckets.push({
         key: cursor.toISOString().slice(0, 10),
         label: formatDayLabel(cursor),
-        count: countItemsInRange(items, cursor, dayEnd),
+        shortLabel: formatDayShortLabel(cursor),
+        count: countPointsInRange(points, cursor, dayEnd),
         start: cursor,
         end: dayEnd,
       });
@@ -124,7 +212,8 @@ export function buildCustomActivityBuckets(
     buckets.push({
       key: cursor.toISOString().slice(0, 10),
       label: formatWeekLabel(weekStart, boundedEnd),
-      count: countItemsInRange(items, weekStart, boundedEnd),
+      shortLabel: formatWeekShortLabel(weekStart),
+      count: countPointsInRange(points, weekStart, boundedEnd),
       start: weekStart,
       end: boundedEnd,
     });
@@ -132,6 +221,18 @@ export function buildCustomActivityBuckets(
   }
 
   return buckets;
+}
+
+export function buildActivityChartBuckets(
+  mode: ActivityChartMode,
+  points: ActivityTimelinePoint[],
+  customRange?: { start: string; end: string },
+): ActivityChartBucket[] {
+  if (mode === '7d') return buildLast7DaysBuckets(points);
+  if (mode === 'week') return buildWeeklyActivityBuckets(points);
+  if (mode === 'month') return buildMonthlyActivityBuckets(points);
+  if (!customRange) return [];
+  return buildCustomActivityBuckets(points, customRange.start, customRange.end);
 }
 
 export function defaultCustomRange(now = new Date()): { start: string; end: string } {
@@ -179,6 +280,10 @@ export function computeAverageOrderMetrics(items: RestaurantCustomerActivityItem
       : null;
 
   return { avgTicketCents, avgItemQuantity };
+}
+
+export function googleMapsCoordinateUrl(latitude: number, longitude: number): string {
+  return `https://www.google.com/maps?q=${latitude},${longitude}`;
 }
 
 export function googleMapsSearchUrl(address: string): string {

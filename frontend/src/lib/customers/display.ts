@@ -82,12 +82,26 @@ export function customerInitials(name: string): string {
   return parts.map((part) => part[0]!.toLocaleUpperCase('es-MX')).join('');
 }
 
-export function customerWhatsAppHref(phone: string, name: string): string | null {
+export function customerWhatsAppHref(
+  phone: string,
+  name: string,
+  options?: { couponCode?: string; orderShortId?: string },
+): string | null {
   if (isLegacyWhatsAppPendingPhone(phone)) return null;
   const digits = phone.replace(/\D/g, '');
   if (digits.length < 8) return null;
   const greeting = name.trim() ? `Hola ${name.trim()}` : 'Hola';
-  const text = encodeURIComponent(`${greeting}, te escribimos de parte del restaurante.`);
+  let message = `${greeting}, te escribimos de parte del restaurante`;
+  if (options?.orderShortId) {
+    message += ` sobre tu pedido #${options.orderShortId}`;
+  }
+  if (options?.couponCode) {
+    message += options?.orderShortId
+      ? ` con el cupón ${options.couponCode}`
+      : `. Tu pedido usó el cupón ${options.couponCode}`;
+  }
+  message += '.';
+  const text = encodeURIComponent(message);
   return `https://wa.me/${digits}?text=${text}`;
 }
 

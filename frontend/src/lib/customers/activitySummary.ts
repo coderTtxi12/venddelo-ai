@@ -1,6 +1,7 @@
 import type {
   CustomerSource,
   RestaurantCustomer,
+  RestaurantCustomerActivity,
   RestaurantCustomerActivityItem,
 } from '@/lib/api/customers';
 
@@ -66,10 +67,10 @@ function monthLabelFromKey(key: string): string {
   return label.charAt(0).toLocaleUpperCase('es-MX') + label.slice(1);
 }
 
-function buildMonthlyBuckets(items: RestaurantCustomerActivityItem[]): CustomerActivityMonthBucket[] {
+function buildMonthlyBucketsFromTimestamps(timestamps: string[]): CustomerActivityMonthBucket[] {
   const counts = new Map<string, number>();
-  for (const item of items) {
-    const key = monthKeyFromIso(item.created_at);
+  for (const value of timestamps) {
+    const key = monthKeyFromIso(value);
     if (!key) continue;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
@@ -89,6 +90,10 @@ function buildMonthlyBuckets(items: RestaurantCustomerActivityItem[]): CustomerA
     });
   }
   return buckets;
+}
+
+function buildMonthlyBuckets(items: RestaurantCustomerActivityItem[]): CustomerActivityMonthBucket[] {
+  return buildMonthlyBucketsFromTimestamps(items.map((item) => item.created_at));
 }
 
 export function summarizeCustomerActivity(
@@ -120,6 +125,34 @@ export function summarizeCustomerActivity(
     monthlyActivity: buildMonthlyBuckets(items),
     deliveredSpentCents:
       items.length > 0 ? deliveredSpentCents : customer.total_spent_cents,
+  };
+}
+
+export function summaryFromActivity(
+  customer: RestaurantCustomer,
+  activity: RestaurantCustomerActivity,
+): CustomerActivitySummary {
+  const { summary } = activity;
+  if (!summary) {
+    return summarizeCustomerActivity(customer, activity.items);
+  }
+  const statusCounts: CustomerActivitySummary['statusCounts'] = {
+    delivered: summary.status_delivered,
+    cancelled: summary.status_cancelled,
+    in_progress: summary.status_in_progress,
+    other: summary.status_other,
+  };
+  const totalEvents =
+    summary.menu_count + summary.delivery_count > 0
+      ? summary.menu_count + summary.delivery_count
+      : 0;
+
+  return {
+    menuCount: totalEvents > 0 ? summary.menu_count : customer.order_count,
+    deliveryCount: totalEvents > 0 ? summary.delivery_count : customer.delivery_count,
+    statusCounts,
+    monthlyActivity: buildMonthlyBucketsFromTimestamps(summary.timeline),
+    deliveredSpentCents: customer.total_spent_cents,
   };
 }
 

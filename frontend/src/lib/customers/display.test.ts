@@ -52,6 +52,17 @@ test('customerWhatsAppHref skips legacy placeholder', () => {
   assert.match(customerWhatsAppHref('+525512345678', 'María') ?? '', /wa\.me\/525512345678/);
 });
 
+test('customerWhatsAppHref includes coupon and order context', () => {
+  const href = customerWhatsAppHref('+525512345678', 'María', {
+    couponCode: 'PIZZA20',
+    orderShortId: 'A1B2C',
+  });
+  assert.ok(href);
+  const decoded = decodeURIComponent(href!.split('text=')[1] ?? '');
+  assert.match(decoded, /pedido #A1B2C/);
+  assert.match(decoded, /cupón PIZZA20/);
+});
+
 test('filterCustomers matches name, digits and source', () => {
   const all = [maria, luis];
   assert.equal(filterCustomers(all, { query: 'maría' }).length, 1);
