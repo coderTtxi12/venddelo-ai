@@ -30,6 +30,7 @@ export function couponStockLabel(redeemedCount: number, stockQty: number | null)
 export function couponStatusLabel(status: CouponEffectiveStatus): string {
   if (status === 'active') return 'Activo';
   if (status === 'inactive') return 'Inactivo';
+  if (status === 'scheduled') return 'Programado';
   if (status === 'expired') return 'Expirado';
   return 'Agotado';
 }
@@ -38,3 +39,7 @@ export function formatCouponExpiry(expiresOn: string | null): string {
   if (!expiresOn) return 'Sin caducidad';
   return new Date(`${expiresOn}T12:00:00`).toLocaleDateString('es-MX', { dateStyle: 'medium' });
 }
+
+export { formatCouponValidityRange } from './dates';
+
+export { formatCouponWeekdaysLabel, formatCouponWeekdaysSummary } from './weekdays';
