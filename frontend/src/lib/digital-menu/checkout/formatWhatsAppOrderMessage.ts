@@ -91,6 +91,55 @@ function formatLineOptions(
   return rows;
 }
 
+function deliveryFeeCentsForQuote(
+  fulfillment: CheckoutFulfillment,
+  quote: CartQuote,
+): number {
+  if (fulfillment.serviceType !== 'delivery') return 0;
+  return quote.delivery_fee_cents ?? fulfillment.deliveryFeeCents ?? 0;
+}
+
+function isCouponDeliveryWaived(quote: CartQuote): boolean {
+  const coupon = quote.coupon;
+  if (!coupon) return false;
+  return coupon.type === 'free_shipping' || coupon.waived_delivery_cents > 0;
+}
+
+function isPromoDeliveryWaived(quote: CartQuote): boolean {
+  return Boolean(quote.applied_free_shipping_promotion_id);
+}
+
+export function formatQuotePromotionWhatsAppLines(
+  promotion: Promotion | undefined,
+  currency: string,
+): string[] {
+  if (!promotion) return [];
+  if (promotion.type === 'free_shipping' || promotion.type === 'combo') {
+    const isComboFreeShipping =
+      promotion.type === 'combo' &&
+      promotion.percent == null &&
+      promotion.amount_cents == null;
+    if (promotion.type === 'free_shipping' || isComboFreeShipping) {
+      return [`Promoción ${promotionDisplayName(promotion)}: Envío gratis`];
+    }
+  }
+  return [];
+}
+
+export function formatQuoteCouponWhatsAppLines(
+  coupon: CartQuote['coupon'],
+  currency: string,
+): string[] {
+  if (!coupon) return [];
+  if (coupon.discount_cents > 0) {
+    return [`Cupón ${coupon.code}: -${formatMoney(coupon.discount_cents / 100, currency)}`];
+  }
+  if (coupon.type === 'free_shipping' || coupon.waived_delivery_cents > 0) {
+    return [`Cupón ${coupon.code}: Envío gratis`];
+  }
+  return [`Cupón ${coupon.code}`];
+}
+
 export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): string {
   const {
     orderId,
@@ -123,11 +172,13 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
     ? promotionsById.get(quote.applied_order_promotion_id)
     : undefined;
   const orderPromoLabel = promotionDisplayName(orderPromo);
-  const deliveryFee =
-    fulfillment.serviceType === 'delivery' && fulfillment.deliveryFeeCents != null
-      ? fulfillment.deliveryFeeCents / 100
-      : 0;
-  const grandTotal = quote.total_cents / 100 + deliveryFee;
+  const freeShippingPromo = quote.applied_free_shipping_promotion_id
+    ? promotionsById.get(quote.applied_free_shipping_promotion_id)
+    : undefined;
+  const deliveryFeeCents = deliveryFeeCentsForQuote(fulfillment, quote);
+  const deliveryFee = deliveryFeeCents / 100;
+  const deliveryFeeWaived = isPromoDeliveryWaived(quote) || isCouponDeliveryWaived(quote);
+  const grandTotal = (quote.total_cents + deliveryFeeCents) / 100;
   const itemLabel = itemCount === 1 ? '1 artículo' : `${itemCount} artículos`;
 
   const parts: string[] = [
@@ -193,8 +244,15 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
     parts.push(`Descuento del pedido${hint}: -${formatMoney(orderDiscount, currency)}`);
   }
 
-  if (deliveryFee > 0) {
-    parts.push(`Envío: ${formatMoney(deliveryFee, currency)}`);
+  parts.push(...formatQuotePromotionWhatsAppLines(freeShippingPromo, currency));
+  parts.push(...formatQuoteCouponWhatsAppLines(quote.coupon, currency));
+
+  if (fulfillment.serviceType === 'delivery' && (deliveryFee > 0 || deliveryFeeWaived)) {
+    parts.push(
+      deliveryFeeWaived
+        ? `Envío: Gratis`
+        : `Envío: ${formatMoney(deliveryFee, currency)}`,
+    );
   }
 
   parts.push(bold(`TOTAL: ${formatMoney(grandTotal, currency)}`));
