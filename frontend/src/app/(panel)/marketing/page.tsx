@@ -1,5 +1,5 @@
-import MarketingPage from '@/components/pages/MarketingPage';
+import { redirect } from 'next/navigation';
 
-export default function MarketingRoute() {
-  return <MarketingPage />;
+export default function MarketingRedirectPage() {
+  redirect('/promociones');
 }

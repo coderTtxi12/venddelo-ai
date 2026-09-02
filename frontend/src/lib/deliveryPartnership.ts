@@ -28,7 +28,7 @@ export function getDeliveryPartnershipStatusHint(
   if (!zoneName) return base;
 
   if (status === 'active') {
-    return `Mexy Reparto gestiona las entregas a domicilio de tu restaurante en la zona ${zoneName}.`;
+    return `Mexy Reparto gestiona las entregas a domicilio de tu restaurante.`;
   }
 
   if (status === 'pending') {

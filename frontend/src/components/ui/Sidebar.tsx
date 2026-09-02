@@ -13,7 +13,7 @@ import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
-import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
+import BoltOutlinedIcon from '@mui/icons-material/BoltOutlined';
 import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined';
@@ -36,20 +36,54 @@ interface NavItem {
   icon: ReactNode;
 }
 
-const navItems: NavItem[] = [
-  { label: 'Órdenes', path: '/orders', icon: <ShoppingBagOutlinedIcon fontSize="small" /> },
-  { label: 'Historial', path: '/history', icon: <HistoryOutlinedIcon fontSize="small" /> },
-  { label: 'Clientes', path: '/clientes', icon: <PeopleOutlinedIcon fontSize="small" /> },
-  { label: 'Impresora', path: '/printer', icon: <PrintOutlinedIcon fontSize="small" /> },
-  { label: 'Productos', path: '/products', icon: <Inventory2OutlinedIcon fontSize="small" /> },
-  { label: 'Menú Digital', path: '/digital-menu', icon: <QrCode2OutlinedIcon fontSize="small" /> },
-  { label: 'Horario', path: '/hours', icon: <AccessTimeOutlinedIcon fontSize="small" /> },
-  { label: 'Delivery', path: '/delivery', icon: <LocalShippingOutlinedIcon fontSize="small" /> },
-  { label: 'Analíticas', path: '/analytics', icon: <BarChartOutlinedIcon fontSize="small" /> },
-  { label: 'Marketing', path: '/marketing', icon: <CampaignOutlinedIcon fontSize="small" /> },
-  { label: 'Cupones', path: '/cupones', icon: <LocalOfferOutlinedIcon fontSize="small" /> },
-  { label: 'Configuración', path: '/settings', icon: <SettingsOutlinedIcon fontSize="small" /> },
+interface NavSection {
+  id: string;
+  title: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
+  {
+    id: 'operacion',
+    title: 'Tu día a día',
+    items: [
+      { label: 'Órdenes', path: '/orders', icon: <ShoppingBagOutlinedIcon fontSize="small" /> },
+      { label: 'Historial', path: '/history', icon: <HistoryOutlinedIcon fontSize="small" /> },
+      { label: 'Clientes', path: '/clientes', icon: <PeopleOutlinedIcon fontSize="small" /> },
+      { label: 'Impresora', path: '/printer', icon: <PrintOutlinedIcon fontSize="small" /> },
+    ],
+  },
+  {
+    id: 'menu',
+    title: 'Menú y servicio',
+    items: [
+      { label: 'Productos', path: '/products', icon: <Inventory2OutlinedIcon fontSize="small" /> },
+      { label: 'Menú Digital', path: '/digital-menu', icon: <QrCode2OutlinedIcon fontSize="small" /> },
+      { label: 'Horario', path: '/hours', icon: <AccessTimeOutlinedIcon fontSize="small" /> },
+      { label: 'Envíos a domicilio', path: '/delivery', icon: <BoltOutlinedIcon fontSize="small" /> },
+    ],
+  },
+  {
+    id: 'ventas',
+    title: 'Atraer clientes',
+    items: [
+      { label: 'Analíticas', path: '/analytics', icon: <BarChartOutlinedIcon fontSize="small" /> },
+      { label: 'Promociones', path: '/promociones', icon: <CampaignOutlinedIcon fontSize="small" /> },
+      { label: 'Cupones', path: '/cupones', icon: <LocalOfferOutlinedIcon fontSize="small" /> },
+    ],
+  },
+  {
+    id: 'ajustes',
+    title: 'Tu negocio',
+    items: [
+      { label: 'Configuración', path: '/settings', icon: <SettingsOutlinedIcon fontSize="small" /> },
+    ],
+  },
 ];
+
+function isDeliveryNavItem(path: string): boolean {
+  return path === '/delivery';
+}
 
 function isNavActive(pathname: string, path: string): boolean {
   if (path === '/') return pathname === '/';
@@ -210,36 +244,61 @@ export default function Sidebar() {
           </div>
         )}
 
-        <nav className={styles.nav}>
-          {navItems.filter((item) => item.path !== '/delivery' || showDelivery).map((item) => {
-            const active = isNavActive(pathname, item.path);
-            const badgeCount =
-              item.path === '/orders' && pendingOrdersCount > 0 ? pendingOrdersCount : null;
+        <nav className={styles.nav} aria-label="Menú principal">
+          {navSections.map((section) => {
+            const visibleItems = section.items.filter(
+              (item) => !isDeliveryNavItem(item.path) || showDelivery,
+            );
+            if (visibleItems.length === 0) return null;
+
+            const sectionTitleId = `sidebar-section-${section.id}`;
+
             return (
-              <Link
-                key={item.path}
-                href={item.path}
-                className={`${styles.navItem} ${active ? styles.active : ''}`}
-                aria-label={
-                  badgeCount != null ? `${item.label}, ${badgeCount} pedidos nuevos` : item.label
-                }
-                onMouseEnter={item.path === '/orders' ? prefetchOrders : undefined}
-                onFocus={item.path === '/orders' ? prefetchOrders : undefined}
-                onClick={() => {
-                  if (isMobileDrawer) closeDrawer();
-                }}
+              <div
+                key={section.id}
+                className={styles.navSection}
+                role="group"
+                aria-labelledby={showLabels ? sectionTitleId : undefined}
               >
-                <span className={styles.icon}>
-                  {item.icon}
-                  {badgeCount != null && showCollapsed ? (
-                    <span className={styles.badgeDot} aria-hidden />
-                  ) : null}
-                </span>
-                {showLabels ? <span className={styles.label}>{item.label}</span> : null}
-                {badgeCount != null && showLabels ? (
-                  <span className={`${styles.badge} ${styles.badgeUrgent}`}>{badgeCount}</span>
+                {showLabels ? (
+                  <h2 id={sectionTitleId} className={styles.navSectionTitle}>
+                    {section.title}
+                  </h2>
                 ) : null}
-              </Link>
+                {visibleItems.map((item) => {
+                  const active = isNavActive(pathname, item.path);
+                  const badgeCount =
+                    item.path === '/orders' && pendingOrdersCount > 0 ? pendingOrdersCount : null;
+                  return (
+                    <Link
+                      key={item.path}
+                      href={item.path}
+                      className={`${styles.navItem} ${active ? styles.active : ''}`}
+                      aria-label={
+                        badgeCount != null
+                          ? `${item.label}, ${badgeCount} pedidos nuevos`
+                          : item.label
+                      }
+                      onMouseEnter={item.path === '/orders' ? prefetchOrders : undefined}
+                      onFocus={item.path === '/orders' ? prefetchOrders : undefined}
+                      onClick={() => {
+                        if (isMobileDrawer) closeDrawer();
+                      }}
+                    >
+                      <span className={styles.icon}>
+                        {item.icon}
+                        {badgeCount != null && showCollapsed ? (
+                          <span className={styles.badgeDot} aria-hidden />
+                        ) : null}
+                      </span>
+                      {showLabels ? <span className={styles.label}>{item.label}</span> : null}
+                      {badgeCount != null && showLabels ? (
+                        <span className={`${styles.badge} ${styles.badgeUrgent}`}>{badgeCount}</span>
+                      ) : null}
+                    </Link>
+                  );
+                })}
+              </div>
             );
           })}
         </nav>
