@@ -248,7 +248,7 @@ class OrderService:
             return order
         try:
             coupon = self._coupons.get(order.restaurant_id, order.applied_coupon_id)
-        except NotFoundError:
+        except Exception:
             return order
         return order.model_copy(
             update={
