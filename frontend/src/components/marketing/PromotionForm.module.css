@@ -371,6 +371,11 @@
   font-weight: 600;
 }
 
+.livePreviewMetaLineMuted {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
 .livePreviewMetaKey {
   display: inline-block;
   min-width: 3.6rem;
@@ -504,9 +509,10 @@
   gap: 0.65rem;
 }
 
+/* Match live menu shortcut cards: ~78vw / max 300px × 16:9 */
 .promoBannerFrame {
   position: relative;
-  width: 100%;
+  width: min(100%, 18.75rem);
   aspect-ratio: 16 / 9;
   border-radius: 14px;
   overflow: hidden;
@@ -533,21 +539,21 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.3rem;
-  padding: 1rem;
+  gap: 0.25rem;
+  padding: 0.65rem 0.75rem;
   text-align: center;
 }
 
 .promoBannerFrameTitle {
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   font-weight: 800;
   color: var(--color-text);
 }
 
 .promoBannerFrameHint {
-  max-width: 16rem;
-  font-size: 0.76rem;
-  line-height: 1.4;
+  max-width: 14rem;
+  font-size: 0.7rem;
+  line-height: 1.35;
   color: var(--color-text-secondary);
 }
 
@@ -555,6 +561,7 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.45rem;
+  width: min(100%, 18.75rem);
 }
 
 @media (min-width: 420px) {
