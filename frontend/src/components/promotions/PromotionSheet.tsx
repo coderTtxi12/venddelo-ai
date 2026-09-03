@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import CouponSheet from '@/components/coupons/CouponSheet';
 import { PromotionTemplatePicker } from './PromotionTemplatePicker';
 import { PromotionForm, type PromotionFormSubmitPayload } from '@/components/marketing/PromotionForm';
@@ -14,6 +15,7 @@ type PromotionSheetProps = {
   mode: 'create' | 'edit';
   template: PromotionTemplate | null;
   catalogPromotion?: Promotion | null;
+  editingPromotionId?: string | null;
   initialValues: PromotionFormSubmitPayload | null;
   restaurantId: string;
   accessToken: string;
@@ -35,6 +37,7 @@ export default function PromotionSheet({
   mode,
   template,
   catalogPromotion = null,
+  editingPromotionId = null,
   initialValues,
   restaurantId,
   accessToken,
@@ -49,7 +52,19 @@ export default function PromotionSheet({
   const showCatalogDetail = catalogPromotion != null;
   const showTemplatePicker = mode === 'create' && template == null && !showCatalogDetail;
   const resolvedTemplate = template ?? 'bundle';
-  const formValues = initialValues ?? (template ? emptyFormForTemplate(template) : null);
+
+  // Stable draft while typing. Re-create only when template / edit target changes —
+  // not on every parent re-render (tab focus, auth refresh, etc.).
+  const formValues = useMemo(() => {
+    if (initialValues) return initialValues;
+    if (!template) return null;
+    return emptyFormForTemplate(template);
+  }, [initialValues, template]);
+
+  const formInstanceKey =
+    mode === 'edit'
+      ? `edit:${editingPromotionId ?? 'unknown'}`
+      : `create:${template ?? 'none'}`;
 
   const title = showCatalogDetail
     ? promotionDisplayName(catalogPromotion)
@@ -84,6 +99,7 @@ export default function PromotionSheet({
         />
       ) : formValues ? (
         <PromotionForm
+          key={formInstanceKey}
           restaurantId={restaurantId}
           accessToken={accessToken}
           categories={categories}

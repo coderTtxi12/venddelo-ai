@@ -207,6 +207,11 @@ export default function PromotionsPage() {
     setSelectedTemplate(null);
   };
 
+  const editFormValues = useMemo(
+    () => (editingPromotion ? mapPromotionToForm(editingPromotion) : null),
+    [editingPromotion],
+  );
+
   const handleSubmit = async (payload: PromotionFormSubmitPayload) => {
     if (!selectedRestaurantId || !accessToken) return;
     setSaving(true);
@@ -447,7 +452,8 @@ export default function PromotionsPage() {
         mode={editingPromotion ? 'edit' : 'create'}
         template={selectedTemplate}
         catalogPromotion={catalogPromotion}
-        initialValues={editingPromotion ? mapPromotionToForm(editingPromotion) : null}
+        editingPromotionId={editingPromotion?.id ?? null}
+        initialValues={editFormValues}
         restaurantId={selectedRestaurantId ?? ''}
         accessToken={accessToken ?? ''}
         categories={categories}
