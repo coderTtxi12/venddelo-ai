@@ -164,3 +164,4 @@ class OrderStatusSummaryDTO(BaseModel):
     cancelled: int = 0
     active: int = 0
     total: int = 0
+    delivery: int = 0
