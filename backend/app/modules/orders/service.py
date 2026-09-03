@@ -14,6 +14,10 @@ from app.infra.realtime.order_hub import get_order_realtime_hub
 from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
 from app.modules.menu.repository import MenuRepository
 from app.modules.orders.coupons import should_redeem_coupon_on_transition
+from app.modules.orders.delivery_fee import (
+    customer_payable_delivery_cents,
+    resolve_delivery_waiver_cents,
+)
 from app.modules.orders.constants import (
     ARCHIVE_ORDER_STATUSES,
     KITCHEN_BULK_STATUS_LIMIT,
@@ -435,6 +439,7 @@ class OrderService:
         int,
         int,
         uuid.UUID | None,
+        uuid.UUID | None,
         list[PromotionDTO],
         list[PricedCartLine],
         dict[uuid.UUID, object],
@@ -515,6 +520,7 @@ class OrderService:
             quote.order_discount_cents,
             total,
             quote.applied_order_promotion_id,
+            quote.applied_free_shipping_promotion_id,
             promotions,
             quote.lines,
             products_by_id,
@@ -557,6 +563,7 @@ class OrderService:
             order_discount,
             lines_total,
             order_promo_id,
+            free_shipping_promo_id,
             promotions,
             priced_lines,
             products_by_id,
@@ -576,7 +583,7 @@ class OrderService:
         applied_coupon_id: uuid.UUID | None = None
         applied_coupon_code: str | None = None
         coupon_discount_cents = 0
-        coupon_waived_delivery_cents = 0
+        coupon_waived_from_coupon = 0
         order_discount_snapshots = _snapshot_order_discounts(
             order_discount,
             order_promo_id,
@@ -610,13 +617,23 @@ class OrderService:
             applied_coupon_id = applied.coupon_id
             applied_coupon_code = applied.code
             coupon_discount_cents = applied.discount_cents
-            coupon_waived_delivery_cents = applied.waived_delivery_cents
+            coupon_waived_from_coupon = applied.waived_delivery_cents
             order_discount_snapshots = [
                 *order_discount_snapshots,
                 _snapshot_coupon_discount(applied),
             ]
 
-        order_total = lines_total + delivery_fee_cents
+        coupon_waived_delivery_cents = resolve_delivery_waiver_cents(
+            delivery_fee_cents=delivery_fee_cents,
+            coupon_waived_delivery_cents=coupon_waived_from_coupon,
+            promo_free_shipping=(
+                free_shipping_promo_id is not None and data.type == "delivery"
+            ),
+        )
+        order_total = lines_total + customer_payable_delivery_cents(
+            delivery_fee_cents,
+            coupon_waived_delivery_cents,
+        )
         cash_denomination_cents = _resolve_cash_denomination_cents(
             data,
             order_total_cents=order_total,
