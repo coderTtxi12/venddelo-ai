@@ -7,18 +7,39 @@ export type KitchenOrdersListQuery = {
   board?: 'kitchen' | 'history';
 };
 
+export type HistoryOrdersListQuery = {
+  board: 'history';
+  status?: 'delivered' | 'cancelled';
+  q?: string;
+  type?: 'delivery' | 'takeout';
+  payment_method?: 'cash' | 'transfer' | 'card_terminal';
+  from?: string;
+  to?: string;
+  sort?: 'created_at' | 'total_cents';
+  order?: 'asc' | 'desc';
+};
+
 export function listRestaurantOrders(
   token: string,
   restaurantId: string,
   limit = 50,
   cursor?: string | null,
-  query?: KitchenOrdersListQuery,
+  query?: KitchenOrdersListQuery | HistoryOrdersListQuery,
 ) {
   const params = new URLSearchParams({ limit: String(limit) });
   if (cursor) params.set('cursor', cursor);
   if (query?.status) params.set('status', query.status);
-  if (query?.view) params.set('view', query.view);
+  if (query && 'view' in query && query.view) params.set('view', query.view);
   if (query?.board) params.set('board', query.board);
+  if (query && 'q' in query && query.q) params.set('q', query.q);
+  if (query && 'type' in query && query.type) params.set('type', query.type);
+  if (query && 'payment_method' in query && query.payment_method) {
+    params.set('payment_method', query.payment_method);
+  }
+  if (query && 'from' in query && query.from) params.set('from', query.from);
+  if (query && 'to' in query && query.to) params.set('to', query.to);
+  if (query && 'sort' in query && query.sort) params.set('sort', query.sort);
+  if (query && 'order' in query && query.order) params.set('order', query.order);
   return apiRequest<CursorPage<Order>>(`/restaurants/${restaurantId}/orders?${params}`, {
     token,
   });

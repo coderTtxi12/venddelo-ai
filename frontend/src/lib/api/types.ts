@@ -22,6 +22,7 @@ export type CursorPage<T> = {
   items: T[];
   next_cursor: string | null;
   has_more: boolean;
+  total?: number | null;
 };
 
 export type { TicketPrintSettings } from '@/lib/print/ticketSettings';
@@ -317,6 +318,7 @@ export type OrderStatusSummary = {
   cancelled: number;
   active: number;
   total: number;
+  delivery: number;
 };
 
 export type OrderItem = {

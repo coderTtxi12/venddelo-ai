@@ -64,6 +64,7 @@ test('applyKitchenBoardClearedToSummary zeros closed kitchen counts', () => {
     cancelled: 3,
     active: 4,
     total: 15,
+    delivery: 0,
   };
   const next = applyKitchenBoardClearedToSummary(summary);
   assert.equal(next.delivered, 0);

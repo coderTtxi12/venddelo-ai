@@ -191,4 +191,5 @@ export const EMPTY_ORDER_STATUS_SUMMARY: OrderStatusSummary = {
   cancelled: 0,
   active: 0,
   total: 0,
+  delivery: 0,
 };

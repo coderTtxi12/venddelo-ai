@@ -25,6 +25,7 @@ test('buildFilterCountsFromSummary exposes chip counts', () => {
     cancelled: 1,
     active: 6,
     total: 17,
+    delivery: 0,
   });
 
   assert.equal(counts.new, 2);
@@ -42,6 +43,7 @@ test('applyOrderStatusSummaryDelta moves counts between statuses', () => {
     cancelled: 0,
     active: 3,
     total: 3,
+    delivery: 0,
   };
 
   const next = applyOrderStatusSummaryDelta(summary, 'pending', 'confirmed');
@@ -71,6 +73,7 @@ test('orderStatusSummaryTransitionKey dedupes duplicate pending→confirmed upda
     cancelled: 0,
     active: 1,
     total: 1,
+    delivery: 0,
   };
 
   summary = applyOrderStatusSummaryDelta(summary, 'pending', 'confirmed');
