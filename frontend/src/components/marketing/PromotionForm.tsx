@@ -1,7 +1,7 @@
 'use client';
 
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Category, Product } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
 import { uploadRestaurantAsset } from '@/lib/storage/upload';
@@ -118,6 +118,27 @@ function formatPreviewDateTime(value: string): string | null {
 
 function formatPreviewTime(value: string): string {
   return value.trim().slice(0, 5);
+}
+
+/** Digits only; empty allowed while typing; capped at 100. */
+function sanitizePercentTyping(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 3);
+  if (digits === '') return '';
+  const n = Number(digits);
+  if (n > 100) return '100';
+  return digits;
+}
+
+/** Non-negative decimal money; empty allowed while typing. */
+function sanitizeAmountTyping(raw: string): string {
+  let cleaned = raw.replace(/[^\d.]/g, '');
+  const dot = cleaned.indexOf('.');
+  if (dot !== -1) {
+    cleaned =
+      cleaned.slice(0, dot + 1) + cleaned.slice(dot + 1).replace(/\./g, '').slice(0, 2);
+  }
+  if (cleaned.startsWith('.')) cleaned = `0${cleaned}`;
+  return cleaned.slice(0, 10);
 }
 
 export type PromotionFormSubmitPayload = Omit<
@@ -287,14 +308,19 @@ export function PromotionForm({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setForm(initialValues ?? createEmptyPromotionDraft());
-    setProductSearch('');
-    setImageError(null);
-  }, [initialValues]);
-
   const [productSearch, setProductSearch] = useState('');
+  const [percentInput, setPercentInput] = useState(() =>
+    String((initialValues ?? createEmptyPromotionDraft()).percent),
+  );
+  const [amountInput, setAmountInput] = useState(() => {
+    const amount = (initialValues ?? createEmptyPromotionDraft()).amount;
+    return amount > 0 ? String(amount) : '';
+  });
+
+  const [minOrderInput, setMinOrderInput] = useState(() => {
+    const amount = (initialValues ?? createEmptyPromotionDraft()).minOrderAmount;
+    return amount > 0 ? String(amount) : '';
+  });
 
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
@@ -307,11 +333,11 @@ export function PromotionForm({
 
   const complementProducts = useMemo(() => {
     if (form.scope === 'order') return [];
-    if (form.scope === 'product') {
+    if (template === 'bundle' || template === 'combo' || form.scope === 'product') {
       return products.filter((p) => form.productIds.includes(p.id));
     }
     return menuEligibleProducts(products, form.categoryIds, form.productIds);
-  }, [products, form.scope, form.productIds, form.categoryIds]);
+  }, [products, form.scope, form.productIds, form.categoryIds, template]);
 
   const complementCount = form.complementOptionItemIds.length;
 
@@ -323,10 +349,7 @@ export function PromotionForm({
       if (form.bundle.getQuantity < 2) return false;
       if (form.bundle.payQuantity < 1) return false;
       if (form.bundle.payQuantity >= form.bundle.getQuantity) return false;
-      if (form.scope === 'product' && form.productIds.length === 0) return false;
-      if (form.scope === 'category' && !hasMenuSelection(form.categoryIds, form.productIds)) {
-        return false;
-      }
+      if (form.productIds.length === 0) return false;
     }
 
     if (template === 'product_discount') {
@@ -362,35 +385,25 @@ export function PromotionForm({
     return true;
   }, [form, template]);
 
-  const previewLabel = useMemo(() => {
-    if (template === 'bundle') return formatBundleLabel(form.bundle);
-    if (template === 'combo') {
-      if (form.kind === 'free_shipping') return 'Combo · Envío gratis';
-      if (form.kind === 'amount') return `Combo ${formatMoney(form.amount)}`;
-      return `Combo ${form.percent}%`;
-    }
-    if (template === 'order_threshold') {
-      if (form.kind === 'free_shipping') return 'Envío gratis';
-      if (form.kind === 'amount') return formatMoney(form.amount);
-      return `${form.percent}%`;
-    }
-    if (form.kind === 'amount') return formatMoney(form.amount);
-    return `${form.percent}%`;
-  }, [form, template]);
-
-  const hasProductDiscountScope = useMemo(() => {
-    if (template !== 'product_discount') return true;
+  const hasMenuScope = useMemo(() => {
+    if (template === 'order_threshold') return true;
+    if (template === 'combo') return form.productIds.length >= 2;
+    if (template === 'bundle') return form.productIds.length > 0;
     return hasMenuSelection(form.categoryIds, form.productIds);
   }, [form.categoryIds, form.productIds, template]);
 
-  const productDiscountPreviewItems = useMemo(() => {
-    if (template !== 'product_discount') {
+  const previewMenuItems = useMemo(() => {
+    if (template === 'order_threshold') {
       return { categoryNames: [] as string[], productNames: [] as string[] };
     }
-    const categoryNames = categories
-      .filter((category) => form.categoryIds.includes(category.id))
-      .map((category) => category.name)
-      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    // NxM and combo are product-only in the editor.
+    const includeCategories = template === 'product_discount';
+    const categoryNames = includeCategories
+      ? categories
+          .filter((category) => form.categoryIds.includes(category.id))
+          .map((category) => category.name)
+          .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+      : [];
     const productNames = products
       .filter((product) => form.productIds.includes(product.id))
       .map((product) => product.name)
@@ -398,36 +411,117 @@ export function PromotionForm({
     return { categoryNames, productNames };
   }, [categories, form.categoryIds, form.productIds, products, template]);
 
-  const productDiscountScheduleLines = useMemo(() => {
-    if (template !== 'product_discount') return [] as string[];
-    const lines: string[] = [];
-
-    if (form.schedule.useWeekdays && form.schedule.weekdays.length > 0) {
-      lines.push(form.schedule.weekdays.map((day) => WEEKDAY_SHORT[day] ?? WEEKDAY_LABELS[day]).join(' · '));
+  const liveSchedule = useMemo(() => {
+    let days: string;
+    let daysDefault: boolean;
+    if (form.schedule.useWeekdays) {
+      if (form.schedule.weekdays.length > 0) {
+        days = form.schedule.weekdays
+          .map((day) => WEEKDAY_SHORT[day] ?? WEEKDAY_LABELS[day])
+          .join(' · ');
+        daysDefault = false;
+      } else {
+        days = 'Elige al menos un día';
+        daysDefault = true;
+      }
+    } else {
+      days = 'Todos los días';
+      daysDefault = true;
     }
 
-    if (
-      form.schedule.useTimeWindow &&
-      form.schedule.dailyStartTime &&
-      form.schedule.dailyEndTime
-    ) {
-      lines.push(
-        `${formatPreviewTime(form.schedule.dailyStartTime)}–${formatPreviewTime(form.schedule.dailyEndTime)}`,
-      );
+    let time: string;
+    let timeDefault: boolean;
+    if (form.schedule.useTimeWindow) {
+      if (form.schedule.dailyStartTime && form.schedule.dailyEndTime) {
+        time = `${formatPreviewTime(form.schedule.dailyStartTime)}–${formatPreviewTime(form.schedule.dailyEndTime)}`;
+        timeDefault = false;
+      } else {
+        time = 'Define hora de inicio y fin';
+        timeDefault = true;
+      }
+    } else {
+      time = 'Todo el día';
+      timeDefault = true;
     }
 
-    return lines;
-  }, [form.schedule, template]);
+    return { days, time, daysDefault, timeDefault };
+  }, [form.schedule]);
 
-  const productDiscountCampaignLine = useMemo(() => {
-    if (template !== 'product_discount') return null;
+  const liveCampaign = useMemo(() => {
     const starts = formatPreviewDateTime(form.campaignStartsAt);
     const ends = formatPreviewDateTime(form.campaignEndsAt);
-    if (!starts && !ends) return null;
-    if (starts && ends) return `${starts} → ${ends}`;
-    if (starts) return `Desde ${starts}`;
-    return `Hasta ${ends}`;
-  }, [form.campaignEndsAt, form.campaignStartsAt, template]);
+    if (!starts && !ends) {
+      return { text: 'Desde ahora · sin fecha de fin', isDefault: true };
+    }
+    if (starts && ends) return { text: `${starts} → ${ends}`, isDefault: false };
+    if (starts) return { text: `Desde ${starts}`, isDefault: false };
+    return { text: `Hasta ${ends}`, isDefault: false };
+  }, [form.campaignEndsAt, form.campaignStartsAt]);
+
+  const liveBadge = useMemo(() => {
+    if (template === 'bundle') return formatBundleLabel(form.bundle);
+    if (form.kind === 'free_shipping') {
+      return template === 'combo' ? 'Combo · Envío gratis' : 'Envío gratis';
+    }
+    if (form.kind === 'amount') {
+      return amountInput.trim() ? formatMoney(Number(amountInput) || 0) : '—';
+    }
+    return percentInput.trim() ? `${percentInput}%` : '—';
+  }, [amountInput, form.bundle, form.kind, percentInput, template]);
+
+  const liveBenefit = useMemo(() => {
+    if (template === 'bundle') {
+      return `Lleva ${form.bundle.getQuantity} y paga ${form.bundle.payQuantity} (mismo producto)`;
+    }
+    if (template === 'order_threshold') {
+      const minLabel = minOrderInput.trim()
+        ? `desde ${formatMoney(Number(minOrderInput) || 0)}`
+        : 'define el mínimo del carrito';
+      if (form.kind === 'free_shipping') return `Envío gratis ${minLabel}`;
+      if (form.kind === 'amount') {
+        return amountInput.trim()
+          ? `${formatMoney(Number(amountInput) || 0)} de descuento ${minLabel}`
+          : `Define el monto · ${minLabel}`;
+      }
+      return percentInput.trim()
+        ? `${percentInput}% de descuento ${minLabel}`
+        : `Define el porcentaje · ${minLabel}`;
+    }
+    if (template === 'combo') {
+      if (form.kind === 'free_shipping') return 'Envío gratis al llevar todo el combo';
+      if (form.kind === 'amount') {
+        return amountInput.trim()
+          ? `${formatMoney(Number(amountInput) || 0)} al llevar todos los productos`
+          : 'Define el monto del combo';
+      }
+      return percentInput.trim()
+        ? `${percentInput}% al llevar todos los productos`
+        : 'Define el porcentaje del combo';
+    }
+    if (form.kind === 'amount') {
+      return amountInput.trim()
+        ? `${formatMoney(Number(amountInput) || 0)} en cada producto`
+        : 'Define el monto de descuento';
+    }
+    return percentInput.trim()
+      ? `${percentInput}% en cada producto`
+      : 'Define el porcentaje de descuento';
+  }, [amountInput, form.bundle, form.kind, minOrderInput, percentInput, template]);
+
+  const liveScopeEmpty = useMemo(() => {
+    if (template === 'order_threshold') return null;
+    if (template === 'combo') {
+      if (form.productIds.length === 0) return 'Elige al menos 2 productos del combo.';
+      if (form.productIds.length === 1) return 'Agrega un producto más para completar el combo.';
+      return null;
+    }
+    if (template === 'bundle') {
+      if (form.productIds.length === 0) return 'Elige al menos un producto.';
+      return null;
+    }
+    if (!hasMenuScope) return 'Elige productos o categorías abajo.';
+    return null;
+  }, [form.productIds.length, hasMenuScope, template]);
 
   const promoImageUrl = storagePublicUrl(form.imagePath);
 
@@ -446,84 +540,90 @@ export function PromotionForm({
 
   return (
     <div className={styles.shell}>
-      {template === 'product_discount' ? (
-        <div className={styles.previewDock}>
-          <div
-            className={
-              !hasProductDiscountScope
-                ? `${styles.livePreview} ${styles.livePreviewAttention}`
-                : styles.livePreview
-            }
-            aria-live="polite"
-          >
-            <div className={styles.livePreviewEyebrow}>
-              <span className={styles.livePreviewEyebrowLabel}>Vista previa</span>
-              <span className={styles.livePreviewBadge}>{previewLabel}</span>
-            </div>
-
-            <p className={styles.livePreviewTitle}>
-              {form.name.trim() || 'Sin nombre todavía'}
-            </p>
-
-            <p className={styles.livePreviewBenefit}>
-              {form.kind === 'amount'
-                ? `${formatMoney(form.amount)} en cada producto`
-                : `${form.percent}% en cada producto`}
-            </p>
-
-            {!hasProductDiscountScope ? (
-              <p className={styles.livePreviewEmpty}>Elige productos o categorías abajo.</p>
-            ) : (
-              <div className={styles.livePreviewChips}>
-                {productDiscountPreviewItems.categoryNames.map((name) => (
-                  <span key={`cat-${name}`} className={styles.livePreviewChip}>
-                    {name}
-                  </span>
-                ))}
-                {productDiscountPreviewItems.productNames.slice(0, 4).map((name) => (
-                  <span key={`prod-${name}`} className={styles.livePreviewChip}>
-                    {name}
-                  </span>
-                ))}
-                {productDiscountPreviewItems.productNames.length > 4 ? (
-                  <span className={`${styles.livePreviewChip} ${styles.livePreviewChipMuted}`}>
-                    +{productDiscountPreviewItems.productNames.length - 4} más
-                  </span>
-                ) : null}
-              </div>
-            )}
-
-            {(productDiscountScheduleLines.length > 0 || productDiscountCampaignLine) ? (
-              <div className={styles.livePreviewMetaList}>
-                {productDiscountScheduleLines.length > 0 ? (
-                  <p className={styles.livePreviewMetaLine}>
-                    <span className={styles.livePreviewMetaKey}>Horario</span>
-                    {productDiscountScheduleLines.join(' · ')}
-                  </p>
-                ) : null}
-                {productDiscountCampaignLine ? (
-                  <p className={styles.livePreviewMetaLine}>
-                    <span className={styles.livePreviewMetaKey}>Vigencia</span>
-                    {productDiscountCampaignLine}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-
-            {!form.showBanner ? (
-              <p className={styles.livePreviewNote}>Sin banner en el menú</p>
-            ) : null}
+      <div className={styles.previewDock}>
+        <div
+          className={
+            liveScopeEmpty
+              ? `${styles.livePreview} ${styles.livePreviewAttention}`
+              : styles.livePreview
+          }
+          aria-live="polite"
+        >
+          <div className={styles.livePreviewEyebrow}>
+            <span className={styles.livePreviewEyebrowLabel}>Vista previa</span>
+            <span className={styles.livePreviewBadge}>{liveBadge}</span>
           </div>
-        </div>
-      ) : null}
 
-      <div
-        className={
-          template === 'product_discount'
-            ? `${styles.scroll} ${styles.scrollWithDock}`
-            : styles.scroll
-        }
-      >
+          <p className={styles.livePreviewTitle}>
+            {form.name.trim() || 'Sin nombre todavía'}
+          </p>
+
+          <p className={styles.livePreviewBenefit}>{liveBenefit}</p>
+
+          {template === 'order_threshold' ? (
+            <p className={styles.livePreviewNote}>Aplica al pedido completo al superar el mínimo.</p>
+          ) : liveScopeEmpty ? (
+            <p className={styles.livePreviewEmpty}>{liveScopeEmpty}</p>
+          ) : (
+            <div className={styles.livePreviewChips}>
+              {previewMenuItems.categoryNames.map((name) => (
+                <span key={`cat-${name}`} className={styles.livePreviewChip}>
+                  {name}
+                </span>
+              ))}
+              {previewMenuItems.productNames.slice(0, 4).map((name) => (
+                <span key={`prod-${name}`} className={styles.livePreviewChip}>
+                  {name}
+                </span>
+              ))}
+              {previewMenuItems.productNames.length > 4 ? (
+                <span className={`${styles.livePreviewChip} ${styles.livePreviewChipMuted}`}>
+                  +{previewMenuItems.productNames.length - 4} más
+                </span>
+              ) : null}
+            </div>
+          )}
+
+          <div className={styles.livePreviewMetaList}>
+            <p
+              className={
+                liveSchedule.daysDefault
+                  ? `${styles.livePreviewMetaLine} ${styles.livePreviewMetaLineMuted}`
+                  : styles.livePreviewMetaLine
+              }
+            >
+              <span className={styles.livePreviewMetaKey}>Días</span>
+              {liveSchedule.days}
+            </p>
+            <p
+              className={
+                liveSchedule.timeDefault
+                  ? `${styles.livePreviewMetaLine} ${styles.livePreviewMetaLineMuted}`
+                  : styles.livePreviewMetaLine
+              }
+            >
+              <span className={styles.livePreviewMetaKey}>Horario</span>
+              {liveSchedule.time}
+            </p>
+            <p
+              className={
+                liveCampaign.isDefault
+                  ? `${styles.livePreviewMetaLine} ${styles.livePreviewMetaLineMuted}`
+                  : styles.livePreviewMetaLine
+              }
+            >
+              <span className={styles.livePreviewMetaKey}>Vigencia</span>
+              {liveCampaign.text}
+            </p>
+          </div>
+
+          {template !== 'order_threshold' && !form.showBanner ? (
+            <p className={styles.livePreviewNote}>Sin banner en el menú</p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className={`${styles.scroll} ${styles.scrollWithDock}`}>
         <form
           id={FORM_ID}
           className={styles.form}
@@ -572,6 +672,8 @@ export function PromotionForm({
                 : {
                     ...normalized,
                     kind: 'bundle' as const,
+                    scope: 'product' as const,
+                    categoryIds: [],
                     bundle: { ...normalized.bundle, pairingMode: 'same_product' as const },
                   };
         void onSubmit(payload as PromotionFormSubmitPayload);
@@ -583,35 +685,9 @@ export function PromotionForm({
         </button>
       ) : null}
 
-      {template !== 'product_discount' ? (
-        <div className={styles.infoBanner} role="status">
-          {template === 'bundle'
-            ? 'Configura días, horarios, ofertas N×M y complementos. La promoción se aplicará en el menú público y en el carrito.'
-            : template === 'combo'
-              ? 'El descuento aplica cuando el cliente lleva todos los productos del combo en el carrito.'
-              : 'El beneficio aplica al superar el monto mínimo del carrito.'}
-        </div>
-      ) : null}
-
-      {template !== 'product_discount' ? (
-        <div className={styles.previewCard}>
-          <span className={styles.previewLabel}>Vista previa</span>
-          <strong className={styles.previewValue}>{previewLabel}</strong>
-          {form.schedule.useWeekdays && form.schedule.weekdays.length > 0 ? (
-            <span className={styles.previewMeta}>
-              {form.schedule.weekdays.map((d: number) => WEEKDAY_LABELS[d]).join(' · ')}
-            </span>
-          ) : null}
-        </div>
-      ) : null}
-
       <FormSection
         title="Identidad"
-        hint={
-          template === 'product_discount'
-            ? 'Nombre e imagen del banner que verán tus clientes en el menú.'
-            : 'Nombre e imagen que verán tus clientes en el menú.'
-        }
+        hint="Nombre e imagen del banner que verán tus clientes en el menú."
       >
       <div className={styles.field}>
         <label className={styles.label} htmlFor="promo-name">
@@ -625,7 +701,11 @@ export function PromotionForm({
           placeholder={
             template === 'product_discount'
               ? 'Ej. 20% en hamburguesas, Promo postres'
-              : 'Ej. Miércoles pizza 2×1, Happy hour bebidas'
+              : template === 'bundle'
+                ? 'Ej. Miércoles pizza 2×1, Happy hour bebidas'
+                : template === 'combo'
+                  ? 'Ej. Combo hamburguesa + refresco'
+                  : 'Ej. Envío gratis desde $300'
           }
         />
       </div>
@@ -633,125 +713,71 @@ export function PromotionForm({
       <div className={styles.field}>
         <label className={styles.label} htmlFor="promo-image">
           Imagen promocional
-          {template !== 'product_discount' && form.showBanner ? (
-            <span className={styles.requiredMark}> *</span>
-          ) : null}
         </label>
         <p className={styles.helpText} id="promo-image-help">
-          {template === 'product_discount'
-            ? form.showBanner
-              ? 'Formato banner (16:9), como el acceso directo del menú público. Necesaria si el banner está activado.'
-              : 'Opcional mientras el banner esté desactivado.'
+          {template === 'order_threshold'
+            ? 'Opcional. El umbral de carrito no muestra banner en el menú.'
             : form.showBanner
-              ? 'Banner del acceso directo en el menú público.'
-              : 'Opcional: esta promoción no se mostrará como banner en el menú.'}
+              ? 'Formato banner (16:9), como el acceso directo del menú público. Necesaria si el banner está activado.'
+              : 'Opcional mientras el banner esté desactivado.'}
         </p>
-        {template === 'product_discount' ? (
-          <div className={styles.promoBannerUpload}>
-            <div
-              className={
-                promoImageUrl
-                  ? `${styles.promoBannerFrame} ${styles.promoBannerFrameFilled}`
-                  : styles.promoBannerFrame
-              }
-            >
-              {promoImageUrl ? (
-                <img src={promoImageUrl} alt="" className={styles.promoBannerFrameImg} />
-              ) : (
-                <div className={styles.promoBannerFrameEmpty} aria-hidden>
-                  <span className={styles.promoBannerFrameTitle}>Vista tipo banner</span>
-                  <span className={styles.promoBannerFrameHint}>
-                    Recomendado 16:9 para que se vea igual que en el menú del cliente.
-                  </span>
-                </div>
-              )}
-            </div>
-            <div className={styles.promoBannerActions}>
-              <button
-                type="button"
-                className={styles.secondaryBtn}
-                disabled={uploadingImage || saving}
-                onClick={() => imageInputRef.current?.click()}
-              >
-                {uploadingImage
-                  ? 'Subiendo…'
-                  : promoImageUrl
-                    ? 'Cambiar imagen'
-                    : 'Subir imagen'}
-              </button>
-              {form.imagePath ? (
-                <button
-                  type="button"
-                  className={styles.dangerGhostBtn}
-                  disabled={uploadingImage || saving}
-                  onClick={() => setForm((prev) => ({ ...prev, imagePath: null }))}
-                >
-                  Quitar
-                </button>
-              ) : null}
-            </div>
-            <input
-              ref={imageInputRef}
-              id="promo-image"
-              type="file"
-              accept="image/*"
-              className={styles.hiddenInput}
-              aria-describedby="promo-image-help"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void handleImageUpload(file);
-                e.target.value = '';
-              }}
-            />
-          </div>
-        ) : (
-          <div className={styles.promoImageRow}>
+        <div className={styles.promoBannerUpload}>
+          <div
+            className={
+              promoImageUrl
+                ? `${styles.promoBannerFrame} ${styles.promoBannerFrameFilled}`
+                : styles.promoBannerFrame
+            }
+          >
             {promoImageUrl ? (
-              <img src={promoImageUrl} alt="" className={styles.promoImagePreview} />
+              <img src={promoImageUrl} alt="" className={styles.promoBannerFrameImg} />
             ) : (
-              <div className={styles.promoImagePlaceholder} aria-hidden>
-                Sin imagen
+              <div className={styles.promoBannerFrameEmpty} aria-hidden>
+                <span className={styles.promoBannerFrameTitle}>Vista tipo banner</span>
+                <span className={styles.promoBannerFrameHint}>
+                  Mismo tamaño que en el menú del cliente (~16:9).
+                </span>
               </div>
             )}
-            <div className={styles.promoImageActions}>
+          </div>
+          <div className={styles.promoBannerActions}>
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              disabled={uploadingImage || saving}
+              onClick={() => imageInputRef.current?.click()}
+            >
+              {uploadingImage
+                ? 'Subiendo…'
+                : promoImageUrl
+                  ? 'Cambiar imagen'
+                  : 'Subir imagen'}
+            </button>
+            {form.imagePath ? (
               <button
                 type="button"
-                className={styles.secondaryBtn}
+                className={styles.dangerGhostBtn}
                 disabled={uploadingImage || saving}
-                onClick={() => imageInputRef.current?.click()}
+                onClick={() => setForm((prev) => ({ ...prev, imagePath: null }))}
               >
-                {uploadingImage
-                  ? 'Subiendo…'
-                  : promoImageUrl
-                    ? 'Cambiar imagen'
-                    : 'Subir imagen'}
+                Quitar
               </button>
-              {form.imagePath ? (
-                <button
-                  type="button"
-                  className={styles.dangerGhostBtn}
-                  disabled={uploadingImage || saving}
-                  onClick={() => setForm((prev) => ({ ...prev, imagePath: null }))}
-                >
-                  Quitar
-                </button>
-              ) : null}
-              <input
-                ref={imageInputRef}
-                id="promo-image"
-                type="file"
-                accept="image/*"
-                className={styles.hiddenInput}
-                aria-describedby="promo-image-help"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleImageUpload(file);
-                  e.target.value = '';
-                }}
-              />
-            </div>
+            ) : null}
           </div>
-        )}
+          <input
+            ref={imageInputRef}
+            id="promo-image"
+            type="file"
+            accept="image/*"
+            className={styles.hiddenInput}
+            aria-describedby="promo-image-help"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleImageUpload(file);
+              e.target.value = '';
+            }}
+          />
+        </div>
         {imageError ? (
           <p className={styles.errorBanner} role="alert">
             {imageError}
@@ -764,7 +790,7 @@ export function PromotionForm({
           <span className={styles.toggleCopy}>
             <span className={styles.toggleLabel}>Banner en menú digital</span>
             <span className={styles.toggleHint}>
-              Muestra un acceso directo en la portada del menú público.
+              Desactivado = solo aplica el beneficio. Activado = también muestra acceso directo.
             </span>
           </span>
           <input
@@ -798,18 +824,20 @@ export function PromotionForm({
                 <input
                   id="product-discount-percent"
                   className={`${styles.input} ${styles.inputSuffixField}`}
-                  type="number"
+                  type="text"
                   inputMode="numeric"
-                  min={1}
-                  max={100}
-                  value={form.percent}
+                  autoComplete="off"
+                  value={percentInput}
                   disabled={saving}
-                  onChange={(e) =>
+                  placeholder="20"
+                  onChange={(e) => {
+                    const next = sanitizePercentTyping(e.target.value);
+                    setPercentInput(next);
                     setForm((prev) => ({
                       ...prev,
-                      percent: clampNumber(Number(e.target.value), 1, 100),
-                    }))
-                  }
+                      percent: next === '' ? 0 : Number(next),
+                    }));
+                  }}
                 />
                 <span className={styles.inputSuffix} aria-hidden>
                   %
@@ -823,19 +851,21 @@ export function PromotionForm({
               <input
                 id="product-discount-amount"
                 className={styles.input}
-                type="number"
+                type="text"
                 inputMode="decimal"
-                min={0}
-                step="0.01"
+                autoComplete="off"
                 placeholder="50"
-                value={form.amount}
+                value={amountInput}
                 disabled={saving}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const next = sanitizeAmountTyping(e.target.value);
+                  setAmountInput(next);
+                  const parsed = Number(next);
                   setForm((prev) => ({
                     ...prev,
-                    amount: Math.max(0, Number(e.target.value)),
-                  }))
-                }
+                    amount: next === '' || Number.isNaN(parsed) ? 0 : parsed,
+                  }));
+                }}
               />
               <p className={styles.helpText}>Se resta del precio de cada producto incluido.</p>
             </label>
@@ -843,152 +873,200 @@ export function PromotionForm({
         </FormSection>
       ) : null}
 
-      {template === 'product_discount' ? null : template === 'combo' ? (
-        <div className={styles.field}>
-          <p className={styles.label}>Beneficio del combo</p>
-          <div className={`${styles.chipGrid} ${styles.chipGridThree}`}>
+      {template === 'combo' ? (
+        <FormSection
+          title="Beneficio del combo"
+          hint="Se aplica solo cuando el carrito incluye todos los productos del combo."
+        >
+          <div className={`${styles.chipGrid} ${styles.chipGridThree}`} role="group" aria-label="Beneficio">
             {(['percent', 'amount', 'free_shipping'] as const).map((kind) => (
-              <button
+              <ChipOption
                 key={kind}
-                type="button"
-                className={
-                  form.kind === kind ? `${styles.chip} ${styles.chipActive}` : styles.chip
-                }
+                selected={form.kind === kind}
+                disabled={saving}
                 onClick={() => setForm((prev) => ({ ...prev, kind }))}
               >
                 {kind === 'percent' ? 'Porcentaje' : kind === 'amount' ? 'Monto fijo' : 'Envío gratis'}
-              </button>
+              </ChipOption>
             ))}
           </div>
           {form.kind === 'percent' ? (
-            <input
-              className={styles.input}
-              type="number"
-              min={1}
-              max={100}
-              value={form.percent}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  percent: clampNumber(Number(e.target.value), 1, 100),
-                }))
-              }
-            />
+            <label className={styles.field} htmlFor="combo-percent">
+              <span className={styles.label}>Porcentaje de descuento</span>
+              <div className={styles.inputWithSuffix}>
+                <input
+                  id="combo-percent"
+                  className={`${styles.input} ${styles.inputSuffixField}`}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={percentInput}
+                  disabled={saving}
+                  placeholder="10"
+                  onChange={(e) => {
+                    const next = sanitizePercentTyping(e.target.value);
+                    setPercentInput(next);
+                    setForm((prev) => ({
+                      ...prev,
+                      percent: next === '' ? 0 : Number(next),
+                    }));
+                  }}
+                />
+                <span className={styles.inputSuffix} aria-hidden>
+                  %
+                </span>
+              </div>
+              <p className={styles.helpText}>Entre 1% y 100%.</p>
+            </label>
           ) : null}
           {form.kind === 'amount' ? (
-            <input
-              className={styles.input}
-              type="number"
-              min={0}
-              step="0.01"
-              value={form.amount}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  amount: Math.max(0, Number(e.target.value)),
-                }))
-              }
-            />
+            <label className={styles.field} htmlFor="combo-amount">
+              <span className={styles.label}>Monto en pesos (MXN)</span>
+              <input
+                id="combo-amount"
+                className={styles.input}
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="50"
+                value={amountInput}
+                disabled={saving}
+                onChange={(e) => {
+                  const next = sanitizeAmountTyping(e.target.value);
+                  setAmountInput(next);
+                  const parsed = Number(next);
+                  setForm((prev) => ({
+                    ...prev,
+                    amount: next === '' || Number.isNaN(parsed) ? 0 : parsed,
+                  }));
+                }}
+              />
+            </label>
           ) : null}
-        </div>
+          {form.kind === 'free_shipping' ? (
+            <p className={styles.helpText}>
+              El envío queda en $0 cuando el cliente arma el combo completo.
+            </p>
+          ) : null}
+        </FormSection>
       ) : null}
 
       {template === 'order_threshold' ? (
-        <div className={styles.field}>
-          <p className={styles.label}>Beneficio al superar el mínimo</p>
-          <div className={`${styles.chipGrid} ${styles.chipGridThree}`}>
+        <FormSection
+          title="Beneficio al superar el mínimo"
+          hint="El carrito debe alcanzar el monto mínimo para aplicar el beneficio."
+        >
+          <div className={`${styles.chipGrid} ${styles.chipGridThree}`} role="group" aria-label="Beneficio">
             {(['percent', 'amount', 'free_shipping'] as const).map((kind) => (
-              <button
+              <ChipOption
                 key={kind}
-                type="button"
-                className={
-                  form.kind === kind ? `${styles.chip} ${styles.chipActive}` : styles.chip
-                }
+                selected={form.kind === kind}
+                disabled={saving}
                 onClick={() => setForm((prev) => ({ ...prev, kind }))}
               >
                 {kind === 'percent' ? 'Porcentaje' : kind === 'amount' ? 'Monto fijo' : 'Envío gratis'}
-              </button>
+              </ChipOption>
             ))}
           </div>
           {form.kind === 'percent' ? (
-            <input
-              className={styles.input}
-              type="number"
-              min={1}
-              max={100}
-              value={form.percent}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  percent: clampNumber(Number(e.target.value), 1, 100),
-                }))
-              }
-            />
+            <label className={styles.field} htmlFor="threshold-percent">
+              <span className={styles.label}>Porcentaje de descuento</span>
+              <div className={styles.inputWithSuffix}>
+                <input
+                  id="threshold-percent"
+                  className={`${styles.input} ${styles.inputSuffixField}`}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={percentInput}
+                  disabled={saving}
+                  placeholder="10"
+                  onChange={(e) => {
+                    const next = sanitizePercentTyping(e.target.value);
+                    setPercentInput(next);
+                    setForm((prev) => ({
+                      ...prev,
+                      percent: next === '' ? 0 : Number(next),
+                    }));
+                  }}
+                />
+                <span className={styles.inputSuffix} aria-hidden>
+                  %
+                </span>
+              </div>
+            </label>
           ) : null}
           {form.kind === 'amount' ? (
+            <label className={styles.field} htmlFor="threshold-amount">
+              <span className={styles.label}>Monto en pesos (MXN)</span>
+              <input
+                id="threshold-amount"
+                className={styles.input}
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="50"
+                value={amountInput}
+                disabled={saving}
+                onChange={(e) => {
+                  const next = sanitizeAmountTyping(e.target.value);
+                  setAmountInput(next);
+                  const parsed = Number(next);
+                  setForm((prev) => ({
+                    ...prev,
+                    amount: next === '' || Number.isNaN(parsed) ? 0 : parsed,
+                  }));
+                }}
+              />
+            </label>
+          ) : null}
+          <label className={styles.field} htmlFor="promo-min-order">
+            <span className={styles.label}>Monto mínimo del carrito</span>
             <input
+              id="promo-min-order"
               className={styles.input}
-              type="number"
-              min={0}
-              step="0.01"
-              value={form.amount}
-              onChange={(e) =>
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder="300"
+              value={minOrderInput}
+              disabled={saving}
+              onChange={(e) => {
+                const next = sanitizeAmountTyping(e.target.value);
+                setMinOrderInput(next);
+                const parsed = Number(next);
                 setForm((prev) => ({
                   ...prev,
-                  amount: Math.max(0, Number(e.target.value)),
-                }))
-              }
+                  minOrderAmount: next === '' || Number.isNaN(parsed) ? 0 : parsed,
+                }));
+              }}
             />
-          ) : null}
-          <label className={styles.label} htmlFor="promo-min-order">
-            Monto mínimo del carrito
+            <p className={styles.helpText}>Debe ser mayor a 0.</p>
           </label>
-          <input
-            id="promo-min-order"
-            className={styles.input}
-            type="number"
-            min={0}
-            step="0.01"
-            value={form.minOrderAmount}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                minOrderAmount: Math.max(0, Number(e.target.value)),
-              }))
-            }
-          />
-        </div>
+        </FormSection>
       ) : null}
 
       {template === 'bundle' ? (
-      <div className={styles.field}>
-        <p className={styles.label}>¿Cómo se combinan los productos?</p>
-          <p className={styles.helpText}>
-            Mismo producto: la oferta aplica solo entre unidades del mismo platillo (ej. 2
-            hamburguesas del mismo tipo). No mezcla productos distintos en la misma oferta.
-          </p>
+        <FormSection
+          title="Oferta N×M"
+          hint="Aplica entre unidades del mismo producto. Se cobra el de mayor precio."
+        >
           <div className={styles.bundleCallout} role="note">
             <p className={styles.bundleCalloutSlogan}>Se cobra el de mayor precio</p>
             <p className={styles.bundleCalloutDetail}>
-              La oferta aplica solo entre unidades del mismo producto. El carrito compara el precio
-              con descuento de catálogo (si el producto ya lo tiene) y cobra el más caro; el de menor
+              La oferta no mezcla productos distintos. El carrito cobra el más caro; el de menor
               precio sale gratis. Los complementos con costo extra se suman siempre.
             </p>
           </div>
-          <span className={styles.label}>Oferta N×M</span>
           <p className={styles.helpText}>
             El cliente lleva {form.bundle.getQuantity} y paga {form.bundle.payQuantity}.
           </p>
-          <div className={styles.chipGrid}>
+          <div className={styles.chipGrid} role="group" aria-label="Presets N×M">
             {BUNDLE_PRESETS.map((preset) => (
-              <button
+              <ChipOption
                 key={preset.label}
-                type="button"
-                className={
-                  bundleMatchesPreset(form.bundle, preset)
-                    ? `${styles.chip} ${styles.chipActive}`
-                    : styles.chip
-                }
+                selected={bundleMatchesPreset(form.bundle, preset)}
+                disabled={saving}
                 onClick={() =>
                   setForm((prev) => ({
                     ...prev,
@@ -1001,7 +1079,7 @@ export function PromotionForm({
                 }
               >
                 {preset.label}
-              </button>
+              </ChipOption>
             ))}
           </div>
           <div className={styles.grid2}>
@@ -1013,6 +1091,7 @@ export function PromotionForm({
                 id="bundle-get"
                 className={styles.input}
                 type="number"
+                inputMode="numeric"
                 min={2}
                 max={99}
                 value={form.bundle.getQuantity}
@@ -1035,6 +1114,7 @@ export function PromotionForm({
                 id="bundle-pay"
                 className={styles.input}
                 type="number"
+                inputMode="numeric"
                 min={1}
                 max={98}
                 value={form.bundle.payQuantity}
@@ -1050,7 +1130,7 @@ export function PromotionForm({
               />
             </div>
           </div>
-        </div>
+        </FormSection>
       ) : null}
 
       {template === 'product_discount' ? (
@@ -1074,48 +1154,22 @@ export function PromotionForm({
             />
           </div>
 
-          {!hasProductDiscountScope ? (
+          {!hasMenuScope ? (
             <p className={styles.scopeHint} role="status">
               Selecciona al menos un producto o categoría para poder guardar.
             </p>
           ) : null}
         </FormSection>
       ) : template !== 'order_threshold' ? (
-      <>
-      <fieldset className={styles.fieldset}>
-        <legend className={styles.legend}>Aplica a</legend>
-        <div className={styles.chipGrid} role="group" aria-label="Alcance de la promoción">
-          {(
-            template === 'combo'
-              ? ([['product', 'Productos del combo']] as const)
-              : ([
-                  ['product', 'Productos'],
-                  ['category', 'Categorías'],
-                ] as const)
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              className={
-                form.scope === value ? `${styles.chip} ${styles.chipActive}` : styles.chip
-              }
-              onClick={() =>
-                setForm((prev) => ({
-                  ...prev,
-                  scope: value,
-                  productIds: value === 'product' ? prev.productIds : [],
-                  categoryIds: value === 'category' ? prev.categoryIds : [],
-                  complementOptionItemIds: prev.complementOptionItemIds,
-                }))
-              }
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </fieldset>
-
-      {form.scope === 'product' ? (
+      <FormSection
+        title={template === 'combo' ? 'Productos del combo' : 'Productos incluidos'}
+        hint={
+          template === 'combo'
+            ? 'Elige al menos 2 productos. El beneficio aplica solo si están todos en el carrito.'
+            : 'La oferta N×M aplica solo entre unidades del mismo producto seleccionado.'
+        }
+      >
+      {form.scope === 'product' || template === 'bundle' || template === 'combo' ? (
         <div className={styles.field}>
           <div className={styles.menuPickerHeader}>
             <span className={styles.label}>
@@ -1160,7 +1214,12 @@ export function PromotionForm({
                         onChange={() =>
                           setForm((prev) => {
                             const productIds = toggleId(prev.productIds, product.id);
-                            const next = { ...prev, productIds };
+                            const next = {
+                              ...prev,
+                              scope: 'product' as const,
+                              categoryIds: [],
+                              productIds,
+                            };
                             return {
                               ...next,
                               complementOptionItemIds: syncComplementsOnSelectionChange(
@@ -1179,43 +1238,21 @@ export function PromotionForm({
               )}
             </>
           )}
+          {liveScopeEmpty ? (
+            <p className={styles.scopeHint} role="status">
+              {liveScopeEmpty}
+            </p>
+          ) : null}
         </div>
       ) : null}
-
-      {form.scope === 'category' ? (
-        <CategoryProductPicker
-          categories={categories}
-          products={products}
-          categoryIds={form.categoryIds}
-          productIds={form.productIds}
-          helpText="Selecciona categorías completas o expande una para elegir productos específicos."
-          onSelectionChange={(categoryIds, productIds) =>
-            setForm((prev) => {
-              const next = { ...prev, categoryIds, productIds };
-              return {
-                ...next,
-                complementOptionItemIds: syncComplementsOnSelectionChange(prev, next, products),
-              };
-            })
-          }
-        />
-      ) : null}
-      </>
+      </FormSection>
       ) : null}
 
       {template === 'bundle' && complementProducts.length > 0 ? (
-        <fieldset className={styles.fieldset}>
-          <legend className={styles.legend}>
-            Complementos que participan
-            {complementCount > 0 ? (
-              <span className={styles.legendCount}> ({complementCount})</span>
-            ) : null}
-          </legend>
-          <p className={styles.helpText}>
-            Marca los extras que entran al NxM. Solo los complementos seleccionados participan en la
-            promoción. Si el cliente elige uno no marcado, la promoción no aplicará y verá un aviso
-            en el menú.
-          </p>
+        <FormSection
+          title={`Complementos que participan${complementCount > 0 ? ` (${complementCount})` : ''}`}
+          hint="Solo los extras marcados entran al N×M. Si el cliente elige uno no marcado, la promo no aplica."
+        >
           <div className={styles.complementList}>
             {complementProducts.map((product) => {
               const activeGroups = product.option_groups.filter(
@@ -1287,24 +1324,20 @@ export function PromotionForm({
               );
             })}
           </div>
-        </fieldset>
+        </FormSection>
       ) : null}
 
       <SectionShell
-        asCard={template === 'product_discount'}
+        asCard
         title="Horario recurrente"
-        hint={
-          template === 'product_discount'
-            ? 'Opcional. Limita la promoción a días u horas específicas.'
-            : undefined
-        }
+        hint="Opcional. Si no limitas nada, la promo aplica todos los días y a cualquier hora."
       >
 
         <label className={styles.toggleRow}>
           <span className={styles.toggleCopy}>
             <span className={styles.toggleLabel}>Repetir en días específicos</span>
             <span className={styles.toggleHint}>
-              Si está desactivado, aplica todos los días de la semana.
+              Desactivado = todos los días. Activado = solo los días que marques.
             </span>
           </span>
           <input
@@ -1353,13 +1386,17 @@ export function PromotionForm({
             })}
           </div>
         ) : (
-          <p className={styles.helpText}>Selecciona los días en los que estará activa.</p>
+          <p className={styles.helpText}>
+            Sin días marcados: la promoción puede aplicar de lunes a domingo.
+          </p>
         )}
 
         <label className={styles.toggleRow}>
           <span className={styles.toggleCopy}>
             <span className={styles.toggleLabel}>Limitar horario del día</span>
-            <span className={styles.toggleHint}>Por ejemplo, happy hour de 17:00 a 20:00.</span>
+            <span className={styles.toggleHint}>
+              Desactivado = todo el día. Activado = solo entre las horas que indiques.
+            </span>
           </span>
           <input
             className={styles.toggleInput}
@@ -1411,24 +1448,22 @@ export function PromotionForm({
               />
             </div>
           </div>
-        ) : null}
+        ) : (
+          <p className={styles.helpText}>
+            Sin horario: aplica a cualquier hora del día (dentro de los días activos).
+          </p>
+        )}
       </SectionShell>
 
       <SectionShell
-        asCard={template === 'product_discount'}
+        asCard
         title="Vigencia de campaña"
-        hint={
-          template === 'product_discount'
-            ? 'Opcional. Define el periodo en que la promoción puede estar activa.'
-            : undefined
-        }
+        hint="Opcional. Sin fechas = activa desde ahora y sin fecha de fin."
       >
-        {template === 'product_discount' ? null : (
         <p className={styles.helpText}>
-          Opcional. Ajusta cuándo puede estar activa la promoción (independiente de los días u
-          horarios de arriba). Si no se especifica, la promoción estará activa siempre.
+          Vacío = empieza a aplicar ahora mismo y sigue vigente hasta que la desactives o borres.
+          Puedes poner solo inicio, solo fin, o ambos.
         </p>
-        )}
         <div className={styles.grid2}>
           <div>
             <label className={styles.label} htmlFor="campaign-starts">
