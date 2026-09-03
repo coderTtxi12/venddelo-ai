@@ -7,7 +7,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from app.core.config import get_settings
-from app.infra.maps.google_distance_matrix import DistanceMatrixError, fetch_driving_distance_km
+from app.infra.maps.google_routes import RoutesError, fetch_driving_distance_km
 from app.modules.delivery_providers.availability import (
     is_night_schedule,
     is_within_regular_schedule,
@@ -329,7 +329,7 @@ class PublicDeliveryQuoteService:
                     destination_lng=delivery_longitude,
                     api_key=api_key,
                 )
-            except DistanceMatrixError:
+            except RoutesError:
                 return ResolvedDeliveryQuote(
                     available=False,
                     reason="No se pudo calcular la ruta hacia esta dirección.",
