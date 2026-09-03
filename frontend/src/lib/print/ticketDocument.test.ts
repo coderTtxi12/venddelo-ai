@@ -287,7 +287,7 @@ test('buildKitchenTicketDocument shows free shipping coupon on ticket', () => {
       subtotal_cents: 11000,
       subtotal_before_discount_cents: 11000,
       total_cents: 11000,
-      delivery_fee_cents: 0,
+      delivery_fee_cents: 3500,
       applied_coupon_id: 'coupon-2',
       applied_coupon_code: 'ENVIO0',
       coupon_discount_cents: 0,
@@ -310,5 +310,11 @@ test('buildKitchenTicketDocument shows free shipping coupon on ticket', () => {
       (line) =>
         line.kind === 'total' && line.label === 'Cupón ENVIO0' && line.value === 'Envío gratis',
     ),
+  );
+  assert.equal(
+    doc.lines.some(
+      (line) => line.kind === 'total' && line.label === 'Envío' && line.value.includes('35'),
+    ),
+    false,
   );
 });

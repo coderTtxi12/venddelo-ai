@@ -1,6 +1,6 @@
 # Envío gratis B2B — fee real al delivery, absorbido por el restaurante
 
-> **Status:** approved — implementation plan ready.  
+> **Status:** implemented on branch `fix/free-shipping-b2b-fee` — pending manual verify.  
 > **Approach:** 1 — `orders.delivery_fee_cents` = tarifa real; `waived_delivery_cents` = lo que el cliente no paga.  
 > **Plan:** `docs/superpowers/plans/2026-09-03-free-shipping-b2b-fee.md`  
 > **Scope:** cupones `free_shipping`, promociones `free_shipping` / combo con envío gratis, quote público, crear pedido, dispatch lock de fee, UI cocina/checkout.  
