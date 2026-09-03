@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 
@@ -56,6 +57,13 @@ def list_orders(
     status: str | None = Query(default=None),
     view: str | None = Query(default=None),
     board: str = Query(default="kitchen"),
+    q: str | None = Query(default=None),
+    order_type: str | None = Query(default=None, alias="type"),
+    payment_method: str | None = Query(default=None),
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    sort: str = Query(default="created_at"),
+    order: str = Query(default="desc"),
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: OrderService = Depends(_service),
 ) -> CursorPage[OrderDTO]:
@@ -65,6 +73,13 @@ def list_orders(
         status=status,
         view=view,
         board=board,
+        q=q,
+        order_type=order_type,
+        payment_method=payment_method,
+        from_date=from_date,
+        to_date=to_date,
+        sort=sort,
+        order=order,
     )
 
 

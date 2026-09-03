@@ -4,7 +4,7 @@ import hashlib
 import json
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from app.core.config import get_settings
 from app.core.exceptions import ConflictError, CouponValidationError, NotFoundError, ValidationError
@@ -272,6 +272,13 @@ class OrderService:
         status: str | None = None,
         view: str | None = None,
         board: str = "kitchen",
+        q: str | None = None,
+        order_type: str | None = None,
+        payment_method: str | None = None,
+        from_date: date | None = None,
+        to_date: date | None = None,
+        sort: str = "created_at",
+        order: str = "desc",
     ) -> CursorPage[OrderDTO]:
         if board not in KITCHEN_ORDER_BOARDS:
             raise ValidationError(f"Unsupported board: {board}")
@@ -279,17 +286,46 @@ class OrderService:
             raise ValidationError("Use either status or view, not both")
         if view is not None and view not in KITCHEN_ORDER_VIEWS:
             raise ValidationError(f"Unsupported view: {view}")
+        history_q = None
+        history_type = None
+        history_payment = None
+        history_from = None
+        history_to = None
+        history_sort = "created_at"
+        history_order = "desc"
         if board == "history":
             if view == "active":
                 raise ValidationError("History only includes closed orders")
             if status is not None and status not in ARCHIVE_ORDER_STATUSES:
                 raise ValidationError("History only includes delivered or cancelled orders")
+            if order_type is not None and order_type not in _ALLOWED_ORDER_TYPES:
+                raise ValidationError("Invalid order type")
+            if payment_method is not None and payment_method not in _ALLOWED_PAYMENT_METHODS:
+                raise ValidationError("Invalid payment method")
+            if sort not in {"created_at", "total_cents"}:
+                raise ValidationError("Unsupported sort")
+            if order not in {"asc", "desc"}:
+                raise ValidationError("Unsupported order")
+            history_q = q
+            history_type = order_type
+            history_payment = payment_method
+            history_from = from_date
+            history_to = to_date
+            history_sort = sort
+            history_order = order
         page = self._orders.list_by_restaurant(
             restaurant_id,
             params,
             status=status,
             view=view,
             board=board,
+            q=history_q,
+            order_type=history_type,
+            payment_method=history_payment,
+            from_date=history_from,
+            to_date=history_to,
+            sort=history_sort,
+            order=history_order,
         )
         page.items = self._enrich_coupon_stock_batch(page.items)
         return page
