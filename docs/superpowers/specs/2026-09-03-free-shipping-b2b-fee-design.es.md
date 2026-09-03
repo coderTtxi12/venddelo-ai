@@ -128,6 +128,10 @@ customerPay = food_total + customerDeliveryDue
    - Sin cambio de lógica si el pedido ya guarda fee real.  
    - Test de regresión: order con waived + delivery_fee > 0 → `quoted_fee_cents == delivery_fee`.
 
+6. **`RequestDeliveryForm.tsx` (cocina → pedir repartidor)**  
+   - Hoy prefilla / bloquea tarifa con `sourceOrder.delivery_fee_cents` y el copy habla de “tarifa que vio el cliente”.  
+   - Debe usar el fee B2B real (`delivery_fee` o fallback `waived` en históricos) y copy alineado: tarifa del servicio de delivery / costo absorbido por el restaurante, no “lo que pagó el cliente”.
+
 ### 4.2 Frontend
 
 1. **Checkout / quote consumers**  
