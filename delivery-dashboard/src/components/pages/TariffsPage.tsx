@@ -345,7 +345,7 @@ export default function TariffsPage() {
   return (
     <PanelPageShell
       title="Tarifas de reparto"
-      subtitle="Configura precios dentro y fuera de tu polígono de cobertura. Fuera del polígono se usa distancia de ruta (Google Distance Matrix, máx. 20 km restaurante → cliente)."
+      subtitle="Configura precios dentro y fuera de tu polígono de cobertura. Fuera del polígono se usa la ruta más corta en km (Google Routes, máx. 20 km restaurante → cliente)."
       styles={{
         page: styles.page,
         header: styles.header,
