@@ -1,6 +1,10 @@
 import { historicalOptionGroups } from '@/components/digital-menu/optionGroupHint';
 import type { AppliedOrderDiscount, Order, OrderItem, Product } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
+import {
+  customerPayableDeliveryCents,
+  providerDeliveryFeeCents,
+} from '@/lib/orders/deliveryFee';
 import { PAYMENT_METHOD_LABELS } from '@/lib/restaurantPaymentConfig';
 import { RESTAURANT_SERVICE_LABELS } from '@/lib/restaurantServices';
 
@@ -233,6 +237,14 @@ export type OrderTotalsBreakdown = {
   orderDiscountCents: number;
   /** Productos del restaurante tras descuentos, sin envío. */
   restaurantSubtotalCents: number;
+  /** Tarifa B2B del delivery (lo que cobra el proveedor / absorbe el restaurante). */
+  providerDeliveryFeeCents: number;
+  /** Lo que paga el cliente por envío (0 si hay envío gratis). */
+  customerDeliveryFeeCents: number;
+  /**
+   * @deprecated Prefer customerDeliveryFeeCents (customer-facing).
+   * Kept as customer due for existing kitchen call sites.
+   */
   deliveryFeeCents: number;
   totalCents: number;
 };
@@ -254,16 +266,22 @@ export function buildOrderTotalsBreakdown(order: Order): OrderTotalsBreakdown {
   const restaurantSubtotalCents =
     order.subtotal_cents > 0 ? order.subtotal_cents : restaurantComputed;
 
+  const waivedDeliveryCents = order.coupon_waived_delivery_cents ?? 0;
+  const providerFee = providerDeliveryFeeCents(order.delivery_fee_cents, waivedDeliveryCents);
+  const customerFee = customerPayableDeliveryCents(providerFee, waivedDeliveryCents);
+
   return {
     subtotalBeforeCents,
     lineDiscountCents,
     promoOrderDiscountCents,
     couponDiscountCents: coupon.discountCents,
-    couponWaivedDeliveryCents: coupon.waivedDeliveryCents,
+    couponWaivedDeliveryCents: waivedDeliveryCents,
     appliedCouponCode: coupon.code,
     orderDiscountCents: promoOrderDiscountCents,
     restaurantSubtotalCents,
-    deliveryFeeCents: order.delivery_fee_cents,
+    providerDeliveryFeeCents: providerFee,
+    customerDeliveryFeeCents: customerFee,
+    deliveryFeeCents: customerFee,
     totalCents: order.total_cents,
   };
 }

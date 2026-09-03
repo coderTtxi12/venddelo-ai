@@ -521,7 +521,7 @@ function OrderDetailContent({
             <div className={`${styles.totalRow} ${styles.totalRowDiscount}`}>
               <span>{couponChip}</span>
               <span>
-                {(order.coupon_waived_delivery_cents ?? 0) > 0
+                {totals.couponWaivedDeliveryCents > 0
                   ? 'Envío gratis'
                   : order.coupon_discount_cents > 0
                     ? `-${formatCents(order.coupon_discount_cents)}`
@@ -529,14 +529,25 @@ function OrderDetailContent({
               </span>
             </div>
           ) : null}
+          {!couponChip && totals.couponWaivedDeliveryCents > 0 ? (
+            <div className={`${styles.totalRow} ${styles.totalRowDiscount}`}>
+              <span>Envío gratis</span>
+              <span>Absorbe restaurante</span>
+            </div>
+          ) : null}
           <div className={`${styles.totalRow} ${styles.totalRowRestaurant}`}>
             <span>Subtotal restaurante</span>
             <span>{formatCents(totals.restaurantSubtotalCents)}</span>
           </div>
-          {totals.deliveryFeeCents > 0 ? (
+          {totals.customerDeliveryFeeCents > 0 ? (
             <div className={styles.totalRow}>
               <span>Envío</span>
-              <span>{formatCents(totals.deliveryFeeCents)}</span>
+              <span>{formatCents(totals.customerDeliveryFeeCents)}</span>
+            </div>
+          ) : totals.providerDeliveryFeeCents > 0 && totals.couponWaivedDeliveryCents > 0 ? (
+            <div className={styles.totalRow}>
+              <span>Envío (servicio)</span>
+              <span>{formatCents(totals.providerDeliveryFeeCents)} · absorbido</span>
             </div>
           ) : null}
           <div className={`${styles.totalRow} ${styles.totalRowStrong}`}>

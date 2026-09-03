@@ -225,3 +225,17 @@ test('buildOrderTotalsBreakdown keeps promo order discount separate from coupon'
   assert.equal(totals.couponDiscountCents, 2000);
   assert.equal(totals.restaurantSubtotalCents, 7500);
 });
+
+test('buildOrderTotalsBreakdown customer delivery is zero when waived', () => {
+  const totals = buildOrderTotalsBreakdown(
+    baseOrder({
+      delivery_fee_cents: 4500,
+      coupon_waived_delivery_cents: 4500,
+      total_cents: 9000,
+    }),
+  );
+  assert.equal(totals.providerDeliveryFeeCents, 4500);
+  assert.equal(totals.customerDeliveryFeeCents, 0);
+  assert.equal(totals.deliveryFeeCents, 0);
+  assert.equal(totals.couponWaivedDeliveryCents, 4500);
+});
