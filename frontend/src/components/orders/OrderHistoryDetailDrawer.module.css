@@ -1,0 +1,200 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.orderId {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.statusBadge {
+  margin: 0;
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+}
+
+.statusDelivered {
+  color: #166534;
+  background: color-mix(in srgb, #16a34a 14%, transparent);
+}
+
+.statusCancelled {
+  color: #991b1b;
+  background: color-mix(in srgb, #dc2626 12%, transparent);
+}
+
+.total {
+  margin: 0.15rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.meta {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.primary {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.secondary {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.whatsappBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #16a34a 28%, var(--color-border));
+  color: #15803d;
+  text-decoration: none;
+  font-size: 0.84rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.whatsappBtn:hover {
+  background: color-mix(in srgb, #16a34a 10%, transparent);
+}
+
+.whatsappBtn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.dlRow {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 0.5rem;
+  font-size: 0.88rem;
+}
+
+.dlRow dt {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.dlRow dd {
+  margin: 0;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.cancelReason {
+  margin: 0.35rem 0 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, #dc2626 6%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, #dc2626 16%, var(--color-border));
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--color-text);
+}
+
+.cancelLabel {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #991b1b;
+}
+
+.itemList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.itemRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: baseline;
+  font-size: 0.88rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.itemRow:last-child {
+  border-bottom: none;
+}
+
+.itemQty {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+}
+
+.itemName {
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.itemPrice {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+}
