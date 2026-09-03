@@ -128,6 +128,26 @@ def test_compose_free_shipping_takeout_returns_delivery_only():
     assert result.delivery_fee_cents == 4500
 
 
+def test_compose_free_shipping_delivery_keeps_real_fee():
+    product = _product()
+    result = compose_quote_coupon(
+        lines=[_line(product.id, 10000)],
+        products_by_id={product.id: product},
+        coupon=_coupon(type="free_shipping", percent=None, amount_cents=None),
+        coupon_code="FREESHIP",
+        food_total_cents=10000,
+        service_type="delivery",
+        delivery_fee_cents=4500,
+        now_utc=_NOW,
+        tz=_TZ,
+    )
+    assert result.coupon is not None
+    assert result.coupon.waived_delivery_cents == 4500
+    assert result.delivery_fee_cents == 4500
+    assert result.food_total_cents == 10000
+    assert result.coupon_error is None
+
+
 def test_compose_errors_do_not_raise():
     product = _product()
     result = compose_quote_coupon(

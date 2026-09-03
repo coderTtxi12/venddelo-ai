@@ -95,6 +95,7 @@ class CartQuoteDTO(BaseModel):
     coupon: CartQuoteCouponDTO | None = None
     coupon_error: CartQuoteCouponErrorDTO | None = None
     delivery_fee_cents: int = 0
+    waived_delivery_cents: int = 0
 
 
 class PublicCheckoutPaymentMethodDTO(BaseModel):

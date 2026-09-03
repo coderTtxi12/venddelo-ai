@@ -348,11 +348,6 @@ def quote_public_cart(
     )
     coupon_input = coupon_service.to_input(resolved) if resolved else None
     delivery_fee_input = max(data.delivery_fee_cents, 0)
-    if (
-        quote.applied_free_shipping_promotion_id is not None
-        and data.service_type == "delivery"
-    ):
-        delivery_fee_input = 0
     composed = compose_quote_coupon(
         lines=quote.lines,
         products_by_id=products_by_id,
@@ -380,6 +375,17 @@ def quote_public_cart(
             message=composed.coupon_error.message,
         )
 
+    fee = max(composed.delivery_fee_cents, 0)
+    waived = 0
+    if composed.coupon is not None:
+        waived = max(waived, composed.coupon.waived_delivery_cents)
+    if (
+        quote.applied_free_shipping_promotion_id is not None
+        and data.service_type == "delivery"
+    ):
+        waived = max(waived, fee)
+    waived = min(fee, waived)
+
     return CartQuoteDTO(
         server_now=now,
         timezone=restaurant.timezone,
@@ -404,7 +410,8 @@ def quote_public_cart(
         applied_free_shipping_promotion_id=quote.applied_free_shipping_promotion_id,
         coupon=coupon_dto,
         coupon_error=coupon_error,
-        delivery_fee_cents=composed.delivery_fee_cents,
+        delivery_fee_cents=fee,
+        waived_delivery_cents=waived,
     )
 
 
