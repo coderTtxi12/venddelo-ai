@@ -613,6 +613,30 @@ def test_create_dispatch_from_order_reuses_display_id_and_quoted_fee(client, eng
 
 
 @requires_db
+def test_create_dispatch_from_order_historical_waived_fee_fallback(client, engine):
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-order-waived")
+    _activate_partnership(client, engine, restaurant_id)
+    order = _create_delivery_order(
+        engine,
+        restaurant_id,
+        delivery_fee_cents=0,
+        coupon_waived_delivery_cents=7777,
+        total_cents=18000,
+    )
+
+    response = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(order_id=str(order.id)),
+        headers=AUTH,
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["quoted_fee_cents"] == 7777
+
+
+@requires_db
 def test_create_dispatch_from_order_requotes_when_pin_moves(client, engine):
     _create_mexy_provider(client)
     restaurant_id = _create_restaurant(client, subdomain="dispatch-order-move")

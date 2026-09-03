@@ -37,6 +37,7 @@ from app.db.models.orders import Order
 from app.db.models.restaurant import Restaurant
 from app.infra.storage.factory import build_storage
 from app.modules.assistant.image_webp import WEBP_CONTENT_TYPE, convert_image_bytes_to_webp
+from app.modules.orders.delivery_fee import provider_quoted_fee_cents
 from app.modules.delivery_dispatch.app_client import (
     force_update_payload,
     must_update_app,
@@ -952,7 +953,10 @@ class RestaurantDispatchService:
         )
         if lock_quoted_fee:
             assert source_order is not None
-            quoted_fee_cents = source_order.delivery_fee_cents
+            quoted_fee_cents = provider_quoted_fee_cents(
+                source_order.delivery_fee_cents,
+                source_order.coupon_waived_delivery_cents or 0,
+            )
         else:
             quote = self._quotes.quote_delivery(
                 restaurant,
