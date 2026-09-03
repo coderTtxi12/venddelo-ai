@@ -77,6 +77,7 @@ export type CartQuote = {
   applied_order_promotion_id: string | null;
   applied_free_shipping_promotion_id?: string | null;
   delivery_fee_cents?: number;
+  waived_delivery_cents?: number;
   coupon: CartQuoteCoupon | null;
   coupon_error: CartQuoteCouponError | null;
 };

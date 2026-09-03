@@ -91,12 +91,28 @@ function formatLineOptions(
   return rows;
 }
 
-function deliveryFeeCentsForQuote(
+function providerDeliveryFeeCentsForQuote(
   fulfillment: CheckoutFulfillment,
   quote: CartQuote,
 ): number {
   if (fulfillment.serviceType !== 'delivery') return 0;
   return quote.delivery_fee_cents ?? fulfillment.deliveryFeeCents ?? 0;
+}
+
+function quoteWaivedDeliveryCents(quote: CartQuote): number {
+  return Math.max(
+    quote.waived_delivery_cents ?? 0,
+    quote.coupon?.waived_delivery_cents ?? 0,
+  );
+}
+
+function customerDeliveryFeeCentsForQuote(
+  fulfillment: CheckoutFulfillment,
+  quote: CartQuote,
+): number {
+  const fee = providerDeliveryFeeCentsForQuote(fulfillment, quote);
+  const waived = quoteWaivedDeliveryCents(quote);
+  return Math.max(0, fee - waived);
 }
 
 function isCouponDeliveryWaived(quote: CartQuote): boolean {
@@ -106,7 +122,10 @@ function isCouponDeliveryWaived(quote: CartQuote): boolean {
 }
 
 function isPromoDeliveryWaived(quote: CartQuote): boolean {
-  return Boolean(quote.applied_free_shipping_promotion_id);
+  return (
+    Boolean(quote.applied_free_shipping_promotion_id) ||
+    (quote.waived_delivery_cents ?? 0) > 0
+  );
 }
 
 export function formatQuotePromotionWhatsAppLines(
@@ -175,7 +194,7 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
   const freeShippingPromo = quote.applied_free_shipping_promotion_id
     ? promotionsById.get(quote.applied_free_shipping_promotion_id)
     : undefined;
-  const deliveryFeeCents = deliveryFeeCentsForQuote(fulfillment, quote);
+  const deliveryFeeCents = customerDeliveryFeeCentsForQuote(fulfillment, quote);
   const deliveryFee = deliveryFeeCents / 100;
   const deliveryFeeWaived = isPromoDeliveryWaived(quote) || isCouponDeliveryWaived(quote);
   const grandTotal = (quote.total_cents + deliveryFeeCents) / 100;

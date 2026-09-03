@@ -718,7 +718,11 @@ export function PublicMenuCheckoutSummary({
   );
   const deliveryFeeCents =
     fulfillment.serviceType === 'delivery'
-      ? quote.delivery_fee_cents ?? fulfillment.deliveryFeeCents ?? 0
+      ? Math.max(
+          0,
+          (quote.delivery_fee_cents ?? fulfillment.deliveryFeeCents ?? 0) -
+            Math.max(quote.waived_delivery_cents ?? 0, quote.coupon?.waived_delivery_cents ?? 0),
+        )
       : 0;
   const deliveryFee = deliveryFeeCents / 100;
   const deliveryWaivedByCoupon =
@@ -726,7 +730,9 @@ export function PublicMenuCheckoutSummary({
     (quote.coupon?.type === 'free_shipping' || (quote.coupon?.waived_delivery_cents ?? 0) > 0);
   const deliveryFeeWaived =
     fulfillment.serviceType === 'delivery' &&
-    (Boolean(freeShippingPromo) || deliveryWaivedByCoupon);
+    (Boolean(freeShippingPromo) ||
+      deliveryWaivedByCoupon ||
+      (quote.waived_delivery_cents ?? 0) > 0);
   const couponDiscountCents = quote.coupon?.discount_cents ?? 0;
   const couponDiscount = couponDiscountCents / 100;
   const couponLabel = quote.coupon?.code ?? appliedCouponCode;
