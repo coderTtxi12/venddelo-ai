@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import date, datetime
 
 from app.core.pagination import CursorPage, PaginationParams
 from app.modules.orders.schemas import OrderCreate, OrderDTO, OrderStatusSummaryDTO
@@ -24,6 +24,13 @@ class OrderRepository(ABC):
         status: str | None = None,
         view: str | None = None,
         board: str = "kitchen",
+        q: str | None = None,
+        order_type: str | None = None,
+        payment_method: str | None = None,
+        from_date: date | None = None,
+        to_date: date | None = None,
+        sort: str = "created_at",
+        order: str = "desc",
     ) -> CursorPage[OrderDTO]: ...
 
     @abstractmethod
