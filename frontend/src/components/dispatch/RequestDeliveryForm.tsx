@@ -26,6 +26,7 @@ import {
   splitDeliveryAddress,
   type KitchenDispatchFormValues,
 } from '@/lib/orders/kitchenDispatch';
+import { providerDeliveryFeeCents } from '@/lib/orders/deliveryFee';
 import { DEFAULT_COUNTRY_ISO, findCountryByIso, formatE164 } from '@/lib/phone/countryDialCodes';
 import styles from './RequestDeliveryForm.module.css';
 
@@ -131,7 +132,10 @@ export function RequestDeliveryForm({
       address: splitDeliveryAddress(sourceOrder.delivery_address).address,
       latitude: sourceOrder.delivery_latitude,
       longitude: sourceOrder.delivery_longitude,
-      feeCents: sourceOrder.delivery_fee_cents,
+      feeCents: providerDeliveryFeeCents(
+        sourceOrder.delivery_fee_cents,
+        sourceOrder.coupon_waived_delivery_cents ?? 0,
+      ),
     };
   }, [sourceOrder]);
 
@@ -461,7 +465,11 @@ export function RequestDeliveryForm({
             {formatMoney(deliveryFeeCents / 100, 'MXN')}
           </span>
           <span className={styles.feeHint}>
-            Tarifa que vio el cliente. Se recalcula solo si mueves el pin o cambias la dirección.
+            Tarifa del servicio de delivery
+            {(sourceOrder?.coupon_waived_delivery_cents ?? 0) > 0
+              ? '. El cliente no pagó envío; el restaurante absorbe este costo'
+              : ''}
+            . Se recalcula solo si mueves el pin o cambias la dirección.
           </span>
         </div>
       ) : null}
