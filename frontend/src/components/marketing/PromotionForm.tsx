@@ -15,7 +15,6 @@ import {
 } from '@/lib/promotions/promotionDraft';
 import type { PromotionTemplate } from '@/lib/promotions/templates';
 import {
-  productDiscountMenuSummary,
   resolveProductDiscountScope,
 } from '@/lib/promotions/productDiscountScope';
 import { WEEKDAY_LABELS } from '@/lib/restaurantScheduleHours';
@@ -102,6 +101,23 @@ function ChipOption({
 function clampNumber(n: number, min: number, max: number): number {
   if (Number.isNaN(n)) return min;
   return Math.min(max, Math.max(min, n));
+}
+
+function formatPreviewDateTime(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) return trimmed;
+  return date.toLocaleString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatPreviewTime(value: string): string {
+  return value.trim().slice(0, 5);
 }
 
 export type PromotionFormSubmitPayload = Omit<
@@ -367,10 +383,51 @@ export function PromotionForm({
     return hasMenuSelection(form.categoryIds, form.productIds);
   }, [form.categoryIds, form.productIds, template]);
 
-  const productDiscountScopeSummary = useMemo(() => {
+  const productDiscountPreviewItems = useMemo(() => {
+    if (template !== 'product_discount') {
+      return { categoryNames: [] as string[], productNames: [] as string[] };
+    }
+    const categoryNames = categories
+      .filter((category) => form.categoryIds.includes(category.id))
+      .map((category) => category.name)
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    const productNames = products
+      .filter((product) => form.productIds.includes(product.id))
+      .map((product) => product.name)
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    return { categoryNames, productNames };
+  }, [categories, form.categoryIds, form.productIds, products, template]);
+
+  const productDiscountScheduleLines = useMemo(() => {
+    if (template !== 'product_discount') return [] as string[];
+    const lines: string[] = [];
+
+    if (form.schedule.useWeekdays && form.schedule.weekdays.length > 0) {
+      lines.push(form.schedule.weekdays.map((day) => WEEKDAY_SHORT[day] ?? WEEKDAY_LABELS[day]).join(' · '));
+    }
+
+    if (
+      form.schedule.useTimeWindow &&
+      form.schedule.dailyStartTime &&
+      form.schedule.dailyEndTime
+    ) {
+      lines.push(
+        `${formatPreviewTime(form.schedule.dailyStartTime)}–${formatPreviewTime(form.schedule.dailyEndTime)}`,
+      );
+    }
+
+    return lines;
+  }, [form.schedule, template]);
+
+  const productDiscountCampaignLine = useMemo(() => {
     if (template !== 'product_discount') return null;
-    return productDiscountMenuSummary(form.categoryIds, form.productIds);
-  }, [form.categoryIds, form.productIds, template]);
+    const starts = formatPreviewDateTime(form.campaignStartsAt);
+    const ends = formatPreviewDateTime(form.campaignEndsAt);
+    if (!starts && !ends) return null;
+    if (starts && ends) return `${starts} → ${ends}`;
+    if (starts) return `Desde ${starts}`;
+    return `Hasta ${ends}`;
+  }, [form.campaignEndsAt, form.campaignStartsAt, template]);
 
   const promoImageUrl = storagePublicUrl(form.imagePath);
 
@@ -389,7 +446,84 @@ export function PromotionForm({
 
   return (
     <div className={styles.shell}>
-      <div className={styles.scroll}>
+      {template === 'product_discount' ? (
+        <div className={styles.previewDock}>
+          <div
+            className={
+              !hasProductDiscountScope
+                ? `${styles.livePreview} ${styles.livePreviewAttention}`
+                : styles.livePreview
+            }
+            aria-live="polite"
+          >
+            <div className={styles.livePreviewEyebrow}>
+              <span className={styles.livePreviewEyebrowLabel}>Vista previa</span>
+              <span className={styles.livePreviewBadge}>{previewLabel}</span>
+            </div>
+
+            <p className={styles.livePreviewTitle}>
+              {form.name.trim() || 'Sin nombre todavía'}
+            </p>
+
+            <p className={styles.livePreviewBenefit}>
+              {form.kind === 'amount'
+                ? `${formatMoney(form.amount)} en cada producto`
+                : `${form.percent}% en cada producto`}
+            </p>
+
+            {!hasProductDiscountScope ? (
+              <p className={styles.livePreviewEmpty}>Elige productos o categorías abajo.</p>
+            ) : (
+              <div className={styles.livePreviewChips}>
+                {productDiscountPreviewItems.categoryNames.map((name) => (
+                  <span key={`cat-${name}`} className={styles.livePreviewChip}>
+                    {name}
+                  </span>
+                ))}
+                {productDiscountPreviewItems.productNames.slice(0, 4).map((name) => (
+                  <span key={`prod-${name}`} className={styles.livePreviewChip}>
+                    {name}
+                  </span>
+                ))}
+                {productDiscountPreviewItems.productNames.length > 4 ? (
+                  <span className={`${styles.livePreviewChip} ${styles.livePreviewChipMuted}`}>
+                    +{productDiscountPreviewItems.productNames.length - 4} más
+                  </span>
+                ) : null}
+              </div>
+            )}
+
+            {(productDiscountScheduleLines.length > 0 || productDiscountCampaignLine) ? (
+              <div className={styles.livePreviewMetaList}>
+                {productDiscountScheduleLines.length > 0 ? (
+                  <p className={styles.livePreviewMetaLine}>
+                    <span className={styles.livePreviewMetaKey}>Horario</span>
+                    {productDiscountScheduleLines.join(' · ')}
+                  </p>
+                ) : null}
+                {productDiscountCampaignLine ? (
+                  <p className={styles.livePreviewMetaLine}>
+                    <span className={styles.livePreviewMetaKey}>Vigencia</span>
+                    {productDiscountCampaignLine}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {!form.showBanner ? (
+              <p className={styles.livePreviewNote}>Sin banner en el menú</p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      <div
+        className={
+          template === 'product_discount'
+            ? `${styles.scroll} ${styles.scrollWithDock}`
+            : styles.scroll
+        }
+      >
         <form
           id={FORM_ID}
           className={styles.form}
@@ -449,37 +583,27 @@ export function PromotionForm({
         </button>
       ) : null}
 
-      <div className={styles.infoBanner} role="status">
-        {template === 'bundle'
-          ? 'Configura días, horarios, ofertas N×M y complementos. La promoción se aplicará en el menú público y en el carrito.'
-          : template === 'combo'
-            ? 'El descuento aplica cuando el cliente lleva todos los productos del combo en el carrito.'
-            : template === 'order_threshold'
-              ? 'El beneficio aplica al superar el monto mínimo del carrito.'
-              : 'El precio con descuento se muestra en el menú y se aplica automáticamente en el carrito.'}
-      </div>
+      {template !== 'product_discount' ? (
+        <div className={styles.infoBanner} role="status">
+          {template === 'bundle'
+            ? 'Configura días, horarios, ofertas N×M y complementos. La promoción se aplicará en el menú público y en el carrito.'
+            : template === 'combo'
+              ? 'El descuento aplica cuando el cliente lleva todos los productos del combo en el carrito.'
+              : 'El beneficio aplica al superar el monto mínimo del carrito.'}
+        </div>
+      ) : null}
 
-      <div
-        className={
-          template === 'product_discount' && !hasProductDiscountScope
-            ? `${styles.previewCard} ${styles.previewCardAttention}`
-            : styles.previewCard
-        }
-      >
-        <span className={styles.previewLabel}>Vista previa</span>
-        <strong className={styles.previewValue}>{previewLabel}</strong>
-        {template === 'product_discount' && productDiscountScopeSummary ? (
-          <span className={styles.previewMeta}>{productDiscountScopeSummary}</span>
-        ) : null}
-        {form.schedule.useWeekdays && form.schedule.weekdays.length > 0 ? (
-          <span className={styles.previewMeta}>
-            {form.schedule.weekdays.map((d: number) => WEEKDAY_LABELS[d]).join(' · ')}
-          </span>
-        ) : null}
-        {template === 'product_discount' && !hasProductDiscountScope ? (
-          <span className={styles.previewHint}>Selecciona productos o categorías abajo.</span>
-        ) : null}
-      </div>
+      {template !== 'product_discount' ? (
+        <div className={styles.previewCard}>
+          <span className={styles.previewLabel}>Vista previa</span>
+          <strong className={styles.previewValue}>{previewLabel}</strong>
+          {form.schedule.useWeekdays && form.schedule.weekdays.length > 0 ? (
+            <span className={styles.previewMeta}>
+              {form.schedule.weekdays.map((d: number) => WEEKDAY_LABELS[d]).join(' · ')}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       <FormSection
         title="Identidad"
@@ -508,44 +632,64 @@ export function PromotionForm({
 
       <div className={styles.field}>
         <label className={styles.label} htmlFor="promo-image">
-          Imagen promocional {form.showBanner ? <span className={styles.requiredMark}>*</span> : null}
+          Imagen promocional
+          {template !== 'product_discount' && form.showBanner ? (
+            <span className={styles.requiredMark}> *</span>
+          ) : null}
         </label>
         <p className={styles.helpText} id="promo-image-help">
-          {form.showBanner
-            ? 'Banner del acceso directo en el menú público.'
-            : 'Opcional: esta promoción no se mostrará como banner en el menú.'}
+          {template === 'product_discount'
+            ? form.showBanner
+              ? 'Formato banner (16:9), como el acceso directo del menú público. Necesaria si el banner está activado.'
+              : 'Opcional mientras el banner esté desactivado.'
+            : form.showBanner
+              ? 'Banner del acceso directo en el menú público.'
+              : 'Opcional: esta promoción no se mostrará como banner en el menú.'}
         </p>
-        <div className={styles.promoImageRow}>
-          {promoImageUrl ? (
-            <img src={promoImageUrl} alt="" className={styles.promoImagePreview} />
-          ) : (
-            <div className={styles.promoImagePlaceholder} aria-hidden>
-              Sin imagen
-            </div>
-          )}
-          <div className={styles.promoImageActions}>
-            <button
-              type="button"
-              className={styles.secondaryBtn}
-              disabled={uploadingImage || saving}
-              onClick={() => imageInputRef.current?.click()}
+        {template === 'product_discount' ? (
+          <div className={styles.promoBannerUpload}>
+            <div
+              className={
+                promoImageUrl
+                  ? `${styles.promoBannerFrame} ${styles.promoBannerFrameFilled}`
+                  : styles.promoBannerFrame
+              }
             >
-              {uploadingImage
-                ? 'Subiendo…'
-                : promoImageUrl
-                  ? 'Cambiar imagen'
-                  : 'Subir imagen'}
-            </button>
-            {form.imagePath ? (
+              {promoImageUrl ? (
+                <img src={promoImageUrl} alt="" className={styles.promoBannerFrameImg} />
+              ) : (
+                <div className={styles.promoBannerFrameEmpty} aria-hidden>
+                  <span className={styles.promoBannerFrameTitle}>Vista tipo banner</span>
+                  <span className={styles.promoBannerFrameHint}>
+                    Recomendado 16:9 para que se vea igual que en el menú del cliente.
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className={styles.promoBannerActions}>
               <button
                 type="button"
-                className={styles.dangerGhostBtn}
+                className={styles.secondaryBtn}
                 disabled={uploadingImage || saving}
-                onClick={() => setForm((prev) => ({ ...prev, imagePath: null }))}
+                onClick={() => imageInputRef.current?.click()}
               >
-                Quitar
+                {uploadingImage
+                  ? 'Subiendo…'
+                  : promoImageUrl
+                    ? 'Cambiar imagen'
+                    : 'Subir imagen'}
               </button>
-            ) : null}
+              {form.imagePath ? (
+                <button
+                  type="button"
+                  className={styles.dangerGhostBtn}
+                  disabled={uploadingImage || saving}
+                  onClick={() => setForm((prev) => ({ ...prev, imagePath: null }))}
+                >
+                  Quitar
+                </button>
+              ) : null}
+            </div>
             <input
               ref={imageInputRef}
               id="promo-image"
@@ -560,7 +704,54 @@ export function PromotionForm({
               }}
             />
           </div>
-        </div>
+        ) : (
+          <div className={styles.promoImageRow}>
+            {promoImageUrl ? (
+              <img src={promoImageUrl} alt="" className={styles.promoImagePreview} />
+            ) : (
+              <div className={styles.promoImagePlaceholder} aria-hidden>
+                Sin imagen
+              </div>
+            )}
+            <div className={styles.promoImageActions}>
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                disabled={uploadingImage || saving}
+                onClick={() => imageInputRef.current?.click()}
+              >
+                {uploadingImage
+                  ? 'Subiendo…'
+                  : promoImageUrl
+                    ? 'Cambiar imagen'
+                    : 'Subir imagen'}
+              </button>
+              {form.imagePath ? (
+                <button
+                  type="button"
+                  className={styles.dangerGhostBtn}
+                  disabled={uploadingImage || saving}
+                  onClick={() => setForm((prev) => ({ ...prev, imagePath: null }))}
+                >
+                  Quitar
+                </button>
+              ) : null}
+              <input
+                ref={imageInputRef}
+                id="promo-image"
+                type="file"
+                accept="image/*"
+                className={styles.hiddenInput}
+                aria-describedby="promo-image-help"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleImageUpload(file);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+          </div>
+        )}
         {imageError ? (
           <p className={styles.errorBanner} role="alert">
             {imageError}
