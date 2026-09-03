@@ -256,6 +256,7 @@ def apply_coupon(
     if coupon.type == "free_shipping":
         if service_type != "delivery":
             return _fail("coupon_delivery_only", food_total_cents, delivery_fee_cents)
+        fee = max(delivery_fee_cents, 0)
         return CouponApplyResult(
             ok=True,
             error_code=None,
@@ -264,9 +265,9 @@ def apply_coupon(
             code=coupon.code,
             type=coupon.type,
             discount_cents=0,
-            waived_delivery_cents=max(delivery_fee_cents, 0),
+            waived_delivery_cents=fee,
             food_total_cents=food_total_cents,
-            delivery_fee_cents=0,
+            delivery_fee_cents=fee,
         )
     if coupon.type == "percent" and coupon.percent is not None:
         discount = round(eligible * coupon.percent / 100)

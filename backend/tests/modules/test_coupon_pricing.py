@@ -140,7 +140,7 @@ def test_free_shipping_delivery_waives_fee():
     assert result.ok is True
     assert result.discount_cents == 0
     assert result.waived_delivery_cents == 4500
-    assert result.delivery_fee_cents == 0
+    assert result.delivery_fee_cents == 4500
     assert result.food_total_cents == 10000
 
 
