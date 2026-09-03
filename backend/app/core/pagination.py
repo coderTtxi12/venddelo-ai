@@ -20,6 +20,7 @@ class CursorPage(BaseModel, Generic[T]):
     items: list[T]
     next_cursor: str | None = None
     has_more: bool = False
+    total: int | None = None
 
 
 def encode_cursor(value: str) -> str:
@@ -39,3 +40,14 @@ def decode_keyset_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
     raw = base64.urlsafe_b64decode(cursor.encode()).decode()
     created_at_str, id_str = raw.split("|", 1)
     return datetime.fromisoformat(created_at_str), uuid.UUID(id_str)
+
+
+def encode_sort_keyset_cursor(sort: str, value: str, id: uuid.UUID) -> str:
+    raw = f"{sort}|{value}|{id}"
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+
+def decode_sort_keyset_cursor(cursor: str) -> tuple[str, str, uuid.UUID]:
+    raw = base64.urlsafe_b64decode(cursor.encode()).decode()
+    sort, value, id_str = raw.split("|", 2)
+    return sort, value, uuid.UUID(id_str)
