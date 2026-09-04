@@ -44,7 +44,13 @@ def discount_label(promo: PromotionDTO) -> str:
     if api_type == "amount" and promo.amount_cents is not None:
         return f"-${promo.amount_cents / 100:.2f}"
     if api_type == "combo":
-        return "Combo"
+        if promo.combo_price_cents is not None:
+            return f"Combo a ${promo.combo_price_cents / 100:.2f}"
+        if promo.percent is not None:
+            return f"Combo -{promo.percent}%"
+        if promo.amount_cents is not None:
+            return f"Combo -${promo.amount_cents / 100:.2f}"
+        return "Combo · Envío gratis"
     return api_type
 
 
@@ -83,7 +89,7 @@ def promotion_payload(
         "is_active": promo.is_active,
         "effective_status": promo.effective_status,
         "is_catalog_discount": is_catalog_discount(promo),
-        "priced_in_cart": api_type != "combo",
+        "priced_in_cart": True,
     }
 
     if api_type == "percent":
@@ -150,5 +156,20 @@ def _pricing_note(promo: PromotionDTO, api_type: str) -> str:
     if api_type == "amount":
         return f"Descuenta ${(promo.amount_cents or 0) / 100:.2f} del subtotal afectado."
     if api_type == "combo":
-        return "Solo etiqueta visual en el menú; no aplica descuento en el carrito."
+        if promo.combo_price_cents is not None:
+            return (
+                f"Precio del combo ${(promo.combo_price_cents or 0) / 100:.2f} "
+                "al llevar todos los productos (complementos aparte)."
+            )
+        if promo.percent is not None:
+            return (
+                f"Descuenta {promo.percent}% del precio base del combo completo "
+                "(complementos aparte)."
+            )
+        if promo.amount_cents is not None:
+            return (
+                f"Descuenta ${(promo.amount_cents or 0) / 100:.2f} al completar el combo "
+                "(complementos aparte)."
+            )
+        return "Envío gratis al completar el combo."
     return ""
