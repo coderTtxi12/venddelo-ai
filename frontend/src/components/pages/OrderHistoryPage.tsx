@@ -706,10 +706,21 @@ export default function OrderHistoryPage() {
 
       <Drawer
         open={selectedOrder != null}
-        title={selectedOrder ? `#${formatOrderDisplayId(selectedOrder)}` : 'Pedido'}
+        title={
+          selectedOrder
+            ? selectedOrder.customer_name || `Pedido #${formatOrderDisplayId(selectedOrder)}`
+            : 'Pedido'
+        }
         onClose={closeDrawer}
       >
-        {selectedOrder ? <OrderHistoryDetailDrawer key={selectedOrder.id} order={selectedOrder} /> : null}
+        {selectedOrder && accessToken && selectedRestaurantId ? (
+          <OrderHistoryDetailDrawer
+            key={selectedOrder.id}
+            order={selectedOrder}
+            accessToken={accessToken}
+            restaurantId={selectedRestaurantId}
+          />
+        ) : null}
       </Drawer>
     </div>
   );
