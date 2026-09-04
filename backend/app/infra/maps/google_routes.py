@@ -14,7 +14,8 @@ FIELD_MASK = "routes.distanceMeters,routes.routeLabels,routes.routeToken"
 
 
 def shortest_route_meters(routes: list[object]) -> int:
-    labeled: list[int] = []
+    # TRAFFIC_UNAWARE + SHORTER_DISTANCE can mislabel the default route as
+    # shortest; always take the minimum distanceMeters across returned routes.
     distances: list[int] = []
     for route in routes:
         if not isinstance(route, dict):
@@ -22,13 +23,7 @@ def shortest_route_meters(routes: list[object]) -> int:
         meters = route.get("distanceMeters")
         if not isinstance(meters, (int, float)) or meters < 0:
             continue
-        value = int(meters)
-        distances.append(value)
-        labels = route.get("routeLabels")
-        if isinstance(labels, list) and "SHORTER_DISTANCE" in labels:
-            labeled.append(value)
-    if labeled:
-        return min(labeled)
+        distances.append(int(meters))
     if distances:
         return min(distances)
     raise RoutesError("No hay ruta disponible hacia esta dirección")
@@ -56,6 +51,7 @@ def fetch_driving_distance_km(
         },
         "travelMode": "DRIVE",
         "routingPreference": "TRAFFIC_UNAWARE",
+        "computeAlternativeRoutes": True,
         "requestedReferenceRoutes": ["SHORTER_DISTANCE"],
         "languageCode": "es-MX",
         "units": "METRIC",
