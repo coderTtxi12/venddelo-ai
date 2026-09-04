@@ -2,7 +2,13 @@ import type { PromotionScope } from '@/lib/api/promotions';
 import { WEEKDAY_LABELS } from '@/lib/restaurantScheduleHours';
 
 /** Tipos de descuento soportados en el borrador (UI). */
-export type PromotionDraftKind = 'percent' | 'amount' | 'bundle' | 'combo' | 'free_shipping';
+export type PromotionDraftKind =
+  | 'percent'
+  | 'amount'
+  | 'combo_price'
+  | 'bundle'
+  | 'combo'
+  | 'free_shipping';
 
 export type BundlePairingMode = 'cross_product' | 'same_product';
 
@@ -132,15 +138,19 @@ export function deletePromotionDraft(restaurantId: string, draftId: string): voi
 
 export function kindLabel(kind: PromotionDraftKind): string {
   if (kind === 'percent') return 'Porcentaje';
-  if (kind === 'amount') return 'Monto fijo';
+  if (kind === 'amount') return 'Descuento en pesos';
+  if (kind === 'combo_price') return 'Precio del combo';
   if (kind === 'bundle') return 'NxM';
+  if (kind === 'free_shipping') return 'Envío gratis';
   return 'Combo';
 }
 
 export function draftDiscountSummary(draft: PromotionDraft): string {
   if (draft.kind === 'percent') return `${draft.percent}%`;
   if (draft.kind === 'amount') return `$${draft.amount.toFixed(2)}`;
+  if (draft.kind === 'combo_price') return `Combo a $${draft.amount.toFixed(2)}`;
   if (draft.kind === 'bundle') return formatBundleLabel(draft.bundle);
+  if (draft.kind === 'free_shipping') return 'Envío gratis';
   return 'Combo';
 }
 
