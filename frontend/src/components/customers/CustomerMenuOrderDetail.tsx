@@ -119,6 +119,8 @@ export function CustomerMenuOrderDetail({
         loading={loading}
         error={error}
         customerName={customerName}
+        accessToken={accessToken}
+        restaurantId={restaurantId}
       />
     </div>
   );
