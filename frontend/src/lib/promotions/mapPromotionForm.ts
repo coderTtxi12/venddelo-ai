@@ -58,23 +58,33 @@ export function mapPromotionFormToApi(
   } else if (type === 'free_shipping') {
     input.percent = null;
     input.amount_cents = null;
+    input.combo_price_cents = null;
   } else if (type === 'combo') {
     if (payload.kind === 'free_shipping') {
+      input.percent = null;
+      input.amount_cents = null;
+      input.combo_price_cents = null;
+    } else if (payload.kind === 'combo_price') {
+      input.combo_price_cents = Math.round(payload.amount * 100);
       input.percent = null;
       input.amount_cents = null;
     } else if (payload.kind === 'amount') {
       input.amount_cents = Math.round(payload.amount * 100);
       input.percent = null;
+      input.combo_price_cents = null;
     } else {
       input.percent = payload.percent;
       input.amount_cents = null;
+      input.combo_price_cents = null;
     }
   } else if (type === 'percent') {
     input.percent = payload.percent;
     input.amount_cents = null;
+    input.combo_price_cents = null;
   } else if (type === 'amount') {
     input.amount_cents = Math.round(payload.amount * 100);
     input.percent = null;
+    input.combo_price_cents = null;
   }
 
   if (payload.scope === 'order' && payload.minOrderAmount > 0) {

@@ -31,3 +31,20 @@ test('maps combo template to combo type', () => {
   assert.equal(resolvePromotionType(payload, 'combo'), 'combo');
   assert.equal(mapPromotionFormToApi(payload, 'combo').type, 'combo');
 });
+
+test('maps combo price kind to combo_price_cents', () => {
+  const base = createEmptyPromotionDraft();
+  const payload = {
+    ...base,
+    kind: 'combo_price' as const,
+    scope: 'product' as const,
+    productIds: ['p1', 'p2'],
+    amount: 149,
+  };
+
+  const api = mapPromotionFormToApi(payload, 'combo');
+  assert.equal(api.type, 'combo');
+  assert.equal(api.combo_price_cents, 14900);
+  assert.equal(api.amount_cents, null);
+  assert.equal(api.percent, null);
+});

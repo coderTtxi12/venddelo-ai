@@ -39,9 +39,12 @@ export function promotionBenefitLabel(promotion: Promotion): string {
   }
   if (promotion.type === 'free_shipping') return 'Envío gratis';
   if (promotion.type === 'combo') {
+    if (promotion.combo_price_cents != null) {
+      return `Combo a ${formatMoney(promotion.combo_price_cents / 100)}`;
+    }
     if (promotion.percent != null) return `Combo ${promotion.percent}%`;
     if (promotion.amount_cents != null) {
-      return `Combo ${formatMoney(promotion.amount_cents / 100)}`;
+      return `Combo −${formatMoney(promotion.amount_cents / 100)}`;
     }
     return 'Combo · Envío gratis';
   }

@@ -14,6 +14,7 @@ function toUpdateBody(api: CreateManualPromotionInput): Partial<CreateManualProm
     scope: api.scope,
     percent: api.percent,
     amount_cents: api.amount_cents,
+    combo_price_cents: api.combo_price_cents,
     min_order_cents: api.min_order_cents,
     starts_at: api.starts_at,
     ends_at: api.ends_at,

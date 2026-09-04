@@ -13,6 +13,7 @@ function toDatetimeLocalValue(iso: string | null | undefined): string {
 function mapKind(promotion: Promotion): PromotionFormSubmitPayload['kind'] {
   if (promotion.type === 'free_shipping') return 'free_shipping';
   if (promotion.type === 'combo') {
+    if (promotion.combo_price_cents != null) return 'combo_price';
     if (promotion.amount_cents != null) return 'amount';
     if (promotion.percent != null) return 'percent';
     return 'free_shipping';
@@ -37,12 +38,16 @@ export function mapPromotionToForm(promotion: Promotion): PromotionFormSubmitPay
     schedule?.daily_end_time ??
     (promotion.recurrence_end_time ? promotion.recurrence_end_time.slice(0, 5) : empty.schedule.dailyEndTime);
 
+  const kind = mapKind(promotion);
+  const amountCents =
+    kind === 'combo_price' ? (promotion.combo_price_cents ?? 0) : (promotion.amount_cents ?? 0);
+
   return {
     name: promotion.name,
-    kind: mapKind(promotion),
+    kind,
     scope: promotion.scope,
     percent: promotion.percent ?? empty.percent,
-    amount: (promotion.amount_cents ?? 0) / 100,
+    amount: amountCents / 100,
     bundle: {
       getQuantity: promotion.bundle?.get_quantity ?? empty.bundle.getQuantity,
       payQuantity: promotion.bundle?.pay_quantity ?? empty.bundle.payQuantity,
