@@ -140,6 +140,7 @@ def test_waived_option_items_in_bundle():
         )
     ]
     promo = _bundle_promo(cat_id)
+    promo.option_item_ids = [option_id]
 
     tz = resolve_timezone("America/Mexico_City")
     quote = price_cart(
@@ -263,6 +264,7 @@ def test_cross_product_2x1_complements_always_charged():
         )
     ]
     promo = _bundle_promo(cat_id)
+    promo.option_item_ids = [option_id]
     tz = resolve_timezone("America/Mexico_City")
 
     quote = price_cart(
@@ -584,6 +586,79 @@ def test_combo_requires_all_products_in_cart():
     )
     assert complete.order_discount_cents == 1800
     assert complete.applied_order_promotion_id == promo.id
+
+
+def test_combo_price_sets_package_total_excluding_complements():
+    option_id = uuid.uuid4()
+    product_a = _product(10000)
+    product_b = _product(8000)
+    group_id = uuid.uuid4()
+    product_b.option_groups = [
+        OptionGroupDTO(
+            id=group_id,
+            product_id=product_b.id,
+            title="Extras",
+            required=False,
+            selection="multi",
+            min_selections=0,
+            max_selections=None,
+            sort_index=0,
+            is_active=True,
+            items=[
+                OptionItemDTO(
+                    id=option_id,
+                    label="Extra",
+                    price_delta_cents=2500,
+                    sort_index=0,
+                    is_active=True,
+                )
+            ],
+        )
+    ]
+    promo = PromotionDTO(
+        id=uuid.uuid4(),
+        restaurant_id=uuid.uuid4(),
+        name="Combo precio",
+        type="combo",
+        scope="product",
+        percent=None,
+        amount_cents=None,
+        combo_price_cents=14900,
+        min_order_cents=None,
+        starts_at=None,
+        ends_at=None,
+        bundle_get_quantity=None,
+        bundle_pay_quantity=None,
+        recurrence_weekdays=None,
+        recurrence_start_time=None,
+        recurrence_end_time=None,
+        is_active=True,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        product_ids=[product_a.id, product_b.id],
+        category_ids=[],
+        option_item_ids=[],
+    )
+    tz = resolve_timezone("America/Mexico_City")
+    now = datetime.now(UTC)
+
+    quote = price_cart(
+        lines=[
+            CartLineInput(product_id=product_a.id, quantity=1),
+            CartLineInput(
+                product_id=product_b.id,
+                quantity=1,
+                selected_options={str(group_id): [str(option_id)]},
+            ),
+        ],
+        products_by_id={product_a.id: product_a, product_b.id: product_b},
+        promotions=[promo],
+        now_utc=now,
+        tz=tz,
+    )
+    # Bases 100+80=180; combo price 149 → discount 31. Complement 25 stays full price.
+    assert quote.order_discount_cents == 3100
+    assert quote.total_cents == 18000 + 2500 - 3100
 
 
 def test_order_free_shipping_threshold():

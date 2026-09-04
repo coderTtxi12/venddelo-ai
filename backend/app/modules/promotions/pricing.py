@@ -359,46 +359,58 @@ def _line_discount_for_promo(
     quantity: int,
     selected_options: dict[str, Any] | None,
 ) -> tuple[int, int, str | None]:
-    """Returns (line_total_cents, discount_cents, badge). Per-line only (percent/amount)."""
-    waived = set(promo.option_item_ids)
-    unit = _unit_effective_cents(product, selected_options, waived)
-    line_subtotal = unit * quantity
+    """Returns (line_total_cents, discount_cents, badge). Per-line only (percent/amount).
+
+    Discounts apply to the product base price only; complements are always charged full.
+    """
+    base_line = product.price_cents * quantity
+    options_line = _options_total_cents(product, selected_options, set()) * quantity
 
     if promo.type == "percent" and promo.percent is not None:
-        discount = round(line_subtotal * promo.percent / 100)
-        return line_subtotal - discount, discount, _percent_badge(promo)
+        discount = round(base_line * promo.percent / 100)
+        return base_line - discount + options_line, discount, _percent_badge(promo)
 
     if promo.type == "amount" and promo.amount_cents is not None:
-        discount = min(promo.amount_cents * quantity, line_subtotal)
-        return line_subtotal - discount, discount, None
+        discount = min(promo.amount_cents * quantity, base_line)
+        return base_line - discount + options_line, discount, None
 
-    return line_subtotal, 0, None
+    return base_line + options_line, 0, None
 
 
 def _combo_is_satisfied(
     lines: list[CartLineInput],
     product_ids: list[uuid.UUID],
 ) -> bool:
+    return _combo_complete_sets(lines, product_ids) >= 1
+
+
+def _combo_complete_sets(
+    lines: list[CartLineInput],
+    product_ids: list[uuid.UUID],
+) -> int:
     if len(product_ids) < 2:
-        return False
+        return 0
     required = set(product_ids)
     cart_counts: dict[uuid.UUID, int] = {}
     for line in lines:
         if line.product_id in required:
             cart_counts[line.product_id] = cart_counts.get(line.product_id, 0) + line.quantity
-    return all(cart_counts.get(product_id, 0) >= 1 for product_id in required)
+    if any(cart_counts.get(product_id, 0) < 1 for product_id in required):
+        return 0
+    return min(cart_counts[product_id] for product_id in required)
 
 
-def _combo_eligible_subtotal(
+def _combo_set_base_cents(
+    promo: PromotionDTO,
     lines: list[CartLineInput],
     priced_lines: list[PricedCartLine],
-    combo_product_ids: set[uuid.UUID],
 ) -> int:
-    total = 0
+    """Sum of base product prices for one complete combo set (excludes complements)."""
+    base_by_product: dict[uuid.UUID, int] = {}
     for line, priced in zip(lines, priced_lines, strict=True):
-        if line.product_id in combo_product_ids:
-            total += priced.line_total_cents
-    return total
+        if line.product_id in promo.product_ids and line.product_id not in base_by_product:
+            base_by_product[line.product_id] = priced.unit_base_cents
+    return sum(base_by_product.get(product_id, 0) for product_id in promo.product_ids)
 
 
 def _combo_discount_for_promo(
@@ -406,19 +418,29 @@ def _combo_discount_for_promo(
     lines: list[CartLineInput],
     priced_lines: list[PricedCartLine],
 ) -> int:
-    if not _combo_is_satisfied(lines, promo.product_ids):
+    sets = _combo_complete_sets(lines, promo.product_ids)
+    if sets < 1:
         return 0
-    subtotal = _combo_eligible_subtotal(lines, priced_lines, set(promo.product_ids))
-    if promo.type == "percent" and promo.percent is not None:
-        return round(subtotal * promo.percent / 100)
-    if promo.type == "amount" and promo.amount_cents is not None:
-        return min(promo.amount_cents, subtotal)
+    set_base = _combo_set_base_cents(promo, lines, priced_lines)
+    if set_base <= 0:
+        return 0
+    eligible = set_base * sets
+    if promo.combo_price_cents is not None:
+        return max(0, set_base - promo.combo_price_cents) * sets
+    if promo.percent is not None:
+        return round(eligible * promo.percent / 100)
+    if promo.amount_cents is not None:
+        return min(promo.amount_cents * sets, eligible)
     return 0
 
 
 def _combo_grants_free_shipping(promo: PromotionDTO) -> bool:
-    return promo.type == "combo" and promo.percent is None and promo.amount_cents is None
-
+    return (
+        promo.type == "combo"
+        and promo.percent is None
+        and promo.amount_cents is None
+        and promo.combo_price_cents is None
+    )
 
 def price_cart(
     *,
