@@ -29,6 +29,7 @@ class PromotionService:
         scope = getattr(data, "scope", None)
         percent = getattr(data, "percent", None)
         amount_cents = getattr(data, "amount_cents", None)
+        combo_price_cents = getattr(data, "combo_price_cents", None)
         starts_at = getattr(data, "starts_at", None)
         ends_at = getattr(data, "ends_at", None)
         bundle = getattr(data, "bundle", None)
@@ -51,6 +52,8 @@ class PromotionService:
             raise ValidationError("percent must be between 1 and 100")
         if amount_cents is not None and amount_cents <= 0:
             raise ValidationError("amount_cents must be positive")
+        if combo_price_cents is not None and combo_price_cents <= 0:
+            raise ValidationError("combo_price_cents must be positive")
         if starts_at is not None and ends_at is not None and starts_at >= ends_at:
             raise ValidationError("starts_at must be before ends_at")
         if ptype == "two_for_one" or bundle is not None:
@@ -70,12 +73,19 @@ class PromotionService:
             elif isinstance(data, PromotionUpdate) and "product_ids" in data.model_fields_set:
                 if not product_ids or len(product_ids) < 2:
                     raise ValidationError("Combo promotions require at least two products")
-            if percent is not None and amount_cents is not None:
-                raise ValidationError("Combo promotions cannot have both percent and amount_cents")
+            combo_benefits = sum(
+                1 for value in (percent, amount_cents, combo_price_cents) if value is not None
+            )
+            if combo_benefits > 1:
+                raise ValidationError(
+                    "Combo promotions can only use one of percent, amount_cents, or combo_price_cents"
+                )
 
         if ptype == "free_shipping":
-            if percent is not None or amount_cents is not None:
-                raise ValidationError("free_shipping promotions must not have percent or amount_cents")
+            if percent is not None or amount_cents is not None or combo_price_cents is not None:
+                raise ValidationError(
+                    "free_shipping promotions must not have percent, amount_cents, or combo_price_cents"
+                )
             if scope != "order":
                 raise ValidationError("free_shipping promotions must apply to the whole order")
             if min_order_cents is None or min_order_cents <= 0:
