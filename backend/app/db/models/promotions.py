@@ -88,6 +88,7 @@ class Promotion(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     type: Mapped[str] = mapped_column(String, nullable=False)
     percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
     amount_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    combo_price_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     scope: Mapped[str] = mapped_column(String, nullable=False)
     min_order_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
