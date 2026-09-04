@@ -241,6 +241,7 @@ export type Promotion = {
   scope: 'product' | 'category' | 'order';
   percent: number | null;
   amount_cents: number | null;
+  combo_price_cents?: number | null;
   min_order_cents: number | null;
   starts_at: string | null;
   ends_at: string | null;
