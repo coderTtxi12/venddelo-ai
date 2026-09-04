@@ -8,10 +8,17 @@ import {
 import { PAYMENT_METHOD_LABELS } from '@/lib/restaurantPaymentConfig';
 import { RESTAURANT_SERVICE_LABELS } from '@/lib/restaurantServices';
 
+export type ResolvedOrderOptionChoice = {
+  id: string;
+  label: string;
+  priceDeltaCents: number;
+};
+
 export type ResolvedOrderOption = {
   groupId: string;
   groupTitle: string;
   labels: string[];
+  choices: ResolvedOrderOptionChoice[];
 };
 
 function selectedOptionIdsForGroup(
@@ -100,14 +107,43 @@ export function resolveOrderItemOptions(
   for (const group of historicalOptionGroups(product)) {
     const optionIds = selectedOptionIdsForGroup(selected, group.id);
     if (optionIds.length === 0) continue;
-    const labels = optionIds
-      .map((optionId) => group.items.find((option) => option.id === optionId)?.label)
-      .filter((label): label is string => Boolean(label));
-    if (labels.length > 0) {
-      rows.push({ groupId: group.id, groupTitle: group.title, labels });
+    const choices = optionIds
+      .map((optionId) => {
+        const option = group.items.find((row) => row.id === optionId);
+        if (!option) return null;
+        return {
+          id: option.id,
+          label: option.label,
+          priceDeltaCents: option.price_delta_cents,
+        } satisfies ResolvedOrderOptionChoice;
+      })
+      .filter((row): row is ResolvedOrderOptionChoice => row != null);
+    if (choices.length > 0) {
+      rows.push({
+        groupId: group.id,
+        groupTitle: group.title,
+        labels: choices.map((choice) => choice.label),
+        choices,
+      });
     }
   }
   return rows;
+}
+
+/** Precio base del producto (sin complementos). Usa catálogo si está; si no, resta deltas. */
+export function resolveOrderItemBaseUnitCents(
+  item: OrderItem,
+  productsById: ReadonlyMap<string, Product>,
+  options: ResolvedOrderOption[] = resolveOrderItemOptions(item, productsById),
+): number {
+  const product = item.product_id ? productsById.get(item.product_id) : undefined;
+  if (product) return product.price_cents;
+  const deltas = options.reduce(
+    (sum, group) =>
+      sum + group.choices.reduce((groupSum, choice) => groupSum + choice.priceDeltaCents, 0),
+    0,
+  );
+  return Math.max(0, item.unit_price_cents - deltas);
 }
 
 export function splitOrderNote(note: string | null): { reference: string | null; details: string | null } {

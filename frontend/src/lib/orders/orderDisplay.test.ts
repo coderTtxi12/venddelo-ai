@@ -5,6 +5,7 @@ import type { Order, OrderItem, Product } from '@/lib/api/types';
 import {
   buildOrderTotalsBreakdown,
   formatOrderDisplayId,
+  resolveOrderItemBaseUnitCents,
   resolveOrderItemOptions,
 } from './orderDisplay.ts';
 
@@ -102,6 +103,7 @@ test('resolveOrderItemOptions resolves labels from the product catalog', () => {
       groupId: GROUP_ID,
       groupTitle: 'Elige tu salsa',
       labels: ['BBQ'],
+      choices: [{ id: OPTION_ID, label: 'BBQ', priceDeltaCents: 0 }],
     },
   ]);
 });
@@ -118,8 +120,53 @@ test('resolveOrderItemOptions includes inactive option items for historical orde
         groupId: GROUP_ID,
         groupTitle: 'Elige tu salsa',
         labels: ['Chipotle'],
+        choices: [{ id: INACTIVE_OPTION_ID, label: 'Chipotle', priceDeltaCents: 0 }],
       },
     ],
+  );
+});
+
+test('resolveOrderItemOptions includes priced complement choices', () => {
+  const pricedOptionId = '44444444-4444-4444-4444-444444444444';
+  const product = buildProduct({
+    option_groups: [
+      {
+        id: GROUP_ID,
+        product_id: PRODUCT_ID,
+        title: 'Extras',
+        selection: 'multi',
+        required: false,
+        min_selections: 0,
+        max_selections: 3,
+        sort_index: 0,
+        is_active: true,
+        items: [
+          {
+            id: pricedOptionId,
+            label: 'Queso extra',
+            price_delta_cents: 1500,
+            sort_index: 0,
+            is_active: true,
+          },
+        ],
+      },
+    ],
+  });
+  const rows = resolveOrderItemOptions(
+    buildItem({
+      selected_options: { [GROUP_ID]: [pricedOptionId] },
+      unit_price_cents: 9100,
+    }),
+    new Map([[product.id, product]]),
+  );
+  assert.equal(rows[0]?.choices[0]?.priceDeltaCents, 1500);
+  assert.equal(
+    resolveOrderItemBaseUnitCents(
+      buildItem({ unit_price_cents: 9100, selected_options: { [GROUP_ID]: [pricedOptionId] } }),
+      new Map([[product.id, product]]),
+      rows,
+    ),
+    7600,
   );
 });
 
