@@ -93,14 +93,31 @@ function SortHeader({
 }) {
   const active = sort === column;
   const label = PROMOTION_SORT_COLUMN_LABELS[column];
+  const nextDirection = !active
+    ? column === 'name'
+      ? 'ascendente'
+      : 'descendente'
+    : order === 'desc'
+      ? 'ascendente'
+      : 'descendente';
+
   return (
     <th aria-sort={active ? (order === 'asc' ? 'ascending' : 'descending') : 'none'}>
       <button
         type="button"
         className={`${styles.sortBtn} ${active ? styles.sortBtnOn : ''}`}
+        aria-label={`Ordenar ${label.toLowerCase()} de forma ${nextDirection}`}
         onClick={() => onToggle(column)}
       >
         <span>{label}</span>
+        <span className={styles.sortDir} aria-hidden>
+          <span className={active && order === 'asc' ? styles.sortDirActive : styles.sortDirIdle}>
+            ↑
+          </span>
+          <span className={active && order === 'desc' ? styles.sortDirActive : styles.sortDirIdle}>
+            ↓
+          </span>
+        </span>
       </button>
     </th>
   );
@@ -114,6 +131,7 @@ export default function PromotionsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
@@ -164,6 +182,7 @@ export default function PromotionsPage() {
       setPromotions(promotionList);
       setCategories(categoryList.filter((category) => category.is_active));
       setProducts(productList.filter((product) => product.status === 'active'));
+      setHasLoaded(true);
     } catch (error) {
       console.error(error);
       setLoadError('No se pudieron cargar las promociones. Intenta de nuevo.');
@@ -267,9 +286,9 @@ export default function PromotionsPage() {
     setOrder(next.order);
   };
 
-  if (accessLoading) {
-    return <div className={styles.page}>Cargando…</div>;
-  }
+  const showFullLoading = loading && !hasLoaded;
+  const emptyAll = hasLoaded && !loadError && stats.total === 0;
+  const emptySearch = hasLoaded && !loadError && stats.total > 0 && visiblePromotions.length === 0;
 
   return (
     <div className={styles.page}>
@@ -277,96 +296,166 @@ export default function PromotionsPage() {
         <div>
           <h1 className={styles.title}>Promociones</h1>
           <p className={styles.subtitle}>
-            Crea descuentos, combos, ofertas N×M y beneficios por monto de carrito para tu menú digital.
+            Crea descuentos, combos, ofertas N×M y beneficios por monto de carrito para tu menú
+            digital.
           </p>
         </div>
-        <div className={styles.metrics} aria-label="Resumen de promociones">
+        <section className={styles.metrics} aria-label="Resumen de promociones">
           <div className={styles.metric}>
             <span className={styles.metricValue}>{stats.total}</span>
             <span className={styles.metricLabel}>Total</span>
           </div>
-          <div className={styles.metricDivider} aria-hidden />
           <div className={styles.metric}>
             <span className={styles.metricValue}>{stats.active}</span>
             <span className={styles.metricLabel}>Vigentes</span>
           </div>
-          <div className={styles.metricDivider} aria-hidden />
           <div className={styles.metric}>
             <span className={styles.metricValue}>{stats.withBanner}</span>
             <span className={styles.metricLabel}>Con banner</span>
           </div>
-        </div>
+        </section>
       </header>
 
-      <div className={styles.toolbar}>
-        <div className={styles.searchField}>
-          <SearchOutlinedIcon className={styles.searchIcon} fontSize="small" aria-hidden />
-          <input
-            className={styles.searchInput}
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar promoción…"
-            aria-label="Buscar promoción"
-          />
-        </div>
-        <ToolbarSelect
-          label="Estado"
-          value={statusFilter}
-          options={PROMOTION_STATUS_FILTER_LABELS}
-          onChange={(value) => setStatusFilter(value as PromotionStatusFilter)}
-        />
-        <ToolbarSelect
-          label="Tipo"
-          value={templateFilter}
-          options={PROMOTION_TEMPLATE_FILTER_LABELS}
-          onChange={(value) => setTemplateFilter(value as PromotionTemplateFilter)}
-        />
-        {filtersActive ? (
-          <button type="button" className={styles.clearFiltersBtn} onClick={clearFilters}>
-            <CloseRoundedIcon fontSize="small" />
-            Limpiar filtros
-          </button>
-        ) : null}
-        <button type="button" className={styles.primaryBtn} onClick={openCreateSheet}>
-          <AddOutlinedIcon fontSize="small" />
-          Nueva promoción
-        </button>
-      </div>
+      {!emptyAll ? (
+        <>
+          <div className={styles.toolbar}>
+            <label className={styles.searchField} htmlFor="promotions-search">
+              <span className={styles.searchLabel}>Buscar</span>
+              <div className={`${styles.searchWrap} ${query ? styles.searchWrapActive : ''}`}>
+                <SearchOutlinedIcon className={styles.searchIcon} fontSize="small" aria-hidden />
+                <input
+                  id="promotions-search"
+                  className={styles.searchInput}
+                  type="search"
+                  inputMode="search"
+                  enterKeyHint="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Nombre o tipo de promoción"
+                  autoComplete="off"
+                />
+                {query ? (
+                  <button
+                    type="button"
+                    className={styles.searchClear}
+                    aria-label="Limpiar búsqueda"
+                    onClick={() => {
+                      setQuery('');
+                      setDebouncedQuery('');
+                    }}
+                  >
+                    <CloseRoundedIcon sx={{ fontSize: 18 }} aria-hidden />
+                  </button>
+                ) : null}
+              </div>
+            </label>
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={openCreateSheet}
+              disabled={accessLoading || !selectedRestaurantId}
+            >
+              <AddOutlinedIcon fontSize="small" aria-hidden />
+              Nueva promoción
+            </button>
+          </div>
 
-      {loadError ? (
-        <div className={styles.errorBanner} role="alert">
-          <p>{loadError}</p>
-          <button type="button" className={styles.secondaryBtn} onClick={() => void loadData()}>
-            <ReplayOutlinedIcon fontSize="small" />
+          <div className={styles.filters} role="group" aria-label="Filtros de promociones">
+            <div className={styles.mobileSort}>
+              <ToolbarSelect
+                label="Ordenar"
+                value={`${sort}:${order}`}
+                options={PROMOTION_MOBILE_SORT_OPTIONS}
+                onChange={(value) => {
+                  const [nextSort, nextOrder] = value.split(':') as [
+                    PromotionSort,
+                    PromotionSortOrder,
+                  ];
+                  setSort(nextSort);
+                  setOrder(nextOrder);
+                }}
+              />
+            </div>
+            <ToolbarSelect
+              label="Estado"
+              value={statusFilter}
+              options={PROMOTION_STATUS_FILTER_LABELS}
+              active={statusFilter !== 'all'}
+              onChange={(value) => setStatusFilter(value as PromotionStatusFilter)}
+            />
+            <ToolbarSelect
+              label="Tipo"
+              value={templateFilter}
+              options={PROMOTION_TEMPLATE_FILTER_LABELS}
+              active={templateFilter !== 'all'}
+              onChange={(value) => setTemplateFilter(value as PromotionTemplateFilter)}
+            />
+            {filtersActive ? (
+              <button type="button" className={styles.clearFilters} onClick={clearFilters}>
+                Limpiar filtros
+              </button>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+
+      {showFullLoading ? (
+        <div className={styles.stateBox}>
+          <div>
+            <p className={styles.stateTitle}>Cargando promociones…</p>
+            <p className={styles.stateText}>
+              Organizamos descuentos, combos y vigencia de tus ofertas.
+            </p>
+          </div>
+        </div>
+      ) : loadError ? (
+        <div className={`${styles.stateBox} ${styles.stateError}`}>
+          <div>
+            <p className={styles.stateTitle}>No se pudo cargar</p>
+            <p className={styles.stateText}>{loadError}</p>
+          </div>
+          <button type="button" className={styles.retryButton} onClick={() => void loadData()}>
+            <ReplayOutlinedIcon fontSize="small" aria-hidden />
             Reintentar
           </button>
         </div>
-      ) : null}
-
-      {loading ? (
-        <p className={styles.helpText}>Cargando promociones…</p>
-      ) : visiblePromotions.length === 0 ? (
-        <div className={styles.emptyState}>
-          <CampaignOutlinedIcon className={styles.emptyIcon} />
-          <h2 className={styles.emptyTitle}>
-            {filtersActive ? 'Sin resultados' : 'Aún no hay promociones'}
-          </h2>
-          <p className={styles.emptyCopy}>
-            {filtersActive
-              ? 'Prueba con otros filtros o limpia la búsqueda.'
-              : 'Crea tu primera promoción para mostrarla en el menú digital.'}
+      ) : emptyAll ? (
+        <div className={styles.empty}>
+          <CampaignOutlinedIcon
+            sx={{ fontSize: 36, color: 'var(--color-text-secondary)' }}
+            aria-hidden
+          />
+          <h2 className={styles.emptyTitle}>Aún no hay promociones</h2>
+          <p className={styles.emptyText}>
+            Crea tu primera promoción para mostrarla en el menú digital.
           </p>
-          {!filtersActive ? (
-            <button type="button" className={styles.primaryBtn} onClick={openCreateSheet}>
-              <AddOutlinedIcon fontSize="small" />
-              Nueva promoción
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className={styles.primaryBtn}
+            style={{ marginTop: '1rem' }}
+            onClick={openCreateSheet}
+            disabled={accessLoading || !selectedRestaurantId}
+          >
+            <AddOutlinedIcon fontSize="small" aria-hidden />
+            Nueva promoción
+          </button>
+        </div>
+      ) : emptySearch ? (
+        <div className={styles.empty}>
+          <h2 className={styles.emptyTitle}>Sin coincidencias</h2>
+          <p className={styles.emptyText}>Prueba otro nombre, tipo o quita los filtros.</p>
         </div>
       ) : (
         <>
-          <div className={styles.tableWrap}>
+          <p className={styles.counter}>
+            {filtersActive
+              ? `${visiblePromotions.length} de ${stats.total} promociones`
+              : `${visiblePromotions.length} ${
+                  visiblePromotions.length === 1 ? 'promoción' : 'promociones'
+                }`}
+          </p>
+
+          <div className={`${styles.tableWrap} ${loading ? styles.tableLoading : ''}`}>
             <table className={styles.table}>
               <thead>
                 <tr>
@@ -376,17 +465,32 @@ export default function PromotionsPage() {
                   <th>Alcance</th>
                   <SortHeader column="status" sort={sort} order={order} onToggle={toggleSort} />
                   <th>Vigencia</th>
-                  <th className={styles.actionsCol}>Acciones</th>
+                  <th aria-label="Acciones">
+                    <span className={styles.muted}>Acciones</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {visiblePromotions.map((promotion) => {
                   const catalog = isCatalogPromotion(promotion);
+                  const displayName = promotionDisplayName(promotion);
                   return (
-                    <tr key={promotion.id}>
+                    <tr
+                      key={promotion.id}
+                      className={styles.tableRow}
+                      tabIndex={0}
+                      aria-label={`${catalog ? 'Ver' : 'Editar'} promoción ${displayName}`}
+                      onClick={() => openEditSheet(promotion)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          openEditSheet(promotion);
+                        }
+                      }}
+                    >
                       <td>
                         <div className={styles.nameCell}>
-                          <strong>{promotionDisplayName(promotion)}</strong>
+                          <strong>{displayName}</strong>
                           {catalog ? <span className={styles.tag}>Desde producto</span> : null}
                         </div>
                       </td>
@@ -410,7 +514,10 @@ export default function PromotionsPage() {
                                 aria-label={
                                   catalog ? 'Ver detalles de la promoción' : 'Editar promoción'
                                 }
-                                onClick={() => openEditSheet(promotion)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openEditSheet(promotion);
+                                }}
                               >
                                 <EditOutlinedIcon fontSize="small" />
                               </IconButton>
@@ -420,7 +527,10 @@ export default function PromotionsPage() {
                             <IconButton
                               size="small"
                               aria-label="Eliminar promoción"
-                              onClick={() => setDeletingPromotion(promotion)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setDeletingPromotion(promotion);
+                              }}
                             >
                               <DeleteOutlineOutlinedIcon fontSize="small" />
                             </IconButton>
