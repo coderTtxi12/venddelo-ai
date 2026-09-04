@@ -10,6 +10,8 @@ import {
   buildMonthlyActivityBuckets,
   buildWeeklyActivityBuckets,
   computeAverageOrderMetrics,
+  resolveOrderDeliveryMapsUrl,
+  resolveOrderDeliveryPinUrl,
   sortActivityHistory,
   timelineFromItems,
 } from './activityChart.ts';
@@ -99,4 +101,40 @@ test('computeAverageOrderMetrics uses delivered tickets and item counts', () => 
   const metrics = computeAverageOrderMetrics(items);
   assert.equal(metrics.avgTicketCents, 13500);
   assert.equal(metrics.avgItemQuantity, 2);
+});
+
+test('resolveOrderDeliveryPinUrl prefers lat/lng google maps link', () => {
+  assert.equal(
+    resolveOrderDeliveryPinUrl({
+      delivery_latitude: 19.4326,
+      delivery_longitude: -99.1332,
+    }),
+    'https://www.google.com/maps?q=19.4326,-99.1332',
+  );
+  assert.equal(
+    resolveOrderDeliveryPinUrl({
+      delivery_latitude: null,
+      delivery_longitude: -99.1332,
+    }),
+    null,
+  );
+});
+
+test('resolveOrderDeliveryMapsUrl falls back to address search', () => {
+  assert.equal(
+    resolveOrderDeliveryMapsUrl({
+      delivery_address: 'Av Reforma 1',
+      delivery_latitude: null,
+      delivery_longitude: null,
+    }),
+    'https://www.google.com/maps/search/?api=1&query=Av%20Reforma%201',
+  );
+  assert.equal(
+    resolveOrderDeliveryMapsUrl({
+      delivery_address: 'Av Reforma 1',
+      delivery_latitude: 19.4,
+      delivery_longitude: -99.1,
+    }),
+    'https://www.google.com/maps?q=19.4,-99.1',
+  );
 });

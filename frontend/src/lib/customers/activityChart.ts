@@ -298,3 +298,42 @@ export function resolveDeliveryMapsUrl(
   if (trimmed) return trimmed;
   return googleMapsSearchUrl(address);
 }
+
+/** Prefer exact pin (lat/lng); fall back to address search. */
+export function resolveOrderDeliveryMapsUrl(order: {
+  delivery_address?: string | null;
+  delivery_latitude?: number | null;
+  delivery_longitude?: number | null;
+}): string | null {
+  const lat = order.delivery_latitude;
+  const lng = order.delivery_longitude;
+  if (
+    typeof lat === 'number' &&
+    typeof lng === 'number' &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng)
+  ) {
+    return googleMapsCoordinateUrl(lat, lng);
+  }
+  const address = order.delivery_address?.trim();
+  if (address) return googleMapsSearchUrl(address);
+  return null;
+}
+
+/** Exact pin only — used when copying so clipboard always gets lat,lng when available. */
+export function resolveOrderDeliveryPinUrl(order: {
+  delivery_latitude?: number | null;
+  delivery_longitude?: number | null;
+}): string | null {
+  const lat = order.delivery_latitude;
+  const lng = order.delivery_longitude;
+  if (
+    typeof lat === 'number' &&
+    typeof lng === 'number' &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng)
+  ) {
+    return googleMapsCoordinateUrl(lat, lng);
+  }
+  return null;
+}
