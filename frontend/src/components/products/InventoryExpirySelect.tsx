@@ -149,12 +149,12 @@ export function InventoryExpirySelect({
             className: styles.paper,
             style: { minWidth: Math.max(anchorEl?.offsetWidth ?? 0, 248) },
           },
-        }}
-        MenuListProps={{
-          id: `${menuId}-list`,
-          autoFocusItem: open,
-          className: styles.list,
-          'aria-label': `Caducidad de ${productName}`,
+          list: {
+            id: `${menuId}-list`,
+            autoFocusItem: open,
+            className: styles.list,
+            'aria-label': `Caducidad de ${productName}`,
+          },
         }}
       >
         {EXPIRY_SELECT_OPTIONS.map((option, index) => {
