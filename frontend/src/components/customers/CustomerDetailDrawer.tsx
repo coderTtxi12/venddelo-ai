@@ -208,10 +208,24 @@ function DeliveryActivityDetail({
   item: RestaurantCustomerActivityItem;
   onBack: () => void;
 }) {
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const mapsUrl =
     item.delivery_address != null
       ? resolveDeliveryMapsUrl(item.delivery_address, item.delivery_maps_url)
       : null;
+  const pinUrl = item.delivery_maps_url?.trim() || null;
+
+  async function copyMapsPin() {
+    if (!pinUrl) return;
+    try {
+      await navigator.clipboard.writeText(pinUrl);
+      setCopyState('copied');
+      window.setTimeout(() => setCopyState('idle'), 1800);
+    } catch {
+      setCopyState('error');
+      window.setTimeout(() => setCopyState('idle'), 1800);
+    }
+  }
 
   return (
     <div className={styles.orderDetailShell}>
@@ -242,19 +256,45 @@ function DeliveryActivityDetail({
         </div>
         {item.delivery_address ? (
           <div className={styles.deliveryDetailBlock}>
-            <span className={styles.deliveryDetailLabel}>Dirección</span>
+            <div className={styles.addressHeader}>
+              <span className={styles.deliveryDetailLabel}>Dirección</span>
+              <div className={styles.addressActions}>
+                <button
+                  type="button"
+                  className={styles.addressActionBtn}
+                  onClick={() => void copyMapsPin()}
+                  disabled={!pinUrl}
+                  aria-label="Copiar enlace de Google Maps"
+                  title={
+                    pinUrl
+                      ? 'Copia el pin exacto de la entrega'
+                      : 'Sin coordenadas para generar enlace'
+                  }
+                >
+                  <ContentCopyOutlinedIcon fontSize="inherit" aria-hidden />
+                  <span className={styles.addressActionLabel}>
+                    {copyState === 'copied'
+                      ? 'Link copiado'
+                      : copyState === 'error'
+                        ? 'Error'
+                        : 'Copiar'}
+                  </span>
+                </button>
+                {mapsUrl ? (
+                  <a
+                    className={styles.addressActionBtn}
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Abrir ubicación en Google Maps"
+                  >
+                    <MapOutlinedIcon fontSize="inherit" aria-hidden />
+                    <span className={styles.addressActionLabel}>Maps</span>
+                  </a>
+                ) : null}
+              </div>
+            </div>
             <p className={styles.deliveryDetailAddress}>{item.delivery_address}</p>
-            {mapsUrl ? (
-              <a
-                className={styles.deliveryDetailMaps}
-                href={mapsUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <MapOutlinedIcon sx={{ fontSize: 16 }} />
-                Abrir en Maps
-              </a>
-            ) : null}
           </div>
         ) : null}
         <p className={styles.deliveryDetailHint}>
