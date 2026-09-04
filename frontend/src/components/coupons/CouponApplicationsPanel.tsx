@@ -162,6 +162,8 @@ export function CouponApplicationsPanel({
               error={detailError}
               customerName={selectedApplication?.customer_name}
               couponCode={couponCode}
+              accessToken={accessToken}
+              restaurantId={restaurantId}
             />
           </div>
         </div>
