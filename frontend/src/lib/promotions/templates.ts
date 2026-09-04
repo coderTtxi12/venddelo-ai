@@ -65,7 +65,8 @@ export function emptyFormForTemplate(template: PromotionTemplate): PromotionForm
     kind: 'percent',
     scope: 'order',
     minOrderAmount: 0,
-    showBanner: true,
+    showBanner: false,
+    imagePath: null,
   };
 }
 
