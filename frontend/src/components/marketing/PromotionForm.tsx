@@ -362,6 +362,7 @@ export function PromotionForm({
       if (form.productIds.length < 2) return false;
       if (form.kind === 'percent' && (form.percent < 1 || form.percent > 100)) return false;
       if (form.kind === 'amount' && form.amount <= 0) return false;
+      if (form.kind === 'combo_price' && form.amount <= 0) return false;
       if (form.kind === 'free_shipping') return true;
     }
 
@@ -463,6 +464,9 @@ export function PromotionForm({
     if (form.kind === 'free_shipping') {
       return template === 'combo' ? 'Combo · Envío gratis' : 'Envío gratis';
     }
+    if (form.kind === 'combo_price') {
+      return amountInput.trim() ? `Combo a ${formatMoney(Number(amountInput) || 0)}` : '—';
+    }
     if (form.kind === 'amount') {
       return amountInput.trim() ? formatMoney(Number(amountInput) || 0) : '—';
     }
@@ -489,10 +493,15 @@ export function PromotionForm({
     }
     if (template === 'combo') {
       if (form.kind === 'free_shipping') return 'Envío gratis al llevar todo el combo';
+      if (form.kind === 'combo_price') {
+        return amountInput.trim()
+          ? `Combo a ${formatMoney(Number(amountInput) || 0)} · complementos aparte`
+          : 'Define el precio total del combo';
+      }
       if (form.kind === 'amount') {
         return amountInput.trim()
-          ? `${formatMoney(Number(amountInput) || 0)} al llevar todos los productos`
-          : 'Define el monto del combo';
+          ? `${formatMoney(Number(amountInput) || 0)} de descuento al completar el combo`
+          : 'Define el descuento en pesos';
       }
       return percentInput.trim()
         ? `${percentInput}% al llevar todos los productos`
@@ -643,9 +652,11 @@ export function PromotionForm({
                 kind:
                   normalized.kind === 'free_shipping'
                     ? 'free_shipping'
-                    : normalized.kind === 'amount'
-                      ? 'amount'
-                      : 'percent',
+                    : normalized.kind === 'combo_price'
+                      ? 'combo_price'
+                      : normalized.kind === 'amount'
+                        ? 'amount'
+                        : 'percent',
                 scope: 'product' as const,
               }
             : template === 'order_threshold'
@@ -882,17 +893,24 @@ export function PromotionForm({
       {template === 'combo' ? (
         <FormSection
           title="Beneficio del combo"
-          hint="Se aplica solo cuando el carrito incluye todos los productos del combo."
+          hint="Se aplica solo cuando el carrito incluye todos los productos del combo. Los complementos se cobran aparte."
         >
-          <div className={`${styles.chipGrid} ${styles.chipGridThree}`} role="group" aria-label="Beneficio">
-            {(['percent', 'amount', 'free_shipping'] as const).map((kind) => (
+          <div className={styles.chipGrid} role="group" aria-label="Beneficio">
+            {(
+              [
+                { id: 'percent' as const, label: 'Porcentaje' },
+                { id: 'amount' as const, label: 'Descuento en pesos' },
+                { id: 'combo_price' as const, label: 'Precio del combo' },
+                { id: 'free_shipping' as const, label: 'Envío gratis' },
+              ] as const
+            ).map((option) => (
               <ChipOption
-                key={kind}
-                selected={form.kind === kind}
+                key={option.id}
+                selected={form.kind === option.id}
                 disabled={saving}
-                onClick={() => setForm((prev) => ({ ...prev, kind }))}
+                onClick={() => setForm((prev) => ({ ...prev, kind: option.id }))}
               >
-                {kind === 'percent' ? 'Porcentaje' : kind === 'amount' ? 'Monto fijo' : 'Envío gratis'}
+                {option.label}
               </ChipOption>
             ))}
           </div>
@@ -922,12 +940,12 @@ export function PromotionForm({
                   %
                 </span>
               </div>
-              <p className={styles.helpText}>Entre 1% y 100%.</p>
+              <p className={styles.helpText}>Entre 1% y 100%. No aplica a complementos.</p>
             </label>
           ) : null}
           {form.kind === 'amount' ? (
             <label className={styles.field} htmlFor="combo-amount">
-              <span className={styles.label}>Monto en pesos (MXN)</span>
+              <span className={styles.label}>Descuento en pesos (MXN)</span>
               <input
                 id="combo-amount"
                 className={styles.input}
@@ -947,6 +965,36 @@ export function PromotionForm({
                   }));
                 }}
               />
+              <p className={styles.helpText}>
+                Se resta al completar el combo. Los complementos se cobran aparte.
+              </p>
+            </label>
+          ) : null}
+          {form.kind === 'combo_price' ? (
+            <label className={styles.field} htmlFor="combo-price">
+              <span className={styles.label}>Precio total del combo (MXN)</span>
+              <input
+                id="combo-price"
+                className={styles.input}
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="149"
+                value={amountInput}
+                disabled={saving}
+                onChange={(e) => {
+                  const next = sanitizeAmountTyping(e.target.value);
+                  setAmountInput(next);
+                  const parsed = Number(next);
+                  setForm((prev) => ({
+                    ...prev,
+                    amount: next === '' || Number.isNaN(parsed) ? 0 : parsed,
+                  }));
+                }}
+              />
+              <p className={styles.helpText}>
+                Lo que paga el cliente por los productos del combo. Los complementos se cobran aparte.
+              </p>
             </label>
           ) : null}
           {form.kind === 'free_shipping' ? (
@@ -1004,7 +1052,7 @@ export function PromotionForm({
           ) : null}
           {form.kind === 'amount' ? (
             <label className={styles.field} htmlFor="threshold-amount">
-              <span className={styles.label}>Descuento en pesos (MXN)</span>
+              <span className={styles.label}>Monto en pesos (MXN)</span>
               <input
                 id="threshold-amount"
                 className={styles.input}
