@@ -10,14 +10,15 @@ from app.infra.maps.google_routes import (
 )
 
 
-def test_shortest_route_meters_prefers_shorter_distance_label():
+def test_shortest_route_meters_picks_min_even_when_label_is_wrong():
     meters = shortest_route_meters(
         [
-            {"distanceMeters": 8000, "routeLabels": ["DEFAULT_ROUTE"]},
-            {"distanceMeters": 5200, "routeLabels": ["SHORTER_DISTANCE"]},
+            {"distanceMeters": 7749, "routeLabels": ["DEFAULT_ROUTE", "SHORTER_DISTANCE"]},
+            {"distanceMeters": 6509, "routeLabels": ["DEFAULT_ROUTE_ALTERNATE"]},
+            {"distanceMeters": 8055, "routeLabels": ["DEFAULT_ROUTE_ALTERNATE"]},
         ]
     )
-    assert meters == 5200
+    assert meters == 6509
 
 
 def test_shortest_route_meters_falls_back_to_min_when_label_missing():
@@ -35,11 +36,12 @@ def test_shortest_route_meters_rejects_empty_routes():
         shortest_route_meters([])
 
 
-def test_fetch_driving_distance_km_posts_essentials_shorter_distance_request():
+def test_fetch_driving_distance_km_posts_essentials_alternatives_request():
     payload = {
         "routes": [
-            {"distanceMeters": 8000, "routeLabels": ["DEFAULT_ROUTE"]},
-            {"distanceMeters": 5123, "routeLabels": ["SHORTER_DISTANCE"]},
+            {"distanceMeters": 7749, "routeLabels": ["DEFAULT_ROUTE", "SHORTER_DISTANCE"]},
+            {"distanceMeters": 6509, "routeLabels": ["DEFAULT_ROUTE_ALTERNATE"]},
+            {"distanceMeters": 8055, "routeLabels": ["DEFAULT_ROUTE_ALTERNATE"]},
         ]
     }
     captured: dict = {}
@@ -74,11 +76,12 @@ def test_fetch_driving_distance_km_posts_essentials_shorter_distance_request():
             api_key="test-key",
         )
 
-    assert km == 5.12
+    assert km == 6.51
     assert captured["url"] == "https://routes.googleapis.com/directions/v2:computeRoutes"
     assert captured["method"] == "POST"
     assert captured["body"]["travelMode"] == "DRIVE"
     assert captured["body"]["routingPreference"] == "TRAFFIC_UNAWARE"
+    assert captured["body"]["computeAlternativeRoutes"] is True
     assert captured["body"]["requestedReferenceRoutes"] == ["SHORTER_DISTANCE"]
     assert captured["body"].get("travelMode") != "TWO_WHEELER"
     assert "routes.distanceMeters" in captured["headers"]["x-goog-fieldmask"]
