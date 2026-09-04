@@ -377,8 +377,8 @@ export function CustomerDetailDrawer({
   }, [activity, customer]);
 
   const chartPoints = useMemo(
-    () => (activity?.summary.timeline ?? []).map((created_at) => ({ created_at })),
-    [activity?.summary.timeline],
+    () => (activity?.summary?.timeline ?? []).map((created_at) => ({ created_at })),
+    [activity?.summary?.timeline],
   );
 
   const chartBuckets = useMemo(
