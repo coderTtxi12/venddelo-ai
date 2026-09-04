@@ -61,12 +61,12 @@ export function ProductsTableColumnsMenu({
             className: styles.paper,
             style: { minWidth: Math.max(anchorEl?.offsetWidth ?? 0, 240) },
           },
-        }}
-        MenuListProps={{
-          id: `${menuId}-list`,
-          autoFocusItem: open,
-          className: styles.list,
-          'aria-label': 'Columnas visibles',
+          list: {
+            id: `${menuId}-list`,
+            autoFocusItem: open,
+            className: styles.list,
+            'aria-label': 'Columnas visibles',
+          },
         }}
       >
         <li className={styles.heading} id={`${menuId}-heading`}>
