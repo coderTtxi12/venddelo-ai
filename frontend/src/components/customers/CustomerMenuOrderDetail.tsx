@@ -31,7 +31,7 @@ async function fetchOrderWithFreshToken(
   try {
     return await getRestaurantOrder(accessToken, restaurantId, orderId);
   } catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 401) {
+    if (!(error instanceof ApiError) || error.httpStatus !== 401) {
       throw error;
     }
     const { data } = await createClient().auth.getSession();
