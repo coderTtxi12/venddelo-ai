@@ -652,6 +652,8 @@ export function PromotionForm({
               ? {
                   ...normalized,
                   scope: 'order' as const,
+                  showBanner: false,
+                  imagePath: null,
                   kind:
                     normalized.kind === 'free_shipping'
                       ? 'free_shipping'
@@ -687,7 +689,11 @@ export function PromotionForm({
 
       <FormSection
         title="Identidad"
-        hint="Nombre e imagen del banner que verán tus clientes en el menú."
+        hint={
+          template === 'order_threshold'
+            ? 'Nombre interno de la promoción. No se muestra banner en el menú.'
+            : 'Nombre e imagen del banner que verán tus clientes en el menú.'
+        }
       >
       <div className={styles.field}>
         <label className={styles.label} htmlFor="promo-name">
@@ -710,16 +716,15 @@ export function PromotionForm({
         />
       </div>
 
+      {template !== 'order_threshold' ? (
       <div className={styles.field}>
         <label className={styles.label} htmlFor="promo-image">
           Imagen promocional
         </label>
         <p className={styles.helpText} id="promo-image-help">
-          {template === 'order_threshold'
-            ? 'Opcional. El umbral de carrito no muestra banner en el menú.'
-            : form.showBanner
-              ? 'Formato banner (16:9), como el acceso directo del menú público. Necesaria si el banner está activado.'
-              : 'Opcional mientras el banner esté desactivado.'}
+          {form.showBanner
+            ? 'Formato banner (16:9), como el acceso directo del menú público. Necesaria si el banner está activado.'
+            : 'Opcional mientras el banner esté desactivado.'}
         </p>
         <div className={styles.promoBannerUpload}>
           <div
@@ -784,6 +789,7 @@ export function PromotionForm({
           </p>
         ) : null}
       </div>
+      ) : null}
 
       {template !== 'order_threshold' ? (
         <label className={styles.toggleRow}>
@@ -998,7 +1004,7 @@ export function PromotionForm({
           ) : null}
           {form.kind === 'amount' ? (
             <label className={styles.field} htmlFor="threshold-amount">
-              <span className={styles.label}>Monto en pesos (MXN)</span>
+              <span className={styles.label}>Descuento en pesos (MXN)</span>
               <input
                 id="threshold-amount"
                 className={styles.input}
