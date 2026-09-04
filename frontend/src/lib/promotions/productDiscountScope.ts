@@ -11,10 +11,7 @@ export function resolveProductDiscountScope(
   productIds: string[];
 } {
   if (categoryIds.length > 0) {
-    return {
-      scope: 'category',
-      ...normalizeCategorySelection(categoryIds, productIds, products),
-    };
+    return normalizeCategorySelection(categoryIds, productIds, products);
   }
   return {
     scope: 'product',
