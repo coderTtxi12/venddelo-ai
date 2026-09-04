@@ -48,6 +48,7 @@ class PromotionCreate(BaseModel):
     scope: str
     percent: int | None = None
     amount_cents: int | None = None
+    combo_price_cents: int | None = None
     min_order_cents: int | None = None
     starts_at: datetime | None = None
     ends_at: datetime | None = None
@@ -83,6 +84,7 @@ class PromotionUpdate(BaseModel):
     scope: str | None = None
     percent: int | None = None
     amount_cents: int | None = None
+    combo_price_cents: int | None = None
     min_order_cents: int | None = None
     starts_at: datetime | None = None
     ends_at: datetime | None = None
@@ -129,6 +131,7 @@ class PromotionDTO(BaseModel):
     scope: str
     percent: int | None = None
     amount_cents: int | None = None
+    combo_price_cents: int | None = None
     min_order_cents: int | None = None
     starts_at: datetime | None = None
     ends_at: datetime | None = None
