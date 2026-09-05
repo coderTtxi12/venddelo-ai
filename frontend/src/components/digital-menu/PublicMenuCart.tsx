@@ -574,7 +574,16 @@ export function PublicMenuCart({
                     {lineAvailabilityIssues.length > 0 ? (
                       <div className={styles.lineAvailabilityErrors} role="alert">
                         {lineAvailabilityIssues.map((issue) => (
-                          <p key={`${issue.kind}-${issue.lineId}-${issue.kind === 'complement' ? issue.itemLabel : 'product'}`} className={styles.lineAvailabilityError}>
+                          <p
+                            key={`${issue.kind}-${issue.lineId}-${
+                              issue.kind === 'complement'
+                                ? issue.itemLabel
+                                : issue.kind === 'stock'
+                                  ? `stock-${issue.available}`
+                                  : 'product'
+                            }`}
+                            className={styles.lineAvailabilityError}
+                          >
                             {cartAvailabilityIssueMessage(issue, 'line')}
                           </p>
                         ))}

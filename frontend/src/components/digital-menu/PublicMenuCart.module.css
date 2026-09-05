@@ -228,8 +228,16 @@
   margin: 0;
   padding: 0.45rem 0.55rem;
   border-radius: 8px;
-  background: rgba(245, 158, 11, 0.12);
-  color: #fbbf24;
+  background: var(
+    --dm-low-stock-badge-bg,
+    color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 14%, var(--dm-surface, #fff))
+  );
+  color: var(--dm-low-stock-badge-text, #c2410c);
+  border: 1px solid
+    var(
+      --dm-low-stock-badge-border,
+      color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 28%, var(--dm-border, #e2e8f0))
+    );
   font-size: 0.74rem;
   line-height: 1.35;
 }
@@ -238,8 +246,16 @@
   margin: 0 0 0.65rem;
   padding: 0.55rem 0.65rem;
   border-radius: 10px;
-  background: rgba(245, 158, 11, 0.12);
-  color: #92400e;
+  background: var(
+    --dm-low-stock-badge-bg,
+    color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 14%, var(--dm-surface, #fff))
+  );
+  color: var(--dm-low-stock-badge-text, #c2410c);
+  border: 1px solid
+    var(
+      --dm-low-stock-badge-border,
+      color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 28%, var(--dm-border, #e2e8f0))
+    );
   font-size: 0.8rem;
   line-height: 1.4;
 }
@@ -257,8 +273,14 @@
 }
 
 .lineCardUnavailable {
-  border-color: rgba(245, 158, 11, 0.45);
-  background: rgba(245, 158, 11, 0.06);
+  border-color: var(
+    --dm-low-stock-badge-border,
+    color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 40%, var(--dm-border, #e2e8f0))
+  );
+  background: var(
+    --dm-low-stock-badge-bg,
+    color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 10%, var(--dm-surface, #fff))
+  );
 }
 
 .pricingNotice {

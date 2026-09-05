@@ -2,7 +2,17 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  padding-bottom: calc(340px + env(safe-area-inset-bottom, 0px));
+  /* Reserve space for the fixed mobile footer (measured live via --checkout-mobile-footer-h). */
+  padding-bottom: calc(
+    var(--checkout-mobile-footer-h, 360px) + 1.5rem + env(safe-area-inset-bottom, 0px)
+  );
+}
+
+.checkoutSummaryWithStockError {
+  /* Extra breathing room so the last line clears the compact footer after the in-body alert. */
+  padding-bottom: calc(
+    var(--checkout-mobile-footer-h, 280px) + 2rem + env(safe-area-inset-bottom, 0px)
+  );
 }
 
 .header {
@@ -450,9 +460,46 @@
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
-  max-height: min(58vh, 460px);
+  /* Cap height; list padding tracks measured height so content stays reachable. */
+  max-height: min(48vh, 380px);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 -12px 32px rgb(15 23 42 / 0.08);
+  touch-action: pan-y;
+}
+
+.totalsBarMobileCompact {
+  /* Stock alert is already in the scroll body — keep footer short so lines stay reachable. */
+  max-height: min(34vh, 260px);
+  gap: 0.4rem;
+  padding-top: 0.55rem;
+}
+
+.stockErrorBannerInBody {
+  margin: 0.75rem 1rem 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  background: var(
+    --dm-low-stock-badge-bg,
+    color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 14%, var(--dm-surface, #fff))
+  );
+  color: var(--dm-low-stock-badge-text, #c2410c);
+  border: 1px solid
+    var(
+      --dm-low-stock-badge-border,
+      color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 28%, var(--dm-border, #e2e8f0))
+    );
+  font-size: 0.86rem;
+  line-height: 1.45;
+  scroll-margin-top: 4.5rem;
+}
+
+.stockErrorRecovery {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  font-weight: 600;
 }
 
 .sendOrderMobile {
@@ -528,7 +575,38 @@
 }
 
 .sendOrderHintBlocked {
-  color: #b45309;
+  color: var(--dm-low-stock-badge-text, #c2410c);
+}
+
+.stockErrorBanner {
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: var(
+    --dm-low-stock-badge-bg,
+    color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 14%, var(--dm-surface, #fff))
+  );
+  color: var(--dm-low-stock-badge-text, #c2410c);
+  border: 1px solid
+    var(
+      --dm-low-stock-badge-border,
+      color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 28%, var(--dm-border, #e2e8f0))
+    );
+  font-size: 0.8rem;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.stockErrorLead {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+}
+
+.stockErrorList {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.3rem;
 }
 
 .sendOrderDesktop .sendOrderHint {
@@ -649,6 +727,10 @@
     display: none;
   }
 
+  .stockErrorBannerInBody {
+    display: none;
+  }
+
   .totalsAside {
     display: block;
     position: sticky;
@@ -707,6 +789,10 @@
 }
 
 .checkoutSummary.publicTablet .totalsBarMobile {
+  display: none;
+}
+
+.checkoutSummary.publicTablet .stockErrorBannerInBody {
   display: none;
 }
 

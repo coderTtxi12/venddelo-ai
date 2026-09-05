@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -14,6 +14,11 @@ import {
 } from '@/lib/digital-menu/cart/buildCheckoutLineBreakdown';
 import { cartItemCount } from '@/lib/digital-menu/cart/cartMath';
 import type { PublicMenuCartLine } from '@/lib/digital-menu/cart/types';
+import {
+  fetchFreshMenuAvailabilityContext,
+  validateCartAgainstMenu,
+} from '@/lib/digital-menu/cart/freshMenuAvailability';
+import { formatCartAvailabilityMessages } from '@/lib/digital-menu/cart/validateCartAvailability';
 import { buildPublicOrderInput } from '@/lib/digital-menu/checkout/buildPublicOrderInput';
 import { createCheckoutOrderRef } from '@/lib/digital-menu/checkout/createCheckoutOrderRef';
 import {
@@ -274,21 +279,41 @@ function SendOrderButton({
   disabled,
   disabledReason,
   sendErrorMessage,
+  stockErrors,
+  checkingStock,
   onSend,
   variant,
+  showStockBanner = true,
 }: {
   disabled: boolean;
   disabledReason: string | null;
   sendErrorMessage: string | null;
+  stockErrors: string[];
+  checkingStock: boolean;
   onSend: () => void;
   variant: 'mobile' | 'desktop';
+  /** Desktop sidebar keeps the banner next to send; mobile shows it in scrollable body. */
+  showStockBanner?: boolean;
 }) {
+  const showBanner = showStockBanner && stockErrors.length > 0;
+
   return (
     <div className={variant === 'desktop' ? styles.sendOrderDesktop : styles.sendOrderMobile}>
+      {showBanner ? (
+        <div className={styles.stockErrorBanner} role="alert">
+          <p className={styles.stockErrorLead}>Antes de enviar:</p>
+          <ul className={styles.stockErrorList}>
+            {stockErrors.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <button
         type="button"
         className={styles.sendOrderBtn}
-        disabled={disabled}
+        disabled={disabled || checkingStock}
+        aria-busy={checkingStock}
         aria-label="Enviar pedido por WhatsApp al restaurante"
         onClick={onSend}
       >
@@ -302,6 +327,12 @@ function SendOrderButton({
       ) : disabled && disabledReason ? (
         <p className={styles.sendOrderHint} role="status">
           {disabledReason}
+        </p>
+      ) : stockErrors.length > 0 ? (
+        <p className={`${styles.sendOrderHint} ${styles.sendOrderHintBlocked}`} role="status">
+          {showStockBanner
+            ? 'Ajusta las cantidades en el carrito y vuelve a intentar.'
+            : 'Revisa el aviso de arriba y vuelve al carrito para corregirlo.'}
         </p>
       ) : (
         <p className={styles.sendOrderHint}>
@@ -652,10 +683,59 @@ export function PublicMenuCheckoutSummary({
   const [collapsedLineIds, setCollapsedLineIds] = useState<Set<string>>(() => new Set());
   const [sendAttempted, setSendAttempted] = useState(false);
   const [closedSendMessage, setClosedSendMessage] = useState<string | null>(null);
+  const [stockErrors, setStockErrors] = useState<string[]>([]);
+  const [checkingStock, setCheckingStock] = useState(false);
+  const mobileStockErrorRef = useRef<HTMLDivElement | null>(null);
+  const mobileFooterRef = useRef<HTMLElement | null>(null);
+  const checkoutRootRef = useRef<HTMLDivElement | null>(null);
+  const hasStockErrors = stockErrors.length > 0;
 
   useEffect(() => {
     setClosedSendMessage(null);
   }, [fulfillment.serviceType]);
+
+  const linesKey = useMemo(
+    () =>
+      JSON.stringify(
+        lines.map((line) => ({
+          id: line.id,
+          productId: line.productId,
+          quantity: line.quantity,
+        })),
+      ),
+    [lines],
+  );
+
+  useEffect(() => {
+    setStockErrors([]);
+  }, [linesKey]);
+
+  useLayoutEffect(() => {
+    const footer = mobileFooterRef.current;
+    const root = checkoutRootRef.current;
+    if (!footer || !root || typeof ResizeObserver === 'undefined') return;
+
+    const syncFooterSpace = () => {
+      const height = Math.ceil(footer.getBoundingClientRect().height);
+      root.style.setProperty('--checkout-mobile-footer-h', `${height}px`);
+    };
+
+    syncFooterSpace();
+    const observer = new ResizeObserver(syncFooterSpace);
+    observer.observe(footer);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--checkout-mobile-footer-h');
+    };
+  }, [hasStockErrors, isTabletLayout]);
+
+  useEffect(() => {
+    if (!hasStockErrors) return;
+    const node = mobileStockErrorRef.current;
+    if (!node) return;
+    // Keep the alert visible without yanking the list so the user can still scroll down.
+    node.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [hasStockErrors, stockErrors]);
 
   const productsById = useMemo(
     () => new Map(products.map((product) => [product.id, product])),
@@ -779,7 +859,7 @@ export function PublicMenuCheckoutSummary({
     onChange: handleCashDenominationChange,
   };
 
-  const handleSendOrder = () => {
+  const handleSendOrder = async () => {
     if (!whatsappPhone || !fulfillment.paymentMethod) return;
     if (!cashDenominationValid) {
       setSendAttempted(true);
@@ -792,7 +872,7 @@ export function PublicMenuCheckoutSummary({
       }
       return;
     }
-    if (!canSendOrder) return;
+    if (!canSendOrder || checkingStock) return;
 
     const openStatus = resolveCheckoutRestaurantOpenStatus(schedules, new Date());
     if (!isRestaurantOpenForCheckout(openStatus, schedules)) {
@@ -801,6 +881,27 @@ export function PublicMenuCheckoutSummary({
     }
 
     setClosedSendMessage(null);
+    setCheckingStock(true);
+
+    let freshMenu;
+    try {
+      freshMenu = await fetchFreshMenuAvailabilityContext(subdomain);
+    } catch {
+      freshMenu = {
+        products,
+        productsById: new Map(products.map((product) => [product.id, product])),
+        validProductIds: new Set(products.map((product) => product.id)),
+      };
+    }
+
+    const availabilityIssues = validateCartAgainstMenu(lines, freshMenu);
+    if (availabilityIssues.length > 0) {
+      setStockErrors(formatCartAvailabilityMessages(availabilityIssues, 'summary'));
+      setCheckingStock(false);
+      return;
+    }
+
+    setStockErrors([]);
 
     const { orderId, idempotencyKey } = createCheckoutOrderRef();
 
@@ -825,11 +926,17 @@ export function PublicMenuCheckoutSummary({
 
     submitPublicOrderBackground(subdomain, payload, idempotencyKey);
     openWhatsAppOrder(whatsappPhone, message);
+    setCheckingStock(false);
     onOrderSent();
   };
 
   return (
-    <div className={`${styles.checkoutSummary} ${isTabletLayout ? menuStyles.publicTablet : ''}`}>
+    <div
+      ref={checkoutRootRef}
+      className={`${styles.checkoutSummary} ${isTabletLayout ? menuStyles.publicTablet : ''} ${
+        hasStockErrors ? styles.checkoutSummaryWithStockError : ''
+      }`.trim()}
+    >
       <header className={styles.header}>
         <button
           type="button"
@@ -848,6 +955,24 @@ export function PublicMenuCheckoutSummary({
       </header>
 
       <div className={styles.body}>
+        {stockErrors.length > 0 ? (
+          <div
+            ref={mobileStockErrorRef}
+            className={styles.stockErrorBannerInBody}
+            role="alert"
+          >
+            <p className={styles.stockErrorLead}>Antes de enviar:</p>
+            <ul className={styles.stockErrorList}>
+              {stockErrors.map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+            </ul>
+            <p className={styles.stockErrorRecovery}>
+              Usa «Volver» para quitar o cambiar esos productos en el carrito.
+            </p>
+          </div>
+        ) : null}
+
         <FulfillmentSummary fulfillment={fulfillment} />
 
         {showCashDenomination ? (
@@ -914,23 +1039,34 @@ export function PublicMenuCheckoutSummary({
               disabled={!whatsappConfigured || lines.length === 0}
               disabledReason={sendDisabledReason}
               sendErrorMessage={closedSendMessage}
-              onSend={handleSendOrder}
+              stockErrors={stockErrors}
+              checkingStock={checkingStock}
+              showStockBanner
+              onSend={() => void handleSendOrder()}
             />
           </div>
         </aside>
       </div>
 
-      <footer className={styles.totalsBarMobile} aria-label="Total del pedido">
-        <CouponSection
-          variant="mobile"
-          couponDraft={couponDraft}
-          onCouponDraftChange={onCouponDraftChange}
-          quote={quote}
-          currency={currency}
-          quoteLoading={quoteLoading}
-          onApplyCoupon={onApplyCoupon}
-          onRemoveCoupon={onRemoveCoupon}
-        />
+      <footer
+        ref={mobileFooterRef}
+        className={`${styles.totalsBarMobile} ${
+          hasStockErrors ? styles.totalsBarMobileCompact : ''
+        }`.trim()}
+        aria-label="Total del pedido"
+      >
+        {!hasStockErrors ? (
+          <CouponSection
+            variant="mobile"
+            couponDraft={couponDraft}
+            onCouponDraftChange={onCouponDraftChange}
+            quote={quote}
+            currency={currency}
+            quoteLoading={quoteLoading}
+            onApplyCoupon={onApplyCoupon}
+            onRemoveCoupon={onRemoveCoupon}
+          />
+        ) : null}
         <TotalsPanel
           currency={currency}
           itemCount={itemCount}
@@ -954,7 +1090,10 @@ export function PublicMenuCheckoutSummary({
           disabled={!whatsappConfigured || lines.length === 0}
           disabledReason={sendDisabledReason}
           sendErrorMessage={closedSendMessage}
-          onSend={handleSendOrder}
+          stockErrors={stockErrors}
+          checkingStock={checkingStock}
+          showStockBanner={false}
+          onSend={() => void handleSendOrder()}
         />
       </footer>
     </div>
