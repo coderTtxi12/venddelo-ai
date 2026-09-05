@@ -1,0 +1,68 @@
+.switch {
+  position: relative;
+  width: 52px;
+  min-width: 52px;
+  height: 32px;
+  min-height: 44px;
+  flex-shrink: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.switch::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 32px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text-secondary) 28%, var(--color-surface));
+  transition: background 160ms ease;
+}
+
+.switchOn::before {
+  background: var(--color-primary);
+}
+
+.thumb {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+  transform: translateY(-50%);
+  transition: transform 160ms ease;
+}
+
+.switchOn .thumb {
+  transform: translateY(-50%) translateX(20px);
+}
+
+.switchPending {
+  opacity: 0.55;
+}
+
+.switch:disabled {
+  cursor: not-allowed;
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch::before,
+  .thumb {
+    transition: none;
+  }
+}
