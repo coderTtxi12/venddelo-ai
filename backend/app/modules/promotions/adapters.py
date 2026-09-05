@@ -183,19 +183,26 @@ class SqlAlchemyPromotionRepository(PromotionRepository):
 
     def get(self, id: uuid.UUID) -> PromotionDTO | None:
         obj = self._session.get(Promotion, id)
-        if obj is None or not obj.is_active:
+        if obj is None or obj.deleted_at is not None:
             return None
         return self._to_dto(obj)
 
-    def list_active(
-        self, restaurant_id: uuid.UUID, params: PaginationParams
+    def _list_page(
+        self,
+        restaurant_id: uuid.UUID,
+        params: PaginationParams,
+        *,
+        only_active: bool,
     ) -> CursorPage[PromotionDTO]:
+        filters = [
+            Promotion.restaurant_id == restaurant_id,
+            Promotion.deleted_at.is_(None),
+        ]
+        if only_active:
+            filters.append(Promotion.is_active.is_(True))
         stmt = (
             select(Promotion)
-            .where(
-                Promotion.restaurant_id == restaurant_id,
-                Promotion.is_active.is_(True),
-            )
+            .where(*filters)
             .order_by(Promotion.created_at, Promotion.id)
             .limit(params.limit + 1)
         )
@@ -212,9 +219,19 @@ class SqlAlchemyPromotionRepository(PromotionRepository):
             has_more=has_more,
         )
 
+    def list_active(
+        self, restaurant_id: uuid.UUID, params: PaginationParams
+    ) -> CursorPage[PromotionDTO]:
+        return self._list_page(restaurant_id, params, only_active=True)
+
+    def list_for_admin(
+        self, restaurant_id: uuid.UUID, params: PaginationParams
+    ) -> CursorPage[PromotionDTO]:
+        return self._list_page(restaurant_id, params, only_active=False)
+
     def update(self, id: uuid.UUID, data: PromotionUpdate) -> PromotionDTO | None:
         obj = self._session.get(Promotion, id)
-        if obj is None or not obj.is_active:
+        if obj is None or obj.deleted_at is not None:
             return None
         for field, value in _storage_fields_from_update(data).items():
             setattr(obj, field, value)
@@ -229,7 +246,7 @@ class SqlAlchemyPromotionRepository(PromotionRepository):
 
     def soft_delete(self, id: uuid.UUID) -> bool:
         obj = self._session.get(Promotion, id)
-        if obj is None or not obj.is_active:
+        if obj is None or obj.deleted_at is not None:
             return False
         obj.is_active = False
         obj.deleted_at = datetime.now(UTC)

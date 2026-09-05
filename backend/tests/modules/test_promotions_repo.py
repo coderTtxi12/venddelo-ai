@@ -2,7 +2,7 @@ from app.core.pagination import PaginationParams
 from app.modules.menu.adapters import SqlAlchemyMenuRepository
 from app.modules.menu.schemas import CategoryCreate, ProductCreate
 from app.modules.promotions.adapters import SqlAlchemyPromotionRepository
-from app.modules.promotions.schemas import PromotionCreate
+from app.modules.promotions.schemas import PromotionCreate, PromotionUpdate
 from app.modules.restaurants.adapters import SqlAlchemyRestaurantRepository
 from app.modules.restaurants.schemas import RestaurantCreate
 from tests.conftest import requires_db
@@ -105,3 +105,60 @@ def test_list_active_bounded_query_count(session, engine):
         assert query_count["n"] <= 8
     finally:
         event.remove(engine, "before_cursor_execute", before_cursor_execute)
+
+
+@requires_db
+def test_list_for_admin_includes_paused_excludes_soft_deleted(session):
+    r = _restaurant(session, "promo-pause-list")
+    repo = SqlAlchemyPromotionRepository(session)
+    live = repo.add(
+        PromotionCreate(restaurant_id=r.id, name="live", type="percent", scope="order", percent=10)
+    )
+    paused = repo.add(
+        PromotionCreate(restaurant_id=r.id, name="paused", type="percent", scope="order", percent=10)
+    )
+    gone = repo.add(
+        PromotionCreate(restaurant_id=r.id, name="gone", type="percent", scope="order", percent=10)
+    )
+    assert repo.update(paused.id, PromotionUpdate(is_active=False)) is not None
+    assert repo.soft_delete(gone.id) is True
+
+    admin_ids = {p.id for p in repo.list_for_admin(r.id, PaginationParams(limit=20)).items}
+    assert live.id in admin_ids
+    assert paused.id in admin_ids
+    assert gone.id not in admin_ids
+
+    active_ids = {p.id for p in repo.list_active(r.id, PaginationParams(limit=20)).items}
+    assert live.id in active_ids
+    assert paused.id not in active_ids
+    assert gone.id not in active_ids
+
+
+@requires_db
+def test_pause_then_reactivate_and_get(session):
+    r = _restaurant(session, "promo-pause-toggle")
+    repo = SqlAlchemyPromotionRepository(session)
+    promo = repo.add(
+        PromotionCreate(restaurant_id=r.id, name="toggle", type="percent", scope="order", percent=15)
+    )
+    paused = repo.update(promo.id, PromotionUpdate(is_active=False))
+    assert paused is not None
+    assert paused.is_active is False
+    assert repo.get(promo.id) is not None
+    assert repo.get(promo.id).is_active is False
+
+    active = repo.update(promo.id, PromotionUpdate(is_active=True))
+    assert active is not None
+    assert active.is_active is True
+
+
+@requires_db
+def test_soft_deleted_not_gettable_or_updatable(session):
+    r = _restaurant(session, "promo-soft-gone")
+    repo = SqlAlchemyPromotionRepository(session)
+    promo = repo.add(
+        PromotionCreate(restaurant_id=r.id, name="gone", type="percent", scope="order", percent=10)
+    )
+    assert repo.soft_delete(promo.id) is True
+    assert repo.get(promo.id) is None
+    assert repo.update(promo.id, PromotionUpdate(name="x")) is None

@@ -24,6 +24,11 @@ class PromotionRepository(ABC):
     ) -> CursorPage[PromotionDTO]: ...
 
     @abstractmethod
+    def list_for_admin(
+        self, restaurant_id: uuid.UUID, params: PaginationParams
+    ) -> CursorPage[PromotionDTO]: ...
+
+    @abstractmethod
     def update(self, id: uuid.UUID, data: PromotionUpdate) -> PromotionDTO | None: ...
 
     @abstractmethod

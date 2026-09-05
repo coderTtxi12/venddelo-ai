@@ -93,6 +93,7 @@ class PromotionUpdate(BaseModel):
     product_ids: list[uuid.UUID] | None = None
     category_ids: list[uuid.UUID] | None = None
     option_item_ids: list[uuid.UUID] | None = None
+    is_active: bool | None = None
 
     @field_validator("type", mode="before")
     @classmethod

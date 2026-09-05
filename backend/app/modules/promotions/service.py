@@ -171,7 +171,7 @@ class PromotionService:
         *,
         timezone: str,
     ) -> CursorPage[PromotionDTO]:
-        page = self._repo.list_active(restaurant_id, params)
+        page = self._repo.list_for_admin(restaurant_id, params)
         page.items = [self._with_status(item, timezone) for item in page.items]
         return page
 
