@@ -910,24 +910,96 @@
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  margin-top: 4px;
+  margin-top: 0;
   padding: 2px 8px;
   border-radius: 6px;
   background: var(
     --dm-low-stock-badge-bg,
-    color-mix(in srgb, var(--dm-low-stock-accent, #d97706) 12%, var(--dm-surface, #fff))
+    color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 16%, var(--dm-surface, #fff))
   );
-  color: var(--dm-low-stock-badge-text, var(--dm-low-stock-accent, #b45309));
+  color: var(--dm-low-stock-badge-text, #c2410c);
   border: 1px solid
     var(
       --dm-low-stock-badge-border,
-      color-mix(in srgb, var(--dm-low-stock-accent, #d97706) 28%, var(--dm-border, #e2e8f0))
+      color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 34%, var(--dm-border, #e2e8f0))
     );
   font-size: 0.62rem;
   font-weight: 700;
   line-height: 1.25;
   letter-spacing: 0.01em;
   white-space: nowrap;
+}
+
+.productLowStockRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.45rem;
+  margin-top: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.productLowStockClosing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(
+    --dm-low-stock-badge-bg,
+    color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 16%, var(--dm-surface, #fff))
+  );
+  border: 1px solid
+    var(
+      --dm-low-stock-badge-border,
+      color-mix(in srgb, var(--dm-low-stock-accent, #ea580c) 34%, var(--dm-border, #e2e8f0))
+    );
+  color: var(--dm-low-stock-badge-text, #c2410c);
+  line-height: 1;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.productLowStockClosingDigits {
+  font-size: 0.68rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .productLowStockBadge {
+    font-size: 0.64rem;
+    padding: 3px 9px;
+  }
+
+  .productLowStockClosingDigits {
+    font-size: 0.7rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .productLowStockClosingUrgent .productLowStockClosingDigits {
+    animation: lowStockClosingPulse 1.8s ease-in-out infinite;
+  }
+}
+
+@keyframes lowStockClosingPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .productLowStockClosingUrgent .productLowStockClosingDigits {
+    animation: none;
+  }
 }
 
 .productThumb {
