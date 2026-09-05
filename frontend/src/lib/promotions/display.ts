@@ -61,7 +61,8 @@ export function promotionStatusLabel(promotion: Promotion): string {
   if (promotion.effective_status === 'scheduled') return 'Programada';
   if (promotion.effective_status === 'expired') return 'Expirada';
   if (promotion.effective_status === 'outside_schedule') return 'Fuera de horario';
-  return promotion.is_active ? 'Activa' : 'Inactiva';
+  if (promotion.effective_status === 'inactive') return 'Pausada';
+  return promotion.is_active ? 'Activa' : 'Pausada';
 }
 
 export function formatPromotionDateRange(startsAt: string | null, endsAt: string | null): string {

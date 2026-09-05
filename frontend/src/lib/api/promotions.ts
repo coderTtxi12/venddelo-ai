@@ -82,11 +82,15 @@ export function createPromotion(
   });
 }
 
+export type UpdatePromotionInput = Partial<CreateManualPromotionInput> & {
+  is_active?: boolean;
+};
+
 export function updatePromotion(
   token: string,
   restaurantId: string,
   promotionId: string,
-  data: Partial<CreateManualPromotionInput>,
+  data: UpdatePromotionInput,
 ) {
   return apiRequest<Promotion>(
     `/restaurants/${restaurantId}/promotions/${promotionId}`,

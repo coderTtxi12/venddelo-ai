@@ -30,7 +30,7 @@ export const PROMOTION_STATUS_FILTER_LABELS: Record<PromotionStatusFilter, strin
   scheduled: 'Programadas',
   expired: 'Expiradas',
   outside_schedule: 'Fuera de horario',
-  inactive: 'Inactivas',
+  inactive: 'Pausadas',
 };
 
 export const PROMOTION_TEMPLATE_FILTER_LABELS: Record<PromotionTemplateFilter, string> = {
