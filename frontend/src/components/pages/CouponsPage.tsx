@@ -57,6 +57,7 @@ import CouponSheet from '@/components/coupons/CouponSheet';
 import { CouponApplicationsPanel } from '@/components/coupons/CouponApplicationsPanel';
 import { CouponListCard } from '@/components/coupons/CouponListCard';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { ActivePauseSwitch } from '@/components/ui/ActivePauseSwitch';
 import { ToolbarSelect } from '@/components/ui/ToolbarSelect';
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -165,6 +166,8 @@ export default function CouponsPage() {
   const [clientsCoupon, setClientsCoupon] = useState<Coupon | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
+  const [toggleErrors, setToggleErrors] = useState<Record<string, string>>({});
 
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -309,6 +312,35 @@ export default function CouponsPage() {
       setLoadError('No se pudo eliminar el cupón.');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleToggleActive = async (coupon: Coupon, next: boolean) => {
+    if (!accessToken || !selectedRestaurantId) return;
+    setTogglingIds((prev) => new Set(prev).add(coupon.id));
+    setToggleErrors((prev) => {
+      const { [coupon.id]: _, ...rest } = prev;
+      return rest;
+    });
+    try {
+      const updated = await updateCoupon(accessToken, selectedRestaurantId, coupon.id, {
+        is_active: next,
+      });
+      setCoupons((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (error) {
+      console.error(error);
+      setToggleErrors((prev) => ({
+        ...prev,
+        [coupon.id]: next
+          ? 'No se pudo reactivar. Intenta de nuevo.'
+          : 'No se pudo pausar. Intenta de nuevo.',
+      }));
+    } finally {
+      setTogglingIds((prev) => {
+        const nextSet = new Set(prev);
+        nextSet.delete(coupon.id);
+        return nextSet;
+      });
     }
   };
 
@@ -583,6 +615,16 @@ export default function CouponsPage() {
                     </td>
                     <td className={styles.actionsCell}>
                       <div className={styles.actionsInner}>
+                        <ActivePauseSwitch
+                          checked={coupon.is_active}
+                          pending={togglingIds.has(coupon.id)}
+                          ariaLabel={
+                            coupon.is_active
+                              ? `Pausar cupón ${coupon.code}`
+                              : `Reactivar cupón ${coupon.code}`
+                          }
+                          onChange={(next) => void handleToggleActive(coupon, next)}
+                        />
                         <Tooltip title="Ver usos">
                           <IconButton
                             size="small"
@@ -621,6 +663,11 @@ export default function CouponsPage() {
                           </IconButton>
                         </Tooltip>
                       </div>
+                      {toggleErrors[coupon.id] ? (
+                        <p className={styles.toggleError} role="alert">
+                          {toggleErrors[coupon.id]}
+                        </p>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -635,11 +682,14 @@ export default function CouponsPage() {
                 coupon={coupon}
                 copied={copiedCode === coupon.code}
                 statusClass={statusPillClass(coupon.effective_status)}
+                toggling={togglingIds.has(coupon.id)}
+                toggleError={toggleErrors[coupon.id] ?? null}
                 onOpen={() => openEditDrawer(coupon)}
                 onCopy={() => void copyCode(coupon.code)}
                 onViewUses={() => openClientsDrawer(coupon)}
                 onEdit={() => openEditDrawer(coupon)}
                 onDelete={() => setDeletingCoupon(coupon)}
+                onToggleActive={(next) => void handleToggleActive(coupon, next)}
               />
             ))}
           </div>

@@ -16,32 +16,39 @@ import {
   formatCouponValidityRange,
   formatCouponWeekdaysLabel,
 } from '@/lib/coupons/display';
+import { ActivePauseSwitch } from '@/components/ui/ActivePauseSwitch';
 import styles from '../pages/CouponsPage.module.css';
 
 type CouponListCardProps = {
   coupon: Coupon;
   copied: boolean;
   statusClass: string;
+  toggling?: boolean;
+  toggleError?: string | null;
   onOpen: () => void;
   onCopy: () => void;
   onViewUses: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleActive: (next: boolean) => void;
 };
 
 export function CouponListCard({
   coupon,
   copied,
   statusClass,
+  toggling = false,
+  toggleError = null,
   onOpen,
   onCopy,
   onViewUses,
   onEdit,
   onDelete,
+  onToggleActive,
 }: CouponListCardProps) {
   const weekdayLabel = formatCouponWeekdaysLabel(coupon.recurrence_weekdays);
   return (
-    <article className={styles.couponCard}>
+    <article className={`${styles.couponCard} ${!coupon.is_active ? styles.couponCardPaused : ''}`}>
       <button
         type="button"
         className={styles.couponCardMainBtn}
@@ -66,6 +73,14 @@ export function CouponListCard({
         </span>
       </button>
       <div className={styles.couponCardActions} role="group" aria-label={`Acciones ${coupon.code}`}>
+        <ActivePauseSwitch
+          checked={coupon.is_active}
+          pending={toggling}
+          ariaLabel={
+            coupon.is_active ? `Pausar cupón ${coupon.code}` : `Reactivar cupón ${coupon.code}`
+          }
+          onChange={onToggleActive}
+        />
         <Tooltip title={copied ? 'Copiado' : 'Copiar código'}>
           <IconButton size="small" aria-label={`Copiar código ${coupon.code}`} onClick={onCopy}>
             <ContentCopyOutlinedIcon fontSize="small" />
@@ -92,6 +107,11 @@ export function CouponListCard({
           </IconButton>
         </Tooltip>
       </div>
+      {toggleError ? (
+        <p className={styles.toggleError} role="alert">
+          {toggleError}
+        </p>
+      ) : null}
     </article>
   );
 }
