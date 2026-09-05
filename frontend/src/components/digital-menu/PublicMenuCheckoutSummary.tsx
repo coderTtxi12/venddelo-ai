@@ -22,6 +22,7 @@ import { formatCartAvailabilityMessages } from '@/lib/digital-menu/cart/validate
 import { buildPublicOrderInput } from '@/lib/digital-menu/checkout/buildPublicOrderInput';
 import { createCheckoutOrderRef } from '@/lib/digital-menu/checkout/createCheckoutOrderRef';
 import {
+  customerDeliveryFeeCentsForQuote,
   formatWhatsAppOrderMessage,
   openWhatsAppOrder,
   whatsappPhoneDigits,
@@ -796,14 +797,7 @@ export function PublicMenuCheckoutSummary({
       fulfillment.serviceType,
     ],
   );
-  const deliveryFeeCents =
-    fulfillment.serviceType === 'delivery'
-      ? Math.max(
-          0,
-          (quote.delivery_fee_cents ?? fulfillment.deliveryFeeCents ?? 0) -
-            Math.max(quote.waived_delivery_cents ?? 0, quote.coupon?.waived_delivery_cents ?? 0),
-        )
-      : 0;
+  const deliveryFeeCents = customerDeliveryFeeCentsForQuote(fulfillment, quote);
   const deliveryFee = deliveryFeeCents / 100;
   const deliveryWaivedByCoupon =
     fulfillment.serviceType === 'delivery' &&
