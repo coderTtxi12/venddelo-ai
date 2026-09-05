@@ -210,6 +210,52 @@ export function getRestaurantClosingDeadlineToday(
 }
 
 /**
+ * Closing deadline for the slot the restaurant is in right now.
+ * Returns null when closed, before opening, or with no hours today.
+ */
+export function getRestaurantClosingDeadlineWhileOpen(
+  schedules: RestaurantSchedule[],
+  enabledServices: RestaurantServiceType[],
+  now: Date,
+  timezone: string,
+): Date | null {
+  if (schedules.length === 0 || enabledServices.length === 0) return null;
+
+  const { weekday, minutesOfDay } = getLocalWeekdayAndMinutes(now, timezone);
+  const relevant = schedules.filter((entry) =>
+    enabledServices.includes(entry.service_type as RestaurantServiceType),
+  );
+
+  let activeCloseMinutes: number | null = null;
+
+  for (const slot of relevant) {
+    if (slot.day_of_week !== weekday) continue;
+
+    const openHm = parseHm(parseApiTime(slot.opens_at));
+    const closeHm = parseHm(parseApiTime(slot.closes_at));
+    if (!openHm || !closeHm) continue;
+
+    const openMinutes = openHm.hour * 60 + openHm.minute;
+    const closeMinutes = closeHm.hour * 60 + closeHm.minute;
+    if (minutesOfDay < openMinutes || minutesOfDay >= closeMinutes) continue;
+
+    if (activeCloseMinutes == null || closeMinutes < activeCloseMinutes) {
+      activeCloseMinutes = closeMinutes;
+    }
+  }
+
+  if (activeCloseMinutes == null) return null;
+
+  const dateParts = getLocalDateParts(now, timezone);
+  return zonedWallClockToUtc(
+    dateParts,
+    Math.floor(activeCloseMinutes / 60),
+    activeCloseMinutes % 60,
+    timezone,
+  );
+}
+
+/**
  * Countdown priority:
  * 1. Marketing promo "Hasta" when "Limitar a un horario del día" is configured (today, valid weekday).
  * 2. Restaurant closing today when the promo has no daily time limit.
