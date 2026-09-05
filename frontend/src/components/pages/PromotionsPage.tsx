@@ -15,7 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import { listCategories, listProducts } from '@/lib/api/menu';
 import type { Category, Product, Promotion } from '@/lib/api/types';
-import { deletePromotion, listAllPromotions } from '@/lib/api/promotions';
+import { deletePromotion, listAllPromotions, updatePromotion } from '@/lib/api/promotions';
 import {
   formatPromotionDateRange,
   promotionBenefitLabel,
@@ -48,6 +48,7 @@ import type { PromotionFormSubmitPayload } from '@/components/marketing/Promotio
 import PromotionSheet from '@/components/promotions/PromotionSheet';
 import { PromotionListCard } from '@/components/promotions/PromotionListCard';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { ActivePauseSwitch } from '@/components/ui/ActivePauseSwitch';
 import { ToolbarSelect } from '@/components/ui/ToolbarSelect';
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -77,6 +78,7 @@ async function loadAllProducts(token: string, restaurantId: string): Promise<Pro
 function statusPillClass(status: Promotion['effective_status']): string {
   if (status === 'active') return styles.statusActive;
   if (status === 'expired') return styles.statusExpired;
+  if (status === 'scheduled') return styles.statusScheduled;
   return styles.statusInactive;
 }
 
@@ -141,6 +143,8 @@ export default function PromotionsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [deletingPromotion, setDeletingPromotion] = useState<Promotion | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
+  const [toggleErrors, setToggleErrors] = useState<Record<string, string>>({});
 
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -273,6 +277,35 @@ export default function PromotionsPage() {
     }
   };
 
+  const handleToggleActive = async (promotion: Promotion, next: boolean) => {
+    if (!accessToken || !selectedRestaurantId) return;
+    setTogglingIds((prev) => new Set(prev).add(promotion.id));
+    setToggleErrors((prev) => {
+      const { [promotion.id]: _, ...rest } = prev;
+      return rest;
+    });
+    try {
+      const updated = await updatePromotion(accessToken, selectedRestaurantId, promotion.id, {
+        is_active: next,
+      });
+      setPromotions((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (error) {
+      console.error(error);
+      setToggleErrors((prev) => ({
+        ...prev,
+        [promotion.id]: next
+          ? 'No se pudo reactivar. Intenta de nuevo.'
+          : 'No se pudo pausar. Intenta de nuevo.',
+      }));
+    } finally {
+      setTogglingIds((prev) => {
+        const nextSet = new Set(prev);
+        nextSet.delete(promotion.id);
+        return nextSet;
+      });
+    }
+  };
+
   const clearFilters = () => {
     setQuery('');
     setDebouncedQuery('');
@@ -303,11 +336,15 @@ export default function PromotionsPage() {
         <section className={styles.metrics} aria-label="Resumen de promociones">
           <div className={styles.metric}>
             <span className={styles.metricValue}>{stats.total}</span>
-            <span className={styles.metricLabel}>Total</span>
+            <span className={styles.metricLabel}>Promociones</span>
           </div>
           <div className={styles.metric}>
             <span className={styles.metricValue}>{stats.active}</span>
             <span className={styles.metricLabel}>Vigentes</span>
+          </div>
+          <div className={styles.metric}>
+            <span className={styles.metricValue}>{stats.scheduled}</span>
+            <span className={styles.metricLabel}>Programadas</span>
           </div>
           <div className={styles.metric}>
             <span className={styles.metricValue}>{stats.withBanner}</span>
@@ -356,7 +393,7 @@ export default function PromotionsPage() {
               disabled={accessLoading || !selectedRestaurantId}
             >
               <AddOutlinedIcon fontSize="small" aria-hidden />
-              Nueva promoción
+              Agregar promoción
             </button>
           </div>
 
@@ -437,7 +474,7 @@ export default function PromotionsPage() {
             disabled={accessLoading || !selectedRestaurantId}
           >
             <AddOutlinedIcon fontSize="small" aria-hidden />
-            Nueva promoción
+            Agregar promoción
           </button>
         </div>
       ) : emptySearch ? (
@@ -463,8 +500,8 @@ export default function PromotionsPage() {
                   <th>Tipo</th>
                   <th>Beneficio</th>
                   <th>Alcance</th>
-                  <SortHeader column="status" sort={sort} order={order} onToggle={toggleSort} />
                   <th>Vigencia</th>
+                  <SortHeader column="status" sort={sort} order={order} onToggle={toggleSort} />
                   <th aria-label="Acciones">
                     <span className={styles.muted}>Acciones</span>
                   </th>
@@ -489,14 +526,23 @@ export default function PromotionsPage() {
                       }}
                     >
                       <td>
-                        <div className={styles.nameCell}>
-                          <strong>{displayName}</strong>
-                          {catalog ? <span className={styles.tag}>Desde producto</span> : null}
-                        </div>
+                        <span className={styles.codeCell}>
+                          <span>
+                            <span className={styles.couponCode}>{displayName}</span>
+                            {catalog ? (
+                              <span className={styles.couponName}>Desde producto</span>
+                            ) : null}
+                          </span>
+                        </span>
                       </td>
-                      <td>{promotionTypeLabel(promotion)}</td>
+                      <td>
+                        <span className={styles.typeCell}>{promotionTypeLabel(promotion)}</span>
+                      </td>
                       <td>{promotionBenefitLabel(promotion)}</td>
-                      <td>{promotionScopeLabel(promotion.scope)}</td>
+                      <td className={styles.muted}>{promotionScopeLabel(promotion.scope)}</td>
+                      <td className={styles.muted}>
+                        {formatPromotionDateRange(promotion.starts_at, promotion.ends_at)}
+                      </td>
                       <td>
                         <span
                           className={`${styles.statusPill} ${statusPillClass(promotion.effective_status)}`}
@@ -504,9 +550,18 @@ export default function PromotionsPage() {
                           {promotionStatusLabel(promotion)}
                         </span>
                       </td>
-                      <td>{formatPromotionDateRange(promotion.starts_at, promotion.ends_at)}</td>
-                      <td>
+                      <td className={styles.actionsCell}>
                         <div className={styles.actionsInner}>
+                          <ActivePauseSwitch
+                            checked={promotion.is_active}
+                            pending={togglingIds.has(promotion.id)}
+                            ariaLabel={
+                              promotion.is_active
+                                ? `Pausar promoción ${displayName}`
+                                : `Reactivar promoción ${displayName}`
+                            }
+                            onChange={(next) => void handleToggleActive(promotion, next)}
+                          />
                           <Tooltip title={catalog ? 'Ver detalles' : 'Editar'}>
                             <span>
                               <IconButton
@@ -526,6 +581,7 @@ export default function PromotionsPage() {
                           <Tooltip title="Eliminar">
                             <IconButton
                               size="small"
+                              color="error"
                               aria-label="Eliminar promoción"
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -536,6 +592,11 @@ export default function PromotionsPage() {
                             </IconButton>
                           </Tooltip>
                         </div>
+                        {toggleErrors[promotion.id] ? (
+                          <p className={styles.toggleError} role="alert">
+                            {toggleErrors[promotion.id]}
+                          </p>
+                        ) : null}
                       </td>
                     </tr>
                   );
@@ -544,13 +605,18 @@ export default function PromotionsPage() {
             </table>
           </div>
 
-          <div className={styles.cardList}>
+          <div className={`${styles.cardList} ${loading ? styles.tableLoading : ''}`}>
             {visiblePromotions.map((promotion) => (
               <PromotionListCard
                 key={promotion.id}
                 promotion={promotion}
-                onEdit={openEditSheet}
-                onDelete={setDeletingPromotion}
+                statusClass={statusPillClass(promotion.effective_status)}
+                toggling={togglingIds.has(promotion.id)}
+                toggleError={toggleErrors[promotion.id] ?? null}
+                onOpen={() => openEditSheet(promotion)}
+                onEdit={() => openEditSheet(promotion)}
+                onDelete={() => setDeletingPromotion(promotion)}
+                onToggleActive={(next) => void handleToggleActive(promotion, next)}
               />
             ))}
           </div>
@@ -577,16 +643,19 @@ export default function PromotionsPage() {
 
       <ConfirmDialog
         open={deletingPromotion != null}
-        title="Eliminar promoción"
+        title="¿Eliminar promoción?"
         description={
           deletingPromotion
-            ? `¿Eliminar "${promotionDisplayName(deletingPromotion)}"? Esta acción no se puede deshacer.`
+            ? `"${promotionDisplayName(deletingPromotion)}" dejará de aplicarse en el menú. Los pedidos ya confirmados conservan su descuento.`
             : ''
         }
         confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
         loading={deleting}
-        onCancel={() => setDeletingPromotion(null)}
         onConfirm={() => void handleDelete()}
+        onCancel={() => {
+          if (!deleting) setDeletingPromotion(null);
+        }}
       />
     </div>
   );
