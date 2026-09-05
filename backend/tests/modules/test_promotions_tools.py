@@ -81,7 +81,8 @@ def test_create_and_disable_marketing_promotion(session):
         ctx,
     )
     assert listed_after.ok is True
-    assert not any(row["id"] == promo["id"] for row in listed_after.data["promotions"])
+    row = next(r for r in listed_after.data["promotions"] if r["id"] == promo["id"])
+    assert row["is_active"] is False
 
 
 @requires_db

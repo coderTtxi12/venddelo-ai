@@ -9,7 +9,7 @@ Mutating access to **marketing promotions** for the current restaurant. Catalog 
 discounts (auto-generated from the product editor) are out of scope — use the admin UI for
 those.
 
-**Never delete** — disable with `disable_promotion` when a campaign ends.
+**Never hard-delete** — pause with `disable_promotion` when a campaign ends (stays in admin list).
 
 ---
 
@@ -109,7 +109,7 @@ You:  [create_promotion] Listo, ya está tu promo de marketing.
 - **Banner:** `generate_promotion_banner` (AI, 16:9 delivery-style creative).
 - **NxM products:** `update_nxm_promotion` to add/remove products without replacing the full list.
 - **NxM complements:** `update_nxm_promotion_complements` to exclude or re-include add-ons.
-- **End campaign:** `disable_promotion` when it expires — never hard-delete.
+- **End campaign:** `disable_promotion` pauses (`is_active=false`) — stays listed in admin; never hard-delete.
 
 Other edits (dates, rules, non-NxM promos) are done in the **admin UI**.
 
@@ -122,7 +122,7 @@ Other edits (dates, rules, non-NxM promos) are done in the **admin UI**.
 | `create_promotion` | New marketing promo after secretary recap confirmed (name, type, scope, targets, optional schedule/dates) |
 | `update_nxm_promotion` | Incrementally add/remove products on an existing NxM / 2×1 promo |
 | `update_nxm_promotion_complements` | Enable or disable complements on an NxM allow-list |
-| `disable_promotion` | Soft-disable (`is_active=false`) by `promotion_id` or name |
+| `disable_promotion` | Pause (`is_active=false`) by `promotion_id` or name; not soft-delete |
 | `generate_promotion_banner` | AI 16:9 marketing banner → storage → sets `image_path` on one promo |
 
 ### Types (`type`)

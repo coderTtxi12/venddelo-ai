@@ -34,6 +34,7 @@ from app.modules.promotions.schemas import (
     PromotionCreate,
     PromotionDTO,
     PromotionScheduleInput,
+    PromotionUpdate,
     enrich_promotion_dto,
 )
 from app.modules.promotions.service import PromotionService
@@ -690,8 +691,9 @@ class PromotionsSkill:
             ToolDefinition(
                 name="disable_promotion",
                 description=(
-                    "Disable a promotion (soft delete). Provide promotion_id or name. "
-                    "Does not remove records from the database."
+                    "Pause a promotion (sets is_active=false). It remains visible in admin "
+                    "lists and can be re-enabled later. Does not soft-delete. "
+                    "Provide promotion_id or name."
                 ),
                 effect="mutate",
                 input_schema={
@@ -920,14 +922,19 @@ class PromotionsSkill:
             display = promotion_display_name(promo)
 
             try:
-                promo_service.delete(ctx.restaurant_id, promotion_id)
+                promo_service.update(
+                    ctx.restaurant_id,
+                    promotion_id,
+                    PromotionUpdate(is_active=False),
+                    timezone=_restaurant_timezone(ctx),
+                )
             except NotFoundError as exc:
                 return ToolResult(ok=False, summary=str(exc) or "Not found")
             _invalidate_menu_cache(ctx)
             commit_agent_mutation(ctx)
             return ToolResult(
                 ok=True,
-                summary=f"Disabled promotion {display!r}",
+                summary=f"Paused promotion {display!r}",
                 data={"promotion_id": str(promotion_id), "is_active": False},
             )
 
