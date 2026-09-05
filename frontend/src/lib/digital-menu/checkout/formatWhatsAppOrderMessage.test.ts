@@ -61,6 +61,30 @@ test('formatQuotePromotionWhatsAppLines includes free shipping promo', () => {
   );
 });
 
+const takeoutFulfillment = {
+  serviceType: 'takeout' as const,
+  customerName: 'María',
+  customerPhoneCountryIso: 'MX',
+  customerPhoneLocal: '5512345678',
+  paymentMethod: 'cash' as const,
+  deliveryAddress: '',
+  deliveryAddressDetails: '',
+  deliveryLatitude: null,
+  deliveryLongitude: null,
+  deliveryPlaceId: null,
+  deliveryFeeCents: null,
+  cashDenominationCents: null,
+};
+
+const deliveryFulfillment = {
+  ...takeoutFulfillment,
+  serviceType: 'delivery' as const,
+  deliveryAddress: 'Calle Reforma 100',
+  deliveryLatitude: 19.43,
+  deliveryLongitude: -99.13,
+  deliveryFeeCents: 3500,
+};
+
 test('formatWhatsAppOrderMessage includes coupon in totals section', () => {
   const message = formatWhatsAppOrderMessage({
     orderId: '11111111-2222-3333-4444-555555555555',
@@ -68,19 +92,7 @@ test('formatWhatsAppOrderMessage includes coupon in totals section', () => {
     currency: 'MXN',
     lines: [] as PublicMenuCartLine[],
     quote: baseQuote,
-    fulfillment: {
-      serviceType: 'takeout',
-      customerName: 'María',
-      customerPhoneCountryIso: 'MX',
-      customerPhoneLocal: '5512345678',
-      paymentMethod: 'cash',
-      deliveryAddress: '',
-      deliveryAddressDetails: '',
-      deliveryLatitude: null,
-      deliveryLongitude: null,
-      deliveryFeeCents: null,
-      cashDenominationCents: null,
-    },
+    fulfillment: takeoutFulfillment,
     productsById: new Map(),
     promotionsById: new Map(),
     itemCount: 0,
@@ -88,4 +100,21 @@ test('formatWhatsAppOrderMessage includes coupon in totals section', () => {
 
   assert.match(message, /Cupón PIZZA20: -\$20\.00/);
   assert.match(message, /\*TOTAL: \$80\.00\*/);
+});
+
+test('formatWhatsAppOrderMessage includes delivery fee when quote still has 0', () => {
+  const message = formatWhatsAppOrderMessage({
+    orderId: '11111111-2222-3333-4444-555555555555',
+    restaurantName: 'Taquería',
+    currency: 'MXN',
+    lines: [] as PublicMenuCartLine[],
+    quote: { ...baseQuote, coupon: null, total_cents: 10000 },
+    fulfillment: deliveryFulfillment,
+    productsById: new Map(),
+    promotionsById: new Map(),
+    itemCount: 1,
+  });
+
+  assert.match(message, /Envío: \$35\.00/);
+  assert.match(message, /\*TOTAL: \$135\.00\*/);
 });

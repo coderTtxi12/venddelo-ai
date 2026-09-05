@@ -96,7 +96,11 @@ function providerDeliveryFeeCentsForQuote(
   quote: CartQuote,
 ): number {
   if (fulfillment.serviceType !== 'delivery') return 0;
-  return quote.delivery_fee_cents ?? fulfillment.deliveryFeeCents ?? 0;
+  // Cart quotes default delivery_fee_cents to 0. Don't let that mask the
+  // coverage quote stored on fulfillment (second order in the same tab).
+  const fromFulfillment = fulfillment.deliveryFeeCents ?? 0;
+  const fromQuote = quote.delivery_fee_cents ?? 0;
+  return Math.max(fromFulfillment, fromQuote);
 }
 
 function quoteWaivedDeliveryCents(quote: CartQuote): number {
@@ -106,7 +110,7 @@ function quoteWaivedDeliveryCents(quote: CartQuote): number {
   );
 }
 
-function customerDeliveryFeeCentsForQuote(
+export function customerDeliveryFeeCentsForQuote(
   fulfillment: CheckoutFulfillment,
   quote: CartQuote,
 ): number {
