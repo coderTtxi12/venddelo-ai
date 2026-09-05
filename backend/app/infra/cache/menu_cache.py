@@ -36,11 +36,14 @@ def sanitize_public_menu(
                 )
             )
         )
+        # When live inventory is on, expose qty so the cart can block overselling.
+        # When off, keep qty hidden (products without tracked stock stay null either way).
+        public_qty = product.inventory_qty if live_menu_inventory_enabled else None
         products.append(
             product.model_copy(
                 update={
                     "show_low_stock": low_stock,
-                    "inventory_qty": None,
+                    "inventory_qty": public_qty,
                     "shelf_life_days": None,
                     "expires_on": None,
                     "batch_started_at": None,

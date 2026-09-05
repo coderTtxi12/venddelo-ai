@@ -26,7 +26,7 @@ def _product(**kwargs) -> ProductDTO:
     return ProductDTO(**defaults)
 
 
-def test_sanitize_public_menu_hides_stock_and_sets_low_stock_flag():
+def test_sanitize_public_menu_exposes_stock_when_live_inventory_on():
     product = _product()
     menu = FullMenuDTO(restaurant_id=product.restaurant_id, categories=[], products=[product])
 
@@ -37,7 +37,7 @@ def test_sanitize_public_menu_hides_stock_and_sets_low_stock_flag():
     )
     out = public.products[0]
     assert out.show_low_stock is True
-    assert out.inventory_qty is None
+    assert out.inventory_qty == 2
     assert out.shelf_life_days is None
     assert out.expires_on is None
     assert out.batch_started_at is None
