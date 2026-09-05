@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { DigitalMenuTheme, DigitalMenuThemeCssVars } from './types';
 import { resolveAddSuccessTokens } from './deriveAddSuccess';
+import { resolveLowStockTokens } from './deriveLowStock';
 import { resolveOverlayScrim } from './deriveOverlayScrim';
 import { resolveUnavailableTokens } from './deriveUnavailable';
 
@@ -16,6 +17,7 @@ export function digitalMenuThemeToCssVars(theme: DigitalMenuTheme): DigitalMenuT
   const { colors, typography, style } = theme;
   const { addSuccess, addSuccessText } = resolveAddSuccessTokens(theme);
   const unavailable = resolveUnavailableTokens(theme);
+  const lowStock = resolveLowStockTokens(theme);
 
   return {
     '--dm-primary': colors.primary,
@@ -50,6 +52,10 @@ export function digitalMenuThemeToCssVars(theme: DigitalMenuTheme): DigitalMenuT
     '--dm-unavailable-badge-text': unavailable.badgeText,
     '--dm-unavailable-badge-border': unavailable.badgeBorder,
     '--dm-unavailable-sold-out-bg': unavailable.soldOutBg,
+    '--dm-low-stock-accent': lowStock.accent,
+    '--dm-low-stock-badge-bg': lowStock.badgeBg,
+    '--dm-low-stock-badge-text': lowStock.badgeText,
+    '--dm-low-stock-badge-border': lowStock.badgeBorder,
     '--dm-overlay-scrim': resolveOverlayScrim(colors),
     '--dm-font-heading': typography.headingFont,
     '--dm-font-body': typography.bodyFont,
