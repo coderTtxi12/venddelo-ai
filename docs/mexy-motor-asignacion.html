@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Motor de asignación · Mexy</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #e2e8f0;
+      --paper: #ffffff;
+      --wash: #f8fafc;
+      --ask: #f1f5f9;
+      --blue: #2563eb;
+      --blue-ink: #1d4ed8;
+      --calm: #ecfdf3;
+      --busy: #fff7ed;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: var(--ink);
+      font-family: Inter, "Segoe UI", system-ui, sans-serif;
+    }
+    .page {
+      width: 1200px;
+      margin: 0;
+      background: var(--paper);
+      padding: 40px 44px 36px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 32px;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+    }
+    .kicker {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 8px;
+    }
+    .lede {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.45;
+      max-width: 820px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin: 28px 0 32px;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px 16px;
+      background: var(--wash);
+    }
+    .stat b {
+      display: block;
+      font-size: 26px;
+      letter-spacing: -0.03em;
+      color: var(--blue-ink);
+    }
+    .stat span {
+      display: block;
+      margin-top: 4px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    h2 {
+      margin: 28px 0 12px;
+      font-size: 20px;
+      letter-spacing: -0.02em;
+    }
+    .flow {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .flow-top {
+      padding: 16px 16px 8px;
+      text-align: center;
+    }
+    .box, .ask, .case, .end {
+      display: inline-block;
+      border-radius: 8px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .box { background: #fff; }
+    .ask { background: var(--ask); }
+    .case {
+      background: #fff;
+      border-color: #cbd5e1;
+      text-align: left;
+      width: 100%;
+    }
+    .case b { display: block; font-size: 15px; }
+    .case small { color: var(--muted); font-size: 12px; }
+    .end {
+      background: var(--blue);
+      color: #fff;
+      border-color: var(--blue);
+      font-weight: 650;
+    }
+    .arrow {
+      color: #64748b;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+    .hint { font-size: 12px; color: var(--muted); }
+    .lanes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border-top: 1px solid var(--line);
+    }
+    .lane {
+      padding: 16px 18px 18px;
+      min-height: 390px;
+    }
+    .lane.calm { background: var(--calm); }
+    .lane.busy { background: var(--busy); }
+    .lane h3 {
+      margin: 0 0 12px;
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .stack { display: flex; flex-direction: column; gap: 8px; }
+    .yesno { font-size: 11px; color: var(--muted); margin: 2px 0; }
+    .merge {
+      text-align: center;
+      padding: 16px;
+      border-top: 1px solid var(--line);
+    }
+    .grid3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px 16px;
+      background: #fff;
+    }
+    .card h3 { margin: 0 0 6px; font-size: 15px; }
+    .card p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--blue-ink);
+      margin-bottom: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .cols {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 20px;
+    }
+    .note {
+      margin-top: 22px;
+      padding: 12px 14px;
+      background: var(--wash);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .ex {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin: 8px 0 8px;
+    }
+    .ex-row {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      gap: 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: #fff;
+      align-items: start;
+    }
+    .ex-letter {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      color: var(--blue-ink);
+      line-height: 1;
+    }
+    .ex-letter span {
+      display: block;
+      margin-top: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .ex-row h3 {
+      margin: 0 0 4px;
+      font-size: 15px;
+    }
+    .ex-row p {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+    .ex-row .story {
+      margin-top: 6px;
+      color: var(--ink);
+    }
+    .ruta {
+      margin-top: 8px;
+      padding: 8px 10px;
+      background: var(--wash);
+      border-radius: 6px;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--ink);
+    }
+    .ruta b { color: var(--blue-ink); }
+    .foot {
+      margin-top: 18px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    @page { size: 1200px 3200px; margin: 0; }
+    @media print {
+      html, body, .page { width: 1200px; background: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="kicker">Mexy · configuración actual</div>
+    <h1>Motor de asignación</h1>
+    <p class="lede">
+      Una pregunta: ¿a qué repartidor le ofrecemos este pedido ahora?
+      Un pedido nunca se parte en varios riders. Los números de abajo
+      son los de Mexy hoy, no los valores de fábrica.
+    </p>
+
+    <div class="stats">
+      <div class="stat"><b>5 min</b><span>Tope buscando rider</span></div>
+      <div class="stat"><b>55 s</b><span>Para aceptar la oferta</span></div>
+      <div class="stat"><b>25 s</b><span>Pausa si nadie sirvió</span></div>
+      <div class="stat"><b>11</b><span>Máx. paquetes por rider</span></div>
+    </div>
+
+    <h2>Las letras, en cristiano (léelas antes del mapa)</h2>
+    <p class="lede" style="margin-bottom:14px">
+      El motor no “adivina”. Elige una de estas formas de ofrecer el pedido.
+      Imagina que Mexy es una flota de motos y el restaurante acaba de marcar
+      “ya está listo”.
+    </p>
+    <div class="ex">
+      <div class="ex-row">
+        <div class="ex-letter">A<span>día tranquilo</span></div>
+        <div>
+          <h3>El más cercano a la cocina</h3>
+          <p>Hay un solo pedido y hay repartidores libres. Se lo damos al que está más cerca del restaurante, en línea recta. Aún no mira la casa del cliente.</p>
+          <p class="story"><b>Ejemplo.</b> Tacos El Güero pide un envío. Juan está a 3 cuadras, Ana a 15. Se ofrece a Juan. Como llamar al que está parado afuera, no al que está del otro lado de la colonia.</p>
+          <p class="ruta"><b>Ruta.</b> 1) Recoge en Tacos El Güero → 2) Entrega en la casa del cliente. Una parada de cocina, una de entrega. Si Juan ya iba llegando a dejar otra bolsa (casi libre), primero termina esa entrega y después va a El Güero.</p>
+        </div>
+      </div>
+      <div class="ex-row">
+        <div class="ex-letter">B<span>día tranquilo</span></div>
+        <div>
+          <h3>Varios pedidos a la vez, sin dejar la calle vacía</h3>
+          <p>Llegan 2 o más pedidos listos juntos. Cada uno va a un rider distinto. Siempre deja 2 motos libres de reserva, por si cae otro.</p>
+          <p class="story"><b>Ejemplo.</b> Salen 2 pedidos a la vez y hay 4 libres. Ofrece los 2 y deja 2 sin tocar. Si solo hubiera 3 libres, ofrece 1 (para no bajar de 2 en reserva). Si ni eso se puede, el día se trata como apretado.</p>
+          <p class="ruta"><b>Ruta.</b> Cada rider lleva el suyo, no se mezclan. Juan: El Güero → casa 1. Ana: la pizzería → casa 2. Dos motos, dos caminos cortos.</p>
+        </div>
+      </div>
+      <div class="ex-row">
+        <div class="ex-letter">E<span>apretado · 1º</span></div>
+        <div>
+          <h3>El día está apretado, pero aún hay alguien libre</h3>
+          <p>Pocos libres, mucha gente ocupada o cola de pedidos. Si todavía hay un rider libre (o a punto de terminar), se lo damos a él. No molestamos a los que ya van.</p>
+          <p class="story"><b>Ejemplo.</b> Hay cola, pero Luis está parado a 2 cuadras de la pizzería. No le pedimos a María (que ya lleva una pizza) que se desvíe. Se ofrece a Luis. Es lo mismo que A, con prisa.</p>
+          <p class="ruta"><b>Ruta.</b> Igual que A: pizzería → casa del cliente. Si Luis era “casi libre” (le faltaban menos de 60 s para dejar la pizza de ahora), primero entrega esa y luego: pizzería nueva → casa nueva.</p>
+        </div>
+      </div>
+      <div class="ex-row">
+        <div class="ex-letter">C<span>apretado · 2º</span></div>
+        <div>
+          <h3>Ya vas a esa cocina: llévate este también</h3>
+          <p>Nadie está libre. Alguien todavía tiene que recoger en ese mismo restaurante, y su última entrega queda a 2 km o menos de la casa nueva. Entonces le sumamos el paquete.</p>
+          <p class="story"><b>Ejemplo.</b> Pedro va a recoger 2 bolsas en Tacos El Güero. Sale un tercer pedido de esa misma taquería. El cliente nuevo vive a 1.5 km de donde Pedro iba a dejar el último. Como 1.5 km es menos de 2 km: “ya estás en esa cocina, llévate también esta”. Si Pedro ya hubiera salido de ahí, no es C.</p>
+          <p class="ruta"><b>Ruta.</b> Se queda en la cocina y carga todo. 1) Recoge las 2 bolsas viejas + la nueva en El Güero → 2) Entrega la primera → 3) Entrega la segunda → 4) Al final, la casa nueva. Primero todas las recolectas, después las entregas viejas, al último la nueva.</p>
+        </div>
+      </div>
+      <div class="ex-row">
+        <div class="ex-letter">D<span>apretado · 3º</span></div>
+        <div>
+          <h3>Pásate un momento por esa cocina</h3>
+          <p>Nadie libre y nadie va a recoger en ese restaurante. Un rider ya salió (va al cliente) y está a 1 km o menos de la cocina nueva. Se le pide un desvío corto. No mira la casa del cliente nuevo.</p>
+          <p class="story"><b>Ejemplo.</b> María ya lleva un pedido hacia Roma Norte. Pasa a 700 m de una sucursal que acaba de pedir rider (menos de 1 km). “Pásate, recógelo, y al final dejas lo nuevo”. Si está a 2 km de esa cocina, no se lo ofrecemos: esperaríamos 25 s y buscaríamos de nuevo.</p>
+          <p class="ruta"><b>Ruta.</b> El desvío es ahora, la casa nueva va al final. 1) Recoge en la cocina nueva (el sushi, 700 m) → 2) Entrega lo que ya traía en Roma Norte → 3) Entrega lo nuevo. No deja primero lo de Roma: primero se mete a la cocina que está pasando.</p>
+        </div>
+      </div>
+      <div class="ex-row">
+        <div class="ex-letter">M<span>a mano</span></div>
+        <div>
+          <h3>Lo manda un operador</h3>
+          <p>Alguien en el monitor elige al rider. El motor automático no elige M. La oferta sigue durando 55 s.</p>
+          <p class="story"><b>Ejemplo.</b> El restaurante pide a “la de la moto roja”. El operador se lo manda a ella desde el monitor, aunque el mapa hubiera elegido a otro.</p>
+          <p class="ruta"><b>Ruta.</b> La que arme el operador en el monitor (o se pega al final de lo que ya traía). Siempre recoge antes de entregar ese mismo pedido.</p>
+        </div>
+      </div>
+    </div>
+
+    <h2>Cómo decide (el mapa)</h2>
+    <div class="flow">
+      <div class="flow-top">
+        <div class="box">Pedido listo para buscar rider</div>
+        <div class="arrow">↓</div>
+        <div class="ask">
+          ¿El rider pasa el filtro?<br />
+          <span class="hint">en línea · GPS de menos de 10 min · app al día · caja · crédito · cupo 11</span>
+        </div>
+        <div class="arrow">↓ sí &nbsp;&nbsp;&nbsp; → no: no entra a ningún caso, reintenta</div>
+        <div class="ask">¿Está apretado el día?</div>
+        <div class="hint" style="margin-top:6px">
+          Alta demanda si cualquiera: 2 o menos libres · 80% ocupados · 5 o más pedidos esperando
+        </div>
+      </div>
+      <div class="lanes">
+        <div class="lane calm">
+          <h3>Día tranquilo · no → A o B</h3>
+          <div class="ask" style="width:100%">¿Hay varios pedidos listos a la vez?</div>
+          <div class="split">
+            <div>
+              <div class="yesno">no · un pedido</div>
+              <div class="case"><b>Caso A</b><small>El más cercano al restaurante</small></div>
+            </div>
+            <div>
+              <div class="yesno">sí · varios</div>
+              <div class="case"><b>Caso B</b><small>Paralelo, deja 2 libres de reserva</small></div>
+            </div>
+          </div>
+          <p class="hint" style="margin:12px 0 0">
+            Si B no puede respetar la reserva de 2 libres, salta a alta demanda.
+            En día tranquilo, si no hay libre, espera: no usa C ni D.
+          </p>
+        </div>
+        <div class="lane busy">
+          <h3>Alta demanda · sí → E, luego C, luego D</h3>
+          <div class="ask" style="width:100%">¿Hay alguien libre o casi libre?</div>
+          <div class="split">
+            <div>
+              <div class="yesno">sí</div>
+              <div class="case"><b>Caso E</b><small>El más cercano, con prisa. Gana sobre C y D.</small></div>
+            </div>
+            <div class="stack">
+              <div class="yesno">no</div>
+              <div class="ask" style="width:100%">¿Aún recoge en esa cocina y su última entrega queda a ≤ 2 km?</div>
+              <div class="yesno">sí → Caso C · enganche</div>
+              <div class="ask" style="width:100%">si no: ¿ya va, y está a ≤ 1 km de la cocina nueva?</div>
+              <div class="yesno">sí → Caso D · desvío &nbsp;·&nbsp; no → esperar 25 s</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="merge">
+        <div class="end">Oferta al rider · 55 segundos para aceptar</div>
+        <p class="hint" style="margin:10px 0 0">
+          Acepta · rechaza · no contesta. A los 5 minutos sin rider, el pedido queda sin asignar.
+        </p>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div>
+        <h2>Libre, casi libre, ocupado</h2>
+        <table>
+          <thead><tr><th>Estado</th><th>Qué significa</th><th>Sirve para</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Libre</td>
+              <td>No tiene pedido asignado, recogido ni en camino.</td>
+              <td>A, B y E</td>
+            </tr>
+            <tr>
+              <td>Casi libre</td>
+              <td>Lleva exactamente un pedido, ya va al cliente, y le faltan 60 s o menos.</td>
+              <td>Cuenta como libre. Primero entrega lo actual.</td>
+            </tr>
+            <tr>
+              <td>Ocupado</td>
+              <td>Tiene un envío activo y no está a punto de llegar.</td>
+              <td>Solo C o D, en alta demanda.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h2>Relojes Mexy</h2>
+        <table>
+          <thead><tr><th>Reloj</th><th>Valor</th></tr></thead>
+          <tbody>
+            <tr><td>Timeout de oferta</td><td>55 s</td></tr>
+            <tr><td>Reintento</td><td>25 s</td></tr>
+            <tr><td>Tope buscando rider</td><td>5 min</td></tr>
+            <tr><td>Pre-libre</td><td>60 s</td></tr>
+            <tr><td>GPS obsoleto</td><td>10 min</td></tr>
+            <tr><td>Cupo de paquetes</td><td>11</td></tr>
+            <tr><td>Enganche C</td><td>2 km al dropoff</td></tr>
+            <tr><td>Desvío D</td><td>1 km a la cocina</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h2>Candados: si falla uno, no entra a ningún caso</h2>
+    <table>
+      <thead><tr><th>Candado</th><th>En cristiano</th><th>Mexy hoy</th></tr></thead>
+      <tbody>
+        <tr><td>Activo</td><td>No invitado ni bloqueado</td><td>—</td></tr>
+        <tr><td>En línea</td><td>El switch de la app está encendido</td><td>—</td></tr>
+        <tr><td>GPS fresco</td><td>Mandó ubicación hace poco, con coordenadas</td><td>10 min</td></tr>
+        <tr><td>App al día</td><td>La app del rider no está vieja</td><td>mínimo build 2</td></tr>
+        <tr><td>Sin oferta abierta</td><td>No está decidiendo otro pedido</td><td>1 a la vez</td></tr>
+        <tr><td>Rechazó / silencio</td><td>Dijo que no, o no contestó, en este ciclo</td><td>hasta el reintento de 25 s</td></tr>
+        <tr><td>Caja</td><td>Pedido grande solo a caja grande. Normal acepta ambas</td><td>—</td></tr>
+        <tr><td>Cupo</td><td>Lo que ya carga + este pedido no pasa el tope</td><td>11 paquetes</td></tr>
+        <tr><td>Crédito</td><td>Solo en efectivo: le debe alcanzar para lo que va a cobrar</td><td>límite − retenido</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      La zona del pedido sirve para la tarifa, no para filtrar riders: un rider de Mexy cubre todas las zonas.
+      La lluvia no elige rider; solo cambia precio o suspende servicio.
+      Todas las distancias son en línea recta, no por calles ni tráfico.
+    </div>
+    <div class="foot">Mapa interno para el equipo Mexy · 5 sep 2026 · valores tomados de Asignación en el dashboard</div>
+  </div>
+</body>
+</html>
