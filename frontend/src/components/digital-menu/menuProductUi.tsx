@@ -5,26 +5,24 @@ import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscou
 import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
+import { ProductLowStockSignals } from '@/components/digital-menu/ProductLowStockSignals';
+import {
+  PRODUCT_LOW_STOCK_LABEL,
+  ProductLowStockBadge,
+  shouldShowProductLowStock,
+} from '@/components/digital-menu/menuProductLowStock';
 import { PromotionCountdown } from '@/components/digital-menu/PromotionCountdown';
 import styles from '../pages/DigitalMenuPage.module.css';
 
 export const PRODUCT_UNAVAILABLE_LABEL = 'No disponible';
-export const PRODUCT_LOW_STOCK_LABEL = '¡Date prisa! Quedan pocas';
+export {
+  PRODUCT_LOW_STOCK_LABEL,
+  ProductLowStockBadge,
+  shouldShowProductLowStock,
+} from '@/components/digital-menu/menuProductLowStock';
 
 export function isProductAvailable(product: Product): boolean {
   return product.status === 'active';
-}
-
-export function shouldShowProductLowStock(product: Product): boolean {
-  return isProductAvailable(product) && product.show_low_stock === true;
-}
-
-export function ProductLowStockBadge({ className }: { className?: string }) {
-  return (
-    <span className={[styles.productLowStockBadge, className].filter(Boolean).join(' ')}>
-      {PRODUCT_LOW_STOCK_LABEL}
-    </span>
-  );
 }
 
 export function productsForCategory(products: Product[], categoryId: string): Product[] {
@@ -170,7 +168,12 @@ export function ProductCardContent({
   const content = (
     <>
       <div className={styles.productName}>{product.name}</div>
-      {shouldShowProductLowStock(product) ? <ProductLowStockBadge /> : null}
+      <ProductLowStockSignals
+        product={product}
+        hasPromoCountdown={timeLimitedPromotion != null && promotionTimezone != null}
+        timezone={promotionTimezone}
+        countdownContext={countdownContext}
+      />
       {product.description ? (
         <div className={styles.productDesc}>{product.description}</div>
       ) : null}

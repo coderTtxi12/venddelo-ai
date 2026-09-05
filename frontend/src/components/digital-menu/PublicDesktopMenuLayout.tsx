@@ -6,13 +6,12 @@ import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import type { Category, Product, Promotion, RestaurantSchedule } from '@/lib/api/types';
 import {
   ProductListThumb,
-  ProductLowStockBadge,
   ProductPrice,
   isProductAvailable,
   productAriaLabel,
   productsForCategory,
-  shouldShowProductLowStock,
 } from '@/components/digital-menu/menuProductUi';
+import { ProductLowStockSignals } from '@/components/digital-menu/ProductLowStockSignals';
 import { PromotionShortcutBanners } from '@/components/digital-menu/PromotionShortcutBanners';
 import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
@@ -274,7 +273,15 @@ export function PublicDesktopMenuLayout({
                             />
                             <div className={styles.limitedTimeBody}>
                               <span className={styles.productName}>{product.name}</span>
-                              {shouldShowProductLowStock(product) ? <ProductLowStockBadge /> : null}
+                              <ProductLowStockSignals
+                                product={product}
+                                hasPromoCountdown={
+                                  productTimeLimitedPromotions.has(product.id) &&
+                                  Boolean(promotionTimezone)
+                                }
+                                timezone={promotionTimezone}
+                                countdownContext={countdownContext}
+                              />
                               {product.description ? (
                                 <span className={styles.productDesc}>{product.description}</span>
                               ) : null}
@@ -324,7 +331,15 @@ export function PublicDesktopMenuLayout({
                         >
                           <div className={styles.productBody}>
                             <span className={styles.productName}>{product.name}</span>
-                            {shouldShowProductLowStock(product) ? <ProductLowStockBadge /> : null}
+                            <ProductLowStockSignals
+                              product={product}
+                              hasPromoCountdown={
+                                productTimeLimitedPromotions.has(product.id) &&
+                                Boolean(promotionTimezone)
+                              }
+                              timezone={promotionTimezone}
+                              countdownContext={countdownContext}
+                            />
                             {product.description ? (
                               <span className={styles.productDesc}>{product.description}</span>
                             ) : null}

@@ -37,6 +37,7 @@ import {
 } from './optionGroupReorder';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import { PRODUCT_UNAVAILABLE_LABEL } from '@/components/digital-menu/menuProductUi';
+import { ProductLowStockSignals } from '@/components/digital-menu/ProductLowStockSignals';
 import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
 import {
   computeLineTotal,
@@ -430,6 +431,14 @@ export function DigitalMenuProductDetail({
               </span>
             ) : null}
           </div>
+          {isAvailable ? (
+            <ProductLowStockSignals
+              product={product}
+              hasPromoCountdown={timeLimitedPromotion != null && promotionTimezone != null}
+              timezone={promotionTimezone}
+              countdownContext={countdownContext}
+            />
+          ) : null}
           {!isAvailable ? (
             <p className={styles.unavailableNotice} role="status">
               Este producto no está disponible por ahora. Puedes ver los detalles, pero no agregarlo al
