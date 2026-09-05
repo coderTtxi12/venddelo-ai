@@ -28,6 +28,7 @@
  
  .headerActions {
    display: flex;
+   flex-wrap: wrap;
    gap: 0.5rem;
  }
  
@@ -968,6 +969,10 @@
  }
  
  .secondaryBtn {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   gap: 0.4rem;
    border: 1px solid var(--color-border);
    background: var(--color-surface);
    color: var(--color-text);
@@ -975,6 +980,51 @@
    border-radius: 12px;
    font-weight: 900;
    cursor: pointer;
+ }
+
+ .secondaryBtn:disabled {
+   opacity: 0.6;
+   cursor: not-allowed;
+ }
+
+ .secondaryBtn:focus-visible {
+   outline: 2px solid var(--color-primary, #111827);
+   outline-offset: 2px;
+ }
+
+ .refreshInfoBtn {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   gap: 0.4rem;
+   flex-shrink: 0;
+   min-height: 44px;
+   margin: 0;
+   padding: 0.55rem 0.85rem;
+   border: 1px solid var(--color-border);
+   border-radius: 12px;
+   background: var(--color-surface);
+   color: var(--color-text);
+   font-size: 0.9rem;
+   font-weight: 750;
+   line-height: 1.2;
+   cursor: pointer;
+   white-space: nowrap;
+ }
+
+ .refreshInfoBtn:hover:not(:disabled) {
+   border-color: color-mix(in srgb, var(--color-primary, #111827) 28%, var(--color-border));
+   background: color-mix(in srgb, var(--color-primary, #111827) 5%, var(--color-surface));
+ }
+
+ .refreshInfoBtn:focus-visible {
+   outline: 2px solid var(--color-primary, #111827);
+   outline-offset: 2px;
+ }
+
+ .refreshInfoBtn:disabled {
+   opacity: 0.6;
+   cursor: not-allowed;
  }
  
  .ghostBtn {
@@ -1010,7 +1060,23 @@
    cursor: pointer;
    color: var(--color-text-secondary);
  }
- 
+
+ .refreshIconSpinning {
+   animation: productsRefreshSpin 0.85s linear infinite;
+ }
+
+ @media (prefers-reduced-motion: reduce) {
+   .refreshIconSpinning {
+     animation: none;
+   }
+ }
+
+ @keyframes productsRefreshSpin {
+   to {
+     transform: rotate(360deg);
+   }
+ }
+
  .nowrap { white-space: nowrap; }
  
  .muted { color: var(--color-text-secondary); }
@@ -2219,7 +2285,21 @@
 
   .headerActions .primaryBtn {
     width: 100%;
-    min-height: 44px;
+    min-height: 48px;
+    font-size: 1rem;
+  }
+
+  .toolbarRight {
+    flex-wrap: wrap;
+    gap: 0.55rem;
+  }
+
+  .refreshInfoBtn {
+    flex: 1 1 100%;
+    width: 100%;
+    min-height: 48px;
+    font-size: 1rem;
+    justify-content: center;
   }
 
   .title {

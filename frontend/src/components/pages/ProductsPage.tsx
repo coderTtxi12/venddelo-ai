@@ -9,6 +9,7 @@ import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import Popover from '@mui/material/Popover';
 import { legacyDb as db, legacyStorage as storage } from '@/services/legacyDb';
 import { useAuth } from '@/hooks/useAuth';
@@ -823,6 +824,9 @@ export default function ProductsPage() {
     [productFiltersActive, productsFilterCatalogVersion],
   );
 
+  const [productsRefreshing, setProductsRefreshing] = useState(false);
+  const [inventoryAnnounce, setInventoryAnnounce] = useState('');
+
   const handleProductsPageChange = useCallback(
     (page: number) => {
       clearProductSelection();
@@ -834,6 +838,42 @@ export default function ProductsPage() {
     },
     [loadProductsTablePage, usesClientProductPagination],
   );
+
+  const refreshProductsData = useCallback(async () => {
+    if (!supplierId || !accessToken || productsRefreshing) return;
+
+    setProductsRefreshing(true);
+    setProductsError(null);
+    setInventoryAnnounce('Actualizando información…');
+
+    const pageToReload = productsPage;
+    invalidateProductsFilterCatalog();
+    resetProductsPagination();
+    productsLoadRequestRef.current += 1;
+
+    try {
+      if (productFiltersActive) {
+        await loadAllProductsForFilters();
+      } else {
+        await loadProductsTablePage(pageToReload, { force: true });
+      }
+      setInventoryAnnounce('Información actualizada');
+    } catch (err) {
+      console.error(err);
+      setInventoryAnnounce('No se pudo actualizar. Intenta de nuevo.');
+    } finally {
+      setProductsRefreshing(false);
+    }
+  }, [
+    accessToken,
+    invalidateProductsFilterCatalog,
+    loadProductsTablePage,
+    productFiltersActive,
+    productsPage,
+    productsRefreshing,
+    resetProductsPagination,
+    supplierId,
+  ]);
 
   useEffect(() => {
     invalidateProductsFilterCatalog();
@@ -1102,7 +1142,6 @@ export default function ProductsPage() {
     }
   }
 
-  const [inventoryAnnounce, setInventoryAnnounce] = useState('');
   const [visibleColumns, setVisibleColumns] = useState<ProductTableColumnVisibility>(
     DEFAULT_PRODUCT_TABLE_COLUMNS,
   );
@@ -1283,7 +1322,12 @@ export default function ProductsPage() {
               + Nueva categoría
             </button>
           ) : (
-            <button type="button" className={styles.primaryBtn} onClick={openNewProduct} disabled={activeCategories.length === 0}>
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={openNewProduct}
+              disabled={activeCategories.length === 0}
+            >
               + Nuevo producto
             </button>
           )}
@@ -1560,6 +1604,23 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div className={styles.toolbarRight}>
+                  <button
+                    type="button"
+                    className={styles.refreshInfoBtn}
+                    onClick={() => void refreshProductsData()}
+                    disabled={productsRefreshing || productsLoading || !supplierId}
+                    aria-busy={productsRefreshing}
+                    title="Vuelve a cargar la lista de productos, precios y piezas disponibles"
+                  >
+                    <RefreshOutlinedIcon
+                      className={productsRefreshing ? styles.refreshIconSpinning : undefined}
+                      sx={{ fontSize: 18 }}
+                      aria-hidden
+                    />
+                    <span>
+                      {productsRefreshing ? 'Actualizando…' : 'Actualizar información'}
+                    </span>
+                  </button>
                   <ProductsTableColumnsMenu
                     visibility={visibleColumns}
                     onChange={handleVisibleColumnsChange}
