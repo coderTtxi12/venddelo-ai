@@ -1,7 +1,7 @@
 # Switch de pausa en /promociones y /cupones
 
 **Fecha:** 2026-09-05  
-**Estado:** Pendiente de review del usuario  
+**Estado:** Approved  
 **Idioma UI:** español
 
 ## Objetivo
