@@ -14,6 +14,13 @@ export type CartAvailabilityIssue =
       productName: string;
       groupTitle: string;
       itemLabel: string;
+    }
+  | {
+      kind: 'stock';
+      lineId: string;
+      productName: string;
+      available: number;
+      requested: number;
     };
 
 function findOptionItem(
@@ -49,12 +56,63 @@ export function groupCartAvailabilityIssuesByLine(
   return byLine;
 }
 
+/**
+ * Stock shortfalls when live inventory is on (public menu exposes inventory_qty)
+ * and the product tracks qty. Aggregates quantity across lines of the same product.
+ */
+export function validateCartStock(
+  lines: PublicMenuCartLine[],
+  productsById: ReadonlyMap<string, Product>,
+  skipLineIds?: ReadonlySet<string>,
+): CartAvailabilityIssue[] {
+  const requestedByProduct = new Map<
+    string,
+    { productName: string; total: number; lineIds: string[] }
+  >();
+
+  for (const line of lines) {
+    if (skipLineIds?.has(line.id)) continue;
+    const product = productsById.get(line.productId);
+    if (!product || product.inventory_qty == null) continue;
+
+    const current = requestedByProduct.get(line.productId) ?? {
+      productName: product.name || line.productName,
+      total: 0,
+      lineIds: [],
+    };
+    current.total += Math.max(0, line.quantity);
+    current.lineIds.push(line.id);
+    current.productName = product.name || line.productName;
+    requestedByProduct.set(line.productId, current);
+  }
+
+  const issues: CartAvailabilityIssue[] = [];
+  for (const [productId, entry] of requestedByProduct) {
+    const product = productsById.get(productId);
+    if (!product || product.inventory_qty == null) continue;
+    if (entry.total <= product.inventory_qty) continue;
+
+    for (const lineId of entry.lineIds) {
+      issues.push({
+        kind: 'stock',
+        lineId,
+        productName: entry.productName,
+        available: product.inventory_qty,
+        requested: entry.total,
+      });
+    }
+  }
+
+  return issues;
+}
+
 export function validateCartAvailability(
   lines: PublicMenuCartLine[],
   productsById: ReadonlyMap<string, Product>,
   validProductIds?: ReadonlySet<string>,
 ): CartAvailabilityIssue[] {
   const issues: CartAvailabilityIssue[] = [];
+  const unavailableLineIds = new Set<string>();
 
   for (const line of lines) {
     const product = productsById.get(line.productId);
@@ -64,6 +122,7 @@ export function validateCartAvailability(
       (validProductIds != null && !validProductIds.has(line.productId));
 
     if (productNotOrderable) {
+      unavailableLineIds.add(line.id);
       issues.push({
         kind: 'product',
         lineId: line.id,
@@ -99,6 +158,7 @@ export function validateCartAvailability(
     }
   }
 
+  issues.push(...validateCartStock(lines, productsById, unavailableLineIds));
   return issues;
 }
 
@@ -106,22 +166,45 @@ export function cartAvailabilityIssueMessage(
   issue: CartAvailabilityIssue,
   context: 'line' | 'summary' = 'summary',
 ): string {
+  if (issue.kind === 'stock') {
+    if (issue.available <= 0) {
+      return context === 'line'
+        ? 'Sin stock · Baja la cantidad o quítalo'
+        : `Sin stock de «${issue.productName}»`;
+    }
+    return context === 'line'
+      ? `Solo quedan ${issue.available} · Baja la cantidad`
+      : `Solo quedan ${issue.available} de «${issue.productName}»`;
+  }
+
   if (issue.kind === 'product') {
     return context === 'line'
-      ? 'Ya no disponible · Quítalo'
-      : `Quita «${issue.productName}»`;
+      ? 'Producto agotado · Quítalo'
+      : `Producto agotado: quita «${issue.productName}»`;
   }
 
   if (context === 'line') {
-    return `«${issue.itemLabel}» no disponible · Cambia opciones`;
+    return `«${issue.itemLabel}» agotada · Cambia opciones`;
   }
 
-  return `Cambia «${issue.itemLabel}» en «${issue.productName}»`;
+  return `Opción agotada: cambia «${issue.itemLabel}» en «${issue.productName}»`;
 }
 
 export function formatCartAvailabilityMessages(
   issues: CartAvailabilityIssue[],
   context: 'line' | 'summary' = 'summary',
 ): string[] {
-  return issues.map((issue) => cartAvailabilityIssueMessage(issue, context));
+  const messages: string[] = [];
+  const seen = new Set<string>();
+
+  for (const issue of issues) {
+    const message = cartAvailabilityIssueMessage(issue, context);
+    if (context === 'summary') {
+      if (seen.has(message)) continue;
+      seen.add(message);
+    }
+    messages.push(message);
+  }
+
+  return messages;
 }
