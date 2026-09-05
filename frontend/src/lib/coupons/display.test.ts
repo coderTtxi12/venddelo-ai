@@ -19,6 +19,6 @@ test('coupon labels', () => {
   assert.equal(couponStockLabel(0, null), 'Ilimitado');
   assert.equal(couponStatusLabel('sold_out'), 'Agotado');
   assert.equal(couponStatusLabel('expired'), 'Expirado');
-  assert.equal(couponStatusLabel('inactive'), 'Inactivo');
+  assert.equal(couponStatusLabel('inactive'), 'Pausada');
   assert.equal(couponStatusLabel('active'), 'Activo');
 });

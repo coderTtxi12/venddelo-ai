@@ -29,7 +29,7 @@ export function couponStockLabel(redeemedCount: number, stockQty: number | null)
 
 export function couponStatusLabel(status: CouponEffectiveStatus): string {
   if (status === 'active') return 'Activo';
-  if (status === 'inactive') return 'Inactivo';
+  if (status === 'inactive') return 'Pausada';
   if (status === 'scheduled') return 'Programado';
   if (status === 'expired') return 'Expirado';
   return 'Agotado';

@@ -15,7 +15,7 @@ export const COUPON_STATUS_FILTER_LABELS: Record<CouponStatusFilter, string> = {
   all: 'Todos',
   active: 'Activos',
   scheduled: 'Programados',
-  inactive: 'Inactivos',
+  inactive: 'Pausados',
   expired: 'Expirados',
   sold_out: 'Agotados',
 };
