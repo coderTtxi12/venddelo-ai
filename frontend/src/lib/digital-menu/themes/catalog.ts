@@ -1,4 +1,6 @@
 import type { DigitalMenuTheme, DigitalMenuThemeColors } from './types';
+import { ESSENTIALS_DIGITAL_MENU_THEMES } from './catalogEssentials';
+import { SOFT_COLOR_DIGITAL_MENU_THEMES } from './catalogSoftColor';
 import { EXTENDED_DIGITAL_MENU_THEMES } from './catalogExtended';
 import { EXTENDED_DIGITAL_MENU_THEMES_2 } from './catalogExtended2';
 import { FESTIVIDADES_MX_THEMES } from './catalogFestividades';
@@ -761,6 +763,8 @@ export const DIGITAL_MENU_THEMES: DigitalMenuTheme[] = [
       productThumbBg: '#FFEDD5',
     }),
   },
+  ...ESSENTIALS_DIGITAL_MENU_THEMES,
+  ...SOFT_COLOR_DIGITAL_MENU_THEMES,
   ...EXTENDED_DIGITAL_MENU_THEMES,
   ...EXTENDED_DIGITAL_MENU_THEMES_2,
   ...DARK_DIGITAL_MENU_THEMES,
