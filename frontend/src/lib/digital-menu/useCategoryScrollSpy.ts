@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import {
+  DOCUMENT_SCROLL_ROOT,
   getCategoryScrollAnchorPosition,
   resolveActiveCategoryId,
+  type MenuScrollRoot,
 } from './categoryScrollSpy';
 
 type UseCategoryScrollSpyOptions = {
@@ -11,6 +13,8 @@ type UseCategoryScrollSpyOptions = {
   categoryIds: readonly string[];
   sectionRefs: RefObject<Record<string, HTMLElement | null>>;
   scrollRootRef: RefObject<HTMLElement | null>;
+  /** When true, ignore the element and use window/document scroll. */
+  useDocumentScroll?: boolean;
   categoryBarRef?: RefObject<HTMLElement | null>;
   heroCollapsed: boolean;
   pinnedBarHeight: number;
@@ -20,11 +24,20 @@ type UseCategoryScrollSpyOptions = {
   onActiveCategoryChange: (categoryId: string) => void;
 };
 
+function resolveMenuScrollRoot(
+  useDocumentScroll: boolean,
+  scrollRootRef: RefObject<HTMLElement | null>,
+): MenuScrollRoot | null {
+  if (useDocumentScroll) return DOCUMENT_SCROLL_ROOT;
+  return scrollRootRef.current;
+}
+
 export function useCategoryScrollSpy({
   enabled,
   categoryIds,
   sectionRefs,
   scrollRootRef,
+  useDocumentScroll = false,
   categoryBarRef,
   heroCollapsed,
   pinnedBarHeight,
@@ -47,11 +60,14 @@ export function useCategoryScrollSpy({
   const syncActiveCategory = useCallback(() => {
     if (!enabled || Date.now() < scrollLockUntilRef.current) return;
 
-    const root = scrollRootRef.current;
+    const root = resolveMenuScrollRoot(useDocumentScroll, scrollRootRef);
     if (!root) return;
 
     const nearBottom =
-      root.scrollHeight - root.clientHeight - root.scrollTop <= 48;
+      root === DOCUMENT_SCROLL_ROOT
+        ? document.documentElement.scrollHeight - window.innerHeight - window.scrollY <= 48
+        : root.scrollHeight - root.clientHeight - root.scrollTop <= 48;
+
     if (nearBottom && categoryIds.length > 0) {
       const lastId = categoryIds[categoryIds.length - 1];
       if (lastId !== activeCategoryRef.current) {
@@ -87,6 +103,7 @@ export function useCategoryScrollSpy({
     categoryIds,
     sectionRefs,
     scrollRootRef,
+    useDocumentScroll,
     categoryBarRef,
     heroCollapsed,
     pinnedBarHeight,
@@ -105,19 +122,30 @@ export function useCategoryScrollSpy({
   useEffect(() => {
     if (!enabled) return;
 
-    let attachedRoot: HTMLElement | null = null;
+    let attachedElement: HTMLElement | null = null;
+    let attachedWindow = false;
     let waitFrame: number | null = null;
 
-    const attach = (root: HTMLElement) => {
-      attachedRoot = root;
+    const attachElement = (root: HTMLElement) => {
+      attachedElement = root;
       root.addEventListener('scroll', handleScroll, { passive: true });
       syncActiveCategory();
     };
 
+    const attachWindow = () => {
+      attachedWindow = true;
+      window.addEventListener('scroll', handleScroll, { passive: true });
+      syncActiveCategory();
+    };
+
     const tryAttach = () => {
+      if (useDocumentScroll) {
+        attachWindow();
+        return;
+      }
       const root = scrollRootRef.current;
       if (root) {
-        attach(root);
+        attachElement(root);
         return;
       }
       waitFrame = requestAnimationFrame(tryAttach);
@@ -127,12 +155,15 @@ export function useCategoryScrollSpy({
 
     return () => {
       if (waitFrame != null) cancelAnimationFrame(waitFrame);
-      if (attachedRoot) {
-        attachedRoot.removeEventListener('scroll', handleScroll);
+      if (attachedElement) {
+        attachedElement.removeEventListener('scroll', handleScroll);
+      }
+      if (attachedWindow) {
+        window.removeEventListener('scroll', handleScroll);
       }
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
-  }, [enabled, handleScroll, syncActiveCategory, scrollRootRef]);
+  }, [enabled, handleScroll, syncActiveCategory, scrollRootRef, useDocumentScroll]);
 
   useEffect(() => {
     if (enabled) syncActiveCategory();
