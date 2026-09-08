@@ -1,8 +1,13 @@
 export type CheckoutOrderRef = {
   /** Short human-readable id shown in WhatsApp and /orders (e.g. K7M2P). */
   orderId: string;
-  /** Full idempotency key for the background API save. */
+  /** Full idempotency key for the API save. Reused on retries of the same attempt. */
   idempotencyKey: string;
+};
+
+export type PendingCheckoutOrderRef = {
+  fingerprint: string;
+  ref: CheckoutOrderRef;
 };
 
 /** Same unambiguous alphabet as delivery dispatch short ids. */
@@ -31,6 +36,17 @@ export function createCheckoutOrderRef(): CheckoutOrderRef {
       : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
   return { orderId: generateCheckoutOrderId(), idempotencyKey };
+}
+
+/** Keep the same order id + Idempotency-Key until the cart/fulfillment changes. */
+export function resolveCheckoutOrderRef(
+  fingerprint: string,
+  pending: PendingCheckoutOrderRef | null,
+): PendingCheckoutOrderRef {
+  if (pending && pending.fingerprint === fingerprint) {
+    return pending;
+  }
+  return { fingerprint, ref: createCheckoutOrderRef() };
 }
 
 export function formatCheckoutOrderIdLabel(orderId: string): string {
