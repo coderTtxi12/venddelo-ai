@@ -332,15 +332,3 @@ export function buildWhatsAppOrderUrl(phone: string, message: string): string {
   const digits = whatsappPhoneDigits(phone);
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
-
-/** Opens WhatsApp in a new tab without navigating the current page. */
-export function openWhatsAppOrder(phone: string, message: string): void {
-  const url = buildWhatsAppOrderUrl(phone, message);
-  const link = document.createElement('a');
-  link.href = url;
-  link.target = '_blank';
-  link.rel = 'noopener noreferrer';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-}
