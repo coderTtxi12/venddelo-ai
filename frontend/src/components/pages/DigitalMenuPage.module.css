@@ -105,6 +105,30 @@
   height: auto;
 }
 
+/* Live public menu (mobile): document scroll so browser chrome can collapse */
+.phone.publicRoot.publicLiveRoot {
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+}
+
+.phone.publicRoot.publicLiveRoot > .phoneScroll {
+  flex: 1 1 auto;
+  min-height: auto;
+  height: auto;
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+
+.phone.publicRoot.publicLiveRoot .compactHeader {
+  /* Fixed (not sticky): sticky kept the invisible 48px bar in flow and left a white gap above the cover. */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+}
+
 .restaurantNameStatic {
   margin: 0;
   font-family: var(--dm-font-heading, inherit);
