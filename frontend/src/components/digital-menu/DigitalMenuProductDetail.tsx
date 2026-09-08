@@ -26,6 +26,10 @@ import {
 } from '@/lib/promotions/bundlePromoEligibility';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import {
+  DOCUMENT_SCROLL_ROOT,
+  getObserverRoot,
+} from '@/lib/digital-menu/categoryScrollSpy';
+import {
   activeOptionGroups,
   displayOptionGroups,
   OPTION_ITEM_SOLD_OUT_LABEL,
@@ -77,6 +81,8 @@ type DigitalMenuProductDetailProps = {
   heroCollapsed: boolean;
   onHeroCollapsedChange: (collapsed: boolean) => void;
   scrollRootRef: RefObject<HTMLDivElement | null>;
+  /** When true, hero IntersectionObserver uses the viewport (document scroll). */
+  useDocumentScroll?: boolean;
   onBack: () => void;
   onAddToCart?: (payload: AddToCartPayload) => void;
   hideHeroBackButton?: boolean;
@@ -155,6 +161,7 @@ export function DigitalMenuProductDetail({
   heroCollapsed,
   onHeroCollapsedChange,
   scrollRootRef,
+  useDocumentScroll = false,
   onBack,
   onAddToCart,
   hideHeroBackButton = false,
@@ -252,9 +259,13 @@ export function DigitalMenuProductDetail({
   }, [product.id, onHeroCollapsedChange]);
 
   useEffect(() => {
-    const root = scrollRootRef.current;
     const sentinel = heroSentinelRef.current;
-    if (!root || !sentinel) return;
+    if (!sentinel) return;
+
+    const root = useDocumentScroll
+      ? getObserverRoot(DOCUMENT_SCROLL_ROOT)
+      : scrollRootRef.current;
+    if (!useDocumentScroll && !root) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -269,7 +280,7 @@ export function DigitalMenuProductDetail({
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [product.id, scrollRootRef, onHeroCollapsedChange]);
+  }, [product.id, scrollRootRef, useDocumentScroll, onHeroCollapsedChange]);
 
   const handleGroupDrop = (targetGroupId: string) => {
     if (!canReorder || !onReorderGroups || !dragGroupId || dragGroupId === targetGroupId) return;

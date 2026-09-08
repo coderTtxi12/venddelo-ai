@@ -11,6 +11,10 @@ import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
 import { PromotionCountdown } from '@/components/digital-menu/PromotionCountdown';
 import { DIGITAL_MENU_PINNED_BAR_HEIGHT_PX } from '@/lib/digital-menu/layout';
+import {
+  DOCUMENT_SCROLL_ROOT,
+  getObserverRoot,
+} from '@/lib/digital-menu/categoryScrollSpy';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import detailStyles from './DigitalMenuProductDetail.module.css';
 import styles from './PromotionShortcutProductsView.module.css';
@@ -25,6 +29,8 @@ type PromotionShortcutProductsViewProps = {
   heroCollapsed: boolean;
   onHeroCollapsedChange: (collapsed: boolean) => void;
   scrollRootRef: RefObject<HTMLDivElement | null>;
+  /** When true, hero IntersectionObserver uses the viewport (document scroll). */
+  useDocumentScroll?: boolean;
   onProductClick: (productId: string) => void;
   onBack: () => void;
   hideHeroBackButton?: boolean;
@@ -41,6 +47,7 @@ export function PromotionShortcutProductsView({
   heroCollapsed,
   onHeroCollapsedChange,
   scrollRootRef,
+  useDocumentScroll = false,
   onProductClick,
   onBack,
   hideHeroBackButton = false,
@@ -55,9 +62,13 @@ export function PromotionShortcutProductsView({
   }, [promotion.id, onHeroCollapsedChange]);
 
   useEffect(() => {
-    const root = scrollRootRef.current;
     const sentinel = heroSentinelRef.current;
-    if (!root || !sentinel) return;
+    if (!sentinel) return;
+
+    const root = useDocumentScroll
+      ? getObserverRoot(DOCUMENT_SCROLL_ROOT)
+      : scrollRootRef.current;
+    if (!useDocumentScroll && !root) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -72,7 +83,7 @@ export function PromotionShortcutProductsView({
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [promotion.id, scrollRootRef, onHeroCollapsedChange]);
+  }, [promotion.id, scrollRootRef, useDocumentScroll, onHeroCollapsedChange]);
 
   return (
     <div className={`${detailStyles.detailRoot} ${isTabletLayout ? menuStyles.publicTablet : ''}`}>
