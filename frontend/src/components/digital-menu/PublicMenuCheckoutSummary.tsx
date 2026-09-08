@@ -20,14 +20,21 @@ import {
 } from '@/lib/digital-menu/cart/freshMenuAvailability';
 import { formatCartAvailabilityMessages } from '@/lib/digital-menu/cart/validateCartAvailability';
 import { buildPublicOrderInput } from '@/lib/digital-menu/checkout/buildPublicOrderInput';
-import { createCheckoutOrderRef } from '@/lib/digital-menu/checkout/createCheckoutOrderRef';
+import {
+  resolveCheckoutOrderRef,
+  type PendingCheckoutOrderRef,
+} from '@/lib/digital-menu/checkout/createCheckoutOrderRef';
 import {
   customerDeliveryFeeCentsForQuote,
   formatWhatsAppOrderMessage,
-  openWhatsAppOrder,
+  buildWhatsAppOrderUrl,
   whatsappPhoneDigits,
   type WhatsAppRestaurantLocation,
 } from '@/lib/digital-menu/checkout/formatWhatsAppOrderMessage';
+import {
+  beginWhatsAppOrderNavigation,
+  completeWhatsAppOrder,
+} from '@/lib/digital-menu/checkout/openWhatsAppOrder';
 import { buildCheckoutCustomerPhoneE164, formatOrderCustomerPhone } from '@/lib/digital-menu/checkout/customerPhone';
 import {
   isCashDenominationValid,
@@ -40,7 +47,10 @@ import {
 } from '@/lib/digital-menu/checkout/checkoutRestaurantHours';
 import type { CheckoutFulfillment } from '@/lib/digital-menu/checkout/fulfillment';
 import { isCustomerContactComplete } from '@/lib/digital-menu/checkout/fulfillment';
-import { submitPublicOrderBackground } from '@/lib/digital-menu/checkout/submitPublicOrderBackground';
+import {
+  formatCheckoutSaveError,
+  submitCheckoutOrder,
+} from '@/lib/digital-menu/checkout/submitCheckoutOrder';
 import { promoWarningLabel } from '@/lib/promotions/bundlePromoEligibility';
 import {
   listUnmetOrderThresholdHints,
@@ -315,11 +325,15 @@ function SendOrderButton({
         className={styles.sendOrderBtn}
         disabled={disabled || checkingStock}
         aria-busy={checkingStock}
-        aria-label="Enviar pedido por WhatsApp al restaurante"
+        aria-label={
+          checkingStock
+            ? 'Registrando pedido'
+            : 'Enviar pedido por WhatsApp al restaurante'
+        }
         onClick={onSend}
       >
         <WhatsappIcon className={styles.sendOrderIcon} />
-        <span>Enviar pedido</span>
+        <span>{checkingStock ? 'Enviando...' : 'Enviar pedido'}</span>
       </button>
       {sendErrorMessage ? (
         <p className={`${styles.sendOrderHint} ${styles.sendOrderHintBlocked}`} role="alert">
@@ -335,9 +349,13 @@ function SendOrderButton({
             ? 'Ajusta las cantidades en el carrito y vuelve a intentar.'
             : 'Revisa el aviso de arriba y vuelve al carrito para corregirlo.'}
         </p>
+      ) : checkingStock ? (
+        <p className={styles.sendOrderHint} role="status">
+          Registrando tu pedido…
+        </p>
       ) : (
         <p className={styles.sendOrderHint}>
-          Se abrirá WhatsApp con el detalle completo de tu pedido.
+          Se registrará tu pedido y se abrirá WhatsApp.
         </p>
       )}
     </div>
@@ -684,8 +702,10 @@ export function PublicMenuCheckoutSummary({
   const [collapsedLineIds, setCollapsedLineIds] = useState<Set<string>>(() => new Set());
   const [sendAttempted, setSendAttempted] = useState(false);
   const [closedSendMessage, setClosedSendMessage] = useState<string | null>(null);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [stockErrors, setStockErrors] = useState<string[]>([]);
   const [checkingStock, setCheckingStock] = useState(false);
+  const pendingCheckoutRef = useRef<PendingCheckoutOrderRef | null>(null);
   const mobileStockErrorRef = useRef<HTMLDivElement | null>(null);
   const mobileFooterRef = useRef<HTMLElement | null>(null);
   const checkoutRootRef = useRef<HTMLDivElement | null>(null);
@@ -875,29 +895,15 @@ export function PublicMenuCheckoutSummary({
     }
 
     setClosedSendMessage(null);
+    setSaveErrorMessage(null);
     setCheckingStock(true);
 
-    let freshMenu;
-    try {
-      freshMenu = await fetchFreshMenuAvailabilityContext(subdomain);
-    } catch {
-      freshMenu = {
-        products,
-        productsById: new Map(products.map((product) => [product.id, product])),
-        validProductIds: new Set(products.map((product) => product.id)),
-      };
-    }
-
-    const availabilityIssues = validateCartAgainstMenu(lines, freshMenu);
-    if (availabilityIssues.length > 0) {
-      setStockErrors(formatCartAvailabilityMessages(availabilityIssues, 'summary'));
-      setCheckingStock(false);
-      return;
-    }
-
-    setStockErrors([]);
-
-    const { orderId, idempotencyKey } = createCheckoutOrderRef();
+    const fingerprint = JSON.stringify(
+      buildPublicOrderInput(lines, fulfillment, undefined, quote.coupon?.code ?? null),
+    );
+    const pending = resolveCheckoutOrderRef(fingerprint, pendingCheckoutRef.current);
+    pendingCheckoutRef.current = pending;
+    const { orderId, idempotencyKey } = pending.ref;
 
     const message = formatWhatsAppOrderMessage({
       orderId,
@@ -917,11 +923,47 @@ export function PublicMenuCheckoutSummary({
       orderId,
       quote.coupon?.code ?? null,
     );
+    const whatsappNav = beginWhatsAppOrderNavigation(
+      buildWhatsAppOrderUrl(whatsappPhone, message),
+    );
+    let saved = false;
+    try {
+      let freshMenu;
+      try {
+        freshMenu = await fetchFreshMenuAvailabilityContext(subdomain);
+      } catch {
+        freshMenu = {
+          products,
+          productsById: new Map(products.map((product) => [product.id, product])),
+          validProductIds: new Set(products.map((product) => product.id)),
+        };
+      }
 
-    submitPublicOrderBackground(subdomain, payload, idempotencyKey);
-    openWhatsAppOrder(whatsappPhone, message);
-    setCheckingStock(false);
-    onOrderSent();
+      const availabilityIssues = validateCartAgainstMenu(lines, freshMenu);
+      if (availabilityIssues.length > 0) {
+        setStockErrors(formatCartAvailabilityMessages(availabilityIssues, 'summary'));
+        return;
+      }
+
+      setStockErrors([]);
+
+      try {
+        await submitCheckoutOrder(subdomain, payload, idempotencyKey);
+      } catch (error) {
+        setSaveErrorMessage(formatCheckoutSaveError(error));
+        return;
+      }
+
+      pendingCheckoutRef.current = null;
+      saved = true;
+      completeWhatsAppOrder(whatsappNav, whatsappPhone, message);
+      onOrderSent();
+    } finally {
+      if (!saved) {
+        whatsappNav.cancel();
+        setCheckingStock(false);
+      }
+    }
   };
 
   return (
@@ -1032,7 +1074,7 @@ export function PublicMenuCheckoutSummary({
               variant="desktop"
               disabled={!whatsappConfigured || lines.length === 0}
               disabledReason={sendDisabledReason}
-              sendErrorMessage={closedSendMessage}
+              sendErrorMessage={closedSendMessage ?? saveErrorMessage}
               stockErrors={stockErrors}
               checkingStock={checkingStock}
               showStockBanner
@@ -1083,7 +1125,7 @@ export function PublicMenuCheckoutSummary({
           variant="mobile"
           disabled={!whatsappConfigured || lines.length === 0}
           disabledReason={sendDisabledReason}
-          sendErrorMessage={closedSendMessage}
+          sendErrorMessage={closedSendMessage ?? saveErrorMessage}
           stockErrors={stockErrors}
           checkingStock={checkingStock}
           showStockBanner={false}
