@@ -23,7 +23,7 @@ AUTH = {"Authorization": "Bearer valid-token"}
 
 @requires_db
 def test_public_live_menu_order_persists_all_details(client, engine):
-    """Mirrors frontend buildPublicOrderInput + submitPublicOrderBackground payload."""
+    """Mirrors frontend buildPublicOrderInput + submitCheckoutOrder payload."""
     me = client.get("/api/v1/users/me", headers=AUTH)
     assert me.status_code == 200
 

@@ -206,7 +206,7 @@ export function quotePublicDelivery(subdomain: string, data: PublicDeliveryQuote
 export function createPublicOrder(
   subdomain: string,
   data: PublicOrderInput,
-  idempotencyKey?: string,
+  idempotencyKey: string,
 ) {
   return apiRequest<{ id: string }>(
     `/public/menu/${encodeURIComponent(subdomain)}/orders`,
