@@ -4,6 +4,7 @@ import { buildDigitalMenuThemeSearchText } from './themeSearch';
 
 export type DigitalMenuThemeGroupId =
   | 'essentials'
+  | 'soft-color'
   | 'cafe-bakery'
   | 'premium'
   | 'casual-street'
@@ -18,7 +19,45 @@ export type DigitalMenuThemeGroup = {
   description: string;
 };
 
-const ESSENTIAL_THEME_IDS = new Set(['original', 'original-verde', 'clasico-rojo']);
+const ESSENTIAL_THEME_IDS = new Set([
+  'original',
+  'original-verde',
+  'clasico-rojo',
+  'white-crimson',
+  'white-violet',
+  'white-navy',
+  'white-emerald',
+  'white-fuchsia',
+  'white-amber',
+  'white-cyan',
+  'white-royal',
+  'white-wine',
+  'white-olive',
+  'white-sunset',
+  'white-ocean',
+  'white-plum',
+  'white-impact',
+  'white-graphite',
+  'white-blush',
+]);
+
+const SOFT_COLOR_THEME_IDS = new Set([
+  'soft-order',
+  'bubble-mint',
+  'peach-soft',
+  'berry-soft',
+  'sky-soft',
+  'citrus-soft',
+  'ink-blue',
+  'forest-clean',
+  'amber-pulse',
+  'slate-indigo',
+  'teal-trust',
+  'editorial-ink',
+  'rose-neutral',
+  'graphite-lime',
+  'copper-modern',
+]);
 
 const CAFE_BAKERY_THEME_IDS = new Set([
   'cafe-artesanal',
@@ -101,7 +140,12 @@ export const DIGITAL_MENU_THEME_GROUPS: DigitalMenuThemeGroup[] = [
   {
     id: 'essentials',
     label: 'Esenciales',
-    description: 'Estilos neutros y versátiles para cualquier restaurante',
+    description: 'Lienzo blanco puro (como Original): solo cambian acentos y tipografía',
+  },
+  {
+    id: 'soft-color',
+    label: 'Soft & color',
+    description: 'Fondos blancos con superficies tintadas, acentos vivos y tipografías expresivas',
   },
   {
     id: 'cafe-bakery',
@@ -142,6 +186,7 @@ export const DIGITAL_MENU_THEME_GROUPS: DigitalMenuThemeGroup[] = [
 
 export function getDigitalMenuThemeGroupId(themeId: string): DigitalMenuThemeGroupId {
   if (ESSENTIAL_THEME_IDS.has(themeId)) return 'essentials';
+  if (SOFT_COLOR_THEME_IDS.has(themeId)) return 'soft-color';
   if (CAFE_BAKERY_THEME_IDS.has(themeId)) return 'cafe-bakery';
   if (PREMIUM_THEME_IDS.has(themeId)) return 'premium';
   if (CASUAL_STREET_THEME_IDS.has(themeId)) return 'casual-street';
@@ -157,6 +202,7 @@ export function groupDigitalMenuThemes(
 ): Record<DigitalMenuThemeGroupId, DigitalMenuTheme[]> {
   const grouped: Record<DigitalMenuThemeGroupId, DigitalMenuTheme[]> = {
     essentials: [],
+    'soft-color': [],
     'cafe-bakery': [],
     premium: [],
     'casual-street': [],
