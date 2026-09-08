@@ -58,7 +58,14 @@ import {
   filterPublicMenuProducts,
 } from '@/lib/digital-menu/orderableProducts';
 import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
-import { scrollCategoryTabIntoView, getCategoryScrollAnchorPosition, getSectionOffsetTop } from '@/lib/digital-menu/categoryScrollSpy';
+import {
+  DOCUMENT_SCROLL_ROOT,
+  getCategoryScrollAnchorPosition,
+  getObserverRoot,
+  getSectionOffsetTop,
+  scrollCategoryTabIntoView,
+  scrollMenuTo,
+} from '@/lib/digital-menu/categoryScrollSpy';
 import { cartSubtotalCents as sumCartSubtotalCents } from '@/lib/digital-menu/cart/cartMath';
 import { usePublicMenuCart } from '@/lib/digital-menu/cart/usePublicMenuCart';
 import { useCategoryScrollSpy } from '@/lib/digital-menu/useCategoryScrollSpy';
@@ -395,6 +402,7 @@ export default function PublicDigitalMenuPage({
     categoryIds,
     sectionRefs,
     scrollRootRef: mobileScrollRef,
+    useDocumentScroll: true,
     categoryBarRef,
     heroCollapsed,
     pinnedBarHeight: PINNED_BAR_HEIGHT,
@@ -429,7 +437,7 @@ export default function PublicDigitalMenuPage({
       else lockMobileScrollSpy();
 
       const section = sectionRefs.current[categoryId];
-      const root = isDesktopLayout ? desktopScrollRef.current : mobileScrollRef.current;
+      const root = isDesktopLayout ? desktopScrollRef.current : DOCUMENT_SCROLL_ROOT;
       if (!section || !root) return;
 
       const categoryBarHeight = categoryBarRef.current?.offsetHeight ?? 52;
@@ -439,11 +447,12 @@ export default function PublicDigitalMenuPage({
         pinnedBarHeight: PINNED_BAR_HEIGHT,
         categoryBarHeight: isDesktopLayout ? 88 : categoryBarHeight,
       });
-      const anchorOffsetFromTop = anchorPosition - root.scrollTop;
+      const scrollTop = root === DOCUMENT_SCROLL_ROOT ? window.scrollY : root.scrollTop;
       const sectionTop = getSectionOffsetTop(section, root);
+      const offsetFromTop = anchorPosition - scrollTop;
 
-      root.scrollTo({
-        top: Math.max(0, sectionTop - anchorOffsetFromTop),
+      scrollMenuTo(root, {
+        top: Math.max(0, sectionTop - offsetFromTop),
         behavior: 'smooth',
       });
     },
@@ -487,30 +496,41 @@ export default function PublicDigitalMenuPage({
     if (mobileScrollRafRef.current != null) return;
     mobileScrollRafRef.current = requestAnimationFrame(() => {
       mobileScrollRafRef.current = null;
-      const el = mobileScrollRef.current;
-      if (!el) return;
-      setScrollY(el.scrollTop);
+      setScrollY(window.scrollY);
     });
   }, []);
 
   useEffect(() => {
+    if (isDesktopLayout) return;
+    window.addEventListener('scroll', handleMobileScroll, { passive: true });
+    handleMobileScroll();
+    return () => {
+      window.removeEventListener('scroll', handleMobileScroll);
+      if (mobileScrollRafRef.current != null) {
+        cancelAnimationFrame(mobileScrollRafRef.current);
+        mobileScrollRafRef.current = null;
+      }
+    };
+  }, [handleMobileScroll, isDesktopLayout]);
+
+  useEffect(() => {
     setHeroCollapsed(false);
     setScrollY(0);
-    if (mobileScrollRef.current) mobileScrollRef.current.scrollTop = 0;
+    scrollMenuTo(DOCUMENT_SCROLL_ROOT, { top: 0 });
     if (desktopScrollRef.current) desktopScrollRef.current.scrollTop = 0;
   }, [restaurant?.subdomain]);
 
   useEffect(() => {
-    const root = mobileScrollRef.current;
+    if (isDesktopLayout || selectedProductId || selectedPromotionId || showCart) return;
     const sentinel = heroSentinelRef.current;
-    if (!root || !sentinel || selectedProductId || selectedPromotionId || showCart) return;
+    if (!sentinel) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         setHeroCollapsed(!entry.isIntersecting);
       },
       {
-        root,
+        root: getObserverRoot(DOCUMENT_SCROLL_ROOT),
         threshold: 0,
         rootMargin: `-${PINNED_BAR_HEIGHT}px 0px 0px 0px`,
       },
@@ -518,7 +538,7 @@ export default function PublicDigitalMenuPage({
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [restaurant?.subdomain, loading, selectedProductId, selectedPromotionId, showCart]);
+  }, [restaurant?.subdomain, loading, selectedProductId, selectedPromotionId, showCart, isDesktopLayout]);
 
   useEffect(() => {
     if (isDesktopLayout || !activeCategoryId) return;
@@ -585,7 +605,7 @@ export default function PublicDigitalMenuPage({
       setSelectedPromotionId(null);
       setSelectedProductId(productId);
       setProductHeroCollapsed(false);
-      mobileScrollRef.current?.scrollTo({ top: 0 });
+      scrollMenuTo(DOCUMENT_SCROLL_ROOT, { top: 0 });
       desktopScrollRef.current?.scrollTo({ top: 0 });
     },
     [categoryIds, isDesktopLayout, products],
@@ -603,7 +623,7 @@ export default function PublicDigitalMenuPage({
     setProductHeroCollapsed(false);
     setPromotionHeroCollapsed(false);
     setSelectedPromotionId(promotionId);
-    mobileScrollRef.current?.scrollTo({ top: 0 });
+    scrollMenuTo(DOCUMENT_SCROLL_ROOT, { top: 0 });
     desktopScrollRef.current?.scrollTo({ top: 0 });
   }, []);
 
@@ -617,7 +637,7 @@ export default function PublicDigitalMenuPage({
     setSelectedPromotionId(null);
     setProductHeroCollapsed(false);
     setShowCart(true);
-    mobileScrollRef.current?.scrollTo({ top: 0 });
+    scrollMenuTo(DOCUMENT_SCROLL_ROOT, { top: 0 });
     desktopScrollRef.current?.scrollTo({ top: 0 });
   }, []);
 
@@ -709,7 +729,7 @@ export default function PublicDigitalMenuPage({
       {!isDesktopLayout ? (
         <div className={styles.mobileLayout}>
         <div
-          className={`${menuStyles.phone} ${menuStyles.publicRoot} ${styles.mobileFrame} ${
+          className={`${menuStyles.phone} ${menuStyles.publicRoot} ${menuStyles.publicLiveRoot} ${styles.mobileFrame} ${
             isTabletLayout ? menuStyles.publicTablet : ''
           }`}
           data-cat-tabs={menuTheme.style.categoryTabStyle}
@@ -806,7 +826,6 @@ export default function PublicDigitalMenuPage({
             className={`${menuStyles.phoneScroll} ${styles.mobileScroll} ${
               selectedProduct || selectedPromotion || showCart ? menuStyles.phoneScrollDetail : ''
             } ${showCart ? styles.mobileScrollCart : ''}`}
-            onScroll={selectedProduct || selectedPromotion || showCart ? undefined : handleMobileScroll}
           >
             {showCart ? (
               <PublicMenuCart
@@ -843,6 +862,7 @@ export default function PublicDigitalMenuPage({
                 heroCollapsed={promotionHeroCollapsed}
                 onHeroCollapsedChange={setPromotionHeroCollapsed}
                 scrollRootRef={mobileScrollRef}
+                useDocumentScroll
                 onProductClick={openProduct}
                 onBack={closePromotion}
                 hideHeroBackButton
@@ -860,6 +880,7 @@ export default function PublicDigitalMenuPage({
                 heroCollapsed={productHeroCollapsed}
                 onHeroCollapsedChange={setProductHeroCollapsed}
                 scrollRootRef={mobileScrollRef}
+                useDocumentScroll
                 onBack={closeProduct}
                 onAddToCart={handleAddToCart}
                 hideHeroBackButton
