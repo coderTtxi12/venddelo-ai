@@ -744,6 +744,1662 @@
     "sort_order": 13
   },
   {
+    "id": "white-crimson",
+    "label": "Crimson",
+    "description": "Lienzo blanco puro con rojo apetitoso. Solo cambia el acento.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Comida casera",
+      "Delivery"
+    ],
+    "recommendation": "Cuando quieres el look limpio del Original con un acento rojo clásico de restaurante.",
+    "style_keywords": [
+      "white",
+      "crimson",
+      "clean",
+      "accent only"
+    ],
+    "colors": {
+      "primary": "#DC2626",
+      "secondary": "#F87171",
+      "accent": "#DC2626",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#DC2626",
+      "categoryIndicator": "#DC2626",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#DC2626",
+      "discountBadgeBg": "#FEF2F2",
+      "discountBadgeText": "#DC2626",
+      "coverPlaceholderFrom": "#FCA5A5",
+      "coverPlaceholderTo": "#DC2626",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "\"Plus Jakarta Sans\", system-ui, sans-serif",
+      "body_font": "\"Plus Jakarta Sans\", system-ui, sans-serif",
+      "heading_weight": 800,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap",
+      "mood": "clean, professional, appetizing, white canvas"
+    },
+    "is_active": true,
+    "sort_order": 14
+  },
+  {
+    "id": "white-violet",
+    "label": "Violet",
+    "description": "Blanco puro + violeta moderno con Nunito Black redondeada.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Marcas young",
+      "Delivery"
+    ],
+    "recommendation": "Marcas contemporáneas que quieren un acento distintivo sobre el mismo blanco limpio.",
+    "style_keywords": [
+      "white",
+      "violet",
+      "soft bold",
+      "clean"
+    ],
+    "colors": {
+      "primary": "#7C3AED",
+      "secondary": "#A78BFA",
+      "accent": "#8B5CF6",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#7C3AED",
+      "categoryIndicator": "#7C3AED",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#7C3AED",
+      "discountBadgeBg": "#F5F3FF",
+      "discountBadgeText": "#6D28D9",
+      "coverPlaceholderFrom": "#C4B5FD",
+      "coverPlaceholderTo": "#7C3AED",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "Nunito, system-ui, sans-serif",
+      "body_font": "\"DM Sans\", system-ui, sans-serif",
+      "heading_weight": 900,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Nunito:ital,wght@0,700;0,800;0,900;1,700&display=swap",
+      "mood": "soft, bold, violet, white canvas"
+    },
+    "is_active": true,
+    "sort_order": 15
+  },
+  {
+    "id": "white-navy",
+    "label": "Navy",
+    "description": "Blanco puro + navy confiable con Outfit geométrico.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Delivery",
+      "Cadenas"
+    ],
+    "recommendation": "Restaurantes o dark kitchens que priorizan claridad y un azul serio sobre blanco.",
+    "style_keywords": [
+      "white",
+      "navy",
+      "trust",
+      "clean"
+    ],
+    "colors": {
+      "primary": "#1E40AF",
+      "secondary": "#60A5FA",
+      "accent": "#2563EB",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#1E40AF",
+      "categoryIndicator": "#2563EB",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#1E40AF",
+      "discountBadgeBg": "#EFF6FF",
+      "discountBadgeText": "#1D4ED8",
+      "coverPlaceholderFrom": "#93C5FD",
+      "coverPlaceholderTo": "#1E40AF",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "Outfit, system-ui, sans-serif",
+      "body_font": "\"Work Sans\", system-ui, sans-serif",
+      "heading_weight": 700,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&display=swap",
+      "mood": "trust, navy, geometric, clean"
+    },
+    "is_active": true,
+    "sort_order": 16
+  },
+  {
+    "id": "white-emerald",
+    "label": "Emerald",
+    "description": "Blanco puro + esmeralda fresca. Como Original Verde, con tipografía propia.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Fresh",
+      "Delivery"
+    ],
+    "recommendation": "Quien quiere el feel delivery-green sobre el mismo blanco del Original, con tipografía más definida.",
+    "style_keywords": [
+      "white",
+      "emerald",
+      "fresh",
+      "clean"
+    ],
+    "colors": {
+      "primary": "#059669",
+      "secondary": "#34D399",
+      "accent": "#10B981",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#059669",
+      "categoryIndicator": "#10B981",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#059669",
+      "discountBadgeBg": "#ECFDF5",
+      "discountBadgeText": "#047857",
+      "coverPlaceholderFrom": "#6EE7B7",
+      "coverPlaceholderTo": "#059669",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "Poppins, system-ui, sans-serif",
+      "body_font": "\"Open Sans\", system-ui, sans-serif",
+      "heading_weight": 600,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap",
+      "mood": "fresh, clean, emerald, professional"
+    },
+    "is_active": true,
+    "sort_order": 17
+  },
+  {
+    "id": "white-fuchsia",
+    "label": "Fuchsia",
+    "description": "Blanco puro + fucsia con Fredoka soft. Alegre sin teñir el fondo.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Casual",
+      "Marcas young"
+    ],
+    "recommendation": "Marcas con tono divertido que aun así quieren el menú sobre blanco limpio.",
+    "style_keywords": [
+      "white",
+      "fuchsia",
+      "soft",
+      "playful"
+    ],
+    "colors": {
+      "primary": "#DB2777",
+      "secondary": "#F472B6",
+      "accent": "#EC4899",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#DB2777",
+      "categoryIndicator": "#EC4899",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#DB2777",
+      "discountBadgeBg": "#FDF2F8",
+      "discountBadgeText": "#BE185D",
+      "coverPlaceholderFrom": "#F9A8D4",
+      "coverPlaceholderTo": "#DB2777",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "Fredoka, system-ui, sans-serif",
+      "body_font": "Nunito, system-ui, sans-serif",
+      "heading_weight": 600,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@300;400;500;600;700&display=swap",
+      "mood": "playful, soft, fuchsia, white canvas"
+    },
+    "is_active": true,
+    "sort_order": 18
+  },
+  {
+    "id": "white-amber",
+    "label": "Amber",
+    "description": "Blanco puro + ámbar apetitoso con Varela Round.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Delivery",
+      "Fast casual"
+    ],
+    "recommendation": "Menús delivery/fast casual que quieren naranja-ámbar sobre el mismo blanco del Original.",
+    "style_keywords": [
+      "white",
+      "amber",
+      "soft",
+      "appetite"
+    ],
+    "colors": {
+      "primary": "#D97706",
+      "secondary": "#FBBF24",
+      "accent": "#F59E0B",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#D97706",
+      "categoryIndicator": "#F59E0B",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#D97706",
+      "discountBadgeBg": "#FFFBEB",
+      "discountBadgeText": "#B45309",
+      "coverPlaceholderFrom": "#FCD34D",
+      "coverPlaceholderTo": "#D97706",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "\"Varela Round\", system-ui, sans-serif",
+      "body_font": "\"Nunito Sans\", system-ui, sans-serif",
+      "heading_weight": 400,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;500;600;700&family=Varela+Round&display=swap",
+      "mood": "soft, appetizing, amber, white canvas"
+    },
+    "is_active": true,
+    "sort_order": 19
+  },
+  {
+    "id": "white-cyan",
+    "label": "Cyan",
+    "description": "Blanco puro + cian fresco con Baloo 2 soft.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Familiar",
+      "Pedidos móviles"
+    ],
+    "recommendation": "Marcas claras y positivas que quieren un acento frío sobre blanco total.",
+    "style_keywords": [
+      "white",
+      "cyan",
+      "soft",
+      "fresh"
+    ],
+    "colors": {
+      "primary": "#0891B2",
+      "secondary": "#22D3EE",
+      "accent": "#06B6D4",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#0891B2",
+      "categoryIndicator": "#06B6D4",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#0891B2",
+      "discountBadgeBg": "#ECFEFF",
+      "discountBadgeText": "#0E7490",
+      "coverPlaceholderFrom": "#67E8F9",
+      "coverPlaceholderTo": "#0891B2",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "\"Baloo 2\", system-ui, sans-serif",
+      "body_font": "Quicksand, system-ui, sans-serif",
+      "heading_weight": 700,
+      "body_weight": 500,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&display=swap",
+      "mood": "soft, cyan, friendly, white canvas"
+    },
+    "is_active": true,
+    "sort_order": 20
+  },
+  {
+    "id": "white-royal",
+    "label": "Royal",
+    "description": "Blanco puro + índigo royal con Plus Jakarta.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Premium casual",
+      "Marca moderna"
+    ],
+    "recommendation": "Marcas modernas que quieren un acento frío elegante sin fondos de color.",
+    "style_keywords": [
+      "white",
+      "royal",
+      "indigo",
+      "clean"
+    ],
+    "colors": {
+      "primary": "#4338CA",
+      "secondary": "#818CF8",
+      "accent": "#4F46E5",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#4338CA",
+      "categoryIndicator": "#4F46E5",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#4338CA",
+      "discountBadgeBg": "#EEF2FF",
+      "discountBadgeText": "#3730A3",
+      "coverPlaceholderFrom": "#A5B4FC",
+      "coverPlaceholderTo": "#4338CA",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "\"Plus Jakarta Sans\", system-ui, sans-serif",
+      "body_font": "\"Plus Jakarta Sans\", system-ui, sans-serif",
+      "heading_weight": 800,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap",
+      "mood": "modern, royal, clean, professional"
+    },
+    "is_active": true,
+    "sort_order": 21
+  },
+  {
+    "id": "white-wine",
+    "label": "Wine",
+    "description": "Blanco puro + vino editorial con Playfair.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Hospitality",
+      "Menú con carácter"
+    ],
+    "recommendation": "Quien quiere elegancia de carta sobre el mismo blanco limpio del Original.",
+    "style_keywords": [
+      "white",
+      "wine",
+      "editorial",
+      "serif"
+    ],
+    "colors": {
+      "primary": "#9F1239",
+      "secondary": "#FB7185",
+      "accent": "#BE123C",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#9F1239",
+      "categoryIndicator": "#BE123C",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#9F1239",
+      "discountBadgeBg": "#FFF1F2",
+      "discountBadgeText": "#9F1239",
+      "coverPlaceholderFrom": "#FDA4AF",
+      "coverPlaceholderTo": "#9F1239",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "\"Playfair Display\", Georgia, serif",
+      "body_font": "Karla, system-ui, sans-serif",
+      "heading_weight": 700,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Karla:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap",
+      "mood": "editorial, wine, elegant, white canvas"
+    },
+    "is_active": true,
+    "sort_order": 22
+  },
+  {
+    "id": "white-olive",
+    "label": "Olive",
+    "description": "Blanco puro + oliva natural con Manrope.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Fresh",
+      "Casual"
+    ],
+    "recommendation": "Marcas con tono natural/vegetal que quieren acento oliva sobre blanco total.",
+    "style_keywords": [
+      "white",
+      "olive",
+      "natural",
+      "clean"
+    ],
+    "colors": {
+      "primary": "#4D7C0F",
+      "secondary": "#A3E635",
+      "accent": "#65A30D",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#4D7C0F",
+      "categoryIndicator": "#65A30D",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#4D7C0F",
+      "discountBadgeBg": "#F7FEE7",
+      "discountBadgeText": "#3F6212",
+      "coverPlaceholderFrom": "#BEF264",
+      "coverPlaceholderTo": "#4D7C0F",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "Manrope, system-ui, sans-serif",
+      "body_font": "\"Source Sans 3\", system-ui, sans-serif",
+      "heading_weight": 700,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Source+Sans+3:wght@300;400;500;600;700&display=swap",
+      "mood": "natural, olive, modern, white canvas"
+    },
+    "is_active": true,
+    "sort_order": 23
+  },
+  {
+    "id": "white-sunset",
+    "label": "Sunset",
+    "description": "Blanco puro + coral atardecer con Nunito Black.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Delivery",
+      "Casual"
+    ],
+    "recommendation": "Marcas amigables que quieren el look “Start an Order” con acento coral sobre blanco puro.",
+    "style_keywords": [
+      "white",
+      "sunset",
+      "soft bold",
+      "coral"
+    ],
+    "colors": {
+      "primary": "#F43F5E",
+      "secondary": "#FB7185",
+      "accent": "#FB923C",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#F43F5E",
+      "categoryIndicator": "#F43F5E",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#EA580C",
+      "discountBadgeBg": "#FFF1F2",
+      "discountBadgeText": "#E11D48",
+      "coverPlaceholderFrom": "#FDA4AF",
+      "coverPlaceholderTo": "#F43F5E",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "Nunito, system-ui, sans-serif",
+      "body_font": "\"DM Sans\", system-ui, sans-serif",
+      "heading_weight": 900,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Nunito:ital,wght@0,700;0,800;0,900;1,700&display=swap",
+      "mood": "soft bold, sunset, friendly, white canvas"
+    },
+    "is_active": true,
+    "sort_order": 24
+  },
+  {
+    "id": "white-ocean",
+    "label": "Ocean",
+    "description": "Blanco puro + ocean teal con Outfit.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Casual moderno",
+      "Delivery"
+    ],
+    "recommendation": "Alternativa al verde delivery: teal océano sobre el mismo blanco limpio.",
+    "style_keywords": [
+      "white",
+      "ocean",
+      "teal",
+      "clean"
+    ],
+    "colors": {
+      "primary": "#0E7490",
+      "secondary": "#22D3EE",
+      "accent": "#14B8A6",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#0E7490",
+      "categoryIndicator": "#14B8A6",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#0E7490",
+      "discountBadgeBg": "#F0FDFA",
+      "discountBadgeText": "#0F766E",
+      "coverPlaceholderFrom": "#5EEAD4",
+      "coverPlaceholderTo": "#0E7490",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "Outfit, system-ui, sans-serif",
+      "body_font": "\"Work Sans\", system-ui, sans-serif",
+      "heading_weight": 600,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&display=swap",
+      "mood": "ocean, teal, clean, trust"
+    },
+    "is_active": true,
+    "sort_order": 25
+  },
+  {
+    "id": "white-plum",
+    "label": "Plum",
+    "description": "Blanco puro + ciruela con Lora editorial suave.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Casual elegante",
+      "Hospitality"
+    ],
+    "recommendation": "Marcas con tono refinado que quieren un acento ciruela sin fondos tintados.",
+    "style_keywords": [
+      "white",
+      "plum",
+      "serif",
+      "refined"
+    ],
+    "colors": {
+      "primary": "#6B21A8",
+      "secondary": "#C084FC",
+      "accent": "#7E22CE",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#6B21A8",
+      "categoryIndicator": "#7E22CE",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#6B21A8",
+      "discountBadgeBg": "#FAF5FF",
+      "discountBadgeText": "#6B21A8",
+      "coverPlaceholderFrom": "#D8B4FE",
+      "coverPlaceholderTo": "#6B21A8",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "Lora, Georgia, serif",
+      "body_font": "Raleway, system-ui, sans-serif",
+      "heading_weight": 600,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Raleway:wght@300;400;500;600;700&display=swap",
+      "mood": "elegant, plum, soft, white canvas"
+    },
+    "is_active": true,
+    "sort_order": 26
+  },
+  {
+    "id": "white-impact",
+    "label": "Impact",
+    "description": "Blanco puro + negro/rojo con Bebas Neue de impacto.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Bold",
+      "Street casual"
+    ],
+    "recommendation": "Marcas bold que quieren headlines potentes sin abandonar el fondo blanco del Original.",
+    "style_keywords": [
+      "white",
+      "impact",
+      "bold",
+      "display"
+    ],
+    "colors": {
+      "primary": "#111827",
+      "secondary": "#F87171",
+      "accent": "#B91C1C",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#FFFFFF",
+      "categoryIndicator": "#111827",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#B91C1C",
+      "discountBadgeBg": "#FEF2F2",
+      "discountBadgeText": "#B91C1C",
+      "coverPlaceholderFrom": "#CBD5E1",
+      "coverPlaceholderTo": "#64748B",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "\"Bebas Neue\", system-ui, sans-serif",
+      "body_font": "\"Source Sans 3\", system-ui, sans-serif",
+      "heading_weight": 400,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Source+Sans+3:wght@300;400;500;600;700&display=swap",
+      "mood": "bold, impactful, modern, white canvas"
+    },
+    "is_active": true,
+    "sort_order": 27
+  },
+  {
+    "id": "white-graphite",
+    "label": "Graphite+",
+    "description": "Blanco puro + grafito y lima CTA. Alto contraste tipográfico.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Urbano",
+      "Marcas bold"
+    ],
+    "recommendation": "Look urbano de alto contraste sin fondos grises ni tintados — solo blanco y acentos.",
+    "style_keywords": [
+      "white",
+      "graphite",
+      "lime",
+      "contrast"
+    ],
+    "colors": {
+      "primary": "#18181B",
+      "secondary": "#71717A",
+      "accent": "#65A30D",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#FFFFFF",
+      "categoryIndicator": "#18181B",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#65A30D",
+      "discountBadgeBg": "#F7FEE7",
+      "discountBadgeText": "#4D7C0F",
+      "coverPlaceholderFrom": "#A1A1AA",
+      "coverPlaceholderTo": "#3F3F46",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "\"DM Sans\", system-ui, sans-serif",
+      "body_font": "Inter, system-ui, sans-serif",
+      "heading_weight": 700,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap",
+      "mood": "contemporary, contrast, white canvas"
+    },
+    "is_active": true,
+    "sort_order": 28
+  },
+  {
+    "id": "white-blush",
+    "label": "Blush",
+    "description": "Lienzo blanco puro con acento blush pastel #F5BCCD. Suave, limpio y femenino.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Marcas soft",
+      "Casual elegante"
+    ],
+    "recommendation": "Marcas con tono suave o romantic que quieren el blanco limpio del Original con un accent blush preciso.",
+    "style_keywords": [
+      "white",
+      "blush",
+      "pastel pink",
+      "soft",
+      "#F5BCCD"
+    ],
+    "colors": {
+      "primary": "#F5BCCD",
+      "secondary": "#FAD4E0",
+      "accent": "#F5BCCD",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text": "#111827",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#EEF2F7",
+      "categoryActive": "#7A3A52",
+      "categoryIndicator": "#F5BCCD",
+      "price": "#111827",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#C45B7A",
+      "discountBadgeBg": "#FFF0F5",
+      "discountBadgeText": "#9F4D68",
+      "coverPlaceholderFrom": "#FAD4E0",
+      "coverPlaceholderTo": "#F5BCCD",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.28), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.92)",
+      "floatButtonText": "#111827",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F1F5F9",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "Nunito, system-ui, sans-serif",
+      "body_font": "\"DM Sans\", system-ui, sans-serif",
+      "heading_weight": 800,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Nunito:ital,wght@0,700;0,800;0,900;1,700&display=swap",
+      "mood": "soft, blush, pastel, white canvas, friendly"
+    },
+    "is_active": true,
+    "sort_order": 29
+  },
+  {
+    "id": "soft-order",
+    "label": "Soft Order",
+    "description": "Fondo blanco con coral cálido y tipografía Nunito Black redondeada. Sensación friendly tipo “Start an Order”.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Delivery app",
+      "Marcas amigables"
+    ],
+    "recommendation": "Restaurantes generales, dark kitchens y marcas que quieren verse modernas y accesibles sin atarse a una cocina específica.",
+    "style_keywords": [
+      "soft",
+      "rounded",
+      "coral",
+      "white",
+      "bold type"
+    ],
+    "colors": {
+      "primary": "#EA580C",
+      "secondary": "#FB923C",
+      "accent": "#F97316",
+      "background": "#FFFFFF",
+      "surface": "#FFF7ED",
+      "text": "#1C1917",
+      "textMuted": "#78716C",
+      "textSecondary": "#A8A29E",
+      "border": "#FFEDD5",
+      "categoryActive": "#9A3412",
+      "categoryIndicator": "#F97316",
+      "price": "#1C1917",
+      "priceOriginal": "#A8A29E",
+      "priceSale": "#EA580C",
+      "discountBadgeBg": "#FFF7ED",
+      "discountBadgeText": "#C2410C",
+      "coverPlaceholderFrom": "#FDBA74",
+      "coverPlaceholderTo": "#EA580C",
+      "coverScrim": "linear-gradient(to top, rgba(28, 25, 23, 0.32), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#1C1917",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#FFEDD5",
+      "productThumbBg": "#FFF7ED"
+    },
+    "typography": {
+      "heading_font": "Nunito, system-ui, sans-serif",
+      "body_font": "\"DM Sans\", system-ui, sans-serif",
+      "heading_weight": 900,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Nunito:ital,wght@0,700;0,800;0,900;1,700&display=swap",
+      "mood": "soft, rounded, bold, friendly, approachable"
+    },
+    "is_active": true,
+    "sort_order": 30
+  },
+  {
+    "id": "bubble-mint",
+    "label": "Bubble Mint",
+    "description": "Blanco + menta fresca con Fredoka redondeada. Limpio, juguetón y versátil.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Healthy casual",
+      "Pedidos rápidos"
+    ],
+    "recommendation": "Menús generales, bowls, cafés ligeros o cualquier marca que quiera transmitir frescura y facilidad de pedido.",
+    "style_keywords": [
+      "mint",
+      "soft",
+      "rounded",
+      "fresh",
+      "white"
+    ],
+    "colors": {
+      "primary": "#059669",
+      "secondary": "#34D399",
+      "accent": "#10B981",
+      "background": "#FFFFFF",
+      "surface": "#ECFDF5",
+      "text": "#064E3B",
+      "textMuted": "#047857",
+      "textSecondary": "#6B7280",
+      "border": "#D1FAE5",
+      "categoryActive": "#064E3B",
+      "categoryIndicator": "#10B981",
+      "price": "#064E3B",
+      "priceOriginal": "#6B7280",
+      "priceSale": "#059669",
+      "discountBadgeBg": "#ECFDF5",
+      "discountBadgeText": "#047857",
+      "coverPlaceholderFrom": "#6EE7B7",
+      "coverPlaceholderTo": "#059669",
+      "coverScrim": "linear-gradient(to top, rgba(6, 78, 59, 0.32), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#064E3B",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#D1FAE5",
+      "productThumbBg": "#ECFDF5"
+    },
+    "typography": {
+      "heading_font": "Fredoka, system-ui, sans-serif",
+      "body_font": "Nunito, system-ui, sans-serif",
+      "heading_weight": 600,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@300;400;500;600;700&display=swap",
+      "mood": "playful, soft, mint, friendly"
+    },
+    "is_active": true,
+    "sort_order": 31
+  },
+  {
+    "id": "peach-soft",
+    "label": "Peach Soft",
+    "description": "Durazno rosado sobre blanco con Varela Round. Cálido, suave y acogedor.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Brunch casual",
+      "Marcas soft"
+    ],
+    "recommendation": "Restaurantes familiares, brunch, panaderías ligeras o marcas con tono cálido y cercano.",
+    "style_keywords": [
+      "peach",
+      "soft",
+      "warm",
+      "rounded",
+      "white"
+    ],
+    "colors": {
+      "primary": "#E11D48",
+      "secondary": "#FB7185",
+      "accent": "#F43F5E",
+      "background": "#FFFFFF",
+      "surface": "#FFF1F2",
+      "text": "#4C0519",
+      "textMuted": "#9F1239",
+      "textSecondary": "#9F1239",
+      "border": "#FFE4E6",
+      "categoryActive": "#4C0519",
+      "categoryIndicator": "#F43F5E",
+      "price": "#4C0519",
+      "priceOriginal": "#A8A29E",
+      "priceSale": "#E11D48",
+      "discountBadgeBg": "#FFF1F2",
+      "discountBadgeText": "#BE123C",
+      "coverPlaceholderFrom": "#FDA4AF",
+      "coverPlaceholderTo": "#E11D48",
+      "coverScrim": "linear-gradient(to top, rgba(76, 5, 25, 0.3), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#4C0519",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#FFE4E6",
+      "productThumbBg": "#FFF1F2"
+    },
+    "typography": {
+      "heading_font": "\"Varela Round\", system-ui, sans-serif",
+      "body_font": "\"Nunito Sans\", system-ui, sans-serif",
+      "heading_weight": 400,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;500;600;700&family=Varela+Round&display=swap",
+      "mood": "soft, rounded, warm, gentle"
+    },
+    "is_active": true,
+    "sort_order": 32
+  },
+  {
+    "id": "berry-soft",
+    "label": "Berry Soft",
+    "description": "Mora/magenta sobre blanco con Nunito ExtraBold. Moderno y con carácter.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Marcas young",
+      "Delivery"
+    ],
+    "recommendation": "Marcas con personalidad joven, menús mixtos o quien quiera un acento memorable sin salir de Esenciales.",
+    "style_keywords": [
+      "berry",
+      "magenta",
+      "soft bold",
+      "white"
+    ],
+    "colors": {
+      "primary": "#A21CAF",
+      "secondary": "#E879F9",
+      "accent": "#C026D3",
+      "background": "#FFFFFF",
+      "surface": "#FDF4FF",
+      "text": "#4A044E",
+      "textMuted": "#86198F",
+      "textSecondary": "#A855F7",
+      "border": "#FAE8FF",
+      "categoryActive": "#4A044E",
+      "categoryIndicator": "#C026D3",
+      "price": "#4A044E",
+      "priceOriginal": "#A8A29E",
+      "priceSale": "#A21CAF",
+      "discountBadgeBg": "#FDF4FF",
+      "discountBadgeText": "#A21CAF",
+      "coverPlaceholderFrom": "#E879F9",
+      "coverPlaceholderTo": "#A21CAF",
+      "coverScrim": "linear-gradient(to top, rgba(74, 4, 78, 0.32), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#4A044E",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#FAE8FF",
+      "productThumbBg": "#FDF4FF"
+    },
+    "typography": {
+      "heading_font": "Nunito, system-ui, sans-serif",
+      "body_font": "\"DM Sans\", system-ui, sans-serif",
+      "heading_weight": 800,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Nunito:ital,wght@0,700;0,800;0,900;1,700&display=swap",
+      "mood": "bold, soft, berry, modern"
+    },
+    "is_active": true,
+    "sort_order": 33
+  },
+  {
+    "id": "sky-soft",
+    "label": "Sky Soft",
+    "description": "Azul cielo sobre blanco con Baloo 2. Alegre, claro y fácil de leer.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Familiar",
+      "Pedidos móviles"
+    ],
+    "recommendation": "Restaurantes familiares, menús para todos o marcas que buscan claridad y un tono positivo.",
+    "style_keywords": [
+      "sky",
+      "soft",
+      "rounded",
+      "clear",
+      "white"
+    ],
+    "colors": {
+      "primary": "#0284C7",
+      "secondary": "#38BDF8",
+      "accent": "#0EA5E9",
+      "background": "#FFFFFF",
+      "surface": "#F0F9FF",
+      "text": "#0C4A6E",
+      "textMuted": "#0369A1",
+      "textSecondary": "#64748B",
+      "border": "#E0F2FE",
+      "categoryActive": "#0C4A6E",
+      "categoryIndicator": "#0EA5E9",
+      "price": "#0C4A6E",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#0284C7",
+      "discountBadgeBg": "#F0F9FF",
+      "discountBadgeText": "#0369A1",
+      "coverPlaceholderFrom": "#7DD3FC",
+      "coverPlaceholderTo": "#0284C7",
+      "coverScrim": "linear-gradient(to top, rgba(12, 74, 110, 0.32), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#0C4A6E",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#E0F2FE",
+      "productThumbBg": "#F0F9FF"
+    },
+    "typography": {
+      "heading_font": "\"Baloo 2\", system-ui, sans-serif",
+      "body_font": "Quicksand, system-ui, sans-serif",
+      "heading_weight": 700,
+      "body_weight": 500,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&display=swap",
+      "mood": "playful, soft, sky, friendly"
+    },
+    "is_active": true,
+    "sort_order": 34
+  },
+  {
+    "id": "citrus-soft",
+    "label": "Citrus Soft",
+    "description": "Lima cítrica sobre blanco con Fredoka. Energético, fresco y versátil.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Casual",
+      "Promos"
+    ],
+    "recommendation": "Menús casuales, promos visibles y marcas que quieren un acento vivo sin oscurecer el fondo.",
+    "style_keywords": [
+      "citrus",
+      "lime",
+      "soft",
+      "energetic",
+      "white"
+    ],
+    "colors": {
+      "primary": "#65A30D",
+      "secondary": "#A3E635",
+      "accent": "#84CC16",
+      "background": "#FFFFFF",
+      "surface": "#F7FEE7",
+      "text": "#1A2E05",
+      "textMuted": "#4D7C0F",
+      "textSecondary": "#64748B",
+      "border": "#ECFCCB",
+      "categoryActive": "#1A2E05",
+      "categoryIndicator": "#84CC16",
+      "price": "#1A2E05",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#65A30D",
+      "discountBadgeBg": "#F7FEE7",
+      "discountBadgeText": "#4D7C0F",
+      "coverPlaceholderFrom": "#A3E635",
+      "coverPlaceholderTo": "#65A30D",
+      "coverScrim": "linear-gradient(to top, rgba(26, 46, 5, 0.3), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#1A2E05",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#ECFCCB",
+      "productThumbBg": "#F7FEE7"
+    },
+    "typography": {
+      "heading_font": "Fredoka, system-ui, sans-serif",
+      "body_font": "Nunito, system-ui, sans-serif",
+      "heading_weight": 600,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@300;400;500;600;700&display=swap",
+      "mood": "energetic, soft, citrus, playful"
+    },
+    "is_active": true,
+    "sort_order": 35
+  },
+  {
+    "id": "ink-blue",
+    "label": "Ink Blue",
+    "description": "Azul confianza sobre blanco con Outfit geométrico. Limpio y profesional.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Delivery",
+      "Marca confiable"
+    ],
+    "recommendation": "Restaurantes con fuerte canal delivery, cadenas o quien prioriza claridad y confianza.",
+    "style_keywords": [
+      "blue",
+      "trust",
+      "geometric",
+      "clean",
+      "white"
+    ],
+    "colors": {
+      "primary": "#2563EB",
+      "secondary": "#60A5FA",
+      "accent": "#3B82F6",
+      "background": "#FFFFFF",
+      "surface": "#F8FAFC",
+      "text": "#1E3A8A",
+      "textMuted": "#475569",
+      "textSecondary": "#94A3B8",
+      "border": "#DBEAFE",
+      "categoryActive": "#1E3A8A",
+      "categoryIndicator": "#2563EB",
+      "price": "#1E3A8A",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#2563EB",
+      "discountBadgeBg": "#EFF6FF",
+      "discountBadgeText": "#1D4ED8",
+      "coverPlaceholderFrom": "#93C5FD",
+      "coverPlaceholderTo": "#2563EB",
+      "coverScrim": "linear-gradient(to top, rgba(30, 58, 138, 0.32), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#1E3A8A",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#DBEAFE",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "Outfit, system-ui, sans-serif",
+      "body_font": "\"Work Sans\", system-ui, sans-serif",
+      "heading_weight": 700,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&display=swap",
+      "mood": "geometric, modern, clean, trust"
+    },
+    "is_active": true,
+    "sort_order": 36
+  },
+  {
+    "id": "forest-clean",
+    "label": "Forest",
+    "description": "Verde bosque sobre blanco con Poppins. Natural, limpio y equilibrado.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Fresh",
+      "Plant-forward casual"
+    ],
+    "recommendation": "Restaurantes que quieren un acento verde serio (no neón) y tipografía profesional amigable.",
+    "style_keywords": [
+      "forest",
+      "green",
+      "clean",
+      "professional",
+      "white"
+    ],
+    "colors": {
+      "primary": "#047857",
+      "secondary": "#34D399",
+      "accent": "#059669",
+      "background": "#FFFFFF",
+      "surface": "#F8FAFC",
+      "text": "#022C22",
+      "textMuted": "#475569",
+      "textSecondary": "#94A3B8",
+      "border": "#D1FAE5",
+      "categoryActive": "#022C22",
+      "categoryIndicator": "#059669",
+      "price": "#022C22",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#047857",
+      "discountBadgeBg": "#ECFDF5",
+      "discountBadgeText": "#047857",
+      "coverPlaceholderFrom": "#6EE7B7",
+      "coverPlaceholderTo": "#047857",
+      "coverScrim": "linear-gradient(to top, rgba(2, 44, 34, 0.32), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#022C22",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#D1FAE5",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "Poppins, system-ui, sans-serif",
+      "body_font": "\"Open Sans\", system-ui, sans-serif",
+      "heading_weight": 600,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap",
+      "mood": "modern, professional, clean, natural"
+    },
+    "is_active": true,
+    "sort_order": 37
+  },
+  {
+    "id": "amber-pulse",
+    "label": "Amber",
+    "description": "Naranja delivery sobre blanco con Outfit. Apetitoso y listo para pedir.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Delivery",
+      "Fast casual"
+    ],
+    "recommendation": "Negocios con foco en pedidos online, combos y CTAs visibles sin fondo tintado.",
+    "style_keywords": [
+      "amber",
+      "orange",
+      "delivery",
+      "appetite",
+      "white"
+    ],
+    "colors": {
+      "primary": "#EA580C",
+      "secondary": "#FB923C",
+      "accent": "#F97316",
+      "background": "#FFFFFF",
+      "surface": "#FFFBEB",
+      "text": "#0F172A",
+      "textMuted": "#57534E",
+      "textSecondary": "#A8A29E",
+      "border": "#FED7AA",
+      "categoryActive": "#FFFFFF",
+      "categoryIndicator": "#EA580C",
+      "price": "#0F172A",
+      "priceOriginal": "#A8A29E",
+      "priceSale": "#EA580C",
+      "discountBadgeBg": "#FFF7ED",
+      "discountBadgeText": "#C2410C",
+      "coverPlaceholderFrom": "#FDBA74",
+      "coverPlaceholderTo": "#EA580C",
+      "coverScrim": "linear-gradient(to top, rgba(15, 23, 42, 0.3), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#0F172A",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#FFEDD5",
+      "productThumbBg": "#FFFBEB"
+    },
+    "typography": {
+      "heading_font": "Outfit, system-ui, sans-serif",
+      "body_font": "\"Work Sans\", system-ui, sans-serif",
+      "heading_weight": 700,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&display=swap",
+      "mood": "appetizing, modern, delivery, clean"
+    },
+    "is_active": true,
+    "sort_order": 38
+  },
+  {
+    "id": "slate-indigo",
+    "label": "Indigo",
+    "description": "Índigo contemporáneo sobre blanco con Poppins. Serio, moderno y neutro.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Premium casual",
+      "Marca tech"
+    ],
+    "recommendation": "Restaurantes con identidad tech/moderna o menús que prefieren un acento frío elegante.",
+    "style_keywords": [
+      "indigo",
+      "slate",
+      "modern",
+      "clean",
+      "white"
+    ],
+    "colors": {
+      "primary": "#4F46E5",
+      "secondary": "#818CF8",
+      "accent": "#6366F1",
+      "background": "#FFFFFF",
+      "surface": "#F8FAFC",
+      "text": "#1E1B4B",
+      "textMuted": "#64748B",
+      "textSecondary": "#94A3B8",
+      "border": "#E0E7FF",
+      "categoryActive": "#1E1B4B",
+      "categoryIndicator": "#4F46E5",
+      "price": "#1E1B4B",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#4F46E5",
+      "discountBadgeBg": "#EEF2FF",
+      "discountBadgeText": "#4338CA",
+      "coverPlaceholderFrom": "#A5B4FC",
+      "coverPlaceholderTo": "#4F46E5",
+      "coverScrim": "linear-gradient(to top, rgba(30, 27, 75, 0.32), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#1E1B4B",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#E0E7FF",
+      "productThumbBg": "#F1F5F9"
+    },
+    "typography": {
+      "heading_font": "Poppins, system-ui, sans-serif",
+      "body_font": "\"Open Sans\", system-ui, sans-serif",
+      "heading_weight": 600,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap",
+      "mood": "modern, professional, indigo, clean"
+    },
+    "is_active": true,
+    "sort_order": 39
+  },
+  {
+    "id": "teal-trust",
+    "label": "Teal",
+    "description": "Teal equilibrado sobre blanco con Outfit. Fresco, confiable y limpio.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Casual moderno",
+      "Delivery"
+    ],
+    "recommendation": "Menús generales que quieren un acento fresco distinto al verde delivery clásico.",
+    "style_keywords": [
+      "teal",
+      "trust",
+      "clean",
+      "white"
+    ],
+    "colors": {
+      "primary": "#0F766E",
+      "secondary": "#2DD4BF",
+      "accent": "#0D9488",
+      "background": "#FFFFFF",
+      "surface": "#F0FDFA",
+      "text": "#134E4A",
+      "textMuted": "#5B716E",
+      "textSecondary": "#64748B",
+      "border": "#CCFBF1",
+      "categoryActive": "#134E4A",
+      "categoryIndicator": "#0D9488",
+      "price": "#134E4A",
+      "priceOriginal": "#94A3B8",
+      "priceSale": "#0F766E",
+      "discountBadgeBg": "#F0FDFA",
+      "discountBadgeText": "#0F766E",
+      "coverPlaceholderFrom": "#5EEAD4",
+      "coverPlaceholderTo": "#0F766E",
+      "coverScrim": "linear-gradient(to top, rgba(19, 78, 74, 0.32), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#134E4A",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#CCFBF1",
+      "productThumbBg": "#F0FDFA"
+    },
+    "typography": {
+      "heading_font": "Outfit, system-ui, sans-serif",
+      "body_font": "\"Work Sans\", system-ui, sans-serif",
+      "heading_weight": 600,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&display=swap",
+      "mood": "clean, trust, teal, contemporary"
+    },
+    "is_active": true,
+    "sort_order": 40
+  },
+  {
+    "id": "editorial-ink",
+    "label": "Editorial",
+    "description": "Tinta y oro sobre blanco con Playfair. Editorial gastronómico sin fondo tintado.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Menú con carácter",
+      "Hospitality"
+    ],
+    "recommendation": "Restaurantes que quieren un look de menú editorial sin paletas de cocina específicas ni fondos de color.",
+    "style_keywords": [
+      "editorial",
+      "ink",
+      "gold",
+      "serif",
+      "white"
+    ],
+    "colors": {
+      "primary": "#1C1917",
+      "secondary": "#78716C",
+      "accent": "#A16207",
+      "background": "#FFFFFF",
+      "surface": "#FAFAF9",
+      "text": "#1C1917",
+      "textMuted": "#57534E",
+      "textSecondary": "#A8A29E",
+      "border": "#E7E5E4",
+      "categoryActive": "#1C1917",
+      "categoryIndicator": "#A16207",
+      "price": "#1C1917",
+      "priceOriginal": "#A8A29E",
+      "priceSale": "#B45309",
+      "discountBadgeBg": "#FFFBEB",
+      "discountBadgeText": "#A16207",
+      "coverPlaceholderFrom": "#D6D3D1",
+      "coverPlaceholderTo": "#57534E",
+      "coverScrim": "linear-gradient(to top, rgba(28, 25, 23, 0.35), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#1C1917",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F5F5F4",
+      "productThumbBg": "#F5F5F4"
+    },
+    "typography": {
+      "heading_font": "\"Playfair Display\", Georgia, serif",
+      "body_font": "Karla, system-ui, sans-serif",
+      "heading_weight": 700,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Karla:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap",
+      "mood": "restaurant, culinary, elegant, hospitality"
+    },
+    "is_active": true,
+    "sort_order": 41
+  },
+  {
+    "id": "rose-neutral",
+    "label": "Rose",
+    "description": "Rosa polvo sobre blanco con Lora. Sofisticado, cálido y neutro.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Casual elegante",
+      "Marcas soft"
+    ],
+    "recommendation": "Marcas con tono suave o menús que quieren calidez sin caer en pastelería o festividades.",
+    "style_keywords": [
+      "rose",
+      "neutral",
+      "serif",
+      "warm",
+      "white"
+    ],
+    "colors": {
+      "primary": "#BE123C",
+      "secondary": "#FB7185",
+      "accent": "#E11D48",
+      "background": "#FFFFFF",
+      "surface": "#FFF8F8",
+      "text": "#4C0519",
+      "textMuted": "#9F1239",
+      "textSecondary": "#9F1239",
+      "border": "#FECDD3",
+      "categoryActive": "#4C0519",
+      "categoryIndicator": "#E11D48",
+      "price": "#4C0519",
+      "priceOriginal": "#A8A29E",
+      "priceSale": "#BE123C",
+      "discountBadgeBg": "#FFF1F2",
+      "discountBadgeText": "#BE123C",
+      "coverPlaceholderFrom": "#FDA4AF",
+      "coverPlaceholderTo": "#BE123C",
+      "coverScrim": "linear-gradient(to top, rgba(76, 5, 25, 0.3), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#4C0519",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#FFE4E6",
+      "productThumbBg": "#FFF1F2"
+    },
+    "typography": {
+      "heading_font": "Lora, Georgia, serif",
+      "body_font": "Raleway, system-ui, sans-serif",
+      "heading_weight": 600,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Raleway:wght@300;400;500;600;700&display=swap",
+      "mood": "elegant, warm, soft, refined"
+    },
+    "is_active": true,
+    "sort_order": 42
+  },
+  {
+    "id": "graphite-lime",
+    "label": "Graphite",
+    "description": "Grafito + lima CTA sobre blanco con DM Sans. Contemporáneo y de alto contraste.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Urbano",
+      "Marcas bold"
+    ],
+    "recommendation": "Marcas urbanas o menús que quieren tipografía geométrica y un acento lima para precios/acciones.",
+    "style_keywords": [
+      "graphite",
+      "lime",
+      "contrast",
+      "modern",
+      "white"
+    ],
+    "colors": {
+      "primary": "#18181B",
+      "secondary": "#71717A",
+      "accent": "#65A30D",
+      "background": "#FFFFFF",
+      "surface": "#FAFAFA",
+      "text": "#18181B",
+      "textMuted": "#52525B",
+      "textSecondary": "#A1A1AA",
+      "border": "#E4E4E7",
+      "categoryActive": "#FFFFFF",
+      "categoryIndicator": "#18181B",
+      "price": "#18181B",
+      "priceOriginal": "#A1A1AA",
+      "priceSale": "#65A30D",
+      "discountBadgeBg": "#F7FEE7",
+      "discountBadgeText": "#4D7C0F",
+      "coverPlaceholderFrom": "#A1A1AA",
+      "coverPlaceholderTo": "#3F3F46",
+      "coverScrim": "linear-gradient(to top, rgba(24, 24, 27, 0.35), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#18181B",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#F4F4F5",
+      "productThumbBg": "#F4F4F5"
+    },
+    "typography": {
+      "heading_font": "\"DM Sans\", system-ui, sans-serif",
+      "body_font": "Inter, system-ui, sans-serif",
+      "heading_weight": 700,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap",
+      "mood": "contemporary, bold, clean, high-contrast"
+    },
+    "is_active": true,
+    "sort_order": 43
+  },
+  {
+    "id": "copper-modern",
+    "label": "Copper",
+    "description": "Cobre cálido sobre blanco con Manrope. Contemporáneo y apetitoso.",
+    "bestFor": [
+      "Cualquier restaurante",
+      "Casual premium",
+      "Hospitality"
+    ],
+    "recommendation": "Restaurantes que buscan un acento cálido distinto al rojo clásico, con tipografía contemporánea.",
+    "style_keywords": [
+      "copper",
+      "warm",
+      "modern",
+      "white"
+    ],
+    "colors": {
+      "primary": "#C2410C",
+      "secondary": "#FB923C",
+      "accent": "#EA580C",
+      "background": "#FFFFFF",
+      "surface": "#FFF7ED",
+      "text": "#431407",
+      "textMuted": "#9A3412",
+      "textSecondary": "#78716C",
+      "border": "#FFEDD5",
+      "categoryActive": "#431407",
+      "categoryIndicator": "#C2410C",
+      "price": "#431407",
+      "priceOriginal": "#A8A29E",
+      "priceSale": "#C2410C",
+      "discountBadgeBg": "#FFF7ED",
+      "discountBadgeText": "#9A3412",
+      "coverPlaceholderFrom": "#FDBA74",
+      "coverPlaceholderTo": "#C2410C",
+      "coverScrim": "linear-gradient(to top, rgba(67, 20, 7, 0.32), transparent)",
+      "floatButtonBg": "rgba(255, 255, 255, 0.94)",
+      "floatButtonText": "#431407",
+      "logoBorder": "#FFFFFF",
+      "logoPlaceholderBg": "#FFEDD5",
+      "productThumbBg": "#FFF7ED"
+    },
+    "typography": {
+      "heading_font": "Manrope, system-ui, sans-serif",
+      "body_font": "\"Source Sans 3\", system-ui, sans-serif",
+      "heading_weight": 700,
+      "body_weight": 400,
+      "google_fonts_url": "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Source+Sans+3:wght@300;400;500;600;700&display=swap",
+      "mood": "warm, modern, copper, hospitality"
+    },
+    "is_active": true,
+    "sort_order": 44
+  },
+  {
     "id": "korean-bbq",
     "label": "K-BBQ",
     "description": "Rojo intenso y negro carbón con tipografía coreana limpia. Ideal para parrilla coreana.",
@@ -794,7 +2450,7 @@
       "mood": "korean, modern, clean, bold"
     },
     "is_active": true,
-    "sort_order": 14
+    "sort_order": 45
   },
   {
     "id": "curry-india",
@@ -847,7 +2503,7 @@
       "mood": "restaurant, culinary, warm, hospitality"
     },
     "is_active": true,
-    "sort_order": 15
+    "sort_order": 46
   },
   {
     "id": "bistro-frances",
@@ -900,7 +2556,7 @@
       "mood": "luxury, elegant, refined, premium"
     },
     "is_active": true,
-    "sort_order": 16
+    "sort_order": 47
   },
   {
     "id": "bbq-humo",
@@ -953,7 +2609,7 @@
       "mood": "indie, craft, artisan, rustic"
     },
     "is_active": true,
-    "sort_order": 17
+    "sort_order": 48
   },
   {
     "id": "vegan-verde",
@@ -1006,7 +2662,7 @@
       "mood": "natural, organic, calm, sustainable"
     },
     "is_active": true,
-    "sort_order": 18
+    "sort_order": 49
   },
   {
     "id": "cava-vino",
@@ -1059,7 +2715,7 @@
       "mood": "luxury, cellar, refined, premium"
     },
     "is_active": true,
-    "sort_order": 19
+    "sort_order": 50
   },
   {
     "id": "diner-retro",
@@ -1112,7 +2768,7 @@
       "mood": "pixel, retro, nostalgic, arcade"
     },
     "is_active": true,
-    "sort_order": 20
+    "sort_order": 51
   },
   {
     "id": "mediterraneo",
@@ -1166,7 +2822,7 @@
       "mood": "artisan, warm, mediterranean, natural"
     },
     "is_active": true,
-    "sort_order": 21
+    "sort_order": 52
   },
   {
     "id": "thai-vibrante",
@@ -1219,7 +2875,7 @@
       "mood": "thai, modern, clean, vibrant"
     },
     "is_active": true,
-    "sort_order": 22
+    "sort_order": 53
   },
   {
     "id": "ramen-miso",
@@ -1272,7 +2928,7 @@
       "mood": "japanese, warm, steam, comfort"
     },
     "is_active": true,
-    "sort_order": 23
+    "sort_order": 54
   },
   {
     "id": "poke-hawaiian",
@@ -1325,7 +2981,7 @@
       "mood": "playful, friendly, tropical, fresh"
     },
     "is_active": true,
-    "sort_order": 24
+    "sort_order": 55
   },
   {
     "id": "steak-carbon",
@@ -1378,7 +3034,7 @@
       "mood": "premium, sophisticated, bold, classic"
     },
     "is_active": true,
-    "sort_order": 25
+    "sort_order": 56
   },
   {
     "id": "dim-sum-china",
@@ -1431,7 +3087,7 @@
       "mood": "chinese, traditional, elegant, culinary"
     },
     "is_active": true,
-    "sort_order": 26
+    "sort_order": 57
   },
   {
     "id": "ceviche-peru",
@@ -1484,7 +3140,7 @@
       "mood": "latin, coastal, fresh, vibrant"
     },
     "is_active": true,
-    "sort_order": 27
+    "sort_order": 58
   },
   {
     "id": "griego-aegeo",
@@ -1537,7 +3193,7 @@
       "mood": "mediterranean, clean, airy, classic"
     },
     "is_active": true,
-    "sort_order": 28
+    "sort_order": 59
   },
   {
     "id": "pho-saigon",
@@ -1590,7 +3246,7 @@
       "mood": "vietnamese, international, readable, clean"
     },
     "is_active": true,
-    "sort_order": 29
+    "sort_order": 60
   },
   {
     "id": "helado-gelato",
@@ -1643,7 +3299,7 @@
       "mood": "playful, sweet, pastel, fun"
     },
     "is_active": true,
-    "sort_order": 30
+    "sort_order": 61
   },
   {
     "id": "cubano-caribe",
@@ -1696,7 +3352,7 @@
       "mood": "tropical, retro, warm, caribbean"
     },
     "is_active": true,
-    "sort_order": 31
+    "sort_order": 62
   },
   {
     "id": "tex-mex-cantina",
@@ -1749,7 +3405,7 @@
       "mood": "playful, bold, festive, warm"
     },
     "is_active": true,
-    "sort_order": 32
+    "sort_order": 63
   },
   {
     "id": "food-truck",
@@ -1802,7 +3458,7 @@
       "mood": "bold, urban, street, energetic"
     },
     "is_active": true,
-    "sort_order": 33
+    "sort_order": 64
   },
   {
     "id": "granja-organica",
@@ -1855,7 +3511,7 @@
       "mood": "calm, wellness, natural, organic"
     },
     "is_active": true,
-    "sort_order": 34
+    "sort_order": 65
   },
   {
     "id": "lounge-nocturno",
@@ -1908,7 +3564,7 @@
       "mood": "luxury, nightlife, refined, premium"
     },
     "is_active": true,
-    "sort_order": 35
+    "sort_order": 66
   },
   {
     "id": "brunch-dorado",
@@ -1961,7 +3617,7 @@
       "mood": "elegant, warm, weekend, inviting"
     },
     "is_active": true,
-    "sort_order": 36
+    "sort_order": 67
   },
   {
     "id": "libanes-fenix",
@@ -2014,7 +3670,7 @@
       "mood": "artisan, warm, levantine, elegant"
     },
     "is_active": true,
-    "sort_order": 37
+    "sort_order": 68
   },
   {
     "id": "obsidiana-oro",
@@ -2067,7 +3723,7 @@
       "mood": "luxury, noir, gold, culinary, premium"
     },
     "is_active": true,
-    "sort_order": 38
+    "sort_order": 69
   },
   {
     "id": "neon-tokyo",
@@ -2120,7 +3776,7 @@
       "mood": "cyberpunk, neon, tokyo, electric"
     },
     "is_active": true,
-    "sort_order": 39
+    "sort_order": 70
   },
   {
     "id": "carbon-bbq",
@@ -2173,7 +3829,7 @@
       "mood": "smoky, bold, ember, masculine"
     },
     "is_active": true,
-    "sort_order": 40
+    "sort_order": 71
   },
   {
     "id": "midnight-taco",
@@ -2226,7 +3882,7 @@
       "mood": "playful, neon, nightlife, street"
     },
     "is_active": true,
-    "sort_order": 41
+    "sort_order": 72
   },
   {
     "id": "void-omakase",
@@ -2279,7 +3935,7 @@
       "mood": "minimal, intimate, luxury, japanese"
     },
     "is_active": true,
-    "sort_order": 42
+    "sort_order": 73
   },
   {
     "id": "noir-copa",
@@ -2332,7 +3988,7 @@
       "mood": "noir, wine, speakeasy, refined"
     },
     "is_active": true,
-    "sort_order": 43
+    "sort_order": 74
   },
   {
     "id": "cyber-void",
@@ -2385,7 +4041,7 @@
       "mood": "cyber, gaming, neon, urban"
     },
     "is_active": true,
-    "sort_order": 44
+    "sort_order": 75
   },
   {
     "id": "lampara-ramen",
@@ -2438,7 +4094,7 @@
       "mood": "warm, lantern, night, brothy"
     },
     "is_active": true,
-    "sort_order": 45
+    "sort_order": 76
   },
   {
     "id": "abisal-mar",
@@ -2491,7 +4147,7 @@
       "mood": "oceanic, deep, elegant, coastal"
     },
     "is_active": true,
-    "sort_order": 46
+    "sort_order": 77
   },
   {
     "id": "forno-notte",
@@ -2544,7 +4200,7 @@
       "mood": "italian, rustic, night, warm"
     },
     "is_active": true,
-    "sort_order": 47
+    "sort_order": 78
   },
   {
     "id": "subway-nocturno",
@@ -2599,7 +4255,7 @@
       "mood": "bold, fresh, energetic, fast casual, sandwich"
     },
     "is_active": true,
-    "sort_order": 48
+    "sort_order": 79
   },
   {
     "id": "septiembre-patrio",
@@ -2652,7 +4308,7 @@
       "mood": "patriotic, bold, festive, mexican"
     },
     "is_active": true,
-    "sort_order": 49
+    "sort_order": 80
   },
   {
     "id": "grito-independencia",
@@ -2705,7 +4361,7 @@
       "mood": "bold, neubrutalist, loud, celebratory"
     },
     "is_active": true,
-    "sort_order": 50
+    "sort_order": 81
   },
   {
     "id": "dia-muertos",
@@ -2758,7 +4414,7 @@
       "mood": "festive, cultural, bold, warm"
     },
     "is_active": true,
-    "sort_order": 51
+    "sort_order": 82
   },
   {
     "id": "mundial-2026",
@@ -2811,7 +4467,7 @@
       "mood": "sports, energetic, bold, competitive"
     },
     "is_active": true,
-    "sort_order": 52
+    "sort_order": 83
   },
   {
     "id": "navidad-posadas",
@@ -2864,7 +4520,7 @@
       "mood": "warm, elegant, holiday, inviting"
     },
     "is_active": true,
-    "sort_order": 53
+    "sort_order": 84
   },
   {
     "id": "cinco-mayo",
@@ -2917,7 +4573,7 @@
       "mood": "playful, festive, warm, approachable"
     },
     "is_active": true,
-    "sort_order": 54
+    "sort_order": 85
   },
   {
     "id": "revolucion-mx",
@@ -2970,7 +4626,7 @@
       "mood": "historical, warm, traditional, dignified"
     },
     "is_active": true,
-    "sort_order": 55
+    "sort_order": 86
   },
   {
     "id": "roastery-latte",
@@ -3024,7 +4680,7 @@
       "mood": "artisan, organic, warm, roastery, bakery"
     },
     "is_active": true,
-    "sort_order": 56
+    "sort_order": 87
   },
   {
     "id": "maitre-elegance",
@@ -3078,7 +4734,7 @@
       "mood": "luxury, high-end, refined, premium, hospitality"
     },
     "is_active": true,
-    "sort_order": 57
+    "sort_order": 88
   },
   {
     "id": "antojo-urbano",
@@ -3132,6 +4788,6 @@
       "mood": "bold, urban, playful, street, energetic"
     },
     "is_active": true,
-    "sort_order": 58
+    "sort_order": 89
   }
 ]
