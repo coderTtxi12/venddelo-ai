@@ -1,5 +1,28 @@
+export const DOCUMENT_SCROLL_ROOT = 'document' as const;
+export type MenuScrollRoot = HTMLElement | typeof DOCUMENT_SCROLL_ROOT;
+
+export function getObserverRoot(root: MenuScrollRoot): Element | null {
+  return root === DOCUMENT_SCROLL_ROOT ? null : root;
+}
+
+export function getScrollPosition(root: MenuScrollRoot): number {
+  if (root === DOCUMENT_SCROLL_ROOT) return window.scrollY;
+  return root.scrollTop;
+}
+
+export function scrollMenuTo(root: MenuScrollRoot, options: ScrollToOptions): void {
+  if (root === DOCUMENT_SCROLL_ROOT) {
+    window.scrollTo(options);
+    return;
+  }
+  root.scrollTo(options);
+}
+
 /** Offset top of `section` within `scrollRoot`'s scroll coordinate space. */
-export function getSectionOffsetTop(section: HTMLElement, scrollRoot: HTMLElement): number {
+export function getSectionOffsetTop(section: HTMLElement, scrollRoot: MenuScrollRoot): number {
+  if (scrollRoot === DOCUMENT_SCROLL_ROOT) {
+    return section.getBoundingClientRect().top + window.scrollY;
+  }
   const sectionRect = section.getBoundingClientRect();
   const rootRect = scrollRoot.getBoundingClientRect();
   return sectionRect.top - rootRect.top + scrollRoot.scrollTop;
@@ -10,7 +33,7 @@ export function getSectionOffsetTop(section: HTMLElement, scrollRoot: HTMLElemen
  * Uses the live bottom edge of the category bar when available so sticky + non-sticky both work.
  */
 export function getCategoryScrollAnchorPosition(
-  scrollRoot: HTMLElement,
+  scrollRoot: MenuScrollRoot,
   options: {
     categoryBar?: HTMLElement | null;
     heroCollapsed: boolean;
@@ -20,16 +43,20 @@ export function getCategoryScrollAnchorPosition(
   },
 ): number {
   const { categoryBar, heroCollapsed, pinnedBarHeight, categoryBarHeight, extra = 8 } = options;
+  const scrollTop = getScrollPosition(scrollRoot);
 
   if (categoryBar) {
     const barRect = categoryBar.getBoundingClientRect();
+    if (scrollRoot === DOCUMENT_SCROLL_ROOT) {
+      return scrollTop + barRect.bottom + extra;
+    }
     const rootRect = scrollRoot.getBoundingClientRect();
-    return scrollRoot.scrollTop + (barRect.bottom - rootRect.top) + extra;
+    return scrollTop + (barRect.bottom - rootRect.top) + extra;
   }
 
   const offsetFromViewportTop =
     (heroCollapsed ? pinnedBarHeight : 0) + categoryBarHeight + extra;
-  return scrollRoot.scrollTop + offsetFromViewportTop;
+  return scrollTop + offsetFromViewportTop;
 }
 
 /**
@@ -39,7 +66,7 @@ export function getCategoryScrollAnchorPosition(
 export function resolveActiveCategoryId(
   categoryIds: readonly string[],
   getSection: (id: string) => HTMLElement | null | undefined,
-  scrollRoot: HTMLElement,
+  scrollRoot: MenuScrollRoot,
   scrollAnchorPx: number,
 ): string | null {
   if (categoryIds.length === 0) return null;
