@@ -15,6 +15,41 @@ export const THEME_ADD_SUCCESS: Record<string, ThemeAddSuccessTokens> = {
   'original-verde': { addSuccess: '#00FF94', addSuccessText: '#0A1628' },
   // Red + gold — chartreuse contrasts appetite red
   'clasico-rojo': { addSuccess: '#7FFF00', addSuccessText: '#1A0505' },
+
+  // ── Soft & color (tinted surfaces) ──
+  'soft-order': { addSuccess: '#00E676', addSuccessText: '#1C1917' },
+  'bubble-mint': { addSuccess: '#00FF9C', addSuccessText: '#064E3B' },
+  'peach-soft': { addSuccess: '#FF6B9A', addSuccessText: '#4C0519' },
+  'berry-soft': { addSuccess: '#E879F9', addSuccessText: '#4A044E' },
+  'sky-soft': { addSuccess: '#00D9FF', addSuccessText: '#0C4A6E' },
+  'citrus-soft': { addSuccess: '#A3E635', addSuccessText: '#1A2E05' },
+  'ink-blue': { addSuccess: '#00E5FF', addSuccessText: '#1E3A8A' },
+  'forest-clean': { addSuccess: '#76FF03', addSuccessText: '#022C22' },
+  'amber-pulse': { addSuccess: '#00E676', addSuccessText: '#0F172A' },
+  'slate-indigo': { addSuccess: '#A5B4FC', addSuccessText: '#1E1B4B' },
+  'teal-trust': { addSuccess: '#00FFBB', addSuccessText: '#134E4A' },
+  'editorial-ink': { addSuccess: '#FFD700', addSuccessText: '#1C1917' },
+  'rose-neutral': { addSuccess: '#FF6B9A', addSuccessText: '#4C0519' },
+  'graphite-lime': { addSuccess: '#A3E635', addSuccessText: '#18181B' },
+  'copper-modern': { addSuccess: '#FFAA00', addSuccessText: '#431407' },
+
+  // ── Pure white canvas essentials ──
+  'white-crimson': { addSuccess: '#00E676', addSuccessText: '#111827' },
+  'white-violet': { addSuccess: '#C4B5FD', addSuccessText: '#1E1B4B' },
+  'white-navy': { addSuccess: '#00E5FF', addSuccessText: '#111827' },
+  'white-emerald': { addSuccess: '#76FF03', addSuccessText: '#111827' },
+  'white-fuchsia': { addSuccess: '#FF6B9A', addSuccessText: '#111827' },
+  'white-amber': { addSuccess: '#00E676', addSuccessText: '#111827' },
+  'white-cyan': { addSuccess: '#00D9FF', addSuccessText: '#111827' },
+  'white-royal': { addSuccess: '#A5B4FC', addSuccessText: '#111827' },
+  'white-wine': { addSuccess: '#FF6B9A', addSuccessText: '#111827' },
+  'white-olive': { addSuccess: '#A3E635', addSuccessText: '#111827' },
+  'white-sunset': { addSuccess: '#00E676', addSuccessText: '#111827' },
+  'white-ocean': { addSuccess: '#00FFBB', addSuccessText: '#111827' },
+  'white-plum': { addSuccess: '#E879F9', addSuccessText: '#111827' },
+  'white-impact': { addSuccess: '#7FFF00', addSuccessText: '#111827' },
+  'white-graphite': { addSuccess: '#A3E635', addSuccessText: '#111827' },
+  'white-blush': { addSuccess: '#00E676', addSuccessText: '#7A3A52' },
   // Rose + blue — tropical neon mint vs pink
   'taqueria-viva': { addSuccess: '#00F5A0', addSuccessText: '#0A1628' },
   // Magenta + gold — vivid lemon gold flash
