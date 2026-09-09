@@ -1,12 +1,18 @@
 'use client';
 
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DeliveryLocationValue } from '@/components/digital-menu/CheckoutDeliveryAddressPicker';
 import { CourierUnavailableAlert } from '@/components/dispatch/CourierUnavailableAlert';
+import { CustomerSuggestField } from '@/components/dispatch/CustomerSuggestField';
 import { DispatchDeliveryAddressPicker } from '@/components/dispatch/DispatchDeliveryAddressPicker';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
 import { FormSelect } from '@/components/ui/FormSelect';
+import {
+  getRestaurantCustomerActivity,
+  type RestaurantCustomer,
+} from '@/lib/api/customers';
 import {
   createDispatchRequest,
   resolveDispatchMapsUrl,
@@ -19,6 +25,11 @@ import {
   isValidRestaurantCollect,
   restaurantCollectFromCustomerTotal,
 } from '@/lib/dispatch/collectTotal';
+import {
+  dispatchAttemptFingerprint,
+  resolveDispatchIdempotency,
+  type PendingDispatchIdempotency,
+} from '@/lib/dispatch/dispatchIdempotency';
 import { getDeliveryWeatherNotice } from '@/lib/digital-menu/checkout/deliveryWeatherNotice';
 import { usePublicDeliveryQuote } from '@/lib/digital-menu/checkout/usePublicDeliveryQuote';
 import {
@@ -28,6 +39,7 @@ import {
 } from '@/lib/orders/kitchenDispatch';
 import { providerDeliveryFeeCents } from '@/lib/orders/deliveryFee';
 import { DEFAULT_COUNTRY_ISO, findCountryByIso, formatE164 } from '@/lib/phone/countryDialCodes';
+import { parseE164Phone } from '@/lib/phone/parseE164';
 import styles from './RequestDeliveryForm.module.css';
 
 const PREP_CUSTOM_VALUE = 'custom';
@@ -43,6 +55,48 @@ function parsePesosToCents(input: string): number {
   const trimmed = input.trim();
   if (!trimmed) return 0;
   return Math.round(Number(trimmed) * 100);
+}
+
+type DispatchValidationIssue = {
+  field:
+    | 'courier'
+    | 'customerName'
+    | 'customerPhone'
+    | 'deliveryAddress'
+    | 'collect'
+    | 'cash'
+    | 'packages'
+    | 'prep';
+  message: string;
+  targetId: string;
+};
+
+function dispatchValidationBannerMessage(issues: DispatchValidationIssue[]): string {
+  if (issues.length === 0) return '';
+  if (issues.length === 1) return issues[0]!.message;
+
+  const labels = issues.map((issue) => {
+    switch (issue.field) {
+      case 'customerName':
+        return 'el nombre';
+      case 'customerPhone':
+        return 'el celular';
+      case 'deliveryAddress':
+        return 'la ubicación de entrega';
+      case 'collect':
+        return 'el total a cobrar';
+      case 'cash':
+        return 'con cuánto paga';
+      case 'packages':
+        return 'los paquetes';
+      case 'prep':
+        return 'el tiempo de preparación';
+      default:
+        return 'un campo';
+    }
+  });
+
+  return `Falta completar: ${labels.join(', ')}`;
 }
 
 function valuesToLocation(values?: KitchenDispatchFormValues | null): DeliveryLocationValue {
@@ -112,6 +166,10 @@ export function RequestDeliveryForm({
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fillNotice, setFillNotice] = useState<string | null>(null);
+  const [validationAttempted, setValidationAttempted] = useState(false);
+  const validationScrollTimerRef = useRef<number | null>(null);
+  const pendingIdempotencyRef = useRef<PendingDispatchIdempotency | null>(null);
 
   const prepMinutes = useMemo(() => {
     if (prepSelection === PREP_CUSTOM_VALUE) {
@@ -182,6 +240,63 @@ export function RequestDeliveryForm({
       };
     },
     [accessToken, restaurantId],
+  );
+
+  const applyCustomerSuggestion = useCallback(
+    async (customer: RestaurantCustomer) => {
+      setCustomerName(customer.customer_name);
+      const parsed = parseE164Phone(customer.customer_phone);
+      setPhoneCountryIso(parsed.countryIso);
+      setPhoneLocal(parsed.localNumber);
+      setError(null);
+
+      try {
+        const activity = await getRestaurantCustomerActivity(
+          accessToken,
+          restaurantId,
+          customer.phone_key,
+          { limit: 1 },
+        );
+        const last = activity.last_delivery;
+        if (!last) {
+          setFillNotice('Cliente cargado');
+        } else {
+          if (last.address.trim() || last.latitude != null) {
+            setLocation({
+              address: last.address,
+              latitude: last.latitude,
+              longitude: last.longitude,
+              placeId: null,
+            });
+            setMapsUrl(last.maps_url);
+          }
+          setAddressReferences(last.references?.trim() ?? '');
+          if (last.payment_method) setPaymentMethod(last.payment_method);
+          if (last.package_size) setPackageSize(last.package_size);
+          if (last.package_count != null && last.package_count >= 1) {
+            setPackageCount(String(last.package_count));
+          }
+          if (
+            last.prep_minutes != null &&
+            last.prep_minutes >= 1 &&
+            last.prep_minutes < 60
+          ) {
+            if (leadTimes.includes(last.prep_minutes)) {
+              setPrepSelection(String(last.prep_minutes));
+            } else {
+              setPrepSelection(PREP_CUSTOM_VALUE);
+              setCustomPrepMinutes(String(last.prep_minutes));
+            }
+          }
+          setFillNotice('Cliente cargado con su último envío');
+        }
+      } catch {
+        setFillNotice('Cliente cargado');
+      }
+
+      window.setTimeout(() => setFillNotice(null), 2800);
+    },
+    [accessToken, leadTimes, restaurantId],
   );
 
   useEffect(() => {
@@ -282,8 +397,173 @@ export function RequestDeliveryForm({
     Number(packageCount) >= 1 &&
     !submitting;
 
+  const validationIssues = useMemo((): DispatchValidationIssue[] => {
+    const issues: DispatchValidationIssue[] = [];
+    if (!courierAvailable) {
+      issues.push({
+        field: 'courier',
+        message: courierReason ?? 'El delivery no está disponible ahora.',
+        targetId: 'dispatch-form-alert',
+      });
+    }
+    if (customerName.trim().length < 1) {
+      issues.push({
+        field: 'customerName',
+        message: 'Ingresa el nombre del cliente.',
+        targetId: 'customer-name',
+      });
+    }
+    if (phoneLocal.replace(/\D/g, '').length < 8) {
+      issues.push({
+        field: 'customerPhone',
+        message: 'Ingresa el celular del cliente.',
+        targetId: 'customer-phone',
+      });
+    }
+    if (
+      !location.address.trim() ||
+      location.latitude == null ||
+      location.longitude == null
+    ) {
+      issues.push({
+        field: 'deliveryAddress',
+        message: 'Escribe la dirección y toca la que aparece en la lista. Si no sale ninguna sugerencia, la dirección no es correcta.',
+        targetId: 'dispatch-address-search',
+      });
+    } else if (!usingLockedFee && deliveryQuoteLoading) {
+      issues.push({
+        field: 'deliveryAddress',
+        message: 'Espera a que se calcule el costo de envío.',
+        targetId: 'dispatch-address-search',
+      });
+    } else if (!usingLockedFee && deliveryBlockingReason) {
+      issues.push({
+        field: 'deliveryAddress',
+        message: deliveryWeatherBlockedNotice ?? deliveryBlockingReason,
+        targetId: 'dispatch-address-search',
+      });
+    } else if (!usingLockedFee && !deliveryQuoteReady) {
+      issues.push({
+        field: 'deliveryAddress',
+        message: 'Confirma la ubicación para cotizar el envío.',
+        targetId: 'dispatch-address-search',
+      });
+    }
+    if (paymentMethod !== 'transfer' && !collectValid) {
+      issues.push({
+        field: 'collect',
+        message: 'El total a cobrar debe ser mayor al costo de envío.',
+        targetId: 'collect-amount',
+      });
+    }
+    if (paymentMethod === 'cash') {
+      if (!cashDenomination.trim()) {
+        issues.push({
+          field: 'cash',
+          message: 'Indica con qué billete o moneda pagará el cliente.',
+          targetId: 'cash-denomination',
+        });
+      } else if (
+        customerTotalCents != null &&
+        parsePesosToCents(cashDenomination) < customerTotalCents
+      ) {
+        issues.push({
+          field: 'cash',
+          message: 'La denominación debe cubrir el total a cobrar.',
+          targetId: 'cash-denomination',
+        });
+      }
+    }
+    if (!Number.isFinite(Number(packageCount)) || Number(packageCount) < 1) {
+      issues.push({
+        field: 'packages',
+        message: 'Indica al menos 1 paquete.',
+        targetId: 'package-count',
+      });
+    }
+    if (!prepValid) {
+      issues.push({
+        field: 'prep',
+        message: 'Indica en cuántos minutos estará listo el pedido.',
+        targetId:
+          prepSelection === PREP_CUSTOM_VALUE ? 'custom-prep-minutes' : 'prep-minutes',
+      });
+    }
+    return issues;
+  }, [
+    cashDenomination,
+    collectValid,
+    courierAvailable,
+    courierReason,
+    customerName,
+    customerTotalCents,
+    deliveryBlockingReason,
+    deliveryQuoteLoading,
+    deliveryQuoteReady,
+    deliveryWeatherBlockedNotice,
+    location.address,
+    location.latitude,
+    location.longitude,
+    packageCount,
+    paymentMethod,
+    phoneLocal,
+    prepSelection,
+    prepValid,
+    usingLockedFee,
+  ]);
+
+  const showAddressValidation =
+    validationAttempted &&
+    validationIssues.some((issue) => issue.field === 'deliveryAddress');
+  const showNameError =
+    validationAttempted &&
+    validationIssues.some((issue) => issue.field === 'customerName');
+  const showPhoneError =
+    validationAttempted &&
+    validationIssues.some((issue) => issue.field === 'customerPhone');
+  const showCollectError =
+    validationAttempted && validationIssues.some((issue) => issue.field === 'collect');
+  const showCashError =
+    validationAttempted && validationIssues.some((issue) => issue.field === 'cash');
+  const showPackagesError =
+    validationAttempted && validationIssues.some((issue) => issue.field === 'packages');
+  const showPrepError =
+    validationAttempted && validationIssues.some((issue) => issue.field === 'prep');
+  const validationBanner =
+    validationAttempted && validationIssues.length > 0
+      ? dispatchValidationBannerMessage(validationIssues)
+      : null;
+
+  useEffect(() => {
+    return () => {
+      if (validationScrollTimerRef.current != null) {
+        window.clearTimeout(validationScrollTimerRef.current);
+      }
+    };
+  }, []);
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting) return;
+
+    if (validationIssues.length > 0) {
+      setValidationAttempted(true);
+      setError(null);
+      const firstId = validationIssues[0]?.targetId;
+      if (validationScrollTimerRef.current != null) {
+        window.clearTimeout(validationScrollTimerRef.current);
+      }
+      validationScrollTimerRef.current = window.setTimeout(() => {
+        const target = firstId ? document.getElementById(firstId) : null;
+        target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (target instanceof HTMLElement && typeof target.focus === 'function') {
+          target.focus({ preventScroll: true });
+        }
+        validationScrollTimerRef.current = null;
+      }, 80);
+      return;
+    }
+
     if (!canRequestRider || prepMinutes == null) return;
 
     if (
@@ -334,9 +614,10 @@ export function RequestDeliveryForm({
     }
 
     setSubmitting(true);
+    setValidationAttempted(false);
     setError(null);
     try {
-      const row = await createDispatchRequest(accessToken, restaurantId, {
+      const input: DispatchCreateInput = {
         customer_name: name,
         customer_phone: customerPhone,
         dropoff_lat: location.latitude,
@@ -351,8 +632,20 @@ export function RequestDeliveryForm({
         prep_minutes: prepMinutes,
         notes: notes.trim() || null,
         order_id: sourceOrder?.id ?? null,
-      });
+      };
+      const pending = resolveDispatchIdempotency(
+        dispatchAttemptFingerprint(restaurantId, input),
+        pendingIdempotencyRef.current,
+      );
+      pendingIdempotencyRef.current = pending;
+      const row = await createDispatchRequest(
+        accessToken,
+        restaurantId,
+        input,
+        pending.key,
+      );
       await onCreated(row);
+      pendingIdempotencyRef.current = null;
       if (resetOnSuccess) {
         setLocation(EMPTY_LOCATION);
         setMapsUrl(null);
@@ -367,6 +660,7 @@ export function RequestDeliveryForm({
         setPhoneCountryIso(DEFAULT_COUNTRY_ISO);
         setPhoneLocal('');
         setNotes('');
+        setValidationAttempted(false);
         if (leadTimes[0] != null) setPrepSelection(String(leadTimes[0]));
       }
     } catch (submitError) {
@@ -381,43 +675,103 @@ export function RequestDeliveryForm({
   }
 
   return (
-    <form className={styles.form} onSubmit={submit}>
+    <form className={styles.form} onSubmit={submit} noValidate>
       {!courierAvailable && showUnavailableAlert ? (
-        <CourierUnavailableAlert reason={courierReason} />
+        <div id="dispatch-form-alert">
+          <CourierUnavailableAlert reason={courierReason} />
+        </div>
       ) : null}
 
       {error ? <div className={styles.error} role="alert">{error}</div> : null}
+      {fillNotice ? (
+        <p className={styles.fillNotice} role="status">
+          {fillNotice}
+        </p>
+      ) : null}
 
       <div className={styles.gridTwo}>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="customer-name">
             Nombre del cliente
           </label>
-          <input
-            id="customer-name"
-            name="customer_name"
-            className={styles.input}
-            required
-            maxLength={200}
-            value={customerName}
-            onChange={(event) => setCustomerName(event.target.value)}
-            disabled={!courierAvailable}
-          />
+          <CustomerSuggestField
+            accessToken={accessToken}
+            restaurantId={restaurantId}
+            query={customerName}
+            enabled={courierAvailable && !submitting}
+            onSelect={applyCustomerSuggestion}
+          >
+            {({ listboxId, expanded, activeOptionId, onKeyDown, onFocus, onQueryInput }) => (
+              <input
+                id="customer-name"
+                name="customer_name"
+                className={`${styles.input}${showNameError ? ` ${styles.inputInvalid}` : ''}`}
+                required
+                maxLength={200}
+                aria-invalid={showNameError || undefined}
+                value={customerName}
+                onChange={(event) => {
+                  setCustomerName(event.target.value);
+                  onQueryInput();
+                }}
+                onKeyDown={onKeyDown}
+                onFocus={onFocus}
+                disabled={!courierAvailable}
+                autoComplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={expanded}
+                aria-controls={expanded ? listboxId : undefined}
+                aria-activedescendant={activeOptionId}
+              />
+            )}
+          </CustomerSuggestField>
+          {showNameError ? (
+            <p className={styles.fieldError} role="alert">
+              Ingresa el nombre del cliente.
+            </p>
+          ) : null}
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="customer-phone">
             Celular
           </label>
-          <PhoneInputWithCountry
-            inputId="customer-phone"
-            countryIso={phoneCountryIso}
-            localNumber={phoneLocal}
-            onCountryChange={setPhoneCountryIso}
-            onLocalNumberChange={setPhoneLocal}
-            placeholder="55 1234 5678"
-            disabled={!courierAvailable}
-            flat
-          />
+          <CustomerSuggestField
+            accessToken={accessToken}
+            restaurantId={restaurantId}
+            query={phoneLocal}
+            enabled={courierAvailable && !submitting}
+            onSelect={applyCustomerSuggestion}
+          >
+            {({ listboxId, expanded, activeOptionId, onKeyDown, onFocus, onQueryInput }) => (
+              <div
+                onKeyDown={onKeyDown}
+                onFocusCapture={onFocus}
+                role="group"
+                aria-controls={expanded ? listboxId : undefined}
+                aria-activedescendant={activeOptionId}
+              >
+                <PhoneInputWithCountry
+                  inputId="customer-phone"
+                  countryIso={phoneCountryIso}
+                  localNumber={phoneLocal}
+                  onCountryChange={setPhoneCountryIso}
+                  onLocalNumberChange={(value) => {
+                    setPhoneLocal(value);
+                    onQueryInput();
+                  }}
+                  placeholder="55 1234 5678"
+                  disabled={!courierAvailable}
+                  flat
+                />
+              </div>
+            )}
+          </CustomerSuggestField>
+          {showPhoneError ? (
+            <p className={styles.fieldError} role="alert">
+              Ingresa el celular del cliente.
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -428,6 +782,7 @@ export function RequestDeliveryForm({
         onMapsUrlChange={setMapsUrl}
         resolveMapsUrl={resolveMapsUrlForPicker}
         disabled={!courierAvailable}
+        showValidation={showAddressValidation}
       />
 
       <div className={styles.field}>
@@ -520,7 +875,7 @@ export function RequestDeliveryForm({
             </label>
             <input
               id="cash-denomination"
-              className={styles.input}
+              className={`${styles.input}${showCashError ? ` ${styles.inputInvalid}` : ''}`}
               type="number"
               min="0.01"
               step="0.01"
@@ -528,7 +883,13 @@ export function RequestDeliveryForm({
               value={cashDenomination}
               onChange={(event) => setCashDenomination(event.target.value)}
               disabled={!courierAvailable}
+              aria-invalid={showCashError || undefined}
             />
+            {showCashError ? (
+              <p className={styles.fieldError} role="alert">
+                {validationIssues.find((issue) => issue.field === 'cash')?.message}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -547,7 +908,8 @@ export function RequestDeliveryForm({
             </span>
             <input
               id="collect-amount"
-              className={styles.collectInput}
+              className={`${styles.collectInput}${showCollectError ? ` ${styles.inputInvalid}` : ''}`}
+              aria-invalid={showCollectError || undefined}
               type="number"
               min="0.01"
               step="0.01"
@@ -584,13 +946,16 @@ export function RequestDeliveryForm({
             </dl>
           ) : (
             <p className={styles.collectHint}>
-              Confirma la dirección para desglosar el envío y lo que recibe tu negocio.
             </p>
           )}
-          {customerTotalCents != null &&
-          customerTotalCents > 0 &&
-          deliveryFeeCents != null &&
-          !collectValid ? (
+          {showCollectError ? (
+            <p className={styles.collectAlert} role="alert">
+              El total a cobrar debe ser mayor al costo de envío.
+            </p>
+          ) : customerTotalCents != null &&
+            customerTotalCents > 0 &&
+            deliveryFeeCents != null &&
+            !collectValid ? (
             <p className={styles.collectAlert} role="alert">
               El total debe ser mayor al envío para que tu negocio reciba un monto.
             </p>
@@ -618,14 +983,20 @@ export function RequestDeliveryForm({
           </label>
           <input
             id="package-count"
-            className={styles.input}
+            className={`${styles.input}${showPackagesError ? ` ${styles.inputInvalid}` : ''}`}
             type="number"
             min="1"
             required
+            aria-invalid={showPackagesError || undefined}
             value={packageCount}
             onChange={(event) => setPackageCount(event.target.value)}
             disabled={!courierAvailable}
           />
+          {showPackagesError ? (
+            <p className={styles.fieldError} role="alert">
+              Indica al menos 1 paquete.
+            </p>
+          ) : null}
         </div>
         <div className={styles.field}>
           <span className={styles.label} id="prep-minutes-label">
@@ -660,8 +1031,8 @@ export function RequestDeliveryForm({
             placeholder="Menor a 60"
             disabled={!courierAvailable}
           />
-          {!prepValid && customPrepMinutes.trim() ? (
-            <p className={styles.fieldHint} role="alert">
+          {showPrepError || (!prepValid && customPrepMinutes.trim()) ? (
+            <p className={styles.fieldError} role="alert">
               Usa un número entero entre 1 y 59 minutos.
             </p>
           ) : null}
@@ -686,13 +1057,27 @@ export function RequestDeliveryForm({
         />
       </div>
 
-      <button
-        className={styles.primaryButton}
-        type="submit"
-        disabled={!canRequestRider}
-      >
-        {submitting ? 'Solicitando…' : submitLabel}
-      </button>
+      <div className={styles.submitBlock}>
+        {validationBanner ? (
+          <div
+            id="dispatch-submit-validation"
+            className={styles.validationBanner}
+            role="alert"
+            aria-live="assertive"
+          >
+            <InfoOutlinedIcon className={styles.validationBannerIcon} aria-hidden />
+            <p className={styles.validationBannerText}>{validationBanner}</p>
+          </div>
+        ) : null}
+        <button
+          className={styles.primaryButton}
+          type="submit"
+          disabled={submitting}
+          aria-describedby={validationBanner ? 'dispatch-submit-validation' : undefined}
+        >
+          {submitting ? 'Solicitando…' : submitLabel}
+        </button>
+      </div>
     </form>
   );
 }

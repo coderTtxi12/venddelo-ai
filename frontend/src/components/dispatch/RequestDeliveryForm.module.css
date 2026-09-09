@@ -27,6 +27,9 @@
 
 .gridTwo {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  position: relative;
+  z-index: 2;
+  overflow: visible;
 }
 
 .gridThree {
@@ -114,6 +117,62 @@
   font-weight: 700;
 }
 
+.submitBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.validationBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+}
+
+.validationBannerIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+  color: var(--color-primary);
+}
+
+.validationBannerText {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.fieldError {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1.4;
+  color: #b91c1c;
+}
+
+.inputInvalid,
+.input.inputInvalid,
+.collectInput.inputInvalid {
+  border-color: #f87171;
+}
+
 .primaryButton {
   justify-self: start;
   border: 0;
@@ -143,6 +202,17 @@
   background: #fef2f2;
   padding: 0.75rem 0.9rem;
   color: #b91c1c;
+}
+
+.fillNotice {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  padding: 0.7rem 0.85rem;
+  color: var(--color-primary);
+  font-size: 0.88rem;
+  font-weight: 700;
 }
 
 .quoteAlert {
@@ -361,6 +431,10 @@
     min-height: 44px;
   }
 
+  .submitBlock {
+    align-items: stretch;
+  }
+
   .primaryButton {
     width: 100%;
     justify-self: stretch;
@@ -389,7 +463,9 @@
   .feeHint,
   .weatherNotice,
   .weightNotice,
-  .collectHint {
+  .collectHint,
+  .validationBannerText,
+  .fieldError {
     overflow-wrap: anywhere;
   }
 }
