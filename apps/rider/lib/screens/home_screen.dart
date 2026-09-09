@@ -1285,6 +1285,15 @@ class _JobDetails extends StatelessWidget {
               value: formatMoneyCents(fee),
               horizontalInset: inset,
             ),
+          if ((assignment.mexyFeeCents) > 0)
+            RiderMetaRow(
+              label: 'Comisión Mexy',
+              value: assignment.mexyHoldStatus == 'held'
+                  ? '${formatMoneyCents(assignment.mexyFeeCents)} · en hold'
+                  : formatMoneyCents(assignment.mexyFeeCents),
+              warning: true,
+              horizontalInset: inset,
+            ),
           RiderMetaRow(
             label: 'Paquetes',
             value:

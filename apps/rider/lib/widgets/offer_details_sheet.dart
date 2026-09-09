@@ -192,6 +192,9 @@ class _OfferDetailsSheetState extends State<OfferDetailsSheet> {
           const SizedBox(height: 16),
           _PayoutHero(
             feeLabel: formatMoneyCents(offer.quotedFeeCents),
+            mexyLabel: offer.mexyFeeCents > 0
+                ? formatMoneyCents(offer.mexyFeeCents)
+                : null,
             distanceLabel: formatDistanceMeters(offer.distanceMeters),
             collectLabel:
                 showsRiderCustomerCollect(
@@ -230,12 +233,14 @@ class _PayoutHero extends StatelessWidget {
     required this.distanceLabel,
     this.collectLabel,
     this.restaurantPayLabel,
+    this.mexyLabel,
   });
 
   final String feeLabel;
   final String distanceLabel;
   final String? collectLabel;
   final String? restaurantPayLabel;
+  final String? mexyLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -283,6 +288,15 @@ class _PayoutHero extends StatelessWidget {
               icon: Icons.payments_rounded,
               label: 'Cobrar',
               value: collectLabel!,
+              expanded: false,
+            ),
+          ],
+          if (mexyLabel != null) ...[
+            const SizedBox(height: 10),
+            _MiniStat(
+              icon: Icons.account_balance_wallet_rounded,
+              label: 'Comisión Mexy',
+              value: mexyLabel!,
               expanded: false,
             ),
           ],

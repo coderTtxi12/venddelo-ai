@@ -14,6 +14,8 @@ class RiderAssignment {
     this.collectCents,
     this.cashDenominationCents,
     this.quotedFeeCents,
+    this.mexyFeeCents = 0,
+    this.mexyHoldStatus,
     this.packageCount = 1,
     this.packageSize = 'normal',
     this.notes,
@@ -36,6 +38,8 @@ class RiderAssignment {
   final int? collectCents;
   final int? cashDenominationCents;
   final int? quotedFeeCents;
+  final int mexyFeeCents;
+  final String? mexyHoldStatus;
   final int packageCount;
   final String packageSize;
   final String? notes;
@@ -59,6 +63,8 @@ class RiderAssignment {
       collectCents: _asInt(json['collect_cents']),
       cashDenominationCents: _asInt(json['cash_denomination_cents']),
       quotedFeeCents: _asInt(json['quoted_fee_cents']),
+      mexyFeeCents: _asInt(json['mexy_fee_cents']) ?? 0,
+      mexyHoldStatus: json['mexy_hold_status'] as String?,
       packageCount: _asInt(json['package_count']) ?? 1,
       packageSize: json['package_size'] as String? ?? 'normal',
       notes: json['notes'] as String?,
@@ -253,6 +259,7 @@ class RiderOffer {
     required this.paymentMethod,
     required this.packageCount,
     this.quotedFeeCents = 0,
+    this.mexyFeeCents = 0,
     this.restaurantLat,
     this.restaurantLng,
     this.dropoffLat,
@@ -270,6 +277,7 @@ class RiderOffer {
   final String dropoffAddress;
   final int collectCents;
   final int quotedFeeCents;
+  final int mexyFeeCents;
   final String paymentMethod;
   final int packageCount;
   final double? restaurantLat;
@@ -291,6 +299,7 @@ class RiderOffer {
       dropoffAddress: json['dropoff_address'] as String,
       collectCents: json['collect_cents'] as int,
       quotedFeeCents: (json['quoted_fee_cents'] as num?)?.toInt() ?? 0,
+      mexyFeeCents: (json['mexy_fee_cents'] as num?)?.toInt() ?? 0,
       paymentMethod: json['payment_method'] as String,
       packageCount: json['package_count'] as int,
       restaurantLat: _asDouble(json['restaurant_lat']),
@@ -326,6 +335,7 @@ class RiderHistoryHold {
     required this.restaurantName,
     required this.amountCents,
     required this.customerName,
+    this.kind = 'restaurant_cash',
   });
 
   final String requestId;
@@ -333,6 +343,9 @@ class RiderHistoryHold {
   final String restaurantName;
   final int amountCents;
   final String customerName;
+  final String kind;
+
+  bool get isMexyFee => kind == 'mexy_fee';
 
   factory RiderHistoryHold.fromJson(Map<String, dynamic> json) {
     return RiderHistoryHold(
@@ -341,6 +354,7 @@ class RiderHistoryHold {
       restaurantName: json['restaurant_name'] as String? ?? '',
       amountCents: _asInt(json['amount_cents']) ?? 0,
       customerName: json['customer_name'] as String? ?? '',
+      kind: json['kind'] as String? ?? 'restaurant_cash',
     );
   }
 }
@@ -364,6 +378,8 @@ class RiderHistoryItem {
     this.customerPhone,
     this.notes,
     this.creditHoldCents = 0,
+    this.mexyFeeCents = 0,
+    this.mexyHoldStatus,
   });
 
   final String id;
@@ -383,6 +399,8 @@ class RiderHistoryItem {
   final String? customerPhone;
   final String? notes;
   final int creditHoldCents;
+  final int mexyFeeCents;
+  final String? mexyHoldStatus;
 
   factory RiderHistoryItem.fromJson(Map<String, dynamic> json) {
     return RiderHistoryItem(
@@ -403,6 +421,8 @@ class RiderHistoryItem {
       customerPhone: json['customer_phone'] as String?,
       notes: json['notes'] as String?,
       creditHoldCents: _asInt(json['credit_hold_cents']) ?? 0,
+      mexyFeeCents: _asInt(json['mexy_fee_cents']) ?? 0,
+      mexyHoldStatus: json['mexy_hold_status'] as String?,
     );
   }
 }

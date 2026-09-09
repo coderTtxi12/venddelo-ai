@@ -516,7 +516,9 @@ class _CreditCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            hold.restaurantName,
+                            hold.isMexyFee
+                                ? 'Comisión Mexy'
+                                : hold.restaurantName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodyLarge
@@ -1072,6 +1074,16 @@ class _HistoryDetailSheet extends StatelessWidget {
                 RiderMetaRow(
                   label: 'Hold',
                   value: formatMoneyCents(item.creditHoldCents),
+                ),
+              if (item.mexyFeeCents > 0)
+                RiderMetaRow(
+                  label: 'Comisión Mexy',
+                  value: item.mexyHoldStatus == 'held'
+                      ? '${formatMoneyCents(item.mexyFeeCents)} · en hold'
+                      : item.mexyHoldStatus == 'released'
+                      ? '${formatMoneyCents(item.mexyFeeCents)} · liberada'
+                      : formatMoneyCents(item.mexyFeeCents),
+                  warning: true,
                 ),
             ],
           ),

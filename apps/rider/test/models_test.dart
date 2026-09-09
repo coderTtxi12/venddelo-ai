@@ -24,6 +24,7 @@ void main() {
     expect(assignment.collectCents, 25000);
     expect(assignment.cashDenominationCents, 50000);
     expect(assignment.quotedFeeCents, 4500);
+    expect(assignment.mexyFeeCents, 0);
     expect(assignment.packageCount, 2);
     expect(assignment.packageSize, 'grande');
     expect(assignment.notes, 'Tocar el timbre');
@@ -33,6 +34,21 @@ void main() {
     expect(paymentLabel(assignment.paymentMethod), 'Efectivo');
     expect(packageSizeLabel(assignment.packageSize), 'Grande');
     expect(packageCountLabel(assignment.packageCount), '2 paquetes');
+  });
+
+  test('RiderAssignment.fromJson keeps mexy fee hold', () {
+    final assignment = RiderAssignment.fromJson({
+      'id': 'a1',
+      'status': 'assigned',
+      'restaurant_name': 'Tacos',
+      'dropoff_address': 'Calle 1',
+      'quoted_fee_cents': 16000,
+      'mexy_fee_cents': 3500,
+      'mexy_hold_status': 'held',
+    });
+    expect(assignment.quotedFeeCents, 16000);
+    expect(assignment.mexyFeeCents, 3500);
+    expect(assignment.mexyHoldStatus, 'held');
   });
 
   test('paymentLabel maps mixed grouped offers', () {

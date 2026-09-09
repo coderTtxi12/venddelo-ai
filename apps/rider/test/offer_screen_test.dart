@@ -110,6 +110,34 @@ void main() {
     expect(find.text('Desliza para rechazar'), findsNothing);
   });
 
+  testWidgets('offer sheet shows mexy commission when present', (tester) async {
+    await _pumpSheet(
+      tester,
+      offer: RiderOffer(
+        id: 'o1',
+        requestId: 'r1',
+        shortId: 'K7M2P',
+        status: 'offered',
+        expiresAt: DateTime.now().toUtc().add(const Duration(seconds: 45)),
+        restaurantName: 'Tacos',
+        dropoffAddress: 'Calle 1',
+        collectCents: 15000,
+        quotedFeeCents: 16000,
+        mexyFeeCents: 3500,
+        paymentMethod: 'transfer',
+        packageCount: 1,
+        restaurantLat: 19.43,
+        restaurantLng: -99.13,
+        dropoffLat: 19.44,
+        dropoffLng: -99.14,
+        distanceMeters: 2300,
+      ),
+    );
+
+    expect(find.text('Comisión Mexy'), findsOneWidget);
+    expect(find.text('\$35.00'), findsOneWidget);
+  });
+
   testWidgets('offer sheet hides collect for transfer', (tester) async {
     await _pumpSheet(
       tester,

@@ -231,12 +231,14 @@ class RiderMetaRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.emphasized = false,
+    this.warning = false,
     this.horizontalInset = 0,
   });
 
   final String label;
   final String value;
   final bool emphasized;
+  final bool warning;
   final double horizontalInset;
 
   @override
@@ -254,7 +256,11 @@ class RiderMetaRow extends StatelessWidget {
             label,
             style: textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              color: emphasized ? AppColors.textPrimary : AppColors.textMuted,
+              color: warning
+                  ? AppColors.warning
+                  : emphasized
+                  ? AppColors.textPrimary
+                  : AppColors.textMuted,
             ),
           ),
         ),
@@ -264,7 +270,11 @@ class RiderMetaRow extends StatelessWidget {
             style: (emphasized ? textTheme.titleLarge : textTheme.bodyLarge)
                 ?.copyWith(
                   fontWeight: emphasized ? FontWeight.w800 : FontWeight.w600,
-                  color: emphasized ? AppColors.cta : AppColors.textPrimary,
+                  color: warning
+                      ? AppColors.warning
+                      : emphasized
+                      ? AppColors.cta
+                      : AppColors.textPrimary,
                   fontFeatures: emphasized
                       ? const [FontFeature.tabularFigures()]
                       : null,
@@ -274,7 +284,7 @@ class RiderMetaRow extends StatelessWidget {
       ],
     );
 
-    if (!emphasized) {
+    if (!emphasized && !warning) {
       return Padding(
         padding: EdgeInsets.fromLTRB(horizontalInset, 0, horizontalInset, 8),
         child: row,
@@ -284,7 +294,7 @@ class RiderMetaRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: ColoredBox(
-        color: AppColors.cta.withValues(alpha: 0.07),
+        color: (warning ? AppColors.warning : AppColors.cta).withValues(alpha: 0.07),
         child: Padding(
           padding: EdgeInsets.fromLTRB(horizontalInset, 8, horizontalInset, 8),
           child: row,
