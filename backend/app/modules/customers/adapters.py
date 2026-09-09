@@ -18,6 +18,7 @@ from app.modules.customers.grouping import (
     customer_stats,
     group_customer_events,
     latest_delivery_address,
+    latest_delivery_snapshot,
     order_display_id,
     sort_activity_items,
     sort_customers,
@@ -34,6 +35,7 @@ from app.modules.customers.schemas import (
     RestaurantCustomerActivity,
     RestaurantCustomerList,
 )
+from app.modules.delivery_dispatch.search_at import prep_minutes_from_times
 
 
 class SqlAlchemyCustomerRepository:
@@ -101,6 +103,7 @@ class SqlAlchemyCustomerRepository:
         customers = group_customer_events(events)
         customer = customers[0]
         last_address, last_maps_url = latest_delivery_address(events)
+        last_delivery = latest_delivery_snapshot(events)
         all_items = activity_items(events)
         summary = build_activity_summary(all_items)
         ordered = sort_activity_items(all_items, sort)
@@ -121,6 +124,7 @@ class SqlAlchemyCustomerRepository:
             next_cursor=encode_cursor(str(next_offset)) if has_more else None,
             last_delivery_address=last_address,
             last_delivery_maps_url=last_maps_url,
+            last_delivery=last_delivery,
         )
 
     def _load_events(self, restaurant_id: uuid.UUID) -> list[CustomerEvent]:
@@ -144,6 +148,7 @@ class SqlAlchemyCustomerRepository:
                 Order.delivery_address,
                 Order.delivery_latitude,
                 Order.delivery_longitude,
+                Order.payment_method,
                 item_quantity.label("item_quantity"),
             ).where(Order.restaurant_id == restaurant_id)
         ).all()
@@ -163,6 +168,7 @@ class SqlAlchemyCustomerRepository:
                     delivery_latitude=row.delivery_latitude,
                     delivery_longitude=row.delivery_longitude,
                     item_quantity=int(row.item_quantity or 0),
+                    payment_method=row.payment_method,
                 )
             )
 
@@ -180,19 +186,24 @@ class SqlAlchemyCustomerRepository:
                 DeliveryDispatchRequest.dropoff_lng,
                 DeliveryDispatchRequest.dropoff_maps_url,
                 DeliveryDispatchRequest.package_count,
+                DeliveryDispatchRequest.package_size,
+                DeliveryDispatchRequest.payment_method,
+                DeliveryDispatchRequest.ready_at,
             ).where(
                 DeliveryDispatchRequest.restaurant_id == restaurant_id,
                 DeliveryDispatchRequest.order_id.is_(None),
             )
         ).all()
         for row in dispatch_rows:
+            created_at = _aware(row.created_at)
+            ready_at = _aware(row.ready_at) if row.ready_at is not None else created_at
             events.append(
                 CustomerEvent(
                     id=str(row.id),
                     source="delivery",
                     customer_name=row.customer_name,
                     customer_phone=row.customer_phone,
-                    created_at=_aware(row.created_at),
+                    created_at=created_at,
                     total_cents=int(row.collect_cents or 0),
                     status=row.status,
                     order_type="delivery",
@@ -202,6 +213,9 @@ class SqlAlchemyCustomerRepository:
                     delivery_longitude=row.dropoff_lng,
                     delivery_maps_url=row.dropoff_maps_url,
                     item_quantity=int(row.package_count or 0),
+                    payment_method=row.payment_method,
+                    package_size=row.package_size,
+                    prep_minutes=prep_minutes_from_times(created_at, ready_at),
                 )
             )
         return events

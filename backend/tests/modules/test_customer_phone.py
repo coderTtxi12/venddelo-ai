@@ -121,6 +121,21 @@ def test_matches_query_uses_name_and_digits():
     assert not matches_query(customer, "pedro")
 
 
+def test_matches_query_ignores_accents_and_tolerates_typos():
+    customer = group_customer_events(
+        [_event(customer_name="María López", customer_phone="+525512345678")]
+    )[0]
+    assert matches_query(customer, "maria")
+    assert matches_query(customer, "marai")
+    assert matches_query(customer, "lopez")
+
+    guadalupe = group_customer_events(
+        [_event(id="g", customer_name="Guadalupe Ruiz", customer_phone="5550001111")]
+    )[0]
+    assert matches_query(guadalupe, "guadlupe")
+    assert not matches_query(guadalupe, "xyz")
+
+
 def test_sort_customers_by_spent_and_name():
     customers = group_customer_events(
         [
@@ -244,3 +259,53 @@ def test_latest_delivery_address_prefers_coordinates_over_text_maps_url():
     address, maps_url = latest_delivery_address(events)
     assert address == "Av. Nueva 99"
     assert maps_url == "https://www.google.com/maps?q=19.635,-99.095"
+
+
+def test_split_delivery_address_supports_menu_and_dispatch_refs():
+    from app.modules.customers.grouping import split_delivery_address
+
+    assert split_delivery_address("Calle 1\nReferencias: puerta azul") == (
+        "Calle 1",
+        "puerta azul",
+    )
+    assert split_delivery_address("Calle 2 · junto a la farmacia") == (
+        "Calle 2",
+        "junto a la farmacia",
+    )
+    assert split_delivery_address("Solo calle") == ("Solo calle", "")
+
+
+def test_latest_delivery_snapshot_prefers_dispatch_and_splits_refs():
+    from app.modules.customers.grouping import latest_delivery_snapshot
+
+    events = [
+        _event(
+            id="menu-del",
+            order_type="delivery",
+            delivery_address="Vieja 1\nReferencias: vieja",
+            payment_method="cash",
+            created_at=datetime(2026, 8, 1, tzinfo=UTC),
+        ),
+        _event(
+            id="dispatch",
+            source="delivery",
+            order_type="delivery",
+            delivery_address="Nueva 9 · portón negro",
+            delivery_latitude=19.4,
+            delivery_longitude=-99.1,
+            payment_method="transfer",
+            package_size="grande",
+            item_quantity=2,
+            prep_minutes=15,
+            created_at=datetime(2026, 8, 20, tzinfo=UTC),
+        ),
+    ]
+    snapshot = latest_delivery_snapshot(events)
+    assert snapshot is not None
+    assert snapshot.address == "Nueva 9"
+    assert snapshot.references == "portón negro"
+    assert snapshot.payment_method == "transfer"
+    assert snapshot.package_size == "grande"
+    assert snapshot.package_count == 2
+    assert snapshot.prep_minutes == 15
+    assert snapshot.maps_url == "https://www.google.com/maps?q=19.4,-99.1"

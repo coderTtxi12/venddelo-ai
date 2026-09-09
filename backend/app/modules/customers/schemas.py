@@ -66,6 +66,18 @@ class RestaurantCustomerActivitySummary(BaseModel):
     avg_item_quantity: float | None = None
 
 
+class CustomerLastDelivery(BaseModel):
+    address: str
+    references: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    maps_url: str | None = None
+    payment_method: Literal["cash", "transfer", "card_terminal"] | None = None
+    package_size: Literal["normal", "grande"] | None = None
+    package_count: int | None = None
+    prep_minutes: int | None = None
+
+
 class RestaurantCustomerActivity(BaseModel):
     phone_key: str
     customer_name: str
@@ -79,3 +91,4 @@ class RestaurantCustomerActivity(BaseModel):
     next_cursor: str | None = None
     last_delivery_address: str | None = None
     last_delivery_maps_url: str | None = None
+    last_delivery: CustomerLastDelivery | None = None
