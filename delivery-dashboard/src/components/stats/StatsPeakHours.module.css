@@ -1,0 +1,144 @@
+.empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.detail {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  font-size: 0.82rem;
+  color: var(--color-text);
+  line-height: 1.4;
+}
+
+.bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.barButton {
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr) 2rem;
+  gap: 0.45rem;
+  align-items: center;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.barButton:hover {
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+}
+
+.barButtonSelected {
+  border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.barButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.barLabel,
+.barValue {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.barValue {
+  text-align: right;
+  color: var(--color-text);
+}
+
+.barTrack {
+  height: 0.7rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-border) 55%, transparent);
+  overflow: hidden;
+}
+
+.barFill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #2563eb;
+}
+
+.heatWrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.heat {
+  width: 100%;
+  min-width: 28rem;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+.caption {
+  text-align: left;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--color-text-secondary);
+}
+
+.heat th,
+.heat td {
+  padding: 0.15rem;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.heat th {
+  padding: 0.35rem 0.3rem;
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+
+.heatCell {
+  padding: 0;
+  min-width: 2.2rem;
+}
+
+.heatButton {
+  width: 100%;
+  min-height: 2.2rem;
+  border: 0;
+  background: #f8fafc;
+  font: inherit;
+  font-weight: 700;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.heatButtonSelected {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.heatButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
