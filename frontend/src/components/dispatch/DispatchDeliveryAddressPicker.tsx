@@ -3,6 +3,7 @@
 import MyLocationOutlinedIcon from '@mui/icons-material/MyLocationOutlined';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
+import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DeliveryLocationValue } from '@/components/digital-menu/CheckoutDeliveryAddressPicker';
 import { ApiError } from '@/lib/api/types';
@@ -24,6 +25,29 @@ import {
   parsePastedCoordinates,
 } from '@/lib/maps/parseMapsUrl';
 import styles from './DispatchDeliveryAddressPicker.module.css';
+
+function addressUnlockHint(searchText: string): { text: string; needsAction: boolean } {
+  const trimmed = searchText.trim();
+  if (!trimmed) {
+    return {
+      text: 'Escribe calle, número y colonia, o pega un enlace de Maps.',
+      needsAction: false,
+    };
+  }
+  if (looksLikeCoordinates(searchText)) {
+    return { text: 'Pulsa «Usar coordenadas» para confirmar el punto.', needsAction: true };
+  }
+  if (looksLikeMapsUrl(searchText)) {
+    return { text: 'Pulsa «Usar enlace» para confirmar el punto.', needsAction: true };
+  }
+  return {
+    text: 'Toca la dirección que aparece en la lista. Si no sale ninguna, está mal escrita.',
+    needsAction: true,
+  };
+}
+
+const LOCATION_CONFIRM_HELP =
+  'Escribe la dirección y toca la que aparece en la lista. Si no sale ninguna sugerencia, la dirección no es correcta.';
 
 type DispatchDeliveryAddressPickerProps = {
   value: DeliveryLocationValue;
@@ -492,6 +516,10 @@ export function DispatchDeliveryAddressPicker({
     looksLikeMapsUrl(searchText) || looksLikeCoordinates(searchText) || Boolean(failedMapsLink);
   const showMapBusy =
     mapState !== 'error' && (mapState === 'loading' || geocoding || linkResolving);
+  const unlockHint =
+    !hasCoords && !inputError && !linkResolving && !showLocationError
+      ? addressUnlockHint(searchText)
+      : null;
 
   return (
     <div className={styles.wrap}>
@@ -502,7 +530,9 @@ export function DispatchDeliveryAddressPicker({
       {autocompleteError ? (
         <p className={styles.error} role="alert">{autocompleteError}</p>
       ) : null}
-      <div className={styles.searchShell}>
+      <div
+        className={`${styles.searchShell}${showLocationError ? ` ${styles.searchShellInvalid}` : ''}`}
+      >
         <SearchOutlinedIcon className={styles.searchLeadIcon} aria-hidden />
         <input
           ref={inputRef}
@@ -542,6 +572,7 @@ export function DispatchDeliveryAddressPicker({
           placeholder="Calle, colonia, maps.app.goo.gl o 19.62, -99.10"
           disabled={disabled || linkResolving}
           autoComplete="off"
+          aria-describedby={unlockHint ? 'dispatch-address-guidance' : undefined}
         />
         {looksLikeMapsUrl(searchText) || looksLikeCoordinates(searchText) ? (
           <button
@@ -570,10 +601,18 @@ export function DispatchDeliveryAddressPicker({
           ) : null}
         </div>
       ) : null}
-      <p className={styles.hint}>
-        Pega un enlace de Google Maps o coordenadas (lat, lng). Si el mapa no aparece,
-        reintenta; también puedes buscar la dirección por nombre.
-      </p>
+      {unlockHint ? (
+        <p
+          id="dispatch-address-guidance"
+          className={unlockHint.needsAction ? styles.guidanceChip : styles.guidanceChipMuted}
+          role="status"
+        >
+          {unlockHint.needsAction ? (
+            <WarningAmberOutlinedIcon className={styles.guidanceChipIcon} aria-hidden />
+          ) : null}
+          {unlockHint.text}
+        </p>
+      ) : null}
 
       {linkResolving ? (
         <p className={styles.hint} role="status">Leyendo enlace de Google Maps…</p>
@@ -628,7 +667,7 @@ export function DispatchDeliveryAddressPicker({
 
       {showLocationError ? (
         <p className={styles.fieldError} role="alert">
-          Indica la ubicación de entrega en el mapa.
+          {LOCATION_CONFIRM_HELP}
         </p>
       ) : null}
     </div>

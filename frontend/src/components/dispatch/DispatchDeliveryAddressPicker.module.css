@@ -20,6 +20,42 @@
   color: var(--color-text-secondary);
 }
 
+.guidanceChip,
+.guidanceChipMuted {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  box-sizing: border-box;
+  min-height: 48px;
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.guidanceChip {
+  border: 1px solid color-mix(in srgb, #b45309 30%, var(--color-border));
+  background: color-mix(in srgb, #b45309 10%, var(--color-surface));
+  color: #92400e;
+}
+
+.guidanceChipMuted {
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-text) 4%, var(--color-surface));
+  color: var(--color-text-secondary);
+  font-weight: 550;
+}
+
+.guidanceChipIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
 .error {
   margin: 0;
   font-size: 0.76rem;
@@ -138,6 +174,15 @@
   border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
   outline: 2px solid var(--color-primary);
   outline-offset: 1px;
+}
+
+.searchShellInvalid {
+  border-color: #f87171;
+}
+
+.searchShellInvalid:focus-within {
+  border-color: #dc2626;
+  outline-color: #dc2626;
 }
 
 .searchLeadIcon {
@@ -362,6 +407,8 @@
   }
 
   .hint,
+  .guidanceChip,
+  .guidanceChipMuted,
   .selectedAddress,
   .precisionText,
   .error,
