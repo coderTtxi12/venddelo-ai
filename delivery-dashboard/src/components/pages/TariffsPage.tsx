@@ -484,8 +484,10 @@ export default function TariffsPage() {
                 </h2>
                 <p className={styles.panelHint}>
                   Define tramos de distancia de ruta y sus tarifas. REPA = repartidor, MEXY =
-                  comisión plataforma, Restaurante = total cobrado. Solo disponible en horario
-                  diurno (el turno nocturno no aplica fuera del polígono).
+                  comisión plataforma, Restaurante = total cobrado. En lluvia ligera o fuerte, el
+                  total es la columna de lluvia; si hay comisión Mexy, ese monto se mantiene fijo y
+                  el resto va al repartidor. Solo disponible en horario diurno (el turno nocturno no
+                  aplica fuera del polígono).
                 </p>
               </div>
               <button type="button" className={styles.addRowBtn} onClick={addBracketRow}>
@@ -588,7 +590,8 @@ export default function TariffsPage() {
             </h2>
             <p className={styles.panelHint}>
               Calcula lo que se cobraría con tus tarifas actuales guardadas (usa clima operativo si
-              no eliges uno distinto). El turno nocturno solo aplica dentro de cobertura.
+              no eliges uno distinto). El turno nocturno solo aplica dentro de cobertura. Fuera de
+              cobertura, la comisión Mexy del tabulador se mantiene fija en lluvia.
             </p>
 
             <div className={styles.simGrid}>

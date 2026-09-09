@@ -96,6 +96,51 @@ def test_outside_rain_light_quote():
     )
     assert quote.available is True
     assert quote.total_cents == 12500
+    assert quote.repa_cents == 12500
+    assert quote.mexy_cents == 0
+    assert quote.restaurant_cents == 12500
+
+
+def test_outside_rain_keeps_fixed_mexy_commission():
+    config = default_pricing_config()
+    light = quote_delivery_fee(
+        config,
+        inside_polygon=False,
+        distance_km=10.5,
+        is_night=False,
+        weather_mode="light",
+    )
+    heavy = quote_delivery_fee(
+        config,
+        inside_polygon=False,
+        distance_km=10.5,
+        is_night=False,
+        weather_mode="heavy",
+    )
+    dry = quote_delivery_fee(
+        config,
+        inside_polygon=False,
+        distance_km=10.5,
+        is_night=False,
+        weather_mode="none",
+    )
+
+    assert dry.available is True
+    assert dry.repa_cents == 12500
+    assert dry.mexy_cents == 3500
+    assert dry.restaurant_cents == 16000
+
+    assert light.available is True
+    assert light.mexy_cents == 3500
+    assert light.restaurant_cents == 20000
+    assert light.repa_cents == 16500
+    assert light.total_cents == 20000
+
+    assert heavy.available is True
+    assert heavy.mexy_cents == 3500
+    assert heavy.restaurant_cents == 24000
+    assert heavy.repa_cents == 20500
+    assert heavy.total_cents == 24000
 
 
 def test_outside_intense_rain_suspended():

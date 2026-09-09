@@ -312,14 +312,12 @@ def quote_delivery_fee(
             is_night=is_night,
         )
 
-    if weather_mode == "light":
-        total = bracket.rain_light_cents
-        repa = total
-        mexy = 0
-    elif weather_mode == "heavy":
-        total = bracket.rain_heavy_cents
-        repa = total
-        mexy = 0
+    if weather_mode in ("light", "heavy"):
+        total = (
+            bracket.rain_light_cents if weather_mode == "light" else bracket.rain_heavy_cents
+        )
+        mexy = min(bracket.mexy_cents, total)
+        repa = total - mexy
     else:
         total = bracket.restaurant_cents
         repa = bracket.repa_cents
