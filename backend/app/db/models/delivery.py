@@ -321,6 +321,12 @@ class RestaurantDeliveryProvider(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="pending")
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    has_web_app: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    on_hold: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     delivery_provider: Mapped["DeliveryProvider"] = relationship(
@@ -620,6 +626,9 @@ class DeliveryDispatchRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     search_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     quoted_fee_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    mexy_fee_cents: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0", default=0
+    )
     status: Mapped[str] = mapped_column(String, nullable=False)
     assigned_driver_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -661,9 +670,9 @@ class DeliveryDispatchRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     assignment_events: Mapped[list["DeliveryDispatchAssignmentEvent"]] = relationship(
         back_populates="request",
     )
-    credit_hold: Mapped["DeliveryCreditHold | None"] = relationship(
+    credit_holds: Mapped[list["DeliveryCreditHold"]] = relationship(
         back_populates="request",
-        uselist=False,
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
@@ -797,6 +806,9 @@ class DeliveryCreditHold(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         unique=True,
     )
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[str] = mapped_column(
+        String, nullable=False, server_default="restaurant_cash", default="restaurant_cash"
+    )
     status: Mapped[str] = mapped_column(String, nullable=False)
     released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     released_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -806,13 +818,18 @@ class DeliveryCreditHold(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
     driver: Mapped["DeliveryDriver"] = relationship(back_populates="credit_holds")
-    request: Mapped["DeliveryDispatchRequest"] = relationship(back_populates="credit_hold")
+    request: Mapped["DeliveryDispatchRequest"] = relationship(back_populates="credit_holds")
 
     __table_args__ = (
         CheckConstraint(
             "status IN ('held','released')",
             name="status_allowed",
         ),
+        CheckConstraint(
+            "kind IN ('restaurant_cash','mexy_fee')",
+            name="kind_allowed",
+        ),
+        UniqueConstraint("request_id", "kind", name="uq_delivery_credit_holds_request_kind"),
     )
 
 
