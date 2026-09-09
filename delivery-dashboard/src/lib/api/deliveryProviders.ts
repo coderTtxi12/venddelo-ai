@@ -1,4 +1,8 @@
 import { apiRequest, API_URL } from './client';
+import {
+  dispatchHistorySearchParams,
+  type DispatchHistoryQuery,
+} from '../dispatch/historyFilters';
 import { postFormWithProgress, putBlobWithProgress } from './uploadWithProgress';
 import type {
   DeliveryAssignmentSettings,
@@ -29,6 +33,7 @@ import type {
   DeliveryDriverUpdateInput,
   AssignmentLog,
   DispatchHistoryPage,
+  DispatchStats,
   DispatchMonitorSnapshot,
   RiderApk,
   RiderApkUploadSession,
@@ -367,30 +372,40 @@ export function getMyDispatchMonitor(token: string, zoneId?: string | null) {
   return apiRequest<DispatchMonitorSnapshot>(path, { token });
 }
 
-export function getMyDispatchHistory(
+export function getMyDispatchHistory(token: string, params: DispatchHistoryQuery) {
+  const qs = dispatchHistorySearchParams(params);
+  return apiRequest<DispatchHistoryPage>(
+    `/delivery-providers/me/dispatch-history?${qs.toString()}`,
+    { token },
+  );
+}
+
+export function getMyDispatchStats(
   token: string,
   params: {
     start: string;
     end: string;
-    status?: 'delivered' | 'cancelled';
-    driverId?: string | null;
-    restaurantId?: string | null;
+    compareStart?: string | null;
+    compareEnd?: string | null;
     zoneId?: string | null;
-    limit?: number;
-    offset?: number;
+    excludeRestaurantIds?: string[];
+    excludeDriverIds?: string[];
+    excludePhones?: string[];
   },
 ) {
   const qs = new URLSearchParams();
   qs.set('start', params.start);
   qs.set('end', params.end);
-  if (params.status) qs.set('status', params.status);
-  if (params.driverId) qs.set('driver_id', params.driverId);
-  if (params.restaurantId) qs.set('restaurant_id', params.restaurantId);
+  if (params.compareStart && params.compareEnd) {
+    qs.set('compare_start', params.compareStart);
+    qs.set('compare_end', params.compareEnd);
+  }
   if (params.zoneId) qs.set('zone_id', params.zoneId);
-  qs.set('limit', String(params.limit ?? 50));
-  qs.set('offset', String(params.offset ?? 0));
-  return apiRequest<DispatchHistoryPage>(
-    `/delivery-providers/me/dispatch-history?${qs.toString()}`,
+  for (const id of params.excludeRestaurantIds ?? []) qs.append('exclude_restaurant_id', id);
+  for (const id of params.excludeDriverIds ?? []) qs.append('exclude_driver_id', id);
+  for (const phone of params.excludePhones ?? []) qs.append('exclude_customer_phone', phone);
+  return apiRequest<DispatchStats>(
+    `/delivery-providers/me/dispatch-stats?${qs.toString()}`,
     { token },
   );
 }
@@ -400,6 +415,19 @@ export function retryMyUnassignedDispatchRequest(token: string, requestId: strin
     `/delivery-providers/me/dispatch-requests/${requestId}/retry`,
     { method: 'POST', token },
   );
+}
+
+export function releaseMyMexyFeeHold(token: string, requestId: string) {
+  return apiRequest<{
+    request_id: string;
+    short_id: string;
+    amount_cents: number;
+    status: 'held' | 'released';
+    kind: 'mexy_fee';
+  }>(`/delivery-providers/me/dispatch-requests/${requestId}/release-mexy-fee`, {
+    method: 'POST',
+    token,
+  });
 }
 
 export function createMyManualDispatchOffer(
