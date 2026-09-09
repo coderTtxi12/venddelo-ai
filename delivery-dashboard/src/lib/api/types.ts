@@ -219,6 +219,7 @@ export type DeliveryPartnershipRestaurant = {
   whatsapp_phone: string | null;
   owner_display_name: string | null;
   owner_phone: string | null;
+  primary_email: string | null;
   logo_path: string | null;
   status: string;
   delivery_enabled: boolean;
@@ -228,10 +229,18 @@ export type DeliveryPartnershipRequest = {
   id: string;
   status: 'pending' | 'active' | 'suspended';
   is_default: boolean;
+  has_web_app: boolean;
+  on_hold: boolean;
   created_at: string;
   activated_at: string | null;
   zone: { id: string; name: string };
   restaurant: DeliveryPartnershipRestaurant;
+};
+
+export type DeliveryPartnershipListPage = {
+  items: DeliveryPartnershipRequest[];
+  total: number;
+  has_more: boolean;
 };
 
 export type DeliveryAssignmentSettings = {
@@ -459,6 +468,7 @@ export type DispatchMonitorRequest = {
   package_size: string;
   package_count?: number;
   quoted_fee_cents?: number;
+  mexy_fee_cents?: number;
   notes?: string | null;
   last_case?: string | null;
   last_decision?: Record<string, unknown> | null;
@@ -469,6 +479,7 @@ export type DispatchMonitorRequest = {
   created_at?: string | null;
   tracking_token?: string | null;
   prep_minutes?: number | null;
+  source?: 'web_app' | 'manual';
   timeline?: DispatchMonitorTimelineEvent[];
 };
 
@@ -503,6 +514,7 @@ export type DispatchMonitorCreditHold = {
   short_id: string;
   amount_cents: number;
   status: string;
+  kind?: 'restaurant_cash' | 'mexy_fee' | string;
   customer_name: string;
   restaurant_name: string;
 };
@@ -559,6 +571,8 @@ export type DispatchHistoryItem = {
   notes?: string | null;
   credit_hold_cents: number;
   credit_hold_status?: string | null;
+  mexy_fee_cents?: number;
+  mexy_hold_status?: string | null;
   assigned_driver_id: string | null;
   assigned_driver_name: string | null;
   assigned_driver_first_name?: string | null;
@@ -586,6 +600,7 @@ export type DispatchHistoryItem = {
   prep_minutes?: number | null;
   tracking_token?: string | null;
   restaurant_subdomain?: string | null;
+  source?: 'web_app' | 'manual';
 };
 
 export type DispatchHistoryPage = {
@@ -597,6 +612,79 @@ export type DispatchHistoryPage = {
   cancelled_count: number;
   earnings_cents: number;
   has_more: boolean;
+};
+
+export type DispatchStatsSummary = {
+  order_count: number;
+  delivered_count: number;
+  cancelled_count: number;
+  cancellation_rate_pct: number;
+  earnings_cents: number;
+  mexy_fee_cents: number;
+  web_app_count: number;
+  manual_count: number;
+  peak_hour: string | null;
+  peak_hour_count: number;
+  peak_occupancy: number;
+  peak_occupancy_change_pct: number | null;
+  routed_order_count: number;
+  routed_order_change_pct: number | null;
+  stacked_rider_count: number;
+  order_count_change_pct: number | null;
+  delivered_count_change_pct: number | null;
+  cancelled_count_change_pct: number | null;
+  earnings_change_pct: number | null;
+  web_app_count_change_pct: number | null;
+  manual_count_change_pct: number | null;
+};
+
+export type DispatchStatsPoint = {
+  label: string;
+  current_count: number;
+  previous_count: number;
+  current_earnings_cents: number;
+  previous_earnings_cents: number;
+  current_delivered_count: number;
+  current_cancelled_count: number;
+  previous_delivered_count: number;
+  previous_cancelled_count: number;
+  current_occupancy: number;
+  previous_occupancy: number;
+  current_routed: number;
+  previous_routed: number;
+};
+
+export type DispatchStatsSource = {
+  source: 'web_app' | 'manual';
+  count: number;
+};
+
+export type DispatchStatsTopEntity = {
+  id: string;
+  name: string;
+  delivered_count: number;
+  earnings_cents: number;
+};
+
+export type DispatchStatsHourCell = {
+  weekday: number;
+  hour: number;
+  count: number;
+};
+
+export type DispatchStats = {
+  start: string;
+  end: string;
+  comparison_start: string;
+  comparison_end: string;
+  granularity: 'hourly' | 'daily' | 'weekly';
+  summary: DispatchStatsSummary;
+  series: DispatchStatsPoint[];
+  hour_heatmap: DispatchStatsHourCell[];
+  sources: DispatchStatsSource[];
+  top_restaurants: DispatchStatsTopEntity[];
+  top_drivers: DispatchStatsTopEntity[];
+  recent: DispatchHistoryItem[];
 };
 
 export type AssignmentLogEvent = {
