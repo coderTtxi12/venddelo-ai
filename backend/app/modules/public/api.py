@@ -238,6 +238,7 @@ def get_public_checkout_config(
             partnership_status=resolved.partnership_status,
             provider_name=resolved.provider_name,
             weather_mode=resolved.weather_mode,
+            on_hold=resolved.on_hold,
         )
         if resolved.available:
             partnership.ensure_restaurant_delivery_payment_methods(restaurant.id)

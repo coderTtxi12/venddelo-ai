@@ -109,6 +109,7 @@ class PublicDeliveryServiceDTO(BaseModel):
     partnership_status: Literal["none", "pending", "active", "suspended"] = "none"
     provider_name: str | None = None
     weather_mode: Literal["none", "light", "heavy", "intense"] = "none"
+    on_hold: bool = False
 
 
 class PublicCheckoutConfigDTO(BaseModel):

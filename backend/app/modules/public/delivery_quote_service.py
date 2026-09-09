@@ -24,6 +24,11 @@ from app.modules.restaurants.schemas import RestaurantDTO
 
 PartnershipStatus = Literal["none", "pending", "active", "suspended"]
 
+MEXY_ON_HOLD_REASON = (
+    "Mexy pausó las entregas de tu negocio. "
+    "Escríbenos por WhatsApp para reactivarlas."
+)
+
 
 @dataclass(frozen=True)
 class ResolvedDeliveryService:
@@ -33,6 +38,7 @@ class ResolvedDeliveryService:
     provider_name: str | None
     provider_id: uuid.UUID | None
     weather_mode: DeliveryWeatherMode = "none"
+    on_hold: bool = False
 
 
 @dataclass(frozen=True)
@@ -45,6 +51,7 @@ class ResolvedDeliveryQuote:
     provider_name: str | None
     partnership_status: PartnershipStatus
     weather_mode: DeliveryWeatherMode = "none"
+    mexy_fee_cents: int = 0
 
 
 def _partnership_status(
@@ -163,6 +170,16 @@ class PublicDeliveryQuoteService:
                 partnership_status=status,
                 provider_name=partnership.provider_name if partnership else None,
                 provider_id=None,
+            )
+
+        if partnership.on_hold:
+            return ResolvedDeliveryService(
+                available=False,
+                reason=MEXY_ON_HOLD_REASON,
+                partnership_status="active",
+                provider_name=partnership.provider_name,
+                provider_id=self._repo.get_mexy_provider_id(),
+                on_hold=True,
             )
 
         provider_id = self._repo.get_mexy_provider_id()
@@ -407,4 +424,5 @@ class PublicDeliveryQuoteService:
             provider_name=provider_name,
             partnership_status=status,
             weather_mode=weather_mode,
+            mexy_fee_cents=quote.mexy_cents if quote.available else 0,
         )

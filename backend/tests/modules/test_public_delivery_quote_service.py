@@ -139,6 +139,35 @@ def test_quote_delivery_allows_outside_polygon_during_regular_hours():
     assert quote.available is True
     assert quote.inside_polygon is False
     assert quote.delivery_fee_cents == 6500
+    assert quote.mexy_fee_cents == 0
+
+
+def test_quote_delivery_outside_keeps_fixed_mexy_fee():
+    repo = _active_outside_quote_repo()
+    service = PublicDeliveryQuoteService(repo)
+    now = datetime(2026, 6, 22, 18, 0, tzinfo=UTC)
+
+    with (
+        patch(
+            "app.modules.public.delivery_quote_service.get_settings",
+            return_value=MagicMock(google_maps_api_key="test-key"),
+        ),
+        patch(
+            "app.modules.public.delivery_quote_service.fetch_driving_distance_km",
+            return_value=10.5,
+        ),
+    ):
+        quote = service.quote_delivery(
+            _restaurant(),
+            delivery_latitude=19.45,
+            delivery_longitude=-99.12,
+            now=now,
+        )
+
+    assert quote.available is True
+    assert quote.inside_polygon is False
+    assert quote.delivery_fee_cents == 16000
+    assert quote.mexy_fee_cents == 3500
     assert quote.weather_mode == "none"
 
 
@@ -352,3 +381,39 @@ def test_resolve_delivery_service_explains_outside_schedule():
     assert resolved.available is False
     assert "fuera del horario de operación" in (resolved.reason or "")
     assert "Reanuda" in (resolved.reason or "")
+
+
+def test_resolve_delivery_service_blocks_active_partnership_on_hold():
+    repo = _active_service_repo(manually_enabled=True)
+    partnership = repo.get_mexy_partnership_for_restaurant.return_value
+    repo.get_mexy_partnership_for_restaurant.return_value = partnership.model_copy(
+        update={"on_hold": True}
+    )
+    now = datetime(2026, 6, 22, 18, 0, tzinfo=UTC)
+
+    resolved = PublicDeliveryQuoteService(repo).resolve_delivery_service(
+        _restaurant(), now=now
+    )
+
+    assert resolved.available is False
+    assert resolved.on_hold is True
+    assert resolved.partnership_status == "active"
+    assert "whatsapp" in (resolved.reason or "").lower()
+
+
+def test_quote_delivery_unavailable_when_partnership_on_hold():
+    repo = _active_service_repo(manually_enabled=True)
+    partnership = repo.get_mexy_partnership_for_restaurant.return_value
+    repo.get_mexy_partnership_for_restaurant.return_value = partnership.model_copy(
+        update={"on_hold": True}
+    )
+    now = datetime(2026, 6, 22, 18, 0, tzinfo=UTC)
+
+    quote = PublicDeliveryQuoteService(repo).quote_delivery(
+        _restaurant(),
+        delivery_latitude=19.45,
+        delivery_longitude=-99.12,
+        now=now,
+    )
+
+    assert quote.available is False
