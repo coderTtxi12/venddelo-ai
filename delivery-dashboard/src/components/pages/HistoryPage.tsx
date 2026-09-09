@@ -1,7 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import { HistoryDetailDrawer } from '@/components/history/HistoryDetailDrawer';
+import { EntityFilterCombobox } from '@/components/history/EntityFilterCombobox';
 import { PanelPageShell, type PanelPageStyles } from '@/components/pages/PanelPageShell';
 import { FormSelect } from '@/components/ui/FormSelect';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
@@ -10,6 +13,15 @@ import { getMyDispatchHistory, listMyDeliveryDrivers } from '@/lib/api/deliveryP
 import { listActivePartnerships } from '@/lib/api/partnerships';
 import { ApiError } from '@/lib/api/types';
 import type { DeliveryDriver, DeliveryPartnershipRequest, DispatchHistoryItem } from '@/lib/api/types';
+import {
+  HISTORY_PAGE_SIZE,
+  historyEmptyHint,
+  historyEmptyTitle,
+  historyPageRangeLabel,
+  historySearchScopeHint,
+  normalizeHistoryQuery,
+  type HistoryEntityMode,
+} from '@/lib/dispatch/historyFilters';
 import { historyDateRange, type HistoryPeriod } from '@/lib/dispatch/historyPeriod';
 import {
   customerCollectCents,
@@ -24,6 +36,8 @@ import styles from './HistoryPage.module.css';
 
 const PERIODS: Array<{ id: HistoryPeriod; label: string }> = [
   { id: 'today', label: 'Hoy' },
+  { id: 'yesterday', label: 'Ayer' },
+  { id: 'day_before', label: 'Antier' },
   { id: 'week', label: 'Semana' },
   { id: 'month', label: 'Mes' },
   { id: 'custom', label: 'Rango' },
@@ -47,8 +61,10 @@ export default function HistoryPage() {
   const [customEnd, setCustomEnd] = useState('');
   const [appliedCustom, setAppliedCustom] = useState<{ start: string; end: string } | null>(null);
   const [status, setStatus] = useState<'' | 'delivered' | 'cancelled'>('');
-  const [driverId, setDriverId] = useState('');
-  const [restaurantId, setRestaurantId] = useState('');
+  const [driverIds, setDriverIds] = useState<string[]>([]);
+  const [driverMode, setDriverMode] = useState<HistoryEntityMode>('include');
+  const [restaurantIds, setRestaurantIds] = useState<string[]>([]);
+  const [restaurantMode, setRestaurantMode] = useState<HistoryEntityMode>('include');
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
   const [partnerships, setPartnerships] = useState<DeliveryPartnershipRequest[]>([]);
   const [items, setItems] = useState<DispatchHistoryItem[]>([]);
@@ -61,6 +77,9 @@ export default function HistoryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<DispatchHistoryItem | null>(null);
+  const [queryInput, setQueryInput] = useState('');
+  const [query, setQuery] = useState('');
+  const queryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const range = useMemo(() => {
     if (period === 'custom') {
@@ -72,6 +91,18 @@ export default function HistoryPage() {
   }, [appliedCustom, period]);
 
   const zoneId = isAllZones ? null : selectedZoneId;
+
+  const visibleRestaurantIds = useMemo(() => {
+    const visible = isAllZones
+      ? partnerships
+      : partnerships.filter((row) => row.zone.id === selectedZoneId);
+    return new Set(visible.map((row) => row.restaurant.id));
+  }, [isAllZones, partnerships, selectedZoneId]);
+
+  const restaurantFilterIds = useMemo(
+    () => restaurantIds.filter((id) => visibleRestaurantIds.has(id)),
+    [restaurantIds, visibleRestaurantIds],
+  );
 
   const loadDrivers = useCallback(async () => {
     if (!accessToken) return;
@@ -86,8 +117,19 @@ export default function HistoryPage() {
   const loadPartnerships = useCallback(async () => {
     if (!accessToken) return;
     try {
-      const rows = await listActivePartnerships(accessToken);
-      setPartnerships(rows);
+      const collected: DeliveryPartnershipRequest[] = [];
+      let offset = 0;
+      for (;;) {
+        const page = await listActivePartnerships(accessToken, {
+          limit: 100,
+          offset,
+          sort: 'name',
+        });
+        collected.push(...page.items);
+        if (!page.has_more || page.items.length === 0) break;
+        offset += page.items.length;
+      }
+      setPartnerships(collected);
     } catch {
       setPartnerships([]);
     }
@@ -103,11 +145,14 @@ export default function HistoryPage() {
         const page = await getMyDispatchHistory(accessToken, {
           start: range.start,
           end: range.end,
+          q: query || undefined,
           status: status || undefined,
-          driverId: driverId || null,
-          restaurantId: restaurantId || null,
+          driverIds,
+          driverMode,
+          restaurantIds: restaurantFilterIds,
+          restaurantMode,
           zoneId,
-          limit: 50,
+          limit: HISTORY_PAGE_SIZE,
           offset,
         });
         setItems((current) => (append ? [...current, ...page.items] : page.items));
@@ -126,7 +171,7 @@ export default function HistoryPage() {
         setLoadingMore(false);
       }
     },
-    [accessToken, driverId, range.end, range.start, restaurantId, status, zoneId, zonesLoading],
+    [accessToken, driverIds, driverMode, query, range.end, range.start, restaurantFilterIds, restaurantMode, status, zoneId, zonesLoading],
   );
 
   useEffect(() => {
@@ -141,11 +186,38 @@ export default function HistoryPage() {
     void loadPage(0, false);
   }, [loadPage]);
 
+  useEffect(() => {
+    return () => {
+      if (queryTimer.current) clearTimeout(queryTimer.current);
+    };
+  }, []);
+
+  function commitQuery(raw: string) {
+    setQuery(normalizeHistoryQuery(raw));
+  }
+
+  function handleQueryChange(raw: string) {
+    setQueryInput(raw);
+    if (queryTimer.current) clearTimeout(queryTimer.current);
+    queryTimer.current = setTimeout(() => commitQuery(raw), 300);
+  }
+
+  function clearQuery() {
+    if (queryTimer.current) clearTimeout(queryTimer.current);
+    setQueryInput('');
+    setQuery('');
+  }
+
+  const searching = Boolean(query);
+  const searchHint = historySearchScopeHint(query);
+  const emptyHint = historyEmptyHint(query);
+
   const driverOptions = useMemo(
-    () => [
-      { value: '', label: 'Todos' },
-      ...drivers.map((driver) => ({ value: driver.id, label: driverLabel(driver) })),
-    ],
+    () =>
+      drivers.map((driver) => ({
+        id: driver.id,
+        label: driverLabel(driver),
+      })),
     [drivers],
   );
 
@@ -157,20 +229,10 @@ export default function HistoryPage() {
     for (const row of visible) {
       unique.set(row.restaurant.id, row.restaurant.name);
     }
-    return [
-      { value: '', label: 'Todos' },
-      ...[...unique.entries()]
-        .sort((a, b) => a[1].localeCompare(b[1], 'es'))
-        .map(([value, label]) => ({ value, label })),
-    ];
+    return [...unique.entries()]
+      .sort((a, b) => a[1].localeCompare(b[1], 'es'))
+      .map(([id, label]) => ({ id, label }));
   }, [isAllZones, partnerships, selectedZoneId]);
-
-  useEffect(() => {
-    if (!restaurantId) return;
-    if (!restaurantOptions.some((option) => option.value === restaurantId)) {
-      setRestaurantId('');
-    }
-  }, [restaurantId, restaurantOptions]);
 
   function applyCustomRange() {
     if (!customStart || !customEnd) return;
@@ -195,14 +257,66 @@ export default function HistoryPage() {
       ) : null}
 
       <div className={styles.filters}>
-        <div className={panelStyles.tabs} role="tablist" aria-label="Periodo">
+        <form
+          className={styles.searchField}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (queryTimer.current) clearTimeout(queryTimer.current);
+            commitQuery(queryInput);
+          }}
+        >
+          <label htmlFor="history-order-id">ID del pedido</label>
+          <div className={styles.searchBox}>
+            <SearchOutlinedIcon sx={{ fontSize: 20 }} className={styles.searchIcon} aria-hidden />
+            <input
+              id="history-order-id"
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              autoComplete="off"
+              spellCheck={false}
+              value={queryInput}
+              placeholder="#BDE4E"
+              aria-describedby={searchHint ? 'history-search-hint' : 'history-search-help'}
+              onChange={(event) => handleQueryChange(event.target.value)}
+            />
+            {queryInput ? (
+              <button
+                type="button"
+                className={styles.searchClear}
+                aria-label="Borrar búsqueda"
+                onClick={clearQuery}
+              >
+                <CloseOutlinedIcon sx={{ fontSize: 18 }} aria-hidden />
+              </button>
+            ) : null}
+          </div>
+          {searchHint ? (
+            <p id="history-search-hint" className={styles.searchHint}>
+              {searchHint}
+            </p>
+          ) : (
+            <p id="history-search-help" className={styles.searchHint}>
+              Busca por ID en todo el historial, por ejemplo #BDE4E.
+            </p>
+          )}
+        </form>
+
+        <div
+          className={`${styles.periodRow} ${searching ? styles.periodRowMuted : ''}`}
+          role="tablist"
+          aria-label="Periodo"
+          aria-disabled={searching}
+        >
           {PERIODS.map((option) => (
             <button
               key={option.id}
               type="button"
               role="tab"
               aria-selected={period === option.id}
-              className={`${panelStyles.tab} ${period === option.id ? panelStyles.tabActive : ''}`}
+              className={`${styles.periodChip} ${period === option.id ? styles.periodChipActive : ''}`}
               onClick={() => {
                 if (option.id === 'custom') {
                   setCustomStart((current) => current || range.start);
@@ -246,22 +360,32 @@ export default function HistoryPage() {
         <div className={styles.selects}>
           <div className={styles.filterField}>
             <span id="history-restaurant-label">Negocio</span>
-            <FormSelect
+            <EntityFilterCombobox
               id="history-restaurant"
-              aria-labelledby="history-restaurant-label"
-              value={restaurantId}
+              labelledBy="history-restaurant-label"
               options={restaurantOptions}
-              onChange={setRestaurantId}
+              selectedIds={restaurantFilterIds}
+              mode={restaurantMode}
+              placeholder="Escribe un restaurante"
+              onChange={({ ids, mode }) => {
+                setRestaurantIds(ids);
+                setRestaurantMode(mode);
+              }}
             />
           </div>
           <div className={styles.filterField}>
             <span id="history-driver-label">Repartidor</span>
-            <FormSelect
+            <EntityFilterCombobox
               id="history-driver"
-              aria-labelledby="history-driver-label"
-              value={driverId}
+              labelledBy="history-driver-label"
               options={driverOptions}
-              onChange={setDriverId}
+              selectedIds={driverIds}
+              mode={driverMode}
+              placeholder="Escribe un repartidor"
+              onChange={({ ids, mode }) => {
+                setDriverIds(ids);
+                setDriverMode(mode);
+              }}
             />
           </div>
           <div className={styles.filterField}>
@@ -290,7 +414,8 @@ export default function HistoryPage() {
         <div className={styles.empty}>Cargando historial…</div>
       ) : items.length === 0 ? (
         <div className={styles.empty}>
-          <p className={styles.emptyTitle}>No hay pedidos cerrados en este periodo.</p>
+          <p className={styles.emptyTitle}>{historyEmptyTitle(query)}</p>
+          {emptyHint ? <p className={styles.emptyHint}>{emptyHint}</p> : null}
         </div>
       ) : (
         <>
@@ -385,6 +510,9 @@ export default function HistoryPage() {
                       ? ` · cobro ${formatMoney(customerCollectCents(item))}`
                       : ''}
                     {' · '}tarifa {formatMoney(item.quoted_fee_cents)}
+                    {(item.mexy_fee_cents ?? 0) > 0
+                      ? ` · Mexy ${formatMoney(item.mexy_fee_cents ?? 0)}`
+                      : ''}
                   </p>
                 </button>
               </li>
@@ -405,7 +533,7 @@ export default function HistoryPage() {
       )}
 
       {items.length > 0 ? (
-        <p className={styles.totalHint}>{total} pedidos en este periodo</p>
+        <p className={styles.totalHint}>{historyPageRangeLabel(0, items.length, total)}</p>
       ) : null}
 
       <HistoryDetailDrawer

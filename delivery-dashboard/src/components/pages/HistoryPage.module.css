@@ -4,11 +4,128 @@
   gap: 0.85rem;
 }
 
+.searchField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.searchField label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  padding: 0.15rem 0.25rem 0.15rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.searchBox:focus-within {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+}
+
+.searchIcon {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+.searchBox input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.45rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.searchBox input::placeholder {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.searchBox input::-webkit-search-decoration,
+.searchBox input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.searchBox input:focus {
+  outline: none;
+}
+
+.searchClear {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.searchClear:hover {
+  color: var(--color-text);
+}
+
+.searchHint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+}
+
+.periodRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.periodRowMuted {
+  opacity: 0.55;
+}
+
+.periodChip {
+  min-height: 2.75rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.periodChipActive {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
 .selects {
   display: grid;
-  grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) minmax(10rem, 14rem);
+  grid-template-columns: 1fr;
   gap: 0.85rem;
-  align-items: end;
+  align-items: start;
 }
 
 .filterField {
@@ -45,28 +162,35 @@
 }
 
 .dateField input {
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   padding: 0.4rem 0.65rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: var(--color-surface);
   color: var(--color-text);
-  font-size: 0.88rem;
+  font-size: 1rem;
   font-weight: 600;
 }
 
 .dateField input:focus-visible,
 .applyButton:focus-visible,
 .loadMore:focus-visible,
+.periodChip:focus-visible,
+.searchClear:focus-visible,
 .row:focus-visible,
 .card:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
+.searchBox:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .applyButton,
 .loadMore {
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   padding: 0.45rem 0.95rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -75,11 +199,11 @@
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background 180ms ease, border-color 180ms ease;
 }
 
 .applyButton:hover,
-.loadMore:hover {
+.loadMore:hover,
+.periodChip:hover:not(.periodChipActive) {
   background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
   border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
 }
@@ -114,12 +238,13 @@
   color: var(--color-text);
 }
 
+.emptyHint {
+  margin: 0.45rem 0 0;
+  font-size: 0.85rem;
+}
+
 .tableWrap {
-  overflow: auto;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-surface);
-  transition: opacity 180ms ease;
+  display: none;
 }
 
 .dimmed {
@@ -159,7 +284,6 @@
 
 .row {
   cursor: pointer;
-  transition: background 180ms ease, border-color 180ms ease;
 }
 
 .row:hover td {
@@ -186,13 +310,12 @@
 }
 
 .cards {
-  display: none;
+  display: flex;
   list-style: none;
   margin: 0;
   padding: 0;
   flex-direction: column;
   gap: 0.75rem;
-  transition: opacity 180ms ease;
 }
 
 .card {
@@ -206,7 +329,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  transition: background 180ms ease, border-color 180ms ease;
+  min-height: 2.75rem;
 }
 
 .card:hover {
@@ -239,26 +362,55 @@
 
 .loadMore {
   align-self: center;
-  width: fit-content;
+  width: 100%;
 }
 
-@media (max-width: 768px) {
+@media (min-width: 768px) {
   .selects {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) minmax(10rem, 14rem);
+  }
+
+  .dateField input {
+    font-size: 0.88rem;
   }
 
   .tableWrap {
-    display: none;
+    display: block;
+    overflow: auto;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
   }
 
   .cards {
-    display: flex;
+    display: none;
+  }
+
+  .loadMore {
+    width: fit-content;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .applyButton,
+  .loadMore,
+  .periodChip,
+  .searchClear,
+  .searchBox,
+  .row,
+  .card,
+  .tableWrap,
+  .cards {
+    transition: background 180ms ease, border-color 180ms ease, opacity 180ms ease;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .applyButton,
   .loadMore,
+  .periodChip,
+  .searchClear,
+  .searchBox,
   .row,
   .card,
   .tableWrap,
