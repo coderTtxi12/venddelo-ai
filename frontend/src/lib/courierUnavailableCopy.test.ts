@@ -87,4 +87,16 @@ describe('restaurantCourierServiceNotice', () => {
     expect(copy?.title).toBe('El servicio de reparto no está disponible en este momento.');
     expect(copy?.detail).toContain('lluvia intensa');
   });
+
+  it('returns null when Mexy has the partnership on hold', () => {
+    expect(
+      restaurantCourierServiceNotice({
+        available: false,
+        reason:
+          'Mexy pausó las entregas de tu negocio. Escríbenos por WhatsApp para reactivarlas.',
+        weather_mode: 'none',
+        on_hold: true,
+      }),
+    ).toBeNull();
+  });
 });

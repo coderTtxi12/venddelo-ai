@@ -55,9 +55,12 @@ export const EMPTY_DELIVERY_LOCATION = {
 };
 
 export function resolveAvailableServices(config: PublicCheckoutConfig): RestaurantServiceType[] {
-  return RESTAURANT_SERVICE_ORDER.filter((type) =>
-    type === 'takeout' ? config.takeout_enabled : config.delivery_enabled,
-  );
+  return RESTAURANT_SERVICE_ORDER.filter((type) => {
+    if (type === 'takeout') return config.takeout_enabled;
+    if (!config.delivery_enabled) return false;
+    if (config.delivery_service?.on_hold) return false;
+    return true;
+  });
 }
 
 export function resolveDefaultServiceType(

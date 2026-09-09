@@ -9,7 +9,9 @@ import {
 } from '@/lib/courierUnavailableCopy';
 import styles from './CourierUnavailableAlert.module.css';
 
-type ServiceSlice = Pick<PublicDeliveryService, 'available' | 'reason' | 'weather_mode'>;
+type ServiceSlice = Pick<PublicDeliveryService, 'available' | 'reason' | 'weather_mode'> & {
+  on_hold?: boolean;
+};
 
 function noticeIcon(copy: CourierServiceNoticeCopy) {
   if (copy.tone === 'weather' || /lluvia/i.test(`${copy.title} ${copy.detail}`)) {

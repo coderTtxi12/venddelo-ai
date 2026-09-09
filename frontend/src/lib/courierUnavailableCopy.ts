@@ -69,9 +69,12 @@ export function restaurantCourierUnavailableCopy(reason: string | null): {
 }
 
 export function restaurantCourierServiceNotice(
-  service: Pick<PublicDeliveryService, 'available' | 'reason' | 'weather_mode'> | null,
+  service: Pick<PublicDeliveryService, 'available' | 'reason' | 'weather_mode'> & {
+    on_hold?: boolean;
+  } | null,
 ): CourierServiceNoticeCopy | null {
   if (!service) return null;
+  if (service.on_hold) return null;
   if (!service.available) return unavailableCopy(service.reason);
   return null;
 }

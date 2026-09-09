@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DispatchRequestSuccess } from '@/components/dispatch/DispatchRequestSuccess';
+import { MexyOnHoldNotice } from '@/components/dispatch/MexyOnHoldNotice';
 import { RequestDeliveryForm } from '@/components/dispatch/RequestDeliveryForm';
 import { updateRestaurantOrderStatus } from '@/lib/api/orders';
 import { listDispatchLeadTimes, type DispatchRequest } from '@/lib/api/dispatch';
-import { getPublicCheckoutConfig } from '@/lib/api/public';
+import { getPublicCheckoutConfig, type PublicDeliveryService } from '@/lib/api/public';
 import { ApiError } from '@/lib/api/types';
 import type { Order } from '@/lib/api/types';
 import { getRestaurant } from '@/lib/api/restaurants';
 import { isActiveDeliveryPartnership } from '@/lib/fetchActiveDeliveryProviderConfig';
+import { isMexyPartnershipOnHold } from '@/lib/dispatch/mexyOnHold';
 import {
   kitchenConfirmOpensDispatch,
   orderToDispatchFormValues,
@@ -53,6 +55,7 @@ export function OrderDispatchDrawer({
   const [leadTimes, setLeadTimes] = useState<number[]>([]);
   const [courierAvailable, setCourierAvailable] = useState(false);
   const [courierReason, setCourierReason] = useState<string | null>(null);
+  const [deliveryService, setDeliveryService] = useState<PublicDeliveryService | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [created, setCreated] = useState<DispatchRequest | null>(null);
@@ -114,6 +117,7 @@ export function OrderDispatchDrawer({
       if (!isActiveDeliveryPartnership(partnership)) {
         setCourierAvailable(false);
         setCourierReason('No tienes un repartidor activo');
+        setDeliveryService(null);
         setSubdomain(restaurant.subdomain);
         setLeadTimes([]);
         return;
@@ -126,6 +130,7 @@ export function OrderDispatchDrawer({
       setLeadTimes(times.map((item) => item.prep_minutes));
       setCourierAvailable(checkoutConfig.delivery_service?.available ?? false);
       setCourierReason(checkoutConfig.delivery_service?.reason ?? null);
+      setDeliveryService(checkoutConfig.delivery_service);
     } catch (error) {
       setLoadError(
         error instanceof ApiError ? error.message : 'No se pudo cargar Delivery.',
@@ -227,6 +232,8 @@ export function OrderDispatchDrawer({
                 onDismiss={tryClose}
               />
             </>
+          ) : !loading && subdomain && isMexyPartnershipOnHold(deliveryService) ? (
+            <MexyOnHoldNotice />
           ) : !loading && subdomain ? (
             <RequestDeliveryForm
               accessToken={accessToken}

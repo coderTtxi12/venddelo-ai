@@ -23,10 +23,12 @@ import { hasPublicSocialLinks, isSocialAtPlacement } from '@/lib/digital-menu/re
 import { RestaurantOpenStatusBadge } from '@/components/digital-menu/RestaurantOpenStatusBadge';
 import { RestaurantServiceChips } from '@/components/digital-menu/RestaurantServiceChips';
 import {
+  getPublicCheckoutConfig,
   getPublicMenu,
   getPublicRestaurant,
   getPublicRestaurantPromotions,
   getPublicRestaurantSchedules,
+  type PublicDeliveryService,
   type PublicMenu,
   type PublicPromotionsContext,
   type PublicRestaurant,
@@ -50,7 +52,8 @@ import {
   getDigitalMenuThemeOrDefault,
   loadDigitalMenuThemeFonts,
 } from '@/lib/digital-menu/themes';
-import { PUBLIC_MENU_SCHEDULE_SERVICE_TYPES, resolveRestaurantServices } from '@/lib/restaurantServices';
+import { PUBLIC_MENU_SCHEDULE_SERVICE_TYPES } from '@/lib/restaurantServices';
+import { resolveAvailableServices } from '@/lib/digital-menu/checkout/fulfillment';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { buildAddToCartInput } from '@/lib/digital-menu/cart/buildCartLine';
 import {
@@ -169,6 +172,8 @@ export default function PublicDigitalMenuPage({
     initialCritical?.products ?? [],
   );
   const [schedules, setSchedules] = useState<Awaited<ReturnType<typeof getPublicRestaurantSchedules>>>([]);
+  const [checkoutDeliveryService, setCheckoutDeliveryService] =
+    useState<PublicDeliveryService | null>(null);
   const [promotionsContext, setPromotionsContext] = useState<PublicPromotionsContext | null>(null);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(
     initialCritical?.activeCategoryId ?? null,
@@ -201,8 +206,16 @@ export default function PublicDigitalMenuPage({
   const menuTheme = useMemo(() => getDigitalMenuThemeOrDefault(themeId), [themeId]);
   const menuThemeStyle = useMemo(() => digitalMenuThemeToStyle(menuTheme), [menuTheme]);
   const enabledServices = useMemo(
-    () => (restaurant ? resolveRestaurantServices(restaurant) : []),
-    [restaurant],
+    () =>
+      restaurant
+        ? resolveAvailableServices({
+            takeout_enabled: restaurant.takeout_enabled,
+            delivery_enabled: restaurant.delivery_enabled,
+            payment_methods: [],
+            delivery_service: checkoutDeliveryService,
+          })
+        : [],
+    [checkoutDeliveryService, restaurant],
   );
 
   useEffect(() => {
@@ -232,15 +245,17 @@ export default function PublicDigitalMenuPage({
 
     async function loadSecondaryData() {
       try {
-        const [scheduleRows, promotionContext] = await Promise.all([
+        const [scheduleRows, promotionContext, checkoutConfig] = await Promise.all([
           getPublicRestaurantSchedules(subdomain),
           getPublicRestaurantPromotions(subdomain),
+          getPublicCheckoutConfig(subdomain).catch(() => null),
         ]);
 
         if (cancelled) return;
 
         setSchedules(scheduleRows);
         setPromotionsContext(promotionContext);
+        setCheckoutDeliveryService(checkoutConfig?.delivery_service ?? null);
         writePromotionsCache(subdomain, promotionContext);
       } catch (error) {
         if (!cancelled) {
@@ -254,9 +269,10 @@ export default function PublicDigitalMenuPage({
       setLoadError(null);
 
       try {
-        const [restaurantData, menuData] = await Promise.all([
+        const [restaurantData, menuData, checkoutConfig] = await Promise.all([
           getPublicRestaurant(subdomain),
           getPublicMenu(subdomain),
+          getPublicCheckoutConfig(subdomain).catch(() => null),
         ]);
 
         if (cancelled) return;
@@ -266,6 +282,7 @@ export default function PublicDigitalMenuPage({
         setCategories(sortedCategories);
         setProducts(filterPublicMenuProducts(menuData.products));
         setActiveCategoryId(sortedCategories[0]?.id ?? null);
+        setCheckoutDeliveryService(checkoutConfig?.delivery_service ?? null);
 
         void loadSecondaryData();
       } catch (error) {

@@ -7,6 +7,7 @@ import { CourierUnavailableAlert } from '@/components/dispatch/CourierUnavailabl
 import { DispatchRecentRequests } from '@/components/dispatch/DispatchRecentRequests';
 import { DispatchRequestSuccess } from '@/components/dispatch/DispatchRequestSuccess';
 import { DispatchRiderCreditPanel } from '@/components/dispatch/DispatchRiderCreditPanel';
+import { MexyOnHoldNotice } from '@/components/dispatch/MexyOnHoldNotice';
 import { RequestDeliveryForm } from '@/components/dispatch/RequestDeliveryForm';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
@@ -34,6 +35,7 @@ import {
   type RestaurantDispatchStreamStatus,
 } from '@/lib/dispatch/useRestaurantDispatchEvents';
 import { isActiveDeliveryPartnership } from '@/lib/fetchActiveDeliveryProviderConfig';
+import { isMexyPartnershipOnHold } from '@/lib/dispatch/mexyOnHold';
 import { syncRestaurantDeliveryPartnership } from '@/lib/syncDeliveryPartnership';
 import styles from './DeliveryPage.module.css';
 
@@ -86,6 +88,7 @@ export default function DeliveryPage() {
 
   const courierAvailable = deliveryService?.available ?? false;
   const courierReason = deliveryService?.reason ?? null;
+  const onHold = isMexyPartnershipOnHold(deliveryService);
 
   const load = useCallback(async () => {
     if (!accessToken || !selectedRestaurantId) return;
@@ -336,8 +339,9 @@ export default function DeliveryPage() {
 
       {error ? <div className={styles.error} role="alert">{error}</div> : null}
 
-      <CourierUnavailableAlert service={deliveryService} />
+      {onHold ? <MexyOnHoldNotice /> : <CourierUnavailableAlert service={deliveryService} />}
 
+      {onHold ? null : (
       <section
         className={`${styles.formSection} ${formExpanded ? styles.formSectionOpen : ''}`}
         aria-labelledby="new-delivery-title"
@@ -392,6 +396,7 @@ export default function DeliveryPage() {
           ) : null}
         </div>
       </section>
+      )}
 
       {created && subdomain ? (
         <DispatchRequestSuccess

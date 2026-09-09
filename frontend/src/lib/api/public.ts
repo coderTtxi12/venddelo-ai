@@ -106,6 +106,7 @@ export type PublicDeliveryService = {
   partnership_status: 'none' | 'pending' | 'active' | 'suspended';
   provider_name: string | null;
   weather_mode: DeliveryWeatherMode;
+  on_hold?: boolean;
 };
 
 export type PublicCheckoutConfig = {
