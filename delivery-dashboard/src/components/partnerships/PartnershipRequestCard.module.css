@@ -64,6 +64,17 @@
   margin-top: 0.45rem;
 }
 
+.webAppSlot {
+  margin-top: 0.55rem;
+}
+
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
 .chip,
 .chipMuted {
   display: inline-flex;
@@ -73,6 +84,7 @@
   border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .chip {
@@ -139,6 +151,7 @@
   font-size: 0.86rem;
   line-height: 1.45;
   color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 .ownerPhone {

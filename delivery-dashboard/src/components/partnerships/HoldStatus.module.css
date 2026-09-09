@@ -1,0 +1,64 @@
+.mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  min-height: 2.75rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.off {
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.on {
+  background: color-mix(in srgb, #f59e0b 14%, var(--color-surface));
+  color: #a16207;
+  border: 1px solid color-mix(in srgb, #f59e0b 40%, var(--color-border));
+}
+
+.button {
+  cursor: pointer;
+  font: inherit;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, #f59e0b 45%, var(--color-border));
+  color: var(--color-text);
+}
+
+.button.on:hover:not(:disabled) {
+  color: #a16207;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+@media (min-width: 720px) {
+  .mark {
+    min-height: 2rem;
+    width: auto;
+  }
+
+  .button {
+    width: auto;
+  }
+}

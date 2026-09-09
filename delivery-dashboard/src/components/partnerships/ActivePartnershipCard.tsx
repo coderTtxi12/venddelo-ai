@@ -2,13 +2,17 @@
 
 import CheckCircleOutlineOutlinedIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
+import MailOutlineOutlinedIcon from '@mui/icons-material/MailOutlineOutlined';
+import PauseCircleOutlinedIcon from '@mui/icons-material/PauseCircleOutlined';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
 import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import type { DeliveryPartnershipRequest, DeliveryProviderZone } from '@/lib/api/types';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ExpandableText } from '@/components/partnerships/ExpandableText';
+import { HoldStatus } from '@/components/partnerships/HoldStatus';
 import { RestaurantLocationPreview } from '@/components/partnerships/RestaurantLocationPreview';
+import { WebAppStatus } from '@/components/partnerships/WebAppStatus';
 import { WhatsappIcon } from '@/components/partnerships/WhatsappIcon';
 import styles from './PartnershipRequestCard.module.css';
 import activeStyles from './ActivePartnershipCard.module.css';
@@ -19,6 +23,8 @@ type ActivePartnershipCardProps = {
   canReassign: boolean;
   reassigning?: boolean;
   onZoneChange?: (zoneId: string) => void;
+  onWebAppChange?: (hasWebApp: boolean) => void;
+  onHoldChange?: (onHold: boolean) => void;
 };
 
 function formatDate(iso: string): string {
@@ -46,10 +52,13 @@ export function ActivePartnershipCard({
   canReassign,
   reassigning = false,
   onZoneChange,
+  onWebAppChange,
+  onHoldChange,
 }: ActivePartnershipCardProps) {
   const { restaurant } = partnership;
   const ownerLabel = restaurant.owner_display_name?.trim() || 'Dueño del restaurante';
   const ownerPhone = restaurant.owner_phone?.trim();
+  const ownerEmail = restaurant.primary_email?.trim();
   const businessWhatsapp = restaurant.whatsapp_phone?.trim();
   const activeSince = partnership.activated_at ?? partnership.created_at;
 
@@ -66,10 +75,17 @@ export function ActivePartnershipCard({
               <StorefrontOutlinedIcon sx={{ fontSize: 14 }} aria-hidden />
               {restaurant.subdomain}
             </span>
-            <span className={activeStyles.activeChip}>
-              <CheckCircleOutlineOutlinedIcon sx={{ fontSize: 14 }} aria-hidden />
-              Activo
-            </span>
+            {partnership.on_hold ? (
+              <span className={activeStyles.onHoldChip}>
+                <PauseCircleOutlinedIcon sx={{ fontSize: 14 }} aria-hidden />
+                En hold
+              </span>
+            ) : (
+              <span className={activeStyles.activeChip}>
+                <CheckCircleOutlineOutlinedIcon sx={{ fontSize: 14 }} aria-hidden />
+                Activo
+              </span>
+            )}
             <span className={styles.chipMuted}>
               <PlaceOutlinedIcon sx={{ fontSize: 14 }} aria-hidden />
               {partnership.zone.name}
@@ -77,6 +93,20 @@ export function ActivePartnershipCard({
             <span className={styles.chipMuted}>
               Desde {formatDate(activeSince)}
             </span>
+          </div>
+          <div className={styles.statusRow}>
+            <HoldStatus
+              onHold={partnership.on_hold}
+              canEdit={canReassign}
+              busy={reassigning}
+              onChange={onHoldChange}
+            />
+            <WebAppStatus
+              hasWebApp={partnership.has_web_app}
+              canEdit={canReassign}
+              busy={reassigning}
+              onChange={onWebAppChange}
+            />
           </div>
           {canReassign && zones.length > 1 && onZoneChange ? (
             <label className={styles.zoneSelectWrap}>
@@ -128,6 +158,22 @@ export function ActivePartnershipCard({
               ) : null}
             </div>
           </div>
+
+          {ownerEmail ? (
+            <div className={styles.infoRow}>
+              <span className={styles.infoIcon} aria-hidden>
+                <MailOutlineOutlinedIcon sx={{ fontSize: 18 }} />
+              </span>
+              <div>
+                <p className={styles.infoLabel}>Correo principal</p>
+                <p className={styles.infoValue}>
+                  <a href={`mailto:${ownerEmail}`} className={styles.phoneLink}>
+                    {ownerEmail}
+                  </a>
+                </p>
+              </div>
+            </div>
+          ) : null}
 
           {businessWhatsapp && businessWhatsapp !== ownerPhone ? (
             <div className={styles.infoRow}>

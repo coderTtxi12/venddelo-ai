@@ -2,6 +2,7 @@
 
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
+import MailOutlineOutlinedIcon from '@mui/icons-material/MailOutlineOutlined';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
 import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
@@ -9,6 +10,7 @@ import type { DeliveryPartnershipRequest, DeliveryProviderZone } from '@/lib/api
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ExpandableText } from '@/components/partnerships/ExpandableText';
 import { RestaurantLocationPreview } from '@/components/partnerships/RestaurantLocationPreview';
+import { WebAppStatus } from '@/components/partnerships/WebAppStatus';
 import { WhatsappIcon } from '@/components/partnerships/WhatsappIcon';
 import styles from './PartnershipRequestCard.module.css';
 
@@ -21,6 +23,7 @@ type PartnershipRequestCardProps = {
   onAccept: () => void;
   onReject: () => void;
   onZoneChange?: (zoneId: string) => void;
+  onWebAppChange?: (hasWebApp: boolean) => void;
 };
 
 function formatRequestedAt(iso: string): string {
@@ -51,10 +54,12 @@ export function PartnershipRequestCard({
   onAccept,
   onReject,
   onZoneChange,
+  onWebAppChange,
 }: PartnershipRequestCardProps) {
   const { restaurant } = request;
   const ownerLabel = restaurant.owner_display_name?.trim() || 'Dueño del restaurante';
   const ownerPhone = restaurant.owner_phone?.trim();
+  const ownerEmail = restaurant.primary_email?.trim();
   const businessWhatsapp = restaurant.whatsapp_phone?.trim();
 
   return (
@@ -78,6 +83,14 @@ export function PartnershipRequestCard({
               <AccessTimeOutlinedIcon sx={{ fontSize: 14 }} aria-hidden />
               {formatRequestedAt(request.created_at)}
             </span>
+          </div>
+          <div className={styles.webAppSlot}>
+            <WebAppStatus
+              hasWebApp={request.has_web_app}
+              canEdit={canReassign}
+              busy={busy || reassigning}
+              onChange={onWebAppChange}
+            />
           </div>
           {canReassign && zones.length > 1 && onZoneChange ? (
             <label className={styles.zoneSelectWrap}>
@@ -147,6 +160,22 @@ export function PartnershipRequestCard({
               ) : null}
             </div>
           </div>
+
+          {ownerEmail ? (
+            <div className={styles.infoRow}>
+              <span className={styles.infoIcon} aria-hidden>
+                <MailOutlineOutlinedIcon sx={{ fontSize: 18 }} />
+              </span>
+              <div>
+                <p className={styles.infoLabel}>Correo principal</p>
+                <p className={styles.infoValue}>
+                  <a href={`mailto:${ownerEmail}`} className={styles.phoneLink}>
+                    {ownerEmail}
+                  </a>
+                </p>
+              </div>
+            </div>
+          ) : null}
 
           {businessWhatsapp && businessWhatsapp !== ownerPhone ? (
             <div className={styles.infoRow}>
