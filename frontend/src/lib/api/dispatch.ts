@@ -156,10 +156,11 @@ export function createDispatchRequest(
   token: string,
   restaurantId: string,
   input: DispatchCreateInput,
+  idempotencyKey?: string,
 ) {
   return apiRequest<DispatchRequest>(
     `/restaurants/me/dispatch-requests?${restaurantQuery(restaurantId)}`,
-    { method: 'POST', token, body: input },
+    { method: 'POST', token, body: input, idempotencyKey },
   );
 }
 
