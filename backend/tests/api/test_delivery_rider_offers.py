@@ -342,6 +342,124 @@ def test_accept_cash_creates_hold_and_confirm_releases(client, engine):
 
 
 @requires_db
+def test_mexy_fee_hold_survives_cash_confirm_and_provider_releases(client, engine):
+    restaurant_id, driver_id = _setup_ready_rider(client, engine)
+    request_id, offer_id = _create_and_offer(client, engine, restaurant_id)
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        row = session.get(DeliveryDispatchRequest, uuid.UUID(request_id))
+        assert row is not None
+        row.mexy_fee_cents = 3500
+        session.commit()
+
+    _as_rider()
+    offers = client.get("/api/v1/rider/me/offers", headers=AUTH)
+    assert offers.status_code == 200, offers.text
+    assert offers.json()[0]["mexy_fee_cents"] == 3500
+
+    accepted = client.post(
+        f"/api/v1/rider/me/offers/{offer_id}/accept",
+        headers=AUTH,
+    )
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["mexy_fee_cents"] == 3500
+
+    me = client.get("/api/v1/rider/me", headers=AUTH)
+    assert me.status_code == 200, me.text
+    assignment = next(item for item in me.json()["assignments"] if item["id"] == str(request_id))
+    assert assignment["mexy_fee_cents"] == 3500
+    assert assignment["mexy_hold_status"] == "held"
+
+    with factory() as session:
+        driver = session.get(DeliveryDriver, uuid.UUID(driver_id))
+        assert driver is not None
+        assert driver.credit_held_cents == 28500
+        holds = list(
+            session.scalars(
+                select(DeliveryCreditHold).where(
+                    DeliveryCreditHold.request_id == uuid.UUID(request_id)
+                )
+            ).all()
+        )
+        kinds = {hold.kind: hold for hold in holds}
+        assert kinds["restaurant_cash"].status == "held"
+        assert kinds["restaurant_cash"].amount_cents == 25000
+        assert kinds["mexy_fee"].status == "held"
+        assert kinds["mexy_fee"].amount_cents == 3500
+
+    _as_owner()
+    listed = client.get(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        headers=AUTH,
+    )
+    assert listed.status_code == 200, listed.text
+    listed_row = next(item for item in listed.json() if item["id"] == str(request_id))
+    assert "mexy_fee_cents" not in listed_row
+    assert listed_row["credit_hold_status"] == "held"
+    assert listed_row["credit_hold_cents"] == 25000
+
+    confirmed = client.post(
+        f"/api/v1/restaurants/me/dispatch-requests/{request_id}/confirm-rider-cash",
+        params={"restaurant_id": restaurant_id},
+        headers=AUTH,
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["credit_hold_status"] == "released"
+    assert confirmed.json()["credit_hold_cents"] == 25000
+    assert "mexy_fee_cents" not in confirmed.json()
+
+    with factory() as session:
+        driver = session.get(DeliveryDriver, uuid.UUID(driver_id))
+        assert driver is not None
+        assert driver.credit_held_cents == 3500
+        mexy = session.scalar(
+            select(DeliveryCreditHold).where(
+                DeliveryCreditHold.request_id == uuid.UUID(request_id),
+                DeliveryCreditHold.kind == "mexy_fee",
+            )
+        )
+        assert mexy is not None
+        assert mexy.status == "held"
+
+    forbidden = client.post(
+        f"/api/v1/delivery-providers/me/dispatch-requests/{request_id}/release-mexy-fee",
+        headers=AUTH,
+    )
+    assert forbidden.status_code in {403, 404}
+
+    _as_mexy()
+    monitor = client.get("/api/v1/delivery-providers/me/dispatch-monitor", headers=AUTH)
+    assert monitor.status_code == 200, monitor.text
+    hold_kinds = {hold["kind"] for hold in monitor.json()["credit_holds"]}
+    assert "mexy_fee" in hold_kinds
+
+    released = client.post(
+        f"/api/v1/delivery-providers/me/dispatch-requests/{request_id}/release-mexy-fee",
+        headers=AUTH,
+    )
+    assert released.status_code == 200, released.text
+    body = released.json()
+    assert body["kind"] == "mexy_fee"
+    assert body["status"] == "released"
+    assert body["amount_cents"] == 3500
+
+    with factory() as session:
+        driver = session.get(DeliveryDriver, uuid.UUID(driver_id))
+        assert driver is not None
+        assert driver.credit_held_cents == 0
+        mexy = session.scalar(
+            select(DeliveryCreditHold).where(
+                DeliveryCreditHold.request_id == uuid.UUID(request_id),
+                DeliveryCreditHold.kind == "mexy_fee",
+            )
+        )
+        assert mexy is not None
+        assert mexy.status == "released"
+
+
+@requires_db
 def test_accept_non_offered_returns_409(client, engine):
     restaurant_id, _driver_id = _setup_ready_rider(client, engine)
     _request_id, offer_id = _create_and_offer(client, engine, restaurant_id)

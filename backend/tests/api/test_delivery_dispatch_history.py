@@ -322,3 +322,158 @@ def test_provider_history_omits_rider_card_fields_when_cancelled(client, engine)
     assert item["assigned_driver_phone"] is None
     assert item["assigned_driver_plate"] is None
     assert item["assigned_driver_first_name"] is None
+
+
+@requires_db
+def test_provider_history_excludes_restaurant_and_driver(client, engine):
+    restaurant_id, driver_id = _setup_ready_rider(client, engine)
+    request_id = _accept_and_deliver(client, engine, restaurant_id)
+
+    _as_mexy()
+    excluded_restaurant = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"exclude_restaurant_id": restaurant_id},
+        headers=AUTH,
+    )
+    assert excluded_restaurant.status_code == 200, excluded_restaurant.text
+    assert excluded_restaurant.json()["items"] == []
+
+    kept_restaurant = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"exclude_restaurant_id": str(uuid.uuid4())},
+        headers=AUTH,
+    )
+    assert [row["id"] for row in kept_restaurant.json()["items"]] == [request_id]
+
+    excluded_driver = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"exclude_driver_id": driver_id},
+        headers=AUTH,
+    )
+    assert excluded_driver.json()["items"] == []
+
+    kept_driver = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"exclude_driver_id": str(uuid.uuid4())},
+        headers=AUTH,
+    )
+    assert [row["id"] for row in kept_driver.json()["items"]] == [request_id]
+
+
+@requires_db
+def test_provider_history_rejects_include_and_exclude_together(client, engine):
+    restaurant_id, driver_id = _setup_ready_rider(client, engine)
+
+    _as_mexy()
+    restaurant_conflict = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={
+            "restaurant_id": restaurant_id,
+            "exclude_restaurant_id": restaurant_id,
+        },
+        headers=AUTH,
+    )
+    assert restaurant_conflict.status_code == 400
+
+    driver_conflict = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"driver_id": driver_id, "exclude_driver_id": driver_id},
+        headers=AUTH,
+    )
+    assert driver_conflict.status_code == 400
+
+
+@requires_db
+def test_provider_history_search_by_short_id_ignores_period(client, engine):
+    restaurant_id, _driver_id = _setup_ready_rider(client, engine)
+    request_id = _accept_and_deliver(client, engine, restaurant_id)
+
+    _as_mexy()
+    listed = client.get("/api/v1/delivery-providers/me/dispatch-history", headers=AUTH)
+    assert listed.status_code == 200, listed.text
+    short_id = listed.json()["items"][0]["short_id"]
+
+    empty = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"start": "2020-01-01", "end": "2020-01-01"},
+        headers=AUTH,
+    )
+    assert empty.status_code == 200
+    assert empty.json()["items"] == []
+
+    found = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"start": "2020-01-01", "end": "2020-01-01", "q": f"#{short_id.lower()}"},
+        headers=AUTH,
+    )
+    assert found.status_code == 200, found.text
+    assert [row["id"] for row in found.json()["items"]] == [request_id]
+
+    prefix = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"q": short_id[:3]},
+        headers=AUTH,
+    )
+    assert [row["id"] for row in prefix.json()["items"]] == [request_id]
+
+    miss = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"q": "ZZZZZ"},
+        headers=AUTH,
+    )
+    assert miss.json()["items"] == []
+
+
+@requires_db
+def test_provider_dispatch_stats_aggregates_closed_orders(client, engine):
+    restaurant_id, driver_id = _setup_ready_rider(client, engine)
+    request_id = _accept_and_deliver(client, engine, restaurant_id)
+
+    _as_mexy()
+    listed = client.get("/api/v1/delivery-providers/me/dispatch-stats", headers=AUTH)
+    assert listed.status_code == 200, listed.text
+    body = listed.json()
+    assert body["summary"]["order_count"] == 1
+    assert body["summary"]["delivered_count"] == 1
+    assert body["summary"]["cancelled_count"] == 0
+    assert [row["id"] for row in body["recent"]] == [request_id]
+    assert body["granularity"] == "hourly"
+    assert {row["source"] for row in body["sources"]} == {"web_app", "manual"}
+    assert any(row["id"] == driver_id for row in body["top_drivers"])
+    assert any(row["id"] == restaurant_id for row in body["top_restaurants"])
+
+
+@requires_db
+def test_provider_dispatch_stats_peak_hours_count_open_requests(client, engine):
+    restaurant_id, _driver_id = _setup_ready_rider(client, engine)
+    _create_and_offer(client, engine, restaurant_id)
+
+    _as_mexy()
+    listed = client.get("/api/v1/delivery-providers/me/dispatch-stats", headers=AUTH)
+    assert listed.status_code == 200, listed.text
+    body = listed.json()
+    assert body["summary"]["order_count"] == 0
+    assert sum(row["count"] for row in body["hour_heatmap"]) == 1
+    assert body["summary"]["peak_hour_count"] == 1
+    assert body["summary"]["peak_hour"] is not None
+
+
+@requires_db
+def test_provider_dispatch_stats_peak_hours_ignore_closed_created_earlier(client, engine):
+    restaurant_id, _driver_id = _setup_ready_rider(client, engine)
+    request_id = _accept_and_deliver(client, engine, restaurant_id)
+
+    session_factory = sessionmaker(bind=engine)
+    with session_factory() as session:
+        row = session.get(DeliveryDispatchRequest, uuid.UUID(request_id))
+        row.created_at = datetime.now(UTC) - timedelta(days=2)
+        session.commit()
+
+    _as_mexy()
+    listed = client.get("/api/v1/delivery-providers/me/dispatch-stats", headers=AUTH)
+    assert listed.status_code == 200, listed.text
+    body = listed.json()
+    assert body["summary"]["order_count"] == 1
+    assert sum(row["count"] for row in body["hour_heatmap"]) == 0
+    assert body["summary"]["peak_hour_count"] == 0
+    assert body["summary"]["peak_hour"] is None

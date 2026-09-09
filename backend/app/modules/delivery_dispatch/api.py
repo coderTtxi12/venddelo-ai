@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
@@ -19,8 +19,10 @@ from app.modules.delivery_dispatch.schemas import (
     ItineraryUpdate,
     ManualOfferCreate,
     ManualOfferDTO,
+    MexyFeeHoldDTO,
     DispatchRetryDTO,
     ProviderHistoryPageDTO,
+    DispatchStatsDTO,
     SearchLeadTimeDTO,
     SearchLeadTimeUpdate,
 )
@@ -132,6 +134,18 @@ def retry_unassigned_dispatch_request(
     return service.retry_unassigned(user.id, request_id)
 
 
+@router.post(
+    "/me/dispatch-requests/{request_id}/release-mexy-fee",
+    response_model=MexyFeeHoldDTO,
+)
+def release_mexy_fee_hold(
+    request_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryDispatchService = Depends(_service),
+) -> MexyFeeHoldDTO:
+    return service.release_mexy_fee(user.id, request_id)
+
+
 @router.get(
     "/me/dispatch-requests/{request_id}/assignment-log",
     response_model=AssignmentLogDTO,
@@ -181,9 +195,12 @@ def list_dispatch_history_endpoint(
     start: date | None = Query(default=None),
     end: date | None = Query(default=None),
     status: Literal["delivered", "cancelled"] | None = Query(default=None),
-    driver_id: UUID | None = Query(default=None),
+    driver_id: Annotated[list[UUID] | None, Query()] = None,
     zone_id: UUID | None = Query(default=None),
-    restaurant_id: UUID | None = Query(default=None),
+    restaurant_id: Annotated[list[UUID] | None, Query()] = None,
+    exclude_driver_id: Annotated[list[UUID] | None, Query()] = None,
+    exclude_restaurant_id: Annotated[list[UUID] | None, Query()] = None,
+    q: str | None = Query(default=None, max_length=32),
     limit: int | None = Query(default=None, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> ProviderHistoryPageDTO:
@@ -195,6 +212,35 @@ def list_dispatch_history_endpoint(
         driver_id=driver_id,
         zone_id=zone_id,
         restaurant_id=restaurant_id,
+        exclude_driver_id=exclude_driver_id,
+        exclude_restaurant_id=exclude_restaurant_id,
+        q=q,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.get("/me/dispatch-stats", response_model=DispatchStatsDTO)
+def list_dispatch_stats_endpoint(
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryDispatchService = Depends(_service),
+    start: date | None = Query(default=None),
+    end: date | None = Query(default=None),
+    compare_start: date | None = Query(default=None),
+    compare_end: date | None = Query(default=None),
+    zone_id: UUID | None = Query(default=None),
+    exclude_restaurant_id: Annotated[list[UUID] | None, Query()] = None,
+    exclude_driver_id: Annotated[list[UUID] | None, Query()] = None,
+    exclude_customer_phone: Annotated[list[str] | None, Query()] = None,
+) -> DispatchStatsDTO:
+    return service.list_stats(
+        user.id,
+        start=start,
+        end=end,
+        compare_start=compare_start,
+        compare_end=compare_end,
+        zone_id=zone_id,
+        exclude_restaurant_id=exclude_restaurant_id,
+        exclude_driver_id=exclude_driver_id,
+        exclude_customer_phone=exclude_customer_phone,
     )

@@ -50,8 +50,14 @@ from app.modules.delivery_dispatch.app_client import (
     provider_rider_apk_url,
 )
 from app.modules.delivery_dispatch.assignment_log import list_assignment_events
+from app.modules.delivery_dispatch.credit import (
+    HOLD_MEXY_FEE,
+    HOLD_RESTAURANT_CASH,
+    hold_of_kind,
+)
 from app.modules.delivery_dispatch.geo import geodesic_meters
 from app.modules.delivery_dispatch.history import list_active_holds, list_dispatch_history
+from app.modules.delivery_dispatch.stats import list_dispatch_stats
 from app.modules.delivery_dispatch.itinerary import (
     ItineraryStop,
     complete_stop,
@@ -94,7 +100,9 @@ from app.modules.delivery_dispatch.schemas import (
     ItineraryUpdate,
     ManualOfferCreate,
     ManualOfferDTO,
+    MexyFeeHoldDTO,
     ProviderHistoryPageDTO,
+    DispatchStatsDTO,
     PublicDispatchTrackingDTO,
     RiderAssignmentDTO,
     RiderHistoryPageDTO,
@@ -127,7 +135,10 @@ from app.modules.delivery_providers.permissions import (
 )
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.orders.display_id import order_display_id
-from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
+from app.modules.public.delivery_quote_service import (
+    MEXY_ON_HOLD_REASON,
+    PublicDeliveryQuoteService,
+)
 from app.modules.restaurants.schemas import RestaurantDTO
 from app.modules.users.schemas import UserDTO
 
@@ -483,9 +494,12 @@ class DeliveryDispatchService:
         start: date | None = None,
         end: date | None = None,
         status: str | None = None,
-        driver_id: uuid.UUID | None = None,
+        driver_id: uuid.UUID | list[uuid.UUID] | None = None,
         zone_id: uuid.UUID | None = None,
-        restaurant_id: uuid.UUID | None = None,
+        restaurant_id: uuid.UUID | list[uuid.UUID] | None = None,
+        exclude_driver_id: uuid.UUID | list[uuid.UUID] | None = None,
+        exclude_restaurant_id: uuid.UUID | list[uuid.UUID] | None = None,
+        q: str | None = None,
         limit: int | None = None,
         offset: int = 0,
     ) -> ProviderHistoryPageDTO:
@@ -496,9 +510,12 @@ class DeliveryDispatchService:
             driver_id=driver_id,
             zone_id=zone_id,
             restaurant_id=restaurant_id,
+            exclude_driver_id=exclude_driver_id,
+            exclude_restaurant_id=exclude_restaurant_id,
             start=start,
             end=end,
             status=status,
+            q=q,
             limit=limit,
             offset=offset,
             include_provider_fields=True,
@@ -513,6 +530,34 @@ class DeliveryDispatchService:
             earnings_cents=payload["earnings_cents"],
             has_more=payload["has_more"],
         )
+
+    def list_stats(
+        self,
+        user_id: uuid.UUID,
+        *,
+        start: date | None = None,
+        end: date | None = None,
+        compare_start: date | None = None,
+        compare_end: date | None = None,
+        zone_id: uuid.UUID | None = None,
+        exclude_restaurant_id: uuid.UUID | list[uuid.UUID] | None = None,
+        exclude_driver_id: uuid.UUID | list[uuid.UUID] | None = None,
+        exclude_customer_phone: list[str] | None = None,
+    ) -> DispatchStatsDTO:
+        provider_id = self._require_provider_id(user_id)
+        payload = list_dispatch_stats(
+            self._session,
+            provider_id=provider_id,
+            zone_id=zone_id,
+            start=start,
+            end=end,
+            compare_start=compare_start,
+            compare_end=compare_end,
+            exclude_restaurant_id=exclude_restaurant_id,
+            exclude_driver_id=exclude_driver_id,
+            exclude_customer_phone=exclude_customer_phone,
+        )
+        return DispatchStatsDTO.model_validate(payload)
 
     def create_manual_offer(
         self,
@@ -652,6 +697,46 @@ class DeliveryDispatchService:
             id=request.id,
             status=request.status,
             search_at=request.search_at,
+        )
+
+    def release_mexy_fee(
+        self,
+        user_id: uuid.UUID,
+        request_id: uuid.UUID,
+    ) -> MexyFeeHoldDTO:
+        provider_id, member_role = self._require_provider_with_role(user_id)
+        require_manage_partnerships(member_role)
+        request = self._session.scalar(
+            select(DeliveryDispatchRequest)
+            .options(selectinload(DeliveryDispatchRequest.credit_holds))
+            .where(
+                DeliveryDispatchRequest.id == request_id,
+                DeliveryDispatchRequest.delivery_provider_id == provider_id,
+            )
+            .with_for_update()
+        )
+        if request is None:
+            raise NotFoundError("Solicitud de delivery no encontrada")
+        hold = hold_of_kind(request.credit_holds, HOLD_MEXY_FEE)
+        if hold is None or hold.status != "held":
+            raise ValidationError("No hay comisión Mexy retenida para esta solicitud")
+        self._release_holds(
+            request,
+            kind=HOLD_MEXY_FEE,
+            released_by_user_id=user_id,
+            now=datetime.now(UTC),
+        )
+        self._session.flush()
+        self._session.refresh(hold)
+        notify_request_realtime(self._session, request)
+        notify_dispatch_monitor_changed(provider_id)
+        if request.assigned_driver_id is not None:
+            notify_rider_updated(request.assigned_driver_id)
+        return MexyFeeHoldDTO(
+            request_id=request.id,
+            short_id=request.short_id,
+            amount_cents=hold.amount_cents,
+            status=hold.status,  # type: ignore[arg-type]
         )
 
     def get_assignment_log(self, user_id: uuid.UUID, request_id: uuid.UUID) -> AssignmentLogDTO:
@@ -956,6 +1041,8 @@ class RestaurantDispatchService:
                     return DispatchRequestDTO.model_validate(replay.response_snapshot)
 
         partnership = self._active_partnership(restaurant.id)
+        if partnership.on_hold:
+            raise ValidationError(MEXY_ON_HOLD_REASON)
         provider_id = partnership.delivery_provider_id
 
         latitude, longitude = self._resolve_dropoff_coordinates(data)
@@ -981,21 +1068,23 @@ class RestaurantDispatchService:
             latitude,
             longitude,
         )
+        quote = self._quotes.quote_delivery(
+            restaurant,
+            delivery_latitude=latitude,
+            delivery_longitude=longitude,
+        )
         if lock_quoted_fee:
             assert source_order is not None
             quoted_fee_cents = provider_quoted_fee_cents(
                 source_order.delivery_fee_cents,
                 source_order.coupon_waived_delivery_cents or 0,
             )
+            mexy_fee_cents = quote.mexy_fee_cents if quote.available else 0
         else:
-            quote = self._quotes.quote_delivery(
-                restaurant,
-                delivery_latitude=latitude,
-                delivery_longitude=longitude,
-            )
             if not quote.available:
                 raise ValidationError(quote.reason or "El servicio de reparto no está disponible.")
             quoted_fee_cents = quote.delivery_fee_cents
+            mexy_fee_cents = quote.mexy_fee_cents
 
         now = datetime.now(UTC)
         ready_at = now + timedelta(minutes=data.prep_minutes)
@@ -1029,6 +1118,7 @@ class RestaurantDispatchService:
             search_at=search_at,
             next_attempt_at=search_at,
             quoted_fee_cents=quoted_fee_cents,
+            mexy_fee_cents=mexy_fee_cents,
             status="searching" if search_at <= now else "scheduled",
             assigned_driver_id=None,
             tracking_token=secrets.token_hex(24),
@@ -1064,7 +1154,7 @@ class RestaurantDispatchService:
             select(DeliveryDispatchRequest)
             .options(
                 selectinload(DeliveryDispatchRequest.assigned_driver),
-                selectinload(DeliveryDispatchRequest.credit_hold),
+                selectinload(DeliveryDispatchRequest.credit_holds),
             )
             .where(DeliveryDispatchRequest.restaurant_id == restaurant.id)
             .order_by(DeliveryDispatchRequest.created_at.desc())
@@ -1156,7 +1246,7 @@ class RestaurantDispatchService:
         release_group_on_cancel(self._session, row, now)
         row.status = "cancelled"
         row.cancelled_at = now
-        self._release_hold(row, released_by_user_id=None, now=now)
+        self._release_holds(row, released_by_user_id=None, now=now)
         return self._flush_request(row)
 
     def retry(
@@ -1179,11 +1269,12 @@ class RestaurantDispatchService:
         row = self._request(restaurant.id, request_id)
         if row.status not in _CASH_CONFIRMABLE_STATUSES:
             raise ValidationError("El efectivo todavía no se puede confirmar")
-        hold = row.credit_hold
+        hold = hold_of_kind(row.credit_holds, HOLD_RESTAURANT_CASH)
         if hold is None or hold.status != "held":
             raise ValidationError("No hay efectivo retenido para esta solicitud")
-        self._release_hold(
+        self._release_holds(
             row,
+            kind=HOLD_RESTAURANT_CASH,
             released_by_user_id=user_id,
             now=datetime.now(UTC),
         )
@@ -1243,7 +1334,7 @@ class RestaurantDispatchService:
             select(DeliveryDispatchRequest)
             .options(
                 selectinload(DeliveryDispatchRequest.assigned_driver),
-                selectinload(DeliveryDispatchRequest.credit_hold),
+                selectinload(DeliveryDispatchRequest.credit_holds),
             )
             .where(
                 DeliveryDispatchRequest.order_id == order_id,
@@ -1276,7 +1367,7 @@ class RestaurantDispatchService:
             select(DeliveryDispatchRequest)
             .options(
                 selectinload(DeliveryDispatchRequest.assigned_driver),
-                selectinload(DeliveryDispatchRequest.credit_hold),
+                selectinload(DeliveryDispatchRequest.credit_holds),
             )
             .where(
                 DeliveryDispatchRequest.id == request_id,
@@ -1356,7 +1447,7 @@ class RestaurantDispatchService:
         driver = row.assigned_driver
         if driver is None and row.assigned_driver_id is not None:
             driver = self._session.get(DeliveryDriver, row.assigned_driver_id)
-        hold = row.credit_hold
+        hold = hold_of_kind(row.credit_holds, HOLD_RESTAURANT_CASH)
         return dto.model_copy(
             update={
                 "rider": build_tracking_rider_dto(
@@ -1368,15 +1459,20 @@ class RestaurantDispatchService:
             }
         )
 
-    def _release_hold(
+    def _release_holds(
         self,
         row: DeliveryDispatchRequest,
         *,
         released_by_user_id: uuid.UUID | None,
         now: datetime,
+        kind: str | None = None,
     ) -> None:
-        hold: DeliveryCreditHold | None = row.credit_hold
-        if hold is None or hold.status != "held":
+        holds = [
+            hold
+            for hold in row.credit_holds
+            if hold.status == "held" and (kind is None or hold.kind == kind)
+        ]
+        if not holds:
             return
         locked_driver = None
         if row.assigned_driver_id is not None:
@@ -1385,14 +1481,15 @@ class RestaurantDispatchService:
                 .where(DeliveryDriver.id == row.assigned_driver_id)
                 .with_for_update()
             )
-        hold.status = "released"
-        hold.released_at = now
-        hold.released_by_user_id = released_by_user_id
-        if locked_driver is not None:
-            locked_driver.credit_held_cents = max(
-                0,
-                locked_driver.credit_held_cents - hold.amount_cents,
-            )
+        for hold in holds:
+            hold.status = "released"
+            hold.released_at = now
+            hold.released_by_user_id = released_by_user_id
+            if locked_driver is not None:
+                locked_driver.credit_held_cents = max(
+                    0,
+                    locked_driver.credit_held_cents - hold.amount_cents,
+                )
 
 
 _DROPOFF_COORD_EPS = 1e-5
@@ -1645,8 +1742,8 @@ class RiderDispatchService:
                 continue
             row.status = "assigned"
             row.assigned_driver_id = locked_driver.id
-            if row.payment_method == "cash":
-                self._ensure_cash_hold(row, locked_driver, row.credit_hold)
+            if row.payment_method == "cash" or row.mexy_fee_cents > 0:
+                self._ensure_assignment_holds(row, locked_driver)
             claimed.append(row)
         rebuild_driver_itinerary(
             self._session,
@@ -1756,43 +1853,64 @@ class RiderDispatchService:
         previous_id = request.assigned_driver_id
         if previous_id == new_driver.id:
             return
-        hold = request.credit_hold
+        held = [hold for hold in request.credit_holds if hold.status == "held"]
         if previous_id is not None and previous_id != new_driver.id:
             previous = self._session.scalar(
                 select(DeliveryDriver).where(DeliveryDriver.id == previous_id).with_for_update()
             )
-            if hold is not None and hold.status == "held":
+            if held:
                 if previous is not None:
-                    previous.credit_held_cents = max(
-                        0, previous.credit_held_cents - hold.amount_cents
-                    )
-                hold.driver_id = new_driver.id
-                new_driver.credit_held_cents += hold.amount_cents
-            elif request.payment_method == "cash":
-                self._ensure_cash_hold(request, new_driver, hold)
-        elif request.payment_method == "cash":
-            self._ensure_cash_hold(request, new_driver, hold)
+                    released = sum(hold.amount_cents for hold in held)
+                    previous.credit_held_cents = max(0, previous.credit_held_cents - released)
+                for hold in held:
+                    hold.driver_id = new_driver.id
+                    new_driver.credit_held_cents += hold.amount_cents
+            else:
+                self._ensure_assignment_holds(request, new_driver)
+        else:
+            self._ensure_assignment_holds(request, new_driver)
         request.assigned_driver_id = new_driver.id
         request.status = "assigned"
 
-    def _ensure_cash_hold(
+    def _ensure_assignment_holds(
         self,
         request: DeliveryDispatchRequest,
         driver: DeliveryDriver,
-        hold: DeliveryCreditHold | None,
     ) -> None:
+        if request.payment_method == "cash":
+            self._ensure_hold(request, driver, HOLD_RESTAURANT_CASH, request.collect_cents)
+        if request.mexy_fee_cents > 0:
+            self._ensure_hold(request, driver, HOLD_MEXY_FEE, request.mexy_fee_cents)
+
+    def _ensure_hold(
+        self,
+        request: DeliveryDispatchRequest,
+        driver: DeliveryDriver,
+        kind: str,
+        amount_cents: int,
+    ) -> None:
+        if amount_cents <= 0:
+            return
+        hold = hold_of_kind(request.credit_holds, kind)
         if hold is None:
-            self._session.add(
-                DeliveryCreditHold(
-                    driver_id=driver.id,
-                    request_id=request.id,
-                    amount_cents=request.collect_cents,
-                    status="held",
-                )
+            next_held = driver.credit_held_cents + amount_cents
+            if next_held > driver.credit_limit_cents:
+                raise ConflictError("El repartidor no tiene crédito suficiente")
+            created = DeliveryCreditHold(
+                driver_id=driver.id,
+                request_id=request.id,
+                amount_cents=amount_cents,
+                kind=kind,
+                status="held",
             )
-            driver.credit_held_cents += request.collect_cents
+            self._session.add(created)
+            request.credit_holds.append(created)
+            driver.credit_held_cents += amount_cents
             return
         if hold.status == "released":
+            next_held = driver.credit_held_cents + hold.amount_cents
+            if next_held > driver.credit_limit_cents:
+                raise ConflictError("El repartidor no tiene crédito suficiente")
             hold.status = "held"
             hold.driver_id = driver.id
             hold.released_at = None
@@ -1802,6 +1920,15 @@ class RiderDispatchService:
         if hold.driver_id != driver.id:
             hold.driver_id = driver.id
             driver.credit_held_cents += hold.amount_cents
+
+    def _release_hold(
+        self,
+        row: DeliveryDispatchRequest,
+        *,
+        released_by_user_id: uuid.UUID | None,
+        now: datetime,
+    ) -> None:
+        self._release_holds(row, released_by_user_id=released_by_user_id, now=now)
 
     def _require_driver(self, user: UserDTO) -> DeliveryDriver:
         driver = self._driver_for_user(user.id)
@@ -1851,6 +1978,7 @@ class RiderDispatchService:
         rows = self._session.execute(
             select(DeliveryDispatchRequest, Restaurant)
             .join(Restaurant, Restaurant.id == DeliveryDispatchRequest.restaurant_id)
+            .options(selectinload(DeliveryDispatchRequest.credit_holds))
             .where(
                 DeliveryDispatchRequest.assigned_driver_id == driver_id,
                 DeliveryDispatchRequest.status.in_(_ACTIVE_ASSIGNMENT_STATUSES),
@@ -1920,6 +2048,7 @@ class RiderDispatchService:
         restaurant_name = restaurant.name if restaurant is not None else ""
         restaurant_address = restaurant.address if restaurant is not None else None
         picked_up = request.status in {"picked_up", "in_transit"}
+        mexy_hold = hold_of_kind(request.credit_holds, HOLD_MEXY_FEE)
         return RiderAssignmentDTO(
             id=request.id,
             short_id=request.short_id,
@@ -1937,6 +2066,8 @@ class RiderDispatchService:
                 request.cash_denomination_cents if request.payment_method == "cash" else None
             ),
             quoted_fee_cents=request.quoted_fee_cents,
+            mexy_fee_cents=request.mexy_fee_cents,
+            mexy_hold_status=mexy_hold.status if mexy_hold is not None else None,
             package_count=request.package_count,
             package_size=request.package_size,
             notes=request.notes,
@@ -2028,6 +2159,7 @@ class RiderDispatchService:
             dropoff_address=request.dropoff_address,
             collect_cents=totals["collect_cents"],
             quoted_fee_cents=sum(member.quoted_fee_cents for member in members),
+            mexy_fee_cents=sum(member.mexy_fee_cents for member in members),
             payment_method=totals["payment_method"],
             package_count=totals["package_count"],
             restaurant_lat=primary.restaurant_lat if primary is not None else None,

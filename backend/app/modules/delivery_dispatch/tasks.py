@@ -925,6 +925,7 @@ def _to_engine_request(
         package_count=request.package_count,
         payment_method=request.payment_method,
         collect_cents=request.collect_cents,
+        mexy_fee_cents=request.mexy_fee_cents,
         dropoff_lat=request.dropoff_lat,
         dropoff_lng=request.dropoff_lng,
         status=request.status,

@@ -39,6 +39,7 @@ from app.modules.delivery_dispatch.schemas import (
     DispatchMonitorSnapshotDTO,
     DispatchMonitorTimelineEventDTO,
     DispatchMonitorZoneWeatherDTO,
+    dispatch_request_source,
 )
 from app.modules.delivery_dispatch.timeline import (
     TimelineOffer,
@@ -97,6 +98,7 @@ def _to_engine_request(
         package_count=request.package_count,
         payment_method=request.payment_method,
         collect_cents=request.collect_cents,
+        mexy_fee_cents=request.mexy_fee_cents,
         dropoff_lat=request.dropoff_lat,
         dropoff_lng=request.dropoff_lng,
         status=request.status,
@@ -576,6 +578,7 @@ def build_dispatch_monitor_snapshot(
                 package_size=request.package_size,
                 package_count=request.package_count,
                 quoted_fee_cents=request.quoted_fee_cents,
+                mexy_fee_cents=request.mexy_fee_cents,
                 notes=request.notes,
                 last_case=_last_case(decision),
                 last_decision=decision,
@@ -586,6 +589,7 @@ def build_dispatch_monitor_snapshot(
                 created_at=request.created_at,
                 tracking_token=request.tracking_token,
                 prep_minutes=prep_minutes_from_times(request.created_at, request.ready_at),
+                source=dispatch_request_source(request.order_id),
                 timeline=_timeline_events(
                     request,
                     timeout_at=timeout_at,
@@ -670,6 +674,7 @@ def build_dispatch_monitor_snapshot(
                 short_id=request.short_id,
                 amount_cents=hold.amount_cents,
                 status=hold.status,
+                kind=hold.kind,
                 customer_name=request.customer_name,
                 restaurant_name=restaurant.name if restaurant is not None else "Restaurante",
             )

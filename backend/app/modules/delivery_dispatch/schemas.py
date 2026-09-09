@@ -7,6 +7,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+def dispatch_request_source(order_id: uuid.UUID | None) -> Literal["web_app", "manual"]:
+    return "web_app" if order_id is not None else "manual"
+
+
 class AssignmentSettingsDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -76,6 +80,14 @@ class DispatchRetryDTO(BaseModel):
     id: uuid.UUID
     status: str
     search_at: datetime
+
+
+class MexyFeeHoldDTO(BaseModel):
+    request_id: uuid.UUID
+    short_id: str
+    amount_cents: int
+    status: Literal["held", "released"]
+    kind: Literal["mexy_fee"] = "mexy_fee"
 
 
 class DriverItineraryStopDTO(BaseModel):
@@ -317,6 +329,8 @@ class RiderAssignmentDTO(BaseModel):
     collect_cents: int
     cash_denomination_cents: int | None = None
     quoted_fee_cents: int = 0
+    mexy_fee_cents: int = 0
+    mexy_hold_status: str | None = None
     package_count: int
     package_size: str
     notes: str | None = None
@@ -359,6 +373,7 @@ class RiderHistoryHoldDTO(BaseModel):
     restaurant_name: str
     amount_cents: int
     customer_name: str
+    kind: str = "restaurant_cash"
 
 
 class RiderHistoryItemDTO(BaseModel):
@@ -379,6 +394,9 @@ class RiderHistoryItemDTO(BaseModel):
     customer_phone: str | None = None
     notes: str | None = None
     credit_hold_cents: int = 0
+    mexy_fee_cents: int = 0
+    mexy_hold_status: str | None = None
+    source: Literal["web_app", "manual"] = "manual"
 
 
 class RiderHistoryPageDTO(BaseModel):
@@ -447,6 +465,79 @@ class ProviderHistoryPageDTO(BaseModel):
     has_more: bool
 
 
+class DispatchStatsSummaryDTO(BaseModel):
+    order_count: int = 0
+    delivered_count: int = 0
+    cancelled_count: int = 0
+    cancellation_rate_pct: float = 0.0
+    earnings_cents: int = 0
+    mexy_fee_cents: int = 0
+    web_app_count: int = 0
+    manual_count: int = 0
+    peak_hour: str | None = None
+    peak_hour_count: int = 0
+    peak_occupancy: int = 0
+    peak_occupancy_change_pct: float | None = None
+    routed_order_count: int = 0
+    routed_order_change_pct: float | None = None
+    stacked_rider_count: int = 0
+    order_count_change_pct: float | None = None
+    delivered_count_change_pct: float | None = None
+    cancelled_count_change_pct: float | None = None
+    earnings_change_pct: float | None = None
+    web_app_count_change_pct: float | None = None
+    manual_count_change_pct: float | None = None
+
+
+class DispatchStatsPointDTO(BaseModel):
+    label: str
+    current_count: int = 0
+    previous_count: int = 0
+    current_earnings_cents: int = 0
+    previous_earnings_cents: int = 0
+    current_delivered_count: int = 0
+    current_cancelled_count: int = 0
+    previous_delivered_count: int = 0
+    previous_cancelled_count: int = 0
+    current_occupancy: int = 0
+    previous_occupancy: int = 0
+    current_routed: int = 0
+    previous_routed: int = 0
+
+
+class DispatchStatsSourceDTO(BaseModel):
+    source: Literal["web_app", "manual"]
+    count: int = 0
+
+
+class DispatchStatsTopEntityDTO(BaseModel):
+    id: uuid.UUID
+    name: str
+    delivered_count: int = 0
+    earnings_cents: int = 0
+
+
+class DispatchStatsHourCellDTO(BaseModel):
+    weekday: int
+    hour: int
+    count: int = 0
+
+
+class DispatchStatsDTO(BaseModel):
+    start: date
+    end: date
+    comparison_start: date
+    comparison_end: date
+    granularity: Literal["hourly", "daily", "weekly"]
+    summary: DispatchStatsSummaryDTO
+    series: list[DispatchStatsPointDTO] = Field(default_factory=list)
+    hour_heatmap: list[DispatchStatsHourCellDTO] = Field(default_factory=list)
+    sources: list[DispatchStatsSourceDTO] = Field(default_factory=list)
+    top_restaurants: list[DispatchStatsTopEntityDTO] = Field(default_factory=list)
+    top_drivers: list[DispatchStatsTopEntityDTO] = Field(default_factory=list)
+    recent: list[ProviderHistoryItemDTO] = Field(default_factory=list)
+
+
 class RiderOfferStopDTO(BaseModel):
     restaurant_name: str
     dropoff_address: str
@@ -471,6 +562,7 @@ class RiderOfferDTO(BaseModel):
     dropoff_address: str
     collect_cents: int
     quoted_fee_cents: int
+    mexy_fee_cents: int = 0
     payment_method: str
     package_count: int
     restaurant_lat: float | None = None
@@ -586,6 +678,7 @@ class DispatchMonitorRequestDTO(BaseModel):
     package_size: str
     package_count: int = 1
     quoted_fee_cents: int = 0
+    mexy_fee_cents: int = 0
     notes: str | None = None
     last_case: str | None = None
     last_decision: dict | None = None
@@ -596,6 +689,7 @@ class DispatchMonitorRequestDTO(BaseModel):
     created_at: datetime | None = None
     tracking_token: str
     prep_minutes: int | None = None
+    source: Literal["web_app", "manual"] = "manual"
     timeline: list[DispatchMonitorTimelineEventDTO] = Field(default_factory=list)
 
 
@@ -622,6 +716,7 @@ class DispatchMonitorCreditHoldDTO(BaseModel):
     short_id: str
     amount_cents: int
     status: str
+    kind: str = "restaurant_cash"
     customer_name: str
     restaurant_name: str
 

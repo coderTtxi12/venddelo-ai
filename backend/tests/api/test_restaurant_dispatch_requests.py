@@ -11,6 +11,7 @@ from tests.api.test_delivery_partnerships import (
     COVERED_LNG,
     MEXY_USER,
     _create_mexy_provider,
+    partnership_items,
 )
 from tests.conftest import requires_db
 
@@ -67,7 +68,9 @@ def _activate_partnership(client, engine, restaurant_id: str) -> None:
     app.dependency_overrides[get_auth] = MexyAuth
     listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
     link_id = next(
-        item["id"] for item in listed.json() if item["restaurant"]["id"] == restaurant_id
+        item["id"]
+        for item in partnership_items(listed)
+        if item["restaurant"]["id"] == restaurant_id
     )
     accepted = client.post(
         f"/api/v1/delivery-providers/me/partnership-requests/{link_id}/accept",
@@ -86,6 +89,39 @@ def _activate_partnership(client, engine, restaurant_id: str) -> None:
     app.dependency_overrides[get_auth] = lambda: __import__(
         "tests.api.test_api_v1", fromlist=["FakeAuth"]
     ).FakeAuth(OWNER)
+
+
+@requires_db
+def test_create_dispatch_rejected_when_partnership_on_hold(client, engine):
+    from tests.api.test_delivery_partnerships import _use_mexy_auth, _use_owner_auth
+
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-on-hold")
+    _activate_partnership(client, engine, restaurant_id)
+
+    _use_mexy_auth()
+    listed = client.get("/api/v1/delivery-providers/me/partnerships", headers=AUTH)
+    link_id = next(
+        item["id"]
+        for item in partnership_items(listed)
+        if item["restaurant"]["id"] == restaurant_id
+    )
+    held = client.patch(
+        f"/api/v1/delivery-providers/me/partnerships/{link_id}",
+        json={"on_hold": True},
+        headers=AUTH,
+    )
+    assert held.status_code == 200, held.text
+
+    _use_owner_auth()
+    response = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(),
+        headers=AUTH,
+    )
+    assert response.status_code == 400
+    assert "WhatsApp" in response.json()["error"]["message"]
 
 
 def _dispatch_payload(**overrides):
