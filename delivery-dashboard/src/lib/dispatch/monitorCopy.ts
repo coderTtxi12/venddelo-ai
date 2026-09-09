@@ -65,6 +65,11 @@ export function paymentLabel(method: string): string {
   return method;
 }
 
+export function dispatchSourceLabel(source: string | null | undefined): string {
+  if (source === 'web_app') return 'App web';
+  return 'Pedido manual';
+}
+
 export function caseLabel(caseApplied: string | null | undefined): string | null {
   if (!caseApplied) return null;
   if (caseApplied === 'M') return 'Manual';
@@ -277,8 +282,13 @@ export function customerCollectCents(request: {
   return Math.max(0, request.collect_cents) + Math.max(0, request.quoted_fee_cents ?? 0);
 }
 
+export function creditHoldKindLabel(kind?: string | null): string {
+  return kind === 'mexy_fee' ? 'Comisión Mexy' : 'Efectivo';
+}
+
 export function requestMoneyLine(request: DispatchMonitorRequest): string {
   const fee = request.quoted_fee_cents ?? 0;
+  const mexy = request.mexy_fee_cents ?? 0;
   const parts = [paymentLabel(request.payment_method)];
   if (request.payment_method !== 'transfer') {
     const total = customerCollectCents(request);
@@ -288,6 +298,9 @@ export function requestMoneyLine(request: DispatchMonitorRequest): string {
   }
   if (fee > 0) {
     parts.push(`envío ${formatMoney(fee)}`);
+  }
+  if (mexy > 0) {
+    parts.push(`Mexy ${formatMoney(mexy)}`);
   }
   return parts.join(' · ');
 }

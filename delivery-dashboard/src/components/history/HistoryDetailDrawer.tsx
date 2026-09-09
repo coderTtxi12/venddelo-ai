@@ -18,6 +18,7 @@ import {
   formatShortId,
   mapsSearchUrl,
   paymentLabel,
+  dispatchSourceLabel,
   requestStatusLabel,
   splitDropoffAddress,
 } from '@/lib/dispatch/monitorCopy';
@@ -169,6 +170,7 @@ export function HistoryDetailDrawer({
               Pedido
             </h3>
             <dl className={styles.list}>
+              <DetailRow label="Fuente">{dispatchSourceLabel(item.source)}</DetailRow>
               {trackingUrl ? (
                 <DetailRow label="Rastreo">
                   <ExternalLink href={trackingUrl}>Abrir rastreo</ExternalLink>
@@ -222,6 +224,15 @@ export function HistoryDetailDrawer({
               <DetailRow label="Envío">
                 {deliveryCents > 0 ? formatMoney(deliveryCents) : null}
               </DetailRow>
+              {(item.mexy_fee_cents ?? 0) > 0 ? (
+                <DetailRow label="Comisión Mexy">
+                  {`${formatMoney(item.mexy_fee_cents ?? 0)}${
+                    holdStatusLabel(item.mexy_hold_status)
+                      ? ` · ${holdStatusLabel(item.mexy_hold_status)}`
+                      : ''
+                  }`}
+                </DetailRow>
+              ) : null}
               <DetailRow label="Paquetes">{packageLine(item)}</DetailRow>
               <DetailRow label="Notas">{item.notes}</DetailRow>
               <DetailRow label="Caso">{caseLabel(item.case_applied)}</DetailRow>

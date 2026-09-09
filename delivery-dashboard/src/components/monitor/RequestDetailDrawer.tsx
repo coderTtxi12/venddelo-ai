@@ -16,6 +16,7 @@ import {
   formatShortId,
   mapsSearchUrl,
   paymentLabel,
+  dispatchSourceLabel,
   requestCashDenominationLine,
   requestPackageLine,
   requestStatusLabel,
@@ -173,6 +174,7 @@ export function RequestDetailDrawer({
               Solicitud del restaurante
             </h3>
             <dl className={styles.list}>
+              <DetailRow label="Fuente">{dispatchSourceLabel(request.source)}</DetailRow>
               {trackingUrl ? (
                 <DetailRow label="Rastreo">
                   <ExternalLink href={trackingUrl}>Abrir rastreo</ExternalLink>
@@ -228,6 +230,9 @@ export function RequestDetailDrawer({
               <DetailRow label="Envío">
                 {deliveryCents > 0 ? formatMoney(deliveryCents) : null}
               </DetailRow>
+              {(request.mexy_fee_cents ?? 0) > 0 ? (
+                <DetailRow label="Comisión Mexy">{formatMoney(request.mexy_fee_cents ?? 0)}</DetailRow>
+              ) : null}
               <DetailRow label="Paquete">{requestPackageLine(request)}</DetailRow>
               <DetailRow label="Notas">{request.notes?.trim() || null}</DetailRow>
             </dl>

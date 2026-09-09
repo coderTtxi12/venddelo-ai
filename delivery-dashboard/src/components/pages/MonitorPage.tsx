@@ -19,6 +19,7 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   createMyManualDispatchOffer,
   getMyDispatchMonitor,
+  releaseMyMexyFeeHold,
   retryMyUnassignedDispatchRequest,
   updateDriverItinerary,
   updateMyDeliveryProviderWeatherMode,
@@ -34,6 +35,7 @@ import type {
 } from '@/lib/api/types';
 import {
   blockersSummary,
+  creditHoldKindLabel,
   demandReasonLine,
   formatCountdown,
   formatSearchStartedAt,
@@ -498,23 +500,50 @@ function OffersList({ offers, nowMs }: { offers: DispatchMonitorOffer[]; nowMs: 
   );
 }
 
-function CreditList({ holds }: { holds: DispatchMonitorCreditHold[] }) {
+function CreditList({
+  holds,
+  canRelease,
+  releasingId,
+  onRelease,
+}: {
+  holds: DispatchMonitorCreditHold[];
+  canRelease: boolean;
+  releasingId: string | null;
+  onRelease: (hold: DispatchMonitorCreditHold) => void;
+}) {
   if (holds.length === 0) {
     return <p className={styles.emptyHint}>Sin crédito retenido.</p>;
   }
   return (
     <ul className={styles.list}>
-      {holds.map((hold) => (
-        <li key={hold.id} className={styles.listItem}>
-          <div className={styles.listMain}>
-            <span className={styles.listTitle}>{hold.driver_name}</span>
-            <span className={styles.listMeta}>
-              {formatShortId(hold.short_id)} · {hold.customer_name} · {hold.restaurant_name}
-            </span>
-          </div>
-          <span className={styles.creditChip}>{formatMoney(hold.amount_cents)}</span>
-        </li>
-      ))}
+      {holds.map((hold) => {
+        const isMexy = hold.kind === 'mexy_fee';
+        return (
+          <li key={hold.id} className={styles.listItem}>
+            <div className={styles.listMain}>
+              <span className={styles.listTitle}>{hold.driver_name}</span>
+              <span className={styles.listMeta}>
+                {formatShortId(hold.short_id)} · {hold.customer_name} · {hold.restaurant_name}
+              </span>
+            </div>
+            <div className={styles.listActions}>
+              <span className={isMexy ? styles.warnChip : styles.creditChip}>
+                {creditHoldKindLabel(hold.kind)} · {formatMoney(hold.amount_cents)}
+              </span>
+              {isMexy && canRelease ? (
+                <button
+                  type="button"
+                  className={styles.assignButton}
+                  disabled={releasingId === hold.request_id}
+                  onClick={() => onRelease(hold)}
+                >
+                  {releasingId === hold.request_id ? 'Liberando…' : 'Liberar comisión'}
+                </button>
+              ) : null}
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -827,6 +856,7 @@ export default function MonitorPage() {
   const snapshotInFlightRef = useRef(false);
   const snapshotQueuedRef = useRef(false);
   const [weatherSaving, setWeatherSaving] = useState(false);
+  const [releasingMexyRequestId, setReleasingMexyRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1094,6 +1124,20 @@ export default function MonitorPage() {
     }
   }
 
+  async function handleReleaseMexyFee(hold: DispatchMonitorCreditHold) {
+    if (!accessToken || hold.kind !== 'mexy_fee') return;
+    setReleasingMexyRequestId(hold.request_id);
+    setError(null);
+    try {
+      await releaseMyMexyFeeHold(accessToken, hold.request_id);
+      await loadSnapshot();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo liberar la comisión Mexy');
+    } finally {
+      setReleasingMexyRequestId(null);
+    }
+  }
+
   async function handleReorderItinerary(
     driverId: string,
     stops: Array<{ kind: 'restaurant' | 'dropoff'; request_id: string }>,
@@ -1348,14 +1392,19 @@ export default function MonitorPage() {
               </MonitorPanel>
 
               <MonitorPanel
-                title="Crédito retenido (efectivo)"
+                title="Crédito retenido"
                 count={sortedCredit.length}
                 collapsed={Boolean(collapsedPanels.credit)}
                 onToggle={() => togglePanel('credit')}
                 sortDir={timeSort.credit}
                 onToggleSort={() => toggleSort('credit')}
               >
-                <CreditList holds={sortedCredit} />
+                <CreditList
+                  holds={sortedCredit}
+                  canRelease={canManagePartnerships}
+                  releasingId={releasingMexyRequestId}
+                  onRelease={handleReleaseMexyFee}
+                />
               </MonitorPanel>
 
               <MonitorPanel
