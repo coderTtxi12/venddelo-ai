@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import ValidationError
 from app.db.models.delivery import (
@@ -16,12 +16,14 @@ from app.db.models.delivery import (
     DeliveryProviderZone,
 )
 from app.db.models.restaurant import Restaurant
+from app.modules.delivery_dispatch.credit import HOLD_MEXY_FEE, HOLD_RESTAURANT_CASH, hold_of_kind
 from app.modules.delivery_dispatch.monitor import _offers_by_request, _timeline_events
 from app.modules.delivery_dispatch.search_at import prep_minutes_from_times
 from app.modules.delivery_dispatch.schemas import (
     ProviderHistoryItemDTO,
     RiderHistoryHoldDTO,
     RiderHistoryItemDTO,
+    dispatch_request_source,
 )
 
 MEXICO_TZ = ZoneInfo("America/Mexico_City")
@@ -56,14 +58,45 @@ def _clamp_limit(limit: int | None) -> int:
     return min(value, MAX_LIMIT)
 
 
+def normalize_history_query(q: str | None) -> str:
+    if not q:
+        return ""
+    stripped = q.strip().upper().lstrip("#")
+    return "".join(ch for ch in stripped if ch.isalnum())
+
+
+def _normalize_ids(value: uuid.UUID | list[uuid.UUID] | None) -> list[uuid.UUID]:
+    if value is None:
+        return []
+    items = value if isinstance(value, list) else [value]
+    seen: set[uuid.UUID] = set()
+    unique: list[uuid.UUID] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        unique.append(item)
+    return unique
+
+
+def _reject_include_and_exclude(
+    include_ids: list[uuid.UUID],
+    exclude_ids: list[uuid.UUID],
+    entity: str,
+) -> None:
+    if include_ids and exclude_ids:
+        raise ValidationError(f"No se puede filtrar y excluir el mismo {entity}")
+
+
 def _to_item(
     request: DeliveryDispatchRequest,
     restaurant: Restaurant | None,
-    hold: DeliveryCreditHold | None,
 ) -> RiderHistoryItemDTO:
     closed_at = request.cancelled_at or request.updated_at
+    cash_hold = hold_of_kind(request.credit_holds, HOLD_RESTAURANT_CASH)
+    mexy_hold = hold_of_kind(request.credit_holds, HOLD_MEXY_FEE)
     credit_hold_cents = (
-        hold.amount_cents if hold is not None and hold.status == "held" else 0
+        cash_hold.amount_cents if cash_hold is not None and cash_hold.status == "held" else 0
     )
     return RiderHistoryItemDTO(
         id=request.id,
@@ -85,6 +118,9 @@ def _to_item(
         customer_phone=request.customer_phone,
         notes=request.notes,
         credit_hold_cents=credit_hold_cents,
+        mexy_fee_cents=request.mexy_fee_cents,
+        mexy_hold_status=mexy_hold.status if mexy_hold is not None else None,
+        source=dispatch_request_source(request.order_id),
     )
 
 
@@ -153,13 +189,13 @@ def _delivered_rider_card_fields(
 def _to_provider_item(
     request: DeliveryDispatchRequest,
     restaurant: Restaurant | None,
-    hold: DeliveryCreditHold | None,
     driver: DeliveryDriver | None,
     zone: DeliveryProviderZone | None,
     case_applied: str | None,
     offers: list[DeliveryDispatchOffer],
 ) -> ProviderHistoryItemDTO:
-    base = _to_item(request, restaurant, hold)
+    base = _to_item(request, restaurant)
+    cash_hold = hold_of_kind(request.credit_holds, HOLD_RESTAURANT_CASH)
     driver_name = None
     if driver is not None:
         driver_name = f"{driver.first_name} {driver.last_name}".strip() or None
@@ -183,7 +219,7 @@ def _to_provider_item(
         updated_at=request.updated_at,
         dispatch_group_id=request.dispatch_group_id,
         case_applied=case_applied,
-        credit_hold_status=hold.status if hold is not None else None,
+        credit_hold_status=cash_hold.status if cash_hold is not None else None,
         prep_minutes=prep_minutes_from_times(request.created_at, request.ready_at),
         tracking_token=request.tracking_token,
         restaurant_subdomain=restaurant.subdomain if restaurant is not None else None,
@@ -217,6 +253,7 @@ def list_active_holds(session: Session, driver_id: uuid.UUID) -> list[RiderHisto
             restaurant_name=restaurant.name,
             amount_cents=hold.amount_cents,
             customer_name=request.customer_name,
+            kind=hold.kind,
         )
         for hold, request, restaurant in rows
     ]
@@ -226,12 +263,15 @@ def list_dispatch_history(
     session: Session,
     *,
     provider_id: uuid.UUID | None = None,
-    driver_id: uuid.UUID | None = None,
+    driver_id: uuid.UUID | list[uuid.UUID] | None = None,
     zone_id: uuid.UUID | None = None,
-    restaurant_id: uuid.UUID | None = None,
+    restaurant_id: uuid.UUID | list[uuid.UUID] | None = None,
+    exclude_driver_id: uuid.UUID | list[uuid.UUID] | None = None,
+    exclude_restaurant_id: uuid.UUID | list[uuid.UUID] | None = None,
     start: date | None = None,
     end: date | None = None,
     status: str | None = None,
+    q: str | None = None,
     limit: int | None = None,
     offset: int = 0,
     include_provider_fields: bool = False,
@@ -242,21 +282,35 @@ def list_dispatch_history(
     closed = closed_at_expr()
     if status is not None and status not in HISTORY_STATUSES:
         raise ValidationError("Estado de historial no válido")
+    include_drivers = _normalize_ids(driver_id)
+    exclude_drivers = _normalize_ids(exclude_driver_id)
+    include_restaurants = _normalize_ids(restaurant_id)
+    exclude_restaurants = _normalize_ids(exclude_restaurant_id)
+    _reject_include_and_exclude(include_drivers, exclude_drivers, "repartidor")
+    _reject_include_and_exclude(include_restaurants, exclude_restaurants, "negocio")
     statuses = HISTORY_STATUSES if status is None else {status}
+    short_id_prefix = normalize_history_query(q)
 
-    filters = [
-        DeliveryDispatchRequest.status.in_(tuple(statuses)),
-        closed >= start_utc,
-        closed < end_utc,
-    ]
-    if driver_id is not None:
-        filters.append(DeliveryDispatchRequest.assigned_driver_id == driver_id)
+    filters = [DeliveryDispatchRequest.status.in_(tuple(statuses))]
+    if short_id_prefix:
+        filters.append(DeliveryDispatchRequest.short_id.startswith(short_id_prefix))
+    else:
+        filters.extend([closed >= start_utc, closed < end_utc])
+    if include_drivers:
+        filters.append(DeliveryDispatchRequest.assigned_driver_id.in_(include_drivers))
+    if exclude_drivers:
+        filters.append(
+            DeliveryDispatchRequest.assigned_driver_id.is_(None)
+            | DeliveryDispatchRequest.assigned_driver_id.notin_(exclude_drivers)
+        )
     if provider_id is not None:
         filters.append(DeliveryDispatchRequest.delivery_provider_id == provider_id)
     if zone_id is not None:
         filters.append(DeliveryDispatchRequest.zone_id == zone_id)
-    if restaurant_id is not None:
-        filters.append(DeliveryDispatchRequest.restaurant_id == restaurant_id)
+    if include_restaurants:
+        filters.append(DeliveryDispatchRequest.restaurant_id.in_(include_restaurants))
+    if exclude_restaurants:
+        filters.append(DeliveryDispatchRequest.restaurant_id.notin_(exclude_restaurants))
 
     page_limit = _clamp_limit(limit)
     page_offset = max(0, offset)
@@ -285,15 +339,11 @@ def list_dispatch_history(
         select(
             DeliveryDispatchRequest,
             Restaurant,
-            DeliveryCreditHold,
             DeliveryDriver,
             DeliveryProviderZone,
         )
+        .options(selectinload(DeliveryDispatchRequest.credit_holds))
         .join(Restaurant, Restaurant.id == DeliveryDispatchRequest.restaurant_id)
-        .outerjoin(
-            DeliveryCreditHold,
-            DeliveryCreditHold.request_id == DeliveryDispatchRequest.id,
-        )
         .outerjoin(
             DeliveryDriver,
             DeliveryDriver.id == DeliveryDispatchRequest.assigned_driver_id,
@@ -320,18 +370,17 @@ def list_dispatch_history(
             _to_provider_item(
                 request,
                 restaurant,
-                hold,
                 driver,
                 zone,
                 cases.get(request.id),
                 offers_by_request.get(request.id, []),
             )
-            for request, restaurant, hold, driver, zone in rows
+            for request, restaurant, driver, zone in rows
         ]
     else:
         items = [
-            _to_item(request, restaurant, hold)
-            for request, restaurant, hold, _driver, _zone in rows
+            _to_item(request, restaurant)
+            for request, restaurant, _driver, _zone in rows
         ]
     return {
         "start": start_d,

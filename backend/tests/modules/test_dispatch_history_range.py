@@ -1,12 +1,17 @@
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from app.core.exceptions import ValidationError
 from app.modules.delivery_dispatch.history import (
     _delivered_rider_card_fields,
+    _normalize_ids,
+    _reject_include_and_exclude,
     mexico_city_range,
+    normalize_history_query,
 )
+from app.modules.delivery_dispatch.schemas import dispatch_request_source
 
 
 def test_mexico_city_range_is_inclusive_dates_exclusive_end_utc() -> None:
@@ -51,3 +56,38 @@ def test_cancelled_rider_card_fields_are_empty() -> None:
     assert fields["assigned_driver_first_name"] is None
     assert fields["assigned_driver_plate"] is None
     assert fields["assigned_driver_phone"] is None
+
+
+def test_reject_include_and_exclude_same_entity() -> None:
+    try:
+        _reject_include_and_exclude([uuid4()], [uuid4()], "negocio")
+    except ValidationError as exc:
+        assert "negocio" in exc.message
+    else:
+        raise AssertionError("expected ValidationError")
+
+
+def test_normalize_ids_dedupes_and_accepts_single() -> None:
+    one = uuid4()
+    two = uuid4()
+    assert _normalize_ids(one) == [one]
+    assert _normalize_ids([one, two, one]) == [one, two]
+    assert _normalize_ids(None) == []
+
+
+def test_reject_include_and_exclude_allows_one_side() -> None:
+    _reject_include_and_exclude([uuid4()], [], "negocio")
+    _reject_include_and_exclude([], [uuid4()], "repartidor")
+
+
+def test_normalize_history_query_strips_hash_spaces_and_punctuation() -> None:
+    assert normalize_history_query("#BDE4E") == "BDE4E"
+    assert normalize_history_query("  bde4e  ") == "BDE4E"
+    assert normalize_history_query("##bd-e4") == "BDE4"
+    assert normalize_history_query(None) == ""
+    assert normalize_history_query("#") == ""
+
+
+def test_dispatch_request_source_uses_linked_order() -> None:
+    assert dispatch_request_source(uuid4()) == "web_app"
+    assert dispatch_request_source(None) == "manual"
