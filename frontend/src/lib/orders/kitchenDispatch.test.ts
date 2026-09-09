@@ -50,6 +50,13 @@ test('splitDeliveryAddress separates checkout referencias', () => {
   });
 });
 
+test('splitDeliveryAddress separates dispatch referencias', () => {
+  assert.deepEqual(splitDeliveryAddress('Calle Reforma 100 · puerta azul'), {
+    address: 'Calle Reforma 100',
+    references: 'puerta azul',
+  });
+});
+
 test('splitDeliveryAddress keeps plain address', () => {
   assert.deepEqual(splitDeliveryAddress('Calle Reforma 100'), {
     address: 'Calle Reforma 100',

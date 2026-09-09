@@ -4,6 +4,7 @@ import { buildOrderTotalsBreakdown } from '@/lib/orders/orderDisplay';
 import { parseE164Phone } from '@/lib/phone/parseE164';
 
 const REFERENCES_MARKER = '\nReferencias:';
+const DISPATCH_REFERENCES_SEP = ' · ';
 const COORD_EPS = 1e-5;
 
 export type KitchenDispatchLocation = {
@@ -30,14 +31,21 @@ export function splitDeliveryAddress(raw: string | null): {
   references: string;
 } {
   const text = raw?.trim() ?? '';
-  const index = text.indexOf(REFERENCES_MARKER);
-  if (index === -1) {
-    return { address: text, references: '' };
+  const menuIndex = text.indexOf(REFERENCES_MARKER);
+  if (menuIndex !== -1) {
+    return {
+      address: text.slice(0, menuIndex).trim(),
+      references: text.slice(menuIndex + REFERENCES_MARKER.length).trim(),
+    };
   }
-  return {
-    address: text.slice(0, index).trim(),
-    references: text.slice(index + REFERENCES_MARKER.length).trim(),
-  };
+  const dispatchIndex = text.indexOf(DISPATCH_REFERENCES_SEP);
+  if (dispatchIndex !== -1) {
+    return {
+      address: text.slice(0, dispatchIndex).trim(),
+      references: text.slice(dispatchIndex + DISPATCH_REFERENCES_SEP.length).trim(),
+    };
+  }
+  return { address: text, references: '' };
 }
 
 export function centsToPesosInput(cents: number): string {
