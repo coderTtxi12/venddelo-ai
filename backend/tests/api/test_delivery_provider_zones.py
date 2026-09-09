@@ -10,7 +10,12 @@ from app.db.models.delivery import RestaurantDeliveryProvider
 from app.db.models.restaurant import Restaurant
 from app.main import app
 from tests.api.test_api_v1 import AUTH, OWNER
-from tests.api.test_delivery_partnerships import COVERED_LAT, COVERED_LNG, _create_mexy_provider
+from tests.api.test_delivery_partnerships import (
+    COVERED_LAT,
+    COVERED_LNG,
+    _create_mexy_provider,
+    partnership_items,
+)
 from tests.api.test_delivery_provider_onboarding import ONBOARDING_PAYLOAD, SAMPLE_POLYGON
 from tests.api.test_delivery_zone_matching import FAR_POLYGON
 from tests.conftest import requires_db
@@ -321,7 +326,9 @@ def _accept_restaurant_partnership(client, subdomain: str) -> str:
     listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
     assert listed.status_code == 200, listed.text
     link_id = next(
-        item["id"] for item in listed.json() if item["restaurant"]["subdomain"] == subdomain
+        item["id"]
+        for item in partnership_items(listed)
+        if item["restaurant"]["subdomain"] == subdomain
     )
     accepted = client.post(
         f"/api/v1/delivery-providers/me/partnership-requests/{link_id}/accept",
@@ -418,8 +425,9 @@ def test_reassign_partnership_zone_allows_deleting_original_zone(client, engine)
     _mexy_auth_override()
     pending = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
     assert pending.status_code == 200, pending.text
-    link_id = pending.json()[0]["id"]
-    assert pending.json()[0]["zone"]["id"] == zone_a_id
+    pending_items = partnership_items(pending)
+    link_id = pending_items[0]["id"]
+    assert pending_items[0]["zone"]["id"] == zone_a_id
 
     reassigned = client.patch(
         f"/api/v1/delivery-providers/me/partnerships/{link_id}",
@@ -434,14 +442,14 @@ def test_reassign_partnership_zone_allows_deleting_original_zone(client, engine)
         headers=AUTH,
     )
     assert filtered.status_code == 200, filtered.text
-    assert any(item["id"] == link_id for item in filtered.json())
+    assert any(item["id"] == link_id for item in partnership_items(filtered))
 
     not_on_a = client.get(
         f"/api/v1/delivery-providers/me/partnership-requests?zone_id={zone_a_id}",
         headers=AUTH,
     )
     assert not_on_a.status_code == 200, not_on_a.text
-    assert not any(item["id"] == link_id for item in not_on_a.json())
+    assert not any(item["id"] == link_id for item in partnership_items(not_on_a))
 
     deleted = client.delete(
         f"/api/v1/delivery-providers/me/zones/{zone_a_id}",

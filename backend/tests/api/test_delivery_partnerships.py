@@ -30,6 +30,50 @@ def _clean_partnership_tables(engine):
     yield
 
 
+def partnership_items(response) -> list:
+    body = response.json()
+    if isinstance(body, dict) and "items" in body:
+        return body["items"]
+    return body
+
+
+def _use_mexy_auth() -> None:
+    from app.api.deps import get_auth
+    from app.core.security import AuthenticatedUser, AuthPort
+    from app.main import app
+
+    class MexyAuth(AuthPort):
+        def verify_token(self, token: str) -> AuthenticatedUser:
+            return AuthenticatedUser(id=MEXY_USER, email="mexy@example.com")
+
+    app.dependency_overrides[get_auth] = MexyAuth
+
+
+def _use_owner_auth() -> None:
+    from app.api.deps import get_auth
+    from app.main import app
+
+    app.dependency_overrides[get_auth] = lambda: __import__(
+        "tests.api.test_api_v1", fromlist=["FakeAuth"]
+    ).FakeAuth(OWNER)
+
+
+def _create_covered_restaurant(client, *, name: str, subdomain: str) -> str:
+    resp = client.post(
+        "/api/v1/restaurants",
+        json={
+            "name": name,
+            "subdomain": subdomain,
+            "delivery_enabled": True,
+            "latitude": COVERED_LAT,
+            "longitude": COVERED_LNG,
+        },
+        headers=AUTH,
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["id"]
+
+
 def _create_mexy_provider(client) -> uuid.UUID:
     from app.api.deps import get_auth
     from app.core.security import AuthenticatedUser, AuthPort
@@ -315,9 +359,10 @@ def test_accepting_partnership_clears_duplicate_pending_requests(client, engine)
 
     listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
     assert listed.status_code == 200
-    assert len(listed.json()) == 1
-    assert listed.json()[0]["restaurant"]["name"] == "Wild Rooster"
-    link_id = listed.json()[0]["id"]
+    items = partnership_items(listed)
+    assert len(items) == 1
+    assert items[0]["restaurant"]["name"] == "Wild Rooster"
+    link_id = items[0]["id"]
 
     accepted = client.post(
         f"/api/v1/delivery-providers/me/partnership-requests/{link_id}/accept",
@@ -386,8 +431,9 @@ def test_delivery_provider_member_sees_platform_requests_with_non_mexy_slug(clie
 
     listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
     assert listed.status_code == 200
-    assert len(listed.json()) == 1
-    assert listed.json()[0]["restaurant"]["name"] == "Non Mexy Slug"
+    items = partnership_items(listed)
+    assert len(items) == 1
+    assert items[0]["restaurant"]["name"] == "Non Mexy Slug"
 
     app.dependency_overrides[get_auth] = lambda: __import__(
         "tests.api.test_api_v1", fromlist=["FakeAuth"]
@@ -432,7 +478,7 @@ def test_mexy_courier_sees_requests_on_platform_provider(client, engine):
 
     listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
     assert listed.status_code == 200
-    body = listed.json()
+    body = partnership_items(listed)
     assert len(body) == 1
     assert body[0]["restaurant"]["name"] == "Platform Link"
 
@@ -484,7 +530,7 @@ def test_provider_lists_accepts_and_rejects_partnership_requests(client, engine)
 
     listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
     assert listed.status_code == 200
-    body = listed.json()
+    body = partnership_items(listed)
     assert len(body) == 1
     assert body[0]["restaurant"]["name"] == "Bistro Norte"
     assert body[0]["restaurant"]["address"] == "Calle Norte 45"
@@ -503,7 +549,7 @@ def test_provider_lists_accepts_and_rejects_partnership_requests(client, engine)
 
     active = client.get("/api/v1/delivery-providers/me/partnerships", headers=AUTH)
     assert active.status_code == 200
-    active_body = active.json()
+    active_body = partnership_items(active)
     assert len(active_body) == 1
     assert active_body[0]["restaurant"]["name"] == "Bistro Norte"
     assert active_body[0]["status"] == "active"
@@ -512,7 +558,7 @@ def test_provider_lists_accepts_and_rejects_partnership_requests(client, engine)
         "/api/v1/delivery-providers/me/partnership-requests", headers=AUTH
     )
     assert pending_after.status_code == 200
-    assert len(pending_after.json()) == 0
+    assert len(partnership_items(pending_after)) == 0
 
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     with factory() as session:
@@ -556,7 +602,7 @@ def test_provider_lists_accepts_and_rejects_partnership_requests(client, engine)
 
     app.dependency_overrides[get_auth] = MexyAuth
     listed_again = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
-    reject_link_id = listed_again.json()[0]["id"]
+    reject_link_id = partnership_items(listed_again)[0]["id"]
 
     rejected = client.post(
         f"/api/v1/delivery-providers/me/partnership-requests/{reject_link_id}/reject",
@@ -604,7 +650,7 @@ def test_restaurant_reads_provider_schedules_and_payments_when_partnership_activ
 
     app.dependency_overrides[get_auth] = MexyAuth
     listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
-    link_id = listed.json()[0]["id"]
+    link_id = partnership_items(listed)[0]["id"]
     client.post(
         f"/api/v1/delivery-providers/me/partnership-requests/{link_id}/accept",
         headers=AUTH,
@@ -692,7 +738,7 @@ def test_restaurant_cannot_enable_delivery_payment_unavailable_from_provider(cli
 
     app.dependency_overrides[get_auth] = MexyAuth
     listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
-    link_id = listed.json()[0]["id"]
+    link_id = partnership_items(listed)[0]["id"]
     client.post(
         f"/api/v1/delivery-providers/me/partnership-requests/{link_id}/accept",
         headers=AUTH,
@@ -769,7 +815,7 @@ def test_public_checkout_config_exposes_delivery_payments_after_partnership(clie
 
     app.dependency_overrides[get_auth] = MexyAuth
     listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
-    link_id = listed.json()[0]["id"]
+    link_id = partnership_items(listed)[0]["id"]
     client.post(
         f"/api/v1/delivery-providers/me/partnership-requests/{link_id}/accept",
         headers=AUTH,
@@ -828,7 +874,7 @@ def test_public_checkout_config_respects_restaurant_delivery_opt_out(client, eng
 
     app.dependency_overrides[get_auth] = MexyAuth
     listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
-    link_id = listed.json()[0]["id"]
+    link_id = partnership_items(listed)[0]["id"]
     client.post(
         f"/api/v1/delivery-providers/me/partnership-requests/{link_id}/accept",
         headers=AUTH,
@@ -858,3 +904,134 @@ def test_public_checkout_config_respects_restaurant_delivery_opt_out(client, eng
     assert ("cash", "delivery") in methods
     assert ("transfer", "delivery") not in methods
     assert ("card_terminal", "delivery") not in methods
+
+
+@requires_db
+def test_partnership_lists_include_primary_email_and_web_app_flag(client):
+    _create_mexy_provider(client)
+    _create_covered_restaurant(client, name="Correo Bistro", subdomain="correo-bistro")
+    _use_mexy_auth()
+
+    listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
+    assert listed.status_code == 200, listed.text
+    body = listed.json()
+    assert body["total"] == 1
+    assert body["has_more"] is False
+    item = body["items"][0]
+    assert item["restaurant"]["primary_email"] == "test@example.com"
+    assert item["has_web_app"] is False
+
+    toggled = client.patch(
+        f"/api/v1/delivery-providers/me/partnerships/{item['id']}",
+        json={"has_web_app": True},
+        headers=AUTH,
+    )
+    assert toggled.status_code == 200, toggled.text
+    assert toggled.json()["has_web_app"] is True
+    assert toggled.json()["restaurant"]["primary_email"] == "test@example.com"
+
+
+@requires_db
+def test_partnership_list_supports_search_sort_filter_and_pagination(client):
+    _create_mexy_provider(client)
+    _create_covered_restaurant(client, name="Zetas Cafe", subdomain="zetas-cafe")
+    _create_covered_restaurant(client, name="Alitas Norte", subdomain="alitas-norte")
+    _create_covered_restaurant(client, name="Mango Sur", subdomain="mango-sur")
+    _use_mexy_auth()
+
+    pending = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
+    mango_id = next(
+        item["id"] for item in pending.json()["items"] if item["restaurant"]["name"] == "Mango Sur"
+    )
+    client.patch(
+        f"/api/v1/delivery-providers/me/partnerships/{mango_id}",
+        json={"has_web_app": True},
+        headers=AUTH,
+    )
+
+    named = client.get(
+        "/api/v1/delivery-providers/me/partnership-requests?q=Alitas&sort=name",
+        headers=AUTH,
+    )
+    assert named.status_code == 200, named.text
+    named_items = named.json()["items"]
+    assert [item["restaurant"]["name"] for item in named_items] == ["Alitas Norte"]
+    assert named.json()["total"] == 1
+
+    emailed = client.get(
+        "/api/v1/delivery-providers/me/partnership-requests?q=test@example.com",
+        headers=AUTH,
+    )
+    assert emailed.status_code == 200, emailed.text
+    assert emailed.json()["total"] == 3
+
+    web_only = client.get(
+        "/api/v1/delivery-providers/me/partnership-requests?has_web_app=true",
+        headers=AUTH,
+    )
+    assert web_only.status_code == 200, web_only.text
+    assert web_only.json()["total"] == 1
+    assert web_only.json()["items"][0]["restaurant"]["name"] == "Mango Sur"
+
+    page = client.get(
+        "/api/v1/delivery-providers/me/partnership-requests?sort=name&limit=2&offset=0",
+        headers=AUTH,
+    )
+    assert page.status_code == 200, page.text
+    assert page.json()["total"] == 3
+    assert page.json()["has_more"] is True
+    assert [item["restaurant"]["name"] for item in page.json()["items"]] == [
+        "Alitas Norte",
+        "Mango Sur",
+    ]
+
+    page_two = client.get(
+        "/api/v1/delivery-providers/me/partnership-requests?sort=name&limit=2&offset=2",
+        headers=AUTH,
+    )
+    assert page_two.status_code == 200, page_two.text
+    assert [item["restaurant"]["name"] for item in page_two.json()["items"]] == ["Zetas Cafe"]
+    assert page_two.json()["has_more"] is False
+
+
+@requires_db
+def test_patch_on_hold_filters_active_list(client):
+    _create_mexy_provider(client)
+    restaurant_id = _create_covered_restaurant(
+        client, name="Hold Bistro", subdomain="hold-bistro"
+    )
+    _use_mexy_auth()
+    listed = client.get("/api/v1/delivery-providers/me/partnership-requests", headers=AUTH)
+    item = next(
+        row for row in partnership_items(listed) if row["restaurant"]["id"] == restaurant_id
+    )
+    accepted = client.post(
+        f"/api/v1/delivery-providers/me/partnership-requests/{item['id']}/accept",
+        headers=AUTH,
+    )
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["on_hold"] is False
+
+    held = client.patch(
+        f"/api/v1/delivery-providers/me/partnerships/{item['id']}",
+        json={"on_hold": True},
+        headers=AUTH,
+    )
+    assert held.status_code == 200, held.text
+    assert held.json()["on_hold"] is True
+    assert held.json()["status"] == "active"
+
+    filtered = client.get(
+        "/api/v1/delivery-providers/me/partnerships?on_hold=true",
+        headers=AUTH,
+    )
+    assert filtered.status_code == 200
+    ids = {row["id"] for row in partnership_items(filtered)}
+    assert item["id"] in ids
+
+    released = client.patch(
+        f"/api/v1/delivery-providers/me/partnerships/{item['id']}",
+        json={"on_hold": False},
+        headers=AUTH,
+    )
+    assert released.json()["on_hold"] is False

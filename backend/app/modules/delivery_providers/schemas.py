@@ -229,6 +229,7 @@ class DeliveryPartnershipRestaurantDTO(BaseModel):
     whatsapp_phone: str | None = None
     owner_display_name: str | None = None
     owner_phone: str | None = None
+    primary_email: str | None = None
     logo_path: str | None = None
     status: str
     delivery_enabled: bool
@@ -238,14 +239,28 @@ class DeliveryPartnershipRequestDTO(BaseModel):
     id: uuid.UUID
     status: str
     is_default: bool
+    has_web_app: bool = False
+    on_hold: bool = False
     created_at: datetime
     activated_at: datetime | None = None
     zone: DeliveryPartnershipZoneRefDTO
     restaurant: DeliveryPartnershipRestaurantDTO
 
 
-class DeliveryPartnershipZoneUpdate(BaseModel):
-    zone_id: uuid.UUID
+class DeliveryPartnershipListDTO(BaseModel):
+    items: list[DeliveryPartnershipRequestDTO]
+    total: int
+    has_more: bool
+
+
+class DeliveryPartnershipUpdate(BaseModel):
+    zone_id: uuid.UUID | None = None
+    has_web_app: bool | None = None
+    on_hold: bool | None = None
+
+
+class DeliveryPartnershipZoneUpdate(DeliveryPartnershipUpdate):
+    pass
 
 
 class RestaurantDeliveryPartnershipDTO(BaseModel):
@@ -256,6 +271,7 @@ class RestaurantDeliveryPartnershipDTO(BaseModel):
     zone_name: str | None = None
     status: Literal["pending", "active", "suspended"]
     is_default: bool
+    on_hold: bool = False
     created_at: datetime
     activated_at: datetime | None = None
 

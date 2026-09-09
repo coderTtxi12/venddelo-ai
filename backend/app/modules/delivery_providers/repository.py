@@ -208,6 +208,21 @@ class DeliveryProviderRepository(ABC):
     ) -> Sequence[DeliveryPartnershipRequestDTO]: ...
 
     @abstractmethod
+    def list_partnerships_page(
+        self,
+        provider_ids: Sequence[uuid.UUID],
+        *,
+        status: str,
+        zone_id: uuid.UUID | None = None,
+        q: str | None = None,
+        has_web_app: bool | None = None,
+        on_hold: bool | None = None,
+        sort: str,
+        limit: int,
+        offset: int,
+    ) -> tuple[Sequence[DeliveryPartnershipRequestDTO], int]: ...
+
+    @abstractmethod
     def accept_partnership_request(
         self, link_id: uuid.UUID, provider_id: uuid.UUID
     ) -> DeliveryPartnershipRequestDTO: ...
@@ -218,6 +233,17 @@ class DeliveryProviderRepository(ABC):
     @abstractmethod
     def reassign_partnership_zone(
         self, link_id: uuid.UUID, provider_id: uuid.UUID, zone_id: uuid.UUID
+    ) -> DeliveryPartnershipRequestDTO: ...
+
+    @abstractmethod
+    def update_partnership(
+        self,
+        link_id: uuid.UUID,
+        provider_id: uuid.UUID,
+        *,
+        zone_id: uuid.UUID | None = None,
+        has_web_app: bool | None = None,
+        on_hold: bool | None = None,
     ) -> DeliveryPartnershipRequestDTO: ...
 
     @abstractmethod

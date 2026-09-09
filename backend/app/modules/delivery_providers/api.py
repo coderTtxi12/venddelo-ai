@@ -4,13 +4,15 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.api.deps import get_synced_user
 from app.core.exceptions import ValidationError
+from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
 from app.infra.storage.factory import build_storage
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
 from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
 from app.modules.delivery_providers.schemas import (
+    DeliveryPartnershipListDTO,
     DeliveryPartnershipRequestDTO,
-    DeliveryPartnershipZoneUpdate,
+    DeliveryPartnershipUpdate,
     DeliveryPricingQuoteDTO,
     DeliveryPricingSimulateRequest,
     DeliveryProviderAdminInviteCreate,
@@ -330,35 +332,71 @@ def simulate_my_delivery_provider_pricing(
     return service.simulate_pricing(user.id, zone_id, data)
 
 
-@router.get("/me/partnership-requests", response_model=list[DeliveryPartnershipRequestDTO])
+@router.get("/me/partnership-requests", response_model=DeliveryPartnershipListDTO)
 def list_my_partnership_requests(
     zone_id: UUID | None = Query(default=None),
+    q: str | None = Query(default=None),
+    has_web_app: bool | None = Query(default=None),
+    on_hold: bool | None = Query(default=None),
+    sort: str | None = Query(default=None),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryPartnershipService = Depends(_partnership_service),
-) -> list[DeliveryPartnershipRequestDTO]:
-    return service.list_pending_requests(user.id, zone_id)
+) -> DeliveryPartnershipListDTO:
+    return service.list_pending_requests(
+        user.id,
+        zone_id,
+        q=q,
+        has_web_app=has_web_app,
+        on_hold=on_hold,
+        sort=sort,
+        limit=limit,
+        offset=offset,
+    )
 
 
-@router.get("/me/partnerships", response_model=list[DeliveryPartnershipRequestDTO])
+@router.get("/me/partnerships", response_model=DeliveryPartnershipListDTO)
 def list_my_active_partnerships(
     zone_id: UUID | None = Query(default=None),
+    q: str | None = Query(default=None),
+    has_web_app: bool | None = Query(default=None),
+    on_hold: bool | None = Query(default=None),
+    sort: str | None = Query(default=None),
+    limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryPartnershipService = Depends(_partnership_service),
-) -> list[DeliveryPartnershipRequestDTO]:
-    return service.list_active_requests(user.id, zone_id)
+) -> DeliveryPartnershipListDTO:
+    return service.list_active_requests(
+        user.id,
+        zone_id,
+        q=q,
+        has_web_app=has_web_app,
+        on_hold=on_hold,
+        sort=sort,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.patch(
     "/me/partnerships/{link_id}",
     response_model=DeliveryPartnershipRequestDTO,
 )
-def reassign_partnership_zone(
+def update_partnership(
     link_id: UUID,
-    data: DeliveryPartnershipZoneUpdate,
+    data: DeliveryPartnershipUpdate,
     user: UserDTO = Depends(get_synced_user),
     service: DeliveryPartnershipService = Depends(_partnership_service),
 ) -> DeliveryPartnershipRequestDTO:
-    return service.reassign_zone(user.id, link_id, data.zone_id)
+    return service.update_partnership(
+        user.id,
+        link_id,
+        zone_id=data.zone_id,
+        has_web_app=data.has_web_app,
+        on_hold=data.on_hold,
+    )
 
 
 @router.post(

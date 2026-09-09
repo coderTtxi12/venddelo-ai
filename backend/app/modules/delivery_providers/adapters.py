@@ -9,8 +9,7 @@ from sqlalchemy import func, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ConflictError, NotFoundError
-
+from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.db.models.delivery import (
     DeliveryProvider,
     DeliveryProviderAdminInvite,
@@ -23,6 +22,7 @@ from app.db.models.delivery import (
 )
 from app.db.models.restaurant import Restaurant
 from app.db.models.user import User
+from app.modules.delivery_dispatch.seed import seed_dispatch_defaults
 from app.modules.delivery_providers.constants import (
     MEXY_LEGACY_SLUG,
     MEXY_PROVIDER_NAME,
@@ -36,7 +36,6 @@ from app.modules.delivery_providers.pricing import (
     config_to_json,
     default_pricing_config,
 )
-from app.modules.delivery_dispatch.seed import seed_dispatch_defaults
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
 from app.modules.delivery_providers.schemas import (
     DeliveryPartnershipRequestDTO,
@@ -45,9 +44,9 @@ from app.modules.delivery_providers.schemas import (
     DeliveryProviderAdminInviteDTO,
     DeliveryProviderDTO,
     DeliveryProviderMemberDTO,
-    DeliveryProviderPricingConfigDTO,
     DeliveryProviderPaymentMethodCreate,
     DeliveryProviderPaymentMethodDTO,
+    DeliveryProviderPricingConfigDTO,
     DeliveryProviderScheduleCreate,
     DeliveryProviderScheduleDTO,
     DeliveryProviderZoneDTO,
@@ -931,69 +930,82 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
     def list_pending_partnership_requests(
         self, provider_id: uuid.UUID, zone_id: uuid.UUID | None = None
     ) -> Sequence[DeliveryPartnershipRequestDTO]:
-        query = (
-            select(
-                RestaurantDeliveryProvider,
-                Restaurant,
-                User.display_name,
-                DeliveryProviderZone,
-            )
-            .join(Restaurant, Restaurant.id == RestaurantDeliveryProvider.restaurant_id)
-            .join(
-                DeliveryProviderZone,
-                DeliveryProviderZone.id == RestaurantDeliveryProvider.zone_id,
-            )
-            .outerjoin(User, User.id == Restaurant.owner_id)
-            .where(
-                RestaurantDeliveryProvider.delivery_provider_id == provider_id,
-                RestaurantDeliveryProvider.status == "pending",
-                Restaurant.is_active.is_(True),
-            )
+        items, _total = self.list_partnerships_page(
+            [provider_id],
+            status="pending",
+            zone_id=zone_id,
+            sort="-created_at",
+            limit=10_000,
+            offset=0,
         )
-        if zone_id is not None:
-            query = query.where(RestaurantDeliveryProvider.zone_id == zone_id)
-        rows = self._session.execute(
-            query.order_by(RestaurantDeliveryProvider.created_at.desc())
-        ).all()
-        return [
-            self._partnership_dto_from_row(link, restaurant, owner_display_name, zone)
-            for link, restaurant, owner_display_name, zone in rows
-        ]
+        return items
 
     def list_active_partnership_requests(
         self, provider_id: uuid.UUID, zone_id: uuid.UUID | None = None
     ) -> Sequence[DeliveryPartnershipRequestDTO]:
-        query = (
-            select(
-                RestaurantDeliveryProvider,
-                Restaurant,
-                User.display_name,
-                DeliveryProviderZone,
-            )
-            .join(Restaurant, Restaurant.id == RestaurantDeliveryProvider.restaurant_id)
-            .join(
-                DeliveryProviderZone,
-                DeliveryProviderZone.id == RestaurantDeliveryProvider.zone_id,
-            )
-            .outerjoin(User, User.id == Restaurant.owner_id)
-            .where(
-                RestaurantDeliveryProvider.delivery_provider_id == provider_id,
-                RestaurantDeliveryProvider.status == "active",
-                Restaurant.is_active.is_(True),
-            )
+        items, _total = self.list_partnerships_page(
+            [provider_id],
+            status="active",
+            zone_id=zone_id,
+            sort="-activated_at",
+            limit=10_000,
+            offset=0,
+        )
+        return items
+
+    def list_partnerships_page(
+        self,
+        provider_ids: Sequence[uuid.UUID],
+        *,
+        status: str,
+        zone_id: uuid.UUID | None = None,
+        q: str | None = None,
+        has_web_app: bool | None = None,
+        on_hold: bool | None = None,
+        sort: str,
+        limit: int,
+        offset: int,
+    ) -> tuple[Sequence[DeliveryPartnershipRequestDTO], int]:
+        if not provider_ids:
+            return [], 0
+
+        query = self._partnership_row_select().where(
+            RestaurantDeliveryProvider.delivery_provider_id.in_(tuple(provider_ids)),
+            RestaurantDeliveryProvider.status == status,
+            Restaurant.is_active.is_(True),
         )
         if zone_id is not None:
             query = query.where(RestaurantDeliveryProvider.zone_id == zone_id)
-        rows = self._session.execute(
-            query.order_by(
-                RestaurantDeliveryProvider.activated_at.desc().nullslast(),
-                RestaurantDeliveryProvider.created_at.desc(),
+        if has_web_app is not None:
+            query = query.where(RestaurantDeliveryProvider.has_web_app.is_(has_web_app))
+        if on_hold is not None:
+            query = query.where(RestaurantDeliveryProvider.on_hold.is_(on_hold))
+        term = (q or "").strip()
+        if term:
+            pattern = f"%{term}%"
+            query = query.where(
+                or_(
+                    Restaurant.name.ilike(pattern),
+                    Restaurant.subdomain.ilike(pattern),
+                    User.email.ilike(pattern),
+                )
             )
-        ).all()
-        return [
-            self._partnership_dto_from_row(link, restaurant, owner_display_name, zone)
-            for link, restaurant, owner_display_name, zone in rows
+
+        rows = list(self._session.execute(query).all())
+        if status == "pending":
+            rows = self._dedupe_pending_partnership_rows(rows)
+        rows = self._sort_partnership_rows(rows, sort)
+        total = len(rows)
+        page_offset = max(0, offset)
+        page_limit = max(0, limit)
+        page = rows[page_offset : page_offset + page_limit]
+        items = [
+            self._partnership_dto_from_row(
+                link, restaurant, owner_display_name, zone, owner_email=owner_email
+            )
+            for link, restaurant, owner_display_name, owner_email, zone in page
         ]
+        return items, total
 
     def accept_partnership_request(
         self, link_id: uuid.UUID, provider_id: uuid.UUID
@@ -1001,19 +1013,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         from app.core.exceptions import NotFoundError, ValidationError
 
         row = self._session.execute(
-            select(
-                RestaurantDeliveryProvider,
-                Restaurant,
-                User.display_name,
-                DeliveryProviderZone,
-            )
-            .join(Restaurant, Restaurant.id == RestaurantDeliveryProvider.restaurant_id)
-            .join(
-                DeliveryProviderZone,
-                DeliveryProviderZone.id == RestaurantDeliveryProvider.zone_id,
-            )
-            .outerjoin(User, User.id == Restaurant.owner_id)
-            .where(
+            self._partnership_row_select().where(
                 RestaurantDeliveryProvider.id == link_id,
                 RestaurantDeliveryProvider.delivery_provider_id == provider_id,
             )
@@ -1021,7 +1021,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         if row is None:
             raise NotFoundError("Solicitud de partnership no encontrada")
 
-        link, restaurant, owner_display_name, zone = row
+        link, restaurant, owner_display_name, owner_email, zone = row
         if link.status != "pending":
             raise ValidationError("Esta solicitud ya fue procesada")
 
@@ -1035,7 +1035,9 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         link.is_default = True
         link.activated_at = now
         self._session.flush()
-        return self._partnership_dto_from_row(link, restaurant, owner_display_name, zone)
+        return self._partnership_dto_from_row(
+            link, restaurant, owner_display_name, zone, owner_email=owner_email
+        )
 
     def _resolve_duplicate_mexy_partnerships_before_accept(
         self,
@@ -1082,22 +1084,24 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
     def reassign_partnership_zone(
         self, link_id: uuid.UUID, provider_id: uuid.UUID, zone_id: uuid.UUID
     ) -> DeliveryPartnershipRequestDTO:
-        self.assert_zone_on_provider(provider_id, zone_id)
+        return self.update_partnership(link_id, provider_id, zone_id=zone_id)
+
+    def update_partnership(
+        self,
+        link_id: uuid.UUID,
+        provider_id: uuid.UUID,
+        *,
+        zone_id: uuid.UUID | None = None,
+        has_web_app: bool | None = None,
+        on_hold: bool | None = None,
+    ) -> DeliveryPartnershipRequestDTO:
+        if zone_id is None and has_web_app is None and on_hold is None:
+            raise ValidationError("Nada que actualizar")
+        if zone_id is not None:
+            self.assert_zone_on_provider(provider_id, zone_id)
 
         row = self._session.execute(
-            select(
-                RestaurantDeliveryProvider,
-                Restaurant,
-                User.display_name,
-                DeliveryProviderZone,
-            )
-            .join(Restaurant, Restaurant.id == RestaurantDeliveryProvider.restaurant_id)
-            .join(
-                DeliveryProviderZone,
-                DeliveryProviderZone.id == RestaurantDeliveryProvider.zone_id,
-            )
-            .outerjoin(User, User.id == Restaurant.owner_id)
-            .where(
+            self._partnership_row_select().where(
                 RestaurantDeliveryProvider.id == link_id,
                 RestaurantDeliveryProvider.delivery_provider_id == provider_id,
             )
@@ -1105,14 +1109,23 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         if row is None:
             raise NotFoundError("Solicitud de partnership no encontrada")
 
-        link, restaurant, owner_display_name, _current_zone = row
-        link.zone_id = zone_id
+        link, restaurant, owner_display_name, owner_email, current_zone = row
+        if zone_id is not None:
+            link.zone_id = zone_id
+        if has_web_app is not None:
+            link.has_web_app = has_web_app
+        if on_hold is not None:
+            link.on_hold = on_hold
         self._session.flush()
 
-        new_zone = self._session.get(DeliveryProviderZone, zone_id)
-        if new_zone is None:
-            raise NotFoundError("Zona no encontrada")
-        return self._partnership_dto_from_row(link, restaurant, owner_display_name, new_zone)
+        zone = current_zone
+        if zone_id is not None:
+            zone = self._session.get(DeliveryProviderZone, zone_id)
+            if zone is None:
+                raise NotFoundError("Zona no encontrada")
+        return self._partnership_dto_from_row(
+            link, restaurant, owner_display_name, zone, owner_email=owner_email
+        )
 
     def get_partnership_provider_id(self, link_id: uuid.UUID) -> uuid.UUID | None:
         return self._session.scalar(
@@ -1156,9 +1169,74 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             zone_name=zone.name,
             status=link.status,  # type: ignore[arg-type]
             is_default=link.is_default,
+            on_hold=bool(link.on_hold),
             created_at=link.created_at,
             activated_at=link.activated_at,
         )
+
+    @staticmethod
+    def _partnership_row_select():
+        return (
+            select(
+                RestaurantDeliveryProvider,
+                Restaurant,
+                User.display_name,
+                User.email,
+                DeliveryProviderZone,
+            )
+            .join(Restaurant, Restaurant.id == RestaurantDeliveryProvider.restaurant_id)
+            .join(
+                DeliveryProviderZone,
+                DeliveryProviderZone.id == RestaurantDeliveryProvider.zone_id,
+            )
+            .outerjoin(User, User.id == Restaurant.owner_id)
+        )
+
+    @staticmethod
+    def _dedupe_pending_partnership_rows(rows: list) -> list:
+        by_restaurant: dict[uuid.UUID, tuple] = {}
+        for row in rows:
+            link = row[0]
+            restaurant_id = link.restaurant_id
+            existing = by_restaurant.get(restaurant_id)
+            if existing is None or link.created_at > existing[0].created_at:
+                by_restaurant[restaurant_id] = row
+        return list(by_restaurant.values())
+
+    @staticmethod
+    def _sort_partnership_rows(rows: list, sort: str) -> list:
+        allowed = {
+            "name",
+            "-name",
+            "email",
+            "-email",
+            "created_at",
+            "-created_at",
+            "activated_at",
+            "-activated_at",
+            "has_web_app",
+            "-has_web_app",
+        }
+        if sort not in allowed:
+            raise ValidationError("Orden no válido")
+        descending = sort.startswith("-")
+        field = sort[1:] if descending else sort
+
+        def key(row: tuple) -> tuple:
+            link, restaurant, _display_name, owner_email, _zone = row
+            if field == "name":
+                value: object = restaurant.name.casefold()
+            elif field == "email":
+                value = (owner_email or "").casefold()
+            elif field == "activated_at":
+                value = link.activated_at or datetime.min.replace(tzinfo=UTC)
+            elif field == "has_web_app":
+                value = link.has_web_app
+            else:
+                value = link.created_at
+            return (value, str(link.id))
+
+        return sorted(rows, key=key, reverse=descending)
 
     @staticmethod
     def _partnership_dto_from_row(
@@ -1166,6 +1244,8 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         restaurant: Restaurant,
         owner_display_name: str | None = None,
         zone: DeliveryProviderZone | None = None,
+        *,
+        owner_email: str | None = None,
     ) -> DeliveryPartnershipRequestDTO:
         zone_ref = DeliveryPartnershipZoneRefDTO(
             id=zone.id if zone is not None else link.zone_id,
@@ -1175,6 +1255,8 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             id=link.id,
             status=link.status,
             is_default=link.is_default,
+            has_web_app=bool(link.has_web_app),
+            on_hold=bool(link.on_hold),
             created_at=link.created_at,
             activated_at=link.activated_at,
             zone=zone_ref,
@@ -1191,6 +1273,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
                     restaurant.owner_contact_name or owner_display_name
                 ),
                 owner_phone=restaurant.owner_phone or restaurant.whatsapp_phone,
+                primary_email=owner_email,
                 logo_path=restaurant.logo_path,
                 status=restaurant.status,
                 delivery_enabled=restaurant.delivery_enabled,
