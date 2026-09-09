@@ -38,6 +38,7 @@ def _request(
     package_count: int = 1,
     payment_method: str = "transfer",
     collect_cents: int = 0,
+    mexy_fee_cents: int = 0,
     rejected: tuple[str, ...] = (),
     silent: tuple[str, ...] = (),
     restaurant_lat: float = RESTAURANT_LAT,
@@ -58,6 +59,7 @@ def _request(
         package_count=package_count,
         payment_method=payment_method,
         collect_cents=collect_cents,
+        mexy_fee_cents=mexy_fee_cents,
         cycle_rejected_driver_ids=rejected,
         cycle_silent_driver_ids=silent,
         dispatch_group_id=dispatch_group_id,
@@ -175,6 +177,28 @@ def test_cash_excludes_insufficient_credit():
         last_lng=-99.1335,
         credit_limit_cents=50_000,
         credit_held_cents=40_000,
+    )
+    rich = _driver(
+        "rich",
+        last_lat=19.4400,
+        last_lng=-99.1400,
+        credit_limit_cents=50_000,
+        credit_held_cents=0,
+    )
+    result = choose_assignments(_context(request, (poor, rich)))
+
+    assert result.case == "A"
+    assert result.offers[0].driver_id == "rich"
+
+
+def test_mexy_fee_excludes_insufficient_credit_on_transfer():
+    request = _request(payment_method="transfer", collect_cents=0, mexy_fee_cents=10_000)
+    poor = _driver(
+        "poor",
+        last_lat=19.4330,
+        last_lng=-99.1335,
+        credit_limit_cents=50_000,
+        credit_held_cents=45_000,
     )
     rich = _driver(
         "rich",

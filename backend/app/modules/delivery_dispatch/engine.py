@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Literal
 
+from app.modules.delivery_dispatch.credit import credit_required_cents
 from app.modules.delivery_dispatch.geo import geodesic_meters
 
 _OCCUPIED_STATUSES = frozenset({"assigned", "picked_up", "in_transit"})
@@ -48,6 +49,7 @@ class EngineRequest:
     cycle_silent_driver_ids: tuple[str, ...] = ()
     dispatch_group_id: str | None = None
     restaurant_id: str | None = None
+    mexy_fee_cents: int = 0
 
 
 @dataclass(frozen=True)
@@ -218,9 +220,14 @@ def eligibility_blockers(
         > context.settings.max_active_packages_per_driver
     ):
         reasons.append("packages")
-    if request.payment_method == "cash":
+    required = credit_required_cents(
+        payment_method=request.payment_method,
+        collect_cents=request.collect_cents,
+        mexy_fee_cents=request.mexy_fee_cents,
+    )
+    if required > 0:
         available = driver.credit_limit_cents - driver.credit_held_cents
-        if available < request.collect_cents:
+        if available < required:
             reasons.append("credit")
     if not _has_current_app(context, driver):
         reasons.append("outdated_app")
@@ -459,9 +466,14 @@ def _is_eligible(context: EngineContext, request: EngineRequest, driver: EngineD
         > context.settings.max_active_packages_per_driver
     ):
         return False
-    if request.payment_method == "cash":
+    required = credit_required_cents(
+        payment_method=request.payment_method,
+        collect_cents=request.collect_cents,
+        mexy_fee_cents=request.mexy_fee_cents,
+    )
+    if required > 0:
         available = driver.credit_limit_cents - driver.credit_held_cents
-        if available < request.collect_cents:
+        if available < required:
             return False
     if not _has_current_app(context, driver):
         return False
