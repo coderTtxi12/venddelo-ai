@@ -69,6 +69,19 @@ export type RestaurantCustomerActivity = {
   next_cursor: string | null;
   last_delivery_address?: string | null;
   last_delivery_maps_url?: string | null;
+  last_delivery?: CustomerLastDelivery | null;
+};
+
+export type CustomerLastDelivery = {
+  address: string;
+  references: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  maps_url: string | null;
+  payment_method: 'cash' | 'transfer' | 'card_terminal' | null;
+  package_size: 'normal' | 'grande' | null;
+  package_count: number | null;
+  prep_minutes: number | null;
 };
 
 export type ActivityHistorySort = 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc';
