@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { ALL_ZONES_ID } from '@/lib/dispatch/zoneColors';
+import { showsAllZonesOption } from '@/lib/nav/sidebarNav';
 import styles from './ZoneSwitcher.module.css';
 
 type ZoneSwitcherProps = {
@@ -16,7 +17,7 @@ export default function ZoneSwitcher({ onAddZone }: ZoneSwitcherProps) {
   const pathname = usePathname();
   const { canWriteProviderConfig } = useDeliveryProviderAccess();
   const { loading, zones, selectedZoneId, setSelectedZoneId } = useDeliveryZone();
-  const showAllChip = pathname === '/monitor' || pathname === '/historial' || selectedZoneId === ALL_ZONES_ID;
+  const showAllChip = showsAllZonesOption(pathname) || selectedZoneId === ALL_ZONES_ID;
 
   if (pathname === '/repartidores' || pathname === '/asignacion') {
     return (

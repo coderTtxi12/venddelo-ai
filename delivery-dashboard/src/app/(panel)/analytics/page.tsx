@@ -1,5 +1,5 @@
-import AnalyticsPage from '@/components/pages/AnalyticsPage';
+import { redirect } from 'next/navigation';
 
 export default function Page() {
-  return <AnalyticsPage />;
+  redirect('/estadisticas');
 }

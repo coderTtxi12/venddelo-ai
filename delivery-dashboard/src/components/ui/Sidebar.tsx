@@ -13,28 +13,24 @@ import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import QueryStatsOutlinedIcon from '@mui/icons-material/QueryStatsOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
+import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import { MOBILE_DRAWER_MAX_WIDTH, useMobileSidebar } from '@/contexts/MobileSidebarContext';
+import { SIDEBAR_NAV_SECTIONS } from '@/lib/nav/sidebarNav';
 import styles from './Sidebar.module.css';
 
-interface NavItem {
-  label: string;
-  path: string;
-  icon: ReactNode;
-  badge?: number;
-}
-
-const navItems: NavItem[] = [
-  { label: 'Monitor', path: '/monitor', icon: <QueryStatsOutlinedIcon fontSize="small" /> },
-  { label: 'Historial', path: '/historial', icon: <HistoryOutlinedIcon fontSize="small" /> },
-  { label: 'Restaurantes', path: '/partnerships', icon: <HandshakeOutlinedIcon fontSize="small" /> },
-  { label: 'Repartidores', path: '/repartidores', icon: <TwoWheelerOutlinedIcon fontSize="small" /> },
-  { label: 'Asignación', path: '/asignacion', icon: <AssignmentOutlinedIcon fontSize="small" /> },
-  { label: 'Tarifas', path: '/tariffs', icon: <LocalShippingOutlinedIcon fontSize="small" /> },
-  { label: 'Horarios', path: '/horarios', icon: <AccessTimeOutlinedIcon fontSize="small" /> },
-  { label: 'Cerco geográfico', path: '/cerco-geografico', icon: <MapOutlinedIcon fontSize="small" /> },
-  { label: 'Configuración', path: '/settings', icon: <SettingsOutlinedIcon fontSize="small" /> },
-];
+const NAV_ICONS: Record<string, ReactNode> = {
+  '/monitor': <QueryStatsOutlinedIcon fontSize="small" />,
+  '/historial': <HistoryOutlinedIcon fontSize="small" />,
+  '/estadisticas': <BarChartOutlinedIcon fontSize="small" />,
+  '/partnerships': <HandshakeOutlinedIcon fontSize="small" />,
+  '/repartidores': <TwoWheelerOutlinedIcon fontSize="small" />,
+  '/asignacion': <AssignmentOutlinedIcon fontSize="small" />,
+  '/tariffs': <LocalShippingOutlinedIcon fontSize="small" />,
+  '/horarios': <AccessTimeOutlinedIcon fontSize="small" />,
+  '/cerco-geografico': <MapOutlinedIcon fontSize="small" />,
+  '/settings': <SettingsOutlinedIcon fontSize="small" />,
+};
 
 function isNavActive(pathname: string, path: string): boolean {
   if (path === '/') return pathname === '/';
@@ -110,34 +106,42 @@ export default function Sidebar() {
           )}
         </div>
 
-        <nav className={styles.nav}>
-          {navItems.map((item) => {
-            const active = isNavActive(pathname, item.path);
-            return (
-              <Link
-                key={item.path}
-                href={item.path}
-                className={`${styles.navItem} ${active ? styles.active : ''}`}
-                aria-current={active ? 'page' : undefined}
-                onClick={() => {
-                  if (isMobileDrawer) closeDrawer();
-                }}
-              >
-                <span className={styles.icon}>{item.icon}</span>
-                {showLabels ? <span className={styles.label}>{item.label}</span> : null}
-                {item.badge != null && showLabels ? (
-                  <span className={styles.badge}>{item.badge}</span>
-                ) : null}
-              </Link>
-            );
-          })}
+        <nav className={styles.nav} aria-label="Navegación principal">
+          {SIDEBAR_NAV_SECTIONS.map((section) => (
+            <section key={section.id} className={styles.navSection} aria-labelledby={`nav-${section.id}`}>
+              {showLabels ? (
+                <h2 id={`nav-${section.id}`} className={styles.sectionLabel}>
+                  {section.label}
+                </h2>
+              ) : (
+                <h2 id={`nav-${section.id}`} className={styles.sectionLabelSr}>
+                  {section.label}
+                </h2>
+              )}
+              {section.items.map((item) => {
+                const active = isNavActive(pathname, item.path);
+                return (
+                  <Link
+                    key={item.path}
+                    href={item.path}
+                    className={`${styles.navItem} ${active ? styles.active : ''}`}
+                    aria-current={active ? 'page' : undefined}
+                    aria-label={item.label}
+                    title={showLabels ? undefined : item.label}
+                    onClick={() => {
+                      if (isMobileDrawer) closeDrawer();
+                    }}
+                  >
+                    <span className={styles.icon} aria-hidden="true">
+                      {NAV_ICONS[item.path]}
+                    </span>
+                    {showLabels ? <span className={styles.label}>{item.label}</span> : null}
+                  </Link>
+                );
+              })}
+            </section>
+          ))}
         </nav>
-
-        {!isMobileDrawer ? (
-          <button type="button" className={styles.addButton}>
-            + Agregar
-          </button>
-        ) : null}
       </aside>
     </>
   );

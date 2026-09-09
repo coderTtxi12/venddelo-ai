@@ -6,6 +6,7 @@ import CheckOutlinedIcon from '@mui/icons-material/CheckOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { ALL_ZONES_ID, zoneColorForId } from '@/lib/dispatch/zoneColors';
+import { showsAllZonesOption } from '@/lib/nav/sidebarNav';
 import styles from './ZonePicker.module.css';
 
 type ZoneOption = { id: string; name: string };
@@ -21,7 +22,7 @@ export default function ZonePicker() {
   const zoneIds = useMemo(() => zones.map((zone) => zone.id), [zones]);
   const options = useMemo<ZoneOption[]>(() => {
     const zoneOptions = zones.map((zone) => ({ id: zone.id, name: zone.name }));
-    if (pathname === '/monitor' || pathname === '/historial' || selectedZoneId === ALL_ZONES_ID) {
+    if (showsAllZonesOption(pathname) || selectedZoneId === ALL_ZONES_ID) {
       return [{ id: ALL_ZONES_ID, name: 'Todas' }, ...zoneOptions];
     }
     return zoneOptions;
