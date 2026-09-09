@@ -659,3 +659,59 @@ def test_create_dispatch_from_order_requotes_when_pin_moves(client, engine):
     assert body["short_id"] == "A1B2C"
     assert body["quoted_fee_cents"] != 7777
     assert body["quoted_fee_cents"] > 0
+
+
+@requires_db
+def test_create_dispatch_replays_same_idempotency_key(client, engine):
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-idempotent")
+    _activate_partnership(client, engine, restaurant_id)
+    payload = _dispatch_payload()
+    headers = {**AUTH, "Idempotency-Key": str(uuid.uuid4())}
+
+    first = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=payload,
+        headers=headers,
+    )
+    second = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=payload,
+        headers=headers,
+    )
+
+    assert first.status_code == 201, first.text
+    assert second.status_code == 201, second.text
+    assert second.json()["id"] == first.json()["id"]
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        rows = session.scalars(select(DeliveryDispatchRequest)).all()
+        assert len(rows) == 1
+
+
+@requires_db
+def test_create_dispatch_rejects_reused_idempotency_key_with_new_payload(client, engine):
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-idempotent-conflict")
+    _activate_partnership(client, engine, restaurant_id)
+    headers = {**AUTH, "Idempotency-Key": str(uuid.uuid4())}
+
+    first = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(),
+        headers=headers,
+    )
+    conflict = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(customer_name="Otro cliente"),
+        headers=headers,
+    )
+
+    assert first.status_code == 201, first.text
+    assert conflict.status_code == 409
+    assert "Idempotency" in conflict.json()["error"]["message"]

@@ -1,7 +1,7 @@
 import base64
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Header, Query, status
 
 from app.api.cache_helpers import (
     invalidate_restaurant_menu_cache,
@@ -88,6 +88,7 @@ def _dispatch_service(
         uow.session,
         SqlAlchemyDeliveryProviderRepository(uow.session),
         build_storage(),
+        uow.idempotency,
     )
 
 
@@ -259,8 +260,9 @@ def create_dispatch_request(
     data: DispatchRequestCreate,
     restaurant: RestaurantDTO = Depends(_owned_me_restaurant),
     service: RestaurantDispatchService = Depends(_dispatch_service),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> DispatchRequestDTO:
-    return service.create(restaurant, data)
+    return service.create(restaurant, data, idempotency_key)
 
 
 @router.get(

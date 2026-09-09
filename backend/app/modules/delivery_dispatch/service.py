@@ -20,6 +20,7 @@ from app.core.exceptions import (
     NotFoundError,
     ValidationError,
 )
+from app.core.idempotency import IdempotencyRepository
 from app.core.storage import StoragePort
 from app.db.models.delivery import (
     DeliveryCreditHold,
@@ -38,6 +39,11 @@ from app.db.models.restaurant import Restaurant
 from app.infra.storage.factory import build_storage
 from app.modules.assistant.image_webp import WEBP_CONTENT_TYPE, convert_image_bytes_to_webp
 from app.modules.orders.delivery_fee import provider_quoted_fee_cents
+from app.modules.delivery_dispatch.create_idempotency import (
+    dispatch_idempotency_storage_key,
+    hash_dispatch_create,
+    normalize_idempotency_key,
+)
 from app.modules.delivery_dispatch.app_client import (
     force_update_payload,
     must_update_app,
@@ -918,17 +924,37 @@ class RestaurantDispatchService:
         session: Session,
         provider_repo: DeliveryProviderRepository,
         storage: StoragePort | None = None,
+        idempotency: IdempotencyRepository | None = None,
+        idempotency_ttl_seconds: int | None = None,
     ) -> None:
         self._session = session
         self._provider_repo = provider_repo
         self._storage = storage
+        self._idempotency = idempotency
+        self._idempotency_ttl = (
+            idempotency_ttl_seconds or get_settings().order_idempotency_ttl_seconds
+        )
         self._quotes = PublicDeliveryQuoteService(provider_repo)
 
     def create(
         self,
         restaurant: RestaurantDTO,
         data: DispatchRequestCreate,
+        idempotency_key: str | None = None,
     ) -> DispatchRequestDTO:
+        key = normalize_idempotency_key(idempotency_key)
+        request_hash = hash_dispatch_create(restaurant.id, data)
+        storage_key = (
+            dispatch_idempotency_storage_key(restaurant.id, key) if key else None
+        )
+        if storage_key and self._idempotency is not None:
+            replay = self._idempotency.get(storage_key)
+            if replay is not None:
+                if replay.request_hash != request_hash:
+                    raise ConflictError("Idempotency key reused with different payload")
+                if replay.response_snapshot:
+                    return DispatchRequestDTO.model_validate(replay.response_snapshot)
+
         partnership = self._active_partnership(restaurant.id)
         provider_id = partnership.delivery_provider_id
 
@@ -944,7 +970,11 @@ class RestaurantDispatchService:
         if source_order is not None:
             existing = self._existing_order_dispatch(restaurant.id, source_order.id)
             if existing is not None:
-                return self._to_dto(existing)
+                return self._store_dispatch_idempotency(
+                    storage_key,
+                    request_hash,
+                    self._to_dto(existing),
+                )
 
         lock_quoted_fee = source_order is not None and _same_dropoff_coords(
             source_order,
@@ -1019,7 +1049,11 @@ class RestaurantDispatchService:
         )
         self._session.refresh(row)
         notify_request_realtime(self._session, row)
-        return self._to_dto(row)
+        return self._store_dispatch_idempotency(
+            storage_key,
+            request_hash,
+            self._to_dto(row),
+        )
 
     def list(
         self,
@@ -1170,6 +1204,21 @@ class RestaurantDispatchService:
             restaurant=restaurant,
             storage=self._storage or build_storage(),
         )
+
+    def _store_dispatch_idempotency(
+        self,
+        storage_key: str | None,
+        request_hash: str,
+        dto: DispatchRequestDTO,
+    ) -> DispatchRequestDTO:
+        if storage_key and self._idempotency is not None:
+            self._idempotency.put(
+                storage_key,
+                request_hash,
+                dto.model_dump(mode="json"),
+                self._idempotency_ttl,
+            )
+        return dto
 
     def _resolve_source_order(
         self,

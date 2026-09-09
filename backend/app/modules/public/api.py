@@ -100,6 +100,7 @@ def _restaurant_dispatch_service(
         uow.session,
         SqlAlchemyDeliveryProviderRepository(uow.session),
         build_storage(),
+        uow.idempotency,
     )
 
 
