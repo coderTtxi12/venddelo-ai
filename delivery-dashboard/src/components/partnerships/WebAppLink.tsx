@@ -50,10 +50,11 @@ export function WebAppLink({ subdomain, restaurantName }: WebAppLinkProps) {
 
   if (!url) return null;
 
-  const host = restaurantPublicMenuLabel(url);
+  const menuUrl = url;
+  const host = restaurantPublicMenuLabel(menuUrl);
 
   async function handleCopy() {
-    const ok = await copyToClipboard(url);
+    const ok = await copyToClipboard(menuUrl);
     if (ok) setCopied(true);
   }
 
@@ -67,7 +68,7 @@ export function WebAppLink({ subdomain, restaurantName }: WebAppLinkProps) {
         <p className={styles.url}>{host}</p>
         <div className={styles.actions}>
           <a
-            href={url}
+            href={menuUrl}
             target="_blank"
             rel="noopener noreferrer"
             className={styles.action}
