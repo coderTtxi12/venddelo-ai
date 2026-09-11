@@ -293,6 +293,7 @@ def _aligned_series(
     previous: dict,
     occupancy_current: dict,
     occupancy_previous: dict,
+    durations_current: dict,
     start: date,
     end: date,
     prev_start: date,
@@ -310,6 +311,7 @@ def _aligned_series(
             if prev_key is not None
             else _empty_bucket()
         )
+        durations = {**_empty_durations(), **durations_current.get(key, {})}
         series.append(
             {
                 "label": label,
@@ -325,6 +327,7 @@ def _aligned_series(
                 "previous_occupancy": prev["occupancy"],
                 "current_routed": cur["routed"],
                 "previous_routed": prev["routed"],
+                **{k: durations.get(k) for k in _DURATION_KEYS},
             }
         )
     return series
@@ -453,6 +456,119 @@ def _busy_start_expr():
     )
 
 
+_DURATION_KEYS = (
+    "avg_total_seconds",
+    "avg_search_seconds",
+    "avg_delivery_seconds",
+    "avg_pickup_seconds",
+    "avg_dropoff_seconds",
+)
+
+
+def _round_avg_seconds(value: object) -> int | None:
+    if value is None:
+        return None
+    return int(round(float(value)))
+
+
+def _empty_durations() -> dict[str, int | None]:
+    return {key: None for key in _DURATION_KEYS}
+
+
+def _duration_change_pcts(
+    current: dict[str, int | None],
+    previous: dict[str, int | None],
+) -> dict[str, float | None]:
+    out: dict[str, float | None] = {}
+    for key in _DURATION_KEYS:
+        cur = current.get(key)
+        prev = previous.get(key)
+        if cur is None or prev is None:
+            out[f"{key}_change_pct"] = None
+        else:
+            out[f"{key}_change_pct"] = stats_pct_change(cur, prev)
+    return out
+
+
+def _accepted_at_expr():
+    return (
+        select(func.min(DeliveryDispatchOffer.responded_at))
+        .where(
+            DeliveryDispatchOffer.request_id == DeliveryDispatchRequest.id,
+            DeliveryDispatchOffer.status == "accepted",
+        )
+        .correlate(DeliveryDispatchRequest)
+        .scalar_subquery()
+    )
+
+
+def _avg_positive_epoch(start, end):
+    delivered = DeliveryDispatchRequest.status == "delivered"
+    return func.avg(
+        case(
+            (
+                delivered & start.is_not(None) & end.is_not(None) & (end > start),
+                extract("epoch", end - start),
+            ),
+            else_=None,
+        )
+    )
+
+
+def _duration_select_columns():
+    accepted = _accepted_at_expr()
+    created = DeliveryDispatchRequest.created_at
+    delivered_at = DeliveryDispatchRequest.delivered_at
+    search_at = DeliveryDispatchRequest.search_at
+    picked_up_at = DeliveryDispatchRequest.picked_up_at
+    in_transit_at = DeliveryDispatchRequest.in_transit_at
+    return (
+        _avg_positive_epoch(created, delivered_at),
+        _avg_positive_epoch(search_at, accepted),
+        _avg_positive_epoch(search_at, delivered_at),
+        _avg_positive_epoch(accepted, picked_up_at),
+        _avg_positive_epoch(in_transit_at, delivered_at),
+    )
+
+
+def _row_to_durations(row) -> dict[str, int | None]:
+    return {
+        key: _round_avg_seconds(value)
+        for key, value in zip(_DURATION_KEYS, row, strict=True)
+    }
+
+
+def _period_durations(session: Session, filters: list) -> dict[str, int | None]:
+    row = session.execute(select(*_duration_select_columns()).where(*filters)).one()
+    return _row_to_durations(row)
+
+
+def _duration_series(
+    session: Session,
+    filters: list,
+    granularity: StatsGranularity,
+) -> dict:
+    bucket = _series_bucket(granularity)
+    rows = session.execute(
+        select(bucket, *_duration_select_columns())
+        .where(*filters)
+        .group_by(bucket)
+        .order_by(bucket)
+    ).all()
+    keyed: dict = {}
+    for key, *values in rows:
+        if key is None:
+            continue
+        payload = _row_to_durations(values)
+        if granularity == "hourly":
+            keyed[int(key)] = payload
+        elif granularity == "daily":
+            keyed[key] = payload
+        else:
+            keyed[key.date() if hasattr(key, "date") else key] = payload
+    return keyed
+
+
 def _busy_end_expr():
     return func.coalesce(
         DeliveryDispatchRequest.delivered_at,
@@ -562,6 +678,8 @@ def _build_summary(
     routed_order_count: int,
     previous_routed: int,
     stacked_rider_count: int,
+    current_durations: dict[str, int | None],
+    previous_durations: dict[str, int | None],
 ) -> dict:
     total = current["order_count"]
     cancellation_rate = round((current["cancelled_count"] / total) * 100, 1) if total else 0.0
@@ -587,6 +705,8 @@ def _build_summary(
             current["web_app_count"], previous["web_app_count"]
         ),
         "manual_count_change_pct": stats_pct_change(current["manual_count"], previous["manual_count"]),
+        **current_durations,
+        **_duration_change_pcts(current_durations, previous_durations),
     }
 
 
@@ -619,6 +739,8 @@ def list_dispatch_stats(
     previous_filters = _closed_filters(provider_id, zone_id, prev_start, prev_end, **exclude_kw)
     current = _period_counts(session, current_filters)
     previous = _period_counts(session, previous_filters)
+    current_durations = _period_durations(session, current_filters)
+    previous_durations = _period_durations(session, previous_filters)
     heatmap = _hour_heatmap(
         session, _created_filters(provider_id, zone_id, start_d, end_d, **exclude_kw)
     )
@@ -675,12 +797,15 @@ def list_dispatch_stats(
             routed_order_count=len(routed_now),
             previous_routed=len(routed_prev),
             stacked_rider_count=len(stacked_now),
+            current_durations=current_durations,
+            previous_durations=previous_durations,
         ),
         "series": _aligned_series(
             _period_series(session, current_filters, granularity),
             _period_series(session, previous_filters, granularity),
             _occupancy_buckets(current_busy, start_d, end_d, granularity),
             _occupancy_buckets(previous_busy, prev_start, prev_end, granularity),
+            _duration_series(session, current_filters, granularity),
             start_d,
             end_d,
             prev_start,

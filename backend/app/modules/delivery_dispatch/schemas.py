@@ -487,6 +487,16 @@ class DispatchStatsSummaryDTO(BaseModel):
     earnings_change_pct: float | None = None
     web_app_count_change_pct: float | None = None
     manual_count_change_pct: float | None = None
+    avg_total_seconds: int | None = None
+    avg_search_seconds: int | None = None
+    avg_delivery_seconds: int | None = None
+    avg_pickup_seconds: int | None = None
+    avg_dropoff_seconds: int | None = None
+    avg_total_seconds_change_pct: float | None = None
+    avg_search_seconds_change_pct: float | None = None
+    avg_delivery_seconds_change_pct: float | None = None
+    avg_pickup_seconds_change_pct: float | None = None
+    avg_dropoff_seconds_change_pct: float | None = None
 
 
 class DispatchStatsPointDTO(BaseModel):
@@ -503,6 +513,11 @@ class DispatchStatsPointDTO(BaseModel):
     previous_occupancy: int = 0
     current_routed: int = 0
     previous_routed: int = 0
+    avg_total_seconds: int | None = None
+    avg_search_seconds: int | None = None
+    avg_delivery_seconds: int | None = None
+    avg_pickup_seconds: int | None = None
+    avg_dropoff_seconds: int | None = None
 
 
 class DispatchStatsSourceDTO(BaseModel):
