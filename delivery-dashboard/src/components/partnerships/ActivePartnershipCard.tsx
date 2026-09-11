@@ -12,6 +12,7 @@ import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ExpandableText } from '@/components/partnerships/ExpandableText';
 import { HoldStatus } from '@/components/partnerships/HoldStatus';
 import { RestaurantLocationPreview } from '@/components/partnerships/RestaurantLocationPreview';
+import { WebAppLink } from '@/components/partnerships/WebAppLink';
 import { WebAppStatus } from '@/components/partnerships/WebAppStatus';
 import { WhatsappIcon } from '@/components/partnerships/WhatsappIcon';
 import styles from './PartnershipRequestCard.module.css';
@@ -141,6 +142,8 @@ export function ActivePartnershipCard({
               </div>
             </div>
           ) : null}
+
+          <WebAppLink subdomain={restaurant.subdomain} restaurantName={restaurant.name} />
 
           <div className={styles.infoRow}>
             <span className={styles.infoIcon} aria-hidden>
