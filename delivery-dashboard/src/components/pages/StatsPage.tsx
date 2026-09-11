@@ -6,6 +6,7 @@ import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import { EntityFilterCombobox } from '@/components/history/EntityFilterCombobox';
 import { HistoryDetailDrawer } from '@/components/history/HistoryDetailDrawer';
 import { PanelPageShell, type PanelPageStyles } from '@/components/pages/PanelPageShell';
+import { StatsDurationChart } from '@/components/stats/StatsDurationChart';
 import { StatsPeakHours } from '@/components/stats/StatsPeakHours';
 import { StatsRankChart } from '@/components/stats/StatsRankChart';
 import { StatsSourceDonut } from '@/components/stats/StatsSourceDonut';
@@ -44,8 +45,11 @@ import {
   type StatsExclusions,
 } from '@/lib/dispatch/statsExclusions';
 import {
+  DURATION_METRICS,
+  formatDuration,
   formatIsoDayRange,
   statsChangeTone,
+  statsDurationPoints,
   statsGranularityLabel,
   statsRankPoints,
   statsSourceSegments,
@@ -69,6 +73,13 @@ function changeClass(pct: number | null | undefined): string {
   const tone = statsChangeTone(pct);
   if (tone === 'up') return styles.up;
   if (tone === 'down') return styles.down;
+  return styles.flat;
+}
+
+function durationChangeClass(pct: number | null | undefined): string {
+  const tone = statsChangeTone(pct);
+  if (tone === 'up') return styles.down;
+  if (tone === 'down') return styles.up;
   return styles.flat;
 }
 
@@ -515,6 +526,23 @@ export default function StatsPage() {
             </div>
           </dl>
 
+          <dl className={styles.kpis}>
+            {DURATION_METRICS.map((metric) => (
+              <div key={metric.key} className={styles.kpi}>
+                <dt>{metric.label}</dt>
+                <dd className={styles.kpiValue}>
+                  {formatDuration(summary?.[metric.secondsKey] ?? null)}
+                </dd>
+                <dd
+                  className={`${styles.kpiChange} ${durationChangeClass(summary?.[metric.changeKey])}`}
+                >
+                  {formatChangePct(summary?.[metric.changeKey])} vs periodo anterior
+                </dd>
+                <dd className={styles.kpiHint}>{metric.hint}</dd>
+              </div>
+            ))}
+          </dl>
+
           {empty ? (
             <div className={historyStyles.empty}>
               <p className={historyStyles.emptyTitle}>No hay pedidos cerrados en este periodo.</p>
@@ -573,6 +601,16 @@ export default function StatsPage() {
                     cells={stats.hour_heatmap ?? []}
                     singleDay={stats.granularity === 'hourly'}
                   />
+                </article>
+
+                <article className={`${styles.card} ${styles.wide}`}>
+                  <header className={styles.cardHeader}>
+                    <h2 className={styles.cardTitle}>Tiempos</h2>
+                    <p className={styles.cardSubtitle}>
+                      Promedio de entregas · {statsGranularityLabel(stats.granularity).toLowerCase()}
+                    </p>
+                  </header>
+                  <StatsDurationChart data={statsDurationPoints(stats.series)} />
                 </article>
 
                 <article className={`${styles.card} ${styles.wide}`}>

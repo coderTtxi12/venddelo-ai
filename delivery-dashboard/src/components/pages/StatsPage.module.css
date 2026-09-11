@@ -159,6 +159,10 @@
   gap: 0.75rem;
 }
 
+.kpis + .kpis {
+  margin-top: 0.75rem;
+}
+
 .kpi {
   margin: 0;
   padding: 0.9rem 1rem;
