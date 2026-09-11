@@ -636,6 +636,16 @@ export type DispatchStatsSummary = {
   earnings_change_pct: number | null;
   web_app_count_change_pct: number | null;
   manual_count_change_pct: number | null;
+  avg_total_seconds: number | null;
+  avg_search_seconds: number | null;
+  avg_delivery_seconds: number | null;
+  avg_pickup_seconds: number | null;
+  avg_dropoff_seconds: number | null;
+  avg_total_seconds_change_pct: number | null;
+  avg_search_seconds_change_pct: number | null;
+  avg_delivery_seconds_change_pct: number | null;
+  avg_pickup_seconds_change_pct: number | null;
+  avg_dropoff_seconds_change_pct: number | null;
 };
 
 export type DispatchStatsPoint = {
@@ -652,6 +662,11 @@ export type DispatchStatsPoint = {
   previous_occupancy: number;
   current_routed: number;
   previous_routed: number;
+  avg_total_seconds: number | null;
+  avg_search_seconds: number | null;
+  avg_delivery_seconds: number | null;
+  avg_pickup_seconds: number | null;
+  avg_dropoff_seconds: number | null;
 };
 
 export type DispatchStatsSource = {
