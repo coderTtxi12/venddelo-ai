@@ -290,14 +290,14 @@ test('overview keeps only the current destination line per rider', () => {
     {
       id: 'drv-1',
       itinerary: [
-        { sequence: 1, kind: 'dropoff', request_id: 'req-b', current: true },
-        { sequence: 2, kind: 'dropoff', request_id: 'req-a' },
-        { sequence: 3, kind: 'dropoff', request_id: 'req-c' },
+        { sequence: 1, request_id: 'req-b', current: true },
+        { sequence: 2, request_id: 'req-a' },
+        { sequence: 3, request_id: 'req-c' },
       ],
     },
     {
       id: 'drv-2',
-      itinerary: [{ sequence: 1, kind: 'restaurant', request_id: 'req-d', current: true }],
+      itinerary: [{ sequence: 1, request_id: 'req-d', current: true }],
     },
   ]);
   assert.deepEqual(
