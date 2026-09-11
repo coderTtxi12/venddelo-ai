@@ -3,9 +3,11 @@ import test from 'node:test';
 
 import { formatChangePct } from './historyPeriod';
 import {
+  formatDuration,
   formatIsoDayRange,
   hourBucketRange,
   statsChangeTone,
+  statsDurationPoints,
   statsRankPoints,
   statsSourceSegments,
   statsTrendPoints,
@@ -65,4 +67,36 @@ test('formatIsoDayRange collapses a single day', () => {
 
 test('hour buckets floor to the started hour', () => {
   assert.equal(hourBucketRange(10), '10:00–10:59');
+});
+
+test('formatDuration uses seconds, minutes, and hours', () => {
+  assert.equal(formatDuration(null), '—');
+  assert.equal(formatDuration(45), '45 s');
+  assert.equal(formatDuration(480), '8 min');
+  assert.equal(formatDuration(4320), '1 h 12 min');
+});
+
+test('statsDurationPoints converts seconds to minutes for the chart', () => {
+  assert.deepEqual(
+    statsDurationPoints([
+      {
+        label: '09:00',
+        avg_total_seconds: 600,
+        avg_search_seconds: 120,
+        avg_delivery_seconds: 480,
+        avg_pickup_seconds: 180,
+        avg_dropoff_seconds: 240,
+      },
+    ]),
+    [
+      {
+        label: '09:00',
+        total: 10,
+        search: 2,
+        delivery: 8,
+        pickup: 3,
+        dropoff: 4,
+      },
+    ],
+  );
 });
