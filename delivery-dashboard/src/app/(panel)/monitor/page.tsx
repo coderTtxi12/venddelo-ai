@@ -1,5 +1,4 @@
-import MonitorPage from '@/components/pages/MonitorPage';
-
+/** Monitor is keep-alive mounted from MainLayout to avoid remounting Dynamic Maps. */
 export default function Page() {
-  return <MonitorPage />;
+  return null;
 }

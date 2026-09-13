@@ -4,6 +4,7 @@ import Sidebar from '@/components/ui/Sidebar';
 import TopBar from '@/components/ui/TopBar';
 import ZoneSwitcher from '@/components/zones/ZoneSwitcher';
 import { MobileSidebarProvider } from '@/contexts/MobileSidebarContext';
+import { PanelMonitorKeepAlive } from '@/layouts/PanelMonitorKeepAlive';
 import styles from './MainLayout.module.css';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
@@ -15,7 +16,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <TopBar />
           <ZoneSwitcher />
           <div className={styles.content} data-scroll-lock>
-            {children}
+            <PanelMonitorKeepAlive>{children}</PanelMonitorKeepAlive>
           </div>
         </div>
       </div>
