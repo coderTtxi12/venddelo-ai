@@ -19,6 +19,15 @@
   padding: 1.25rem 1.35rem;
 }
 
+.stepHint {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
 .title {
   font-size: 1.05rem;
   font-weight: 700;
@@ -31,6 +40,7 @@
   color: var(--color-text-secondary);
   line-height: 1.5;
   margin: 0 0 1.25rem;
+  white-space: pre-line;
 }
 
 .actions {
@@ -48,29 +58,84 @@
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
+  transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease;
 }
 
-.cancelBtn:hover {
+.cancelBtn:hover:not(:disabled) {
   border-color: #cbd5e1;
   color: var(--color-text);
 }
 
-.confirmBtn {
+.confirmBtn,
+.confirmPrimary,
+.confirmWarning {
   border: none;
   border-radius: 999px;
-  background: #b91c1c;
-  color: #fff;
   padding: 0.5rem 1rem;
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
+  color: #fff;
+  transition: background-color 180ms ease;
+}
+
+.confirmBtn {
+  background: #b91c1c;
 }
 
 .confirmBtn:hover:not(:disabled) {
   background: #991b1b;
 }
 
-.confirmBtn:disabled {
+.confirmPrimary {
+  background: #2563eb;
+}
+
+.confirmPrimary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.confirmWarning {
+  background: #b45309;
+}
+
+.confirmWarning:hover:not(:disabled) {
+  background: #92400e;
+}
+
+.cancelBtn:disabled,
+.confirmBtn:disabled,
+.confirmPrimary:disabled,
+.confirmWarning:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+.cancelBtn:focus-visible,
+.confirmBtn:focus-visible,
+.confirmPrimary:focus-visible,
+.confirmWarning:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.confirmBtn:focus-visible {
+  outline-color: #b91c1c;
+}
+
+.confirmWarning:focus-visible {
+  outline-color: #b45309;
+}
+
+.dialog:focus-visible {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cancelBtn,
+  .confirmBtn,
+  .confirmPrimary,
+  .confirmWarning {
+    transition: none;
+  }
 }

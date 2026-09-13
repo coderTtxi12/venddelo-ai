@@ -1,31 +1,55 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import styles from './ConfirmDialog.module.css';
 
 type ConfirmDialogProps = {
   open: boolean;
   title: string;
   body: ReactNode;
+  stepHint?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   confirming?: boolean;
   confirmDisabled?: boolean;
+  variant?: 'danger' | 'primary' | 'warning';
   onConfirm: () => void;
   onCancel: () => void;
 };
+
+function confirmClassName(variant: ConfirmDialogProps['variant']): string {
+  if (variant === 'primary') return styles.confirmPrimary;
+  if (variant === 'warning') return styles.confirmWarning;
+  return styles.confirmBtn;
+}
 
 export function ConfirmDialog({
   open,
   title,
   body,
+  stepHint,
   confirmLabel = 'Confirmar',
   cancelLabel = 'Cancelar',
   confirming = false,
   confirmDisabled = false,
+  variant = 'danger',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape' && !confirming) onCancel();
+    }
+    window.addEventListener('keydown', onKey);
+    const focusTarget = variant === 'warning' ? cancelRef.current : dialogRef.current;
+    focusTarget?.focus();
+    return () => window.removeEventListener('keydown', onKey);
+  }, [confirming, onCancel, open, variant]);
+
   if (!open) return null;
 
   return (
@@ -36,13 +60,25 @@ export function ConfirmDialog({
         if (event.target === event.currentTarget && !confirming) onCancel();
       }}
     >
-      <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <div
+        ref={dialogRef}
+        className={styles.dialog}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-title"
+        aria-describedby="confirm-body"
+        tabIndex={-1}
+      >
+        {stepHint ? <p className={styles.stepHint}>{stepHint}</p> : null}
         <h2 id="confirm-title" className={styles.title}>
           {title}
         </h2>
-        <div className={styles.body}>{body}</div>
+        <div id="confirm-body" className={styles.body}>
+          {body}
+        </div>
         <div className={styles.actions}>
           <button
+            ref={cancelRef}
             type="button"
             className={styles.cancelBtn}
             disabled={confirming}
@@ -52,7 +88,7 @@ export function ConfirmDialog({
           </button>
           <button
             type="button"
-            className={styles.confirmBtn}
+            className={confirmClassName(variant)}
             disabled={confirming || confirmDisabled}
             onClick={onConfirm}
           >
