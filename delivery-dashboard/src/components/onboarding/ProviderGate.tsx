@@ -17,9 +17,12 @@ export function ProviderGate({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     async function check() {
+      // Keep the panel mounted while Supabase revalidates the session.
       if (authLoading) return;
 
       if (!accessToken || !user) {
+        // Auth settled with no session (logout). While authLoading, we keep the
+        // previous gate so an active panel is not unmounted on token refresh.
         if (!cancelled) setGate('loading');
         return;
       }
@@ -70,6 +73,11 @@ export function ProviderGate({ children }: { children: React.ReactNode }) {
     };
   }, [accessToken, authLoading, router, user]);
 
+  // Once active, keep children mounted across authLoading / token refresh.
+  if (gate === 'active') {
+    return <>{children}</>;
+  }
+
   if (authLoading || gate === 'loading') {
     return (
       <div className={styles.loading} role="status" aria-live="polite">
@@ -78,13 +86,9 @@ export function ProviderGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (gate !== 'active') {
-    return (
-      <div className={styles.loading} role="status" aria-live="polite">
-        Redirigiendo…
-      </div>
-    );
-  }
-
-  return <>{children}</>;
+  return (
+    <div className={styles.loading} role="status" aria-live="polite">
+      Redirigiendo…
+    </div>
+  );
 }
