@@ -15,12 +15,22 @@ const body = Lato({
   weight: ['400', '700'],
 });
 
+export type LegalPath =
+  | '/terminos'
+  | '/privacidad'
+  | '/rider/terminos'
+  | '/rider/privacidad';
+
 type LegalDocumentProps = {
   title: string;
   lastUpdated: string;
-  currentPath: '/terminos' | '/privacidad';
+  currentPath: LegalPath;
   children: ReactNode;
 };
+
+function isRiderPath(path: LegalPath): boolean {
+  return path.startsWith('/rider/');
+}
 
 export default function LegalDocument({
   title,
@@ -28,30 +38,38 @@ export default function LegalDocument({
   currentPath,
   children,
 }: LegalDocumentProps) {
+  const rider = isRiderPath(currentPath);
+  const termsHref = rider ? '/rider/terminos' : '/terminos';
+  const privacyHref = rider ? '/rider/privacidad' : '/privacidad';
+  const brandHref = rider ? '/rider/privacidad' : '/';
+  const brandLabel = rider ? 'Mexy Rider' : 'Mexy AI';
+
   return (
     <div className={`${styles.page} ${display.variable} ${body.variable}`}>
       <header className={styles.topBar}>
-        <Link href="/" className={styles.brand}>
-          Mexy AI
+        <Link href={brandHref} className={styles.brand}>
+          {brandLabel}
         </Link>
         <nav className={styles.nav} aria-label="Documentos legales">
           <Link
-            href="/terminos"
-            className={currentPath === '/terminos' ? styles.navLinkActive : styles.navLink}
-            aria-current={currentPath === '/terminos' ? 'page' : undefined}
+            href={termsHref}
+            className={currentPath === termsHref ? styles.navLinkActive : styles.navLink}
+            aria-current={currentPath === termsHref ? 'page' : undefined}
           >
             Términos
           </Link>
           <Link
-            href="/privacidad"
-            className={currentPath === '/privacidad' ? styles.navLinkActive : styles.navLink}
-            aria-current={currentPath === '/privacidad' ? 'page' : undefined}
+            href={privacyHref}
+            className={currentPath === privacyHref ? styles.navLinkActive : styles.navLink}
+            aria-current={currentPath === privacyHref ? 'page' : undefined}
           >
             Privacidad
           </Link>
-          <Link href="/login" className={styles.navCta}>
-            Entrar
-          </Link>
+          {!rider && (
+            <Link href="/login" className={styles.navCta}>
+              Entrar
+            </Link>
+          )}
         </nav>
       </header>
 
@@ -67,8 +85,8 @@ export default function LegalDocument({
       <footer className={styles.footer}>
         <p>© {new Date().getFullYear()} Mexy AI. Todos los derechos reservados.</p>
         <div className={styles.footerLinks}>
-          <Link href="/terminos">Términos y Condiciones</Link>
-          <Link href="/privacidad">Política de Privacidad</Link>
+          <Link href={termsHref}>Términos y Condiciones</Link>
+          <Link href={privacyHref}>Política de Privacidad</Link>
         </div>
       </footer>
     </div>
