@@ -32,6 +32,8 @@ type DispatchMonitorMapProps = {
   focusedRequestId?: string | null;
   focusedDriverId?: string | null;
   focusedRestaurantId?: string | null;
+  /** When false (keep-alive hidden), skip layout work; map instance stays mounted. */
+  active?: boolean;
   onReorderItinerary?: (
     driverId: string,
     stops: Array<{ kind: 'restaurant' | 'dropoff'; request_id: string }>,
@@ -412,6 +414,7 @@ export function DispatchMonitorMap({
   focusedRequestId = null,
   focusedDriverId = null,
   focusedRestaurantId = null,
+  active = true,
   onReorderItinerary,
 }: DispatchMonitorMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -491,6 +494,13 @@ export function DispatchMonitorMap({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!active || !mapReady) return;
+    const map = mapInstanceRef.current;
+    if (!map || !window.google?.maps?.event) return;
+    window.google.maps.event.trigger(map, 'resize');
+  }, [active, mapReady]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
