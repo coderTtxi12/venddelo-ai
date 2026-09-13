@@ -6,6 +6,7 @@ import {
   blockersSummary,
   creditHoldKindLabel,
   dispatchSourceLabel,
+  mexyReleaseConfirmCopy,
   requestMoneyLine,
   requestStatusLabel,
   splitDropoffAddress,
@@ -69,6 +70,28 @@ test('creditHoldKindLabel distinguishes Mexy commission from restaurant cash', (
 test('dispatchSourceLabel distinguishes digital menu from manual delivery', () => {
   assert.equal(dispatchSourceLabel('web_app'), 'App web');
   assert.equal(dispatchSourceLabel('manual'), 'Pedido manual');
+});
+
+test('mexyReleaseConfirmCopy asks twice before releasing commission', () => {
+  const hold = {
+    short_id: 'AB12',
+    amount_cents: 3500,
+    driver_name: 'Carlos',
+    restaurant_name: 'Wild Rooster',
+  };
+  const first = mexyReleaseConfirmCopy(hold, 1);
+  assert.equal(first.title, '¿Liberar la comisión Mexy?');
+  assert.match(first.body, /crédito retenido/);
+  assert.equal(first.confirmLabel, 'Continuar');
+  assert.equal(first.cancelLabel, 'Todavía no');
+
+  const second = mexyReleaseConfirmCopy(hold, 2);
+  assert.equal(second.title, 'Confirma la liberación');
+  assert.match(second.body, /#AB12/);
+  assert.match(second.body, new RegExp(formatMoney(3500).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(second.body, /Carlos/);
+  assert.equal(second.confirmLabel, 'Sí, liberar comisión');
+  assert.equal(second.cancelLabel, 'Volver');
 });
 
 test('requestMoneyLine shows Mexy commission when present', () => {

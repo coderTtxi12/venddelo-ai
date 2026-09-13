@@ -286,6 +286,36 @@ export function creditHoldKindLabel(kind?: string | null): string {
   return kind === 'mexy_fee' ? 'Comisión Mexy' : 'Efectivo';
 }
 
+export function mexyReleaseConfirmCopy(
+  hold: {
+    short_id: string;
+    amount_cents: number;
+    driver_name: string;
+    restaurant_name: string;
+  },
+  step: 1 | 2,
+): {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  cancelLabel: string;
+} {
+  if (step === 1) {
+    return {
+      title: '¿Liberar la comisión Mexy?',
+      body: 'Esto libera el crédito retenido al repartidor por la comisión de Mexy.\n\nConfírmalo solo si ya cobraste esa comisión.',
+      confirmLabel: 'Continuar',
+      cancelLabel: 'Todavía no',
+    };
+  }
+  return {
+    title: 'Confirma la liberación',
+    body: `Vas a liberar ${formatMoney(hold.amount_cents)} de comisión Mexy en ${formatShortId(hold.short_id)} (${hold.driver_name} · ${hold.restaurant_name}).`,
+    confirmLabel: 'Sí, liberar comisión',
+    cancelLabel: 'Volver',
+  };
+}
+
 export function requestMoneyLine(request: DispatchMonitorRequest): string {
   const fee = request.quoted_fee_cents ?? 0;
   const mexy = request.mexy_fee_cents ?? 0;
