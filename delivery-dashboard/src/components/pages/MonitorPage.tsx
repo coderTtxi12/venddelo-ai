@@ -9,6 +9,7 @@ import { AssignDriverDrawer } from '@/components/monitor/AssignDriverDrawer';
 import { DispatchMonitorMap } from '@/components/monitor/DispatchMonitorMap';
 import { MonitorWeatherBar } from '@/components/monitor/MonitorWeatherBar';
 import { RequestDetailDrawer } from '@/components/monitor/RequestDetailDrawer';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DriverPhoneContact } from '@/components/drivers/DriverPhoneContact';
 import { DriverAvatar } from '@/components/drivers/DriverAvatar';
 import { DriverMetaTags } from '@/components/drivers/DriverMetaTags';
@@ -42,6 +43,7 @@ import {
   formatShortId,
   formatTime,
   gpsAgeLabel,
+  mexyReleaseConfirmCopy,
   offerCaseLine,
   requestCashDenominationLine,
   requestLastAssignmentLine,
@@ -825,7 +827,7 @@ function BusinessesList({
   );
 }
 
-export default function MonitorPage() {
+export default function MonitorPage({ active = true }: { active?: boolean }) {
   const { accessToken } = useAuth();
   const { canManagePartnerships, canManageWeather } = useDeliveryProviderAccess();
   const { selectedZoneId, zones, isAllZones, loading: zonesLoading, refreshZones } = useDeliveryZone();
@@ -857,6 +859,10 @@ export default function MonitorPage() {
   const snapshotQueuedRef = useRef(false);
   const [weatherSaving, setWeatherSaving] = useState(false);
   const [releasingMexyRequestId, setReleasingMexyRequestId] = useState<string | null>(null);
+  const [mexyRelease, setMexyRelease] = useState<{
+    hold: DispatchMonitorCreditHold;
+    step: 1 | 2;
+  } | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1130,6 +1136,7 @@ export default function MonitorPage() {
     setError(null);
     try {
       await releaseMyMexyFeeHold(accessToken, hold.request_id);
+      setMexyRelease(null);
       await loadSnapshot();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo liberar la comisión Mexy');
@@ -1137,6 +1144,8 @@ export default function MonitorPage() {
       setReleasingMexyRequestId(null);
     }
   }
+
+  const mexyReleaseCopy = mexyRelease ? mexyReleaseConfirmCopy(mexyRelease.hold, mexyRelease.step) : null;
 
   async function handleReorderItinerary(
     driverId: string,
@@ -1274,6 +1283,7 @@ export default function MonitorPage() {
                 focusedRequestId={focusedRequestId}
                 focusedDriverId={focusedDriverId}
                 focusedRestaurantId={focusedRestaurantId}
+                active={active}
                 onReorderItinerary={handleReorderItinerary}
               />
               <div className={styles.mapLegend} role="list" aria-label="Leyenda del mapa">
@@ -1403,7 +1413,7 @@ export default function MonitorPage() {
                   holds={sortedCredit}
                   canRelease={canManagePartnerships}
                   releasingId={releasingMexyRequestId}
-                  onRelease={handleReleaseMexyFee}
+                  onRelease={(hold) => setMexyRelease({ hold, step: 1 })}
                 />
               </MonitorPanel>
 
@@ -1470,6 +1480,32 @@ export default function MonitorPage() {
         }}
         onSystemAssign={() => {
           void handleSystemRetry();
+        }}
+      />
+      <ConfirmDialog
+        open={mexyRelease != null && mexyReleaseCopy != null}
+        title={mexyReleaseCopy?.title ?? ''}
+        body={mexyReleaseCopy?.body ?? ''}
+        stepHint={mexyRelease ? `Paso ${mexyRelease.step} de 2` : undefined}
+        confirmLabel={mexyReleaseCopy?.confirmLabel}
+        cancelLabel={mexyReleaseCopy?.cancelLabel}
+        variant="primary"
+        confirming={releasingMexyRequestId != null}
+        onCancel={() => {
+          if (releasingMexyRequestId != null) return;
+          if (mexyRelease?.step === 2) {
+            setMexyRelease({ ...mexyRelease, step: 1 });
+            return;
+          }
+          setMexyRelease(null);
+        }}
+        onConfirm={() => {
+          if (!mexyRelease) return;
+          if (mexyRelease.step === 1) {
+            setMexyRelease({ ...mexyRelease, step: 2 });
+            return;
+          }
+          void handleReleaseMexyFee(mexyRelease.hold);
         }}
       />
     </PanelPageShell>
