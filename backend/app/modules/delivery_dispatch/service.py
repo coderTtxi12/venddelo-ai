@@ -54,6 +54,7 @@ from app.modules.delivery_dispatch.credit import (
     HOLD_MEXY_FEE,
     HOLD_RESTAURANT_CASH,
     hold_of_kind,
+    mark_holds_released,
 )
 from app.modules.delivery_dispatch.geo import geodesic_meters
 from app.modules.delivery_dispatch.history import list_active_holds, list_dispatch_history
@@ -183,6 +184,38 @@ def claim_drivers(session: Session, user_id: uuid.UUID, email: str) -> None:
             )
 
     session.flush()
+
+
+def release_credit_holds(
+    session: Session,
+    row: DeliveryDispatchRequest,
+    *,
+    released_by_user_id: uuid.UUID | None,
+    now: datetime,
+    kind: str | None = None,
+) -> None:
+    holds = mark_holds_released(
+        row.credit_holds,
+        kind=kind,
+        now=now,
+        released_by_user_id=released_by_user_id,
+    )
+    if not holds:
+        return
+    locked_driver = None
+    if row.assigned_driver_id is not None:
+        locked_driver = session.scalar(
+            select(DeliveryDriver)
+            .where(DeliveryDriver.id == row.assigned_driver_id)
+            .with_for_update()
+        )
+    if locked_driver is None:
+        return
+    for hold in holds:
+        locked_driver.credit_held_cents = max(
+            0,
+            locked_driver.credit_held_cents - hold.amount_cents,
+        )
 
 
 class DeliveryDispatchService:
@@ -720,7 +753,8 @@ class DeliveryDispatchService:
         hold = hold_of_kind(request.credit_holds, HOLD_MEXY_FEE)
         if hold is None or hold.status != "held":
             raise ValidationError("No hay comisión Mexy retenida para esta solicitud")
-        self._release_holds(
+        release_credit_holds(
+            self._session,
             request,
             kind=HOLD_MEXY_FEE,
             released_by_user_id=user_id,
@@ -1246,7 +1280,7 @@ class RestaurantDispatchService:
         release_group_on_cancel(self._session, row, now)
         row.status = "cancelled"
         row.cancelled_at = now
-        self._release_holds(row, released_by_user_id=None, now=now)
+        release_credit_holds(self._session, row, released_by_user_id=None, now=now)
         return self._flush_request(row)
 
     def retry(
@@ -1272,7 +1306,8 @@ class RestaurantDispatchService:
         hold = hold_of_kind(row.credit_holds, HOLD_RESTAURANT_CASH)
         if hold is None or hold.status != "held":
             raise ValidationError("No hay efectivo retenido para esta solicitud")
-        self._release_holds(
+        release_credit_holds(
+            self._session,
             row,
             kind=HOLD_RESTAURANT_CASH,
             released_by_user_id=user_id,
@@ -1467,29 +1502,13 @@ class RestaurantDispatchService:
         now: datetime,
         kind: str | None = None,
     ) -> None:
-        holds = [
-            hold
-            for hold in row.credit_holds
-            if hold.status == "held" and (kind is None or hold.kind == kind)
-        ]
-        if not holds:
-            return
-        locked_driver = None
-        if row.assigned_driver_id is not None:
-            locked_driver = self._session.scalar(
-                select(DeliveryDriver)
-                .where(DeliveryDriver.id == row.assigned_driver_id)
-                .with_for_update()
-            )
-        for hold in holds:
-            hold.status = "released"
-            hold.released_at = now
-            hold.released_by_user_id = released_by_user_id
-            if locked_driver is not None:
-                locked_driver.credit_held_cents = max(
-                    0,
-                    locked_driver.credit_held_cents - hold.amount_cents,
-                )
+        release_credit_holds(
+            self._session,
+            row,
+            released_by_user_id=released_by_user_id,
+            now=now,
+            kind=kind,
+        )
 
 
 _DROPOFF_COORD_EPS = 1e-5
@@ -1928,7 +1947,12 @@ class RiderDispatchService:
         released_by_user_id: uuid.UUID | None,
         now: datetime,
     ) -> None:
-        self._release_holds(row, released_by_user_id=released_by_user_id, now=now)
+        release_credit_holds(
+            self._session,
+            row,
+            released_by_user_id=released_by_user_id,
+            now=now,
+        )
 
     def _require_driver(self, user: UserDTO) -> DeliveryDriver:
         driver = self._driver_for_user(user.id)
