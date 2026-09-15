@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 
 from app.db.models.delivery import DeliveryDispatchRequest
+from app.db.models.orders import Order
 from tests.api.test_api_v1 import AUTH
 from tests.api.test_delivery_rider_offers import (
     _as_mexy,
@@ -28,6 +29,7 @@ def _clean(engine):
                 """
                 TRUNCATE delivery_credit_holds, delivery_dispatch_offers,
                          delivery_dispatch_requests, delivery_drivers,
+                         order_items, orders,
                          restaurant_delivery_providers,
                          delivery_search_lead_times,
                          delivery_provider_assignment_settings,
@@ -422,6 +424,60 @@ def test_provider_history_search_by_short_id_ignores_period(client, engine):
         headers=AUTH,
     )
     assert miss.json()["items"] == []
+
+
+def _link_web_app_order(engine, request_id: str) -> None:
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        request = session.get(DeliveryDispatchRequest, uuid.UUID(request_id))
+        assert request is not None
+        order = Order(
+            restaurant_id=request.restaurant_id,
+            type="delivery",
+            customer_name=request.customer_name,
+            customer_phone=request.customer_phone,
+            payment_method="cash",
+            subtotal_cents=1000,
+            total_cents=1000,
+            status="delivered",
+        )
+        session.add(order)
+        session.flush()
+        request.order_id = order.id
+        session.commit()
+
+
+@requires_db
+def test_provider_history_filters_web_app_and_manual_source(client, engine):
+    restaurant_id, _driver_id = _setup_ready_rider(client, engine)
+    web_id = _accept_and_deliver(client, engine, restaurant_id)
+    manual_id = _accept_and_deliver(client, engine, restaurant_id)
+    _link_web_app_order(engine, web_id)
+
+    _as_mexy()
+    all_rows = client.get("/api/v1/delivery-providers/me/dispatch-history", headers=AUTH)
+    assert all_rows.status_code == 200, all_rows.text
+    assert {row["id"] for row in all_rows.json()["items"]} == {web_id, manual_id}
+
+    web = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"source": "web_app"},
+        headers=AUTH,
+    )
+    assert web.status_code == 200, web.text
+    assert [row["id"] for row in web.json()["items"]] == [web_id]
+    assert web.json()["items"][0]["source"] == "web_app"
+    assert web.json()["total"] == 1
+    assert web.json()["delivered_count"] == 1
+
+    manual = client.get(
+        "/api/v1/delivery-providers/me/dispatch-history",
+        params={"source": "manual"},
+        headers=AUTH,
+    )
+    assert [row["id"] for row in manual.json()["items"]] == [manual_id]
+    assert manual.json()["items"][0]["source"] == "manual"
+    assert manual.json()["total"] == 1
 
 
 @requires_db
