@@ -2,6 +2,8 @@ export const HISTORY_PAGE_SIZE = 50;
 
 export type HistoryEntityMode = 'include' | 'exclude';
 
+export type HistorySource = 'web_app' | 'manual';
+
 export type HistoryEntityOption = {
   id: string;
   label: string;
@@ -12,6 +14,7 @@ export type DispatchHistoryQuery = {
   end: string;
   q?: string;
   status?: 'delivered' | 'cancelled';
+  source?: HistorySource;
   restaurantIds?: string[];
   restaurantMode?: HistoryEntityMode;
   driverIds?: string[];
@@ -112,6 +115,7 @@ export function dispatchHistorySearchParams(query: DispatchHistoryQuery): URLSea
   const q = normalizeHistoryQuery(query.q ?? '');
   if (q) qs.set('q', q);
   if (query.status) qs.set('status', query.status);
+  if (query.source) qs.set('source', query.source);
   applyEntityParams(
     qs,
     query.restaurantIds,

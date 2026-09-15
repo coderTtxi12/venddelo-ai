@@ -87,6 +87,35 @@ test('dispatchHistorySearchParams omits empty or hash-only order id query', () =
   );
 });
 
+test('dispatchHistorySearchParams sends web_app or manual source', () => {
+  assert.equal(
+    dispatchHistorySearchParams({
+      start: '2026-09-09',
+      end: '2026-09-09',
+      source: 'web_app',
+    }).toString(),
+    'start=2026-09-09&end=2026-09-09&source=web_app&limit=50&offset=0',
+  );
+  assert.equal(
+    dispatchHistorySearchParams({
+      start: '2026-09-09',
+      end: '2026-09-09',
+      source: 'manual',
+    }).get('source'),
+    'manual',
+  );
+});
+
+test('dispatchHistorySearchParams omits source when unset', () => {
+  assert.equal(
+    dispatchHistorySearchParams({
+      start: '2026-09-09',
+      end: '2026-09-09',
+    }).has('source'),
+    false,
+  );
+});
+
 test('history empty copy explains a missing order id', () => {
   assert.equal(
     historyEmptyTitle('#BDE4E'),
