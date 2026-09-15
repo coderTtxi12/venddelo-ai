@@ -28,6 +28,7 @@ from app.modules.delivery_dispatch.schemas import (
 
 MEXICO_TZ = ZoneInfo("America/Mexico_City")
 HISTORY_STATUSES = frozenset({"delivered", "cancelled"})
+HISTORY_SOURCES = frozenset({"web_app", "manual"})
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 100
 
@@ -86,6 +87,17 @@ def _reject_include_and_exclude(
 ) -> None:
     if include_ids and exclude_ids:
         raise ValidationError(f"No se puede filtrar y excluir el mismo {entity}")
+
+
+def apply_history_source_filter(filters: list[object], source: str | None) -> None:
+    if source is None:
+        return
+    if source not in HISTORY_SOURCES:
+        raise ValidationError("Fuente de historial no válida")
+    if source == "web_app":
+        filters.append(DeliveryDispatchRequest.order_id.is_not(None))
+        return
+    filters.append(DeliveryDispatchRequest.order_id.is_(None))
 
 
 def _to_item(
@@ -271,6 +283,7 @@ def list_dispatch_history(
     start: date | None = None,
     end: date | None = None,
     status: str | None = None,
+    source: str | None = None,
     q: str | None = None,
     limit: int | None = None,
     offset: int = 0,
@@ -311,6 +324,7 @@ def list_dispatch_history(
         filters.append(DeliveryDispatchRequest.restaurant_id.in_(include_restaurants))
     if exclude_restaurants:
         filters.append(DeliveryDispatchRequest.restaurant_id.notin_(exclude_restaurants))
+    apply_history_source_filter(filters, source)
 
     page_limit = _clamp_limit(limit)
     page_offset = max(0, offset)

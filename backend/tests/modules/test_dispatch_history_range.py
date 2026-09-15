@@ -91,3 +91,32 @@ def test_normalize_history_query_strips_hash_spaces_and_punctuation() -> None:
 def test_dispatch_request_source_uses_linked_order() -> None:
     assert dispatch_request_source(uuid4()) == "web_app"
     assert dispatch_request_source(None) == "manual"
+
+
+def test_history_source_filter_rejects_unknown_value() -> None:
+    from app.modules.delivery_dispatch.history import apply_history_source_filter
+
+    try:
+        apply_history_source_filter([], "whatsapp")
+    except ValidationError as exc:
+        assert "fuente" in exc.message.lower()
+    else:
+        raise AssertionError("expected ValidationError")
+
+
+def test_history_source_filter_uses_linked_order_nullability() -> None:
+    from app.modules.delivery_dispatch.history import apply_history_source_filter
+
+    web: list[object] = []
+    apply_history_source_filter(web, "web_app")
+    assert "IS NOT NULL" in str(web[0]).upper()
+
+    manual: list[object] = []
+    apply_history_source_filter(manual, "manual")
+    clause = str(manual[0]).upper()
+    assert "IS NULL" in clause
+    assert "IS NOT NULL" not in clause
+
+    untouched: list[object] = []
+    apply_history_source_filter(untouched, None)
+    assert untouched == []
