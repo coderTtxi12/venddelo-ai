@@ -21,10 +21,12 @@ import {
   historySearchScopeHint,
   normalizeHistoryQuery,
   type HistoryEntityMode,
+  type HistorySource,
 } from '@/lib/dispatch/historyFilters';
 import { historyDateRange, type HistoryPeriod } from '@/lib/dispatch/historyPeriod';
 import {
   customerCollectCents,
+  dispatchSourceLabel,
   formatDateTime,
   formatShortId,
   paymentLabel,
@@ -61,6 +63,7 @@ export default function HistoryPage() {
   const [customEnd, setCustomEnd] = useState('');
   const [appliedCustom, setAppliedCustom] = useState<{ start: string; end: string } | null>(null);
   const [status, setStatus] = useState<'' | 'delivered' | 'cancelled'>('');
+  const [source, setSource] = useState<'' | HistorySource>('');
   const [driverIds, setDriverIds] = useState<string[]>([]);
   const [driverMode, setDriverMode] = useState<HistoryEntityMode>('include');
   const [restaurantIds, setRestaurantIds] = useState<string[]>([]);
@@ -147,6 +150,7 @@ export default function HistoryPage() {
           end: range.end,
           q: query || undefined,
           status: status || undefined,
+          source: source || undefined,
           driverIds,
           driverMode,
           restaurantIds: restaurantFilterIds,
@@ -171,7 +175,7 @@ export default function HistoryPage() {
         setLoadingMore(false);
       }
     },
-    [accessToken, driverIds, driverMode, query, range.end, range.start, restaurantFilterIds, restaurantMode, status, zoneId, zonesLoading],
+    [accessToken, driverIds, driverMode, query, range.end, range.start, restaurantFilterIds, restaurantMode, source, status, zoneId, zonesLoading],
   );
 
   useEffect(() => {
@@ -402,6 +406,20 @@ export default function HistoryPage() {
               onChange={(value) => setStatus(value as '' | 'delivered' | 'cancelled')}
             />
           </div>
+          <div className={styles.filterField}>
+            <span id="history-source-label">Fuente</span>
+            <FormSelect
+              id="history-source"
+              aria-labelledby="history-source-label"
+              value={source}
+              options={[
+                { value: '', label: 'Todas' },
+                { value: 'web_app', label: 'App web' },
+                { value: 'manual', label: 'Pedido manual' },
+              ]}
+              onChange={(value) => setSource(value as '' | HistorySource)}
+            />
+          </div>
         </div>
       </div>
 
@@ -426,6 +444,7 @@ export default function HistoryPage() {
                   <th>Cierre</th>
                   <th>#</th>
                   <th>Estado</th>
+                  <th>Fuente</th>
                   <th>Restaurante</th>
                   <th>Cliente</th>
                   <th>Dropoff</th>
@@ -462,6 +481,7 @@ export default function HistoryPage() {
                         {requestStatusLabel(item.status)}
                       </span>
                     </td>
+                    <td>{dispatchSourceLabel(item.source)}</td>
                     <td>{item.restaurant_name}</td>
                     <td>{item.customer_name || '—'}</td>
                     <td className={styles.dropoff}>{item.dropoff_address}</td>
@@ -500,6 +520,7 @@ export default function HistoryPage() {
                     </span>
                   </div>
                   <p className={styles.cardTitle}>{item.restaurant_name}</p>
+                  <p className={styles.cardMeta}>{dispatchSourceLabel(item.source)}</p>
                   <p className={styles.cardMeta}>{item.dropoff_address}</p>
                   <p className={styles.cardMeta}>
                     {formatDateTime(item.closed_at)} · {item.assigned_driver_name || 'Sin repartidor'}
