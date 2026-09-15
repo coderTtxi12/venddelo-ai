@@ -254,7 +254,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1080px;
+  min-width: 1180px;
 }
 
 .table th,
@@ -367,7 +367,7 @@
 
 @media (min-width: 768px) {
   .selects {
-    grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) minmax(10rem, 14rem);
+    grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr);
   }
 
   .dateField input {
@@ -388,6 +388,16 @@
 
   .loadMore {
     width: fit-content;
+  }
+}
+
+@media (min-width: 1100px) {
+  .selects {
+    grid-template-columns:
+      minmax(12rem, 1.2fr)
+      minmax(12rem, 1.2fr)
+      minmax(9rem, 11rem)
+      minmax(9rem, 11rem);
   }
 }
 
