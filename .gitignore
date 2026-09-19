@@ -79,3 +79,7 @@ GoogleService-Info.plist
 *firebase-adminsdk*.json
 **/.secrets/
 backend/.secrets/firebase-adminsdk.json
+
+# Local / untracked assets
+video-script.md
+apps/rider/android/app/src/main/assets/adi-registration.properties
