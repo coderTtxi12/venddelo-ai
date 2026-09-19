@@ -38,6 +38,13 @@ test('comparisonDateRange uses the previous calendar month for a full month', ()
   });
 });
 
+test('comparisonDateRange uses same weekday previous week for a single day', () => {
+  assert.deepEqual(comparisonDateRange('2026-09-09', '2026-09-09'), {
+    start: '2026-09-02',
+    end: '2026-09-02',
+  });
+});
+
 test('comparisonDateRange uses equal length immediately before for a week', () => {
   assert.deepEqual(comparisonDateRange('2026-09-07', '2026-09-13'), {
     start: '2026-08-31',

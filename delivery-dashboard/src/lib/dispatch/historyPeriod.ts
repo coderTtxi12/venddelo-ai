@@ -81,6 +81,13 @@ export function comparisonDateRange(start: string, end: string): HistoryDateRang
     };
   }
   const span = Math.round((endDay.getTime() - startDay.getTime()) / 86400000) + 1;
+  if (span === 1) {
+    const prev = shiftDays(startDay, -7);
+    return {
+      start: formatHistoryQueryDate(prev),
+      end: formatHistoryQueryDate(prev),
+    };
+  }
   const prevEnd = shiftDays(startDay, -1);
   const prevStart = shiftDays(prevEnd, -(span - 1));
   return {
