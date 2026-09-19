@@ -156,7 +156,11 @@ export function formatCoords(lat: number | null | undefined, lng: number | null 
   if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
     return null;
   }
-  return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  return `${formatCoordValue(lat)}, ${formatCoordValue(lng)}`;
+}
+
+function formatCoordValue(value: number): string {
+  return value.toFixed(15).replace(/\.?0+$/, '');
 }
 
 export function formatTimelineTime(value: string | null | undefined): string {

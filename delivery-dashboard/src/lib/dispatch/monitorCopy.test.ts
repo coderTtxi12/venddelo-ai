@@ -6,6 +6,7 @@ import {
   blockersSummary,
   creditHoldKindLabel,
   dispatchSourceLabel,
+  formatCoords,
   mexyReleaseConfirmCopy,
   requestMoneyLine,
   requestStatusLabel,
@@ -59,6 +60,14 @@ test('splitDropoffAddress keeps a plain address', () => {
     address: 'Calle Reforma 100',
     references: '',
   });
+});
+
+test('formatCoords keeps full precision so pasted pins match the original point', () => {
+  const formatted = formatCoords(19.62450131234567, -99.10079971234567);
+  assert.ok(formatted);
+  assert.match(formatted, /19\.62450131234567/);
+  assert.match(formatted, /-99\.10079971234567/);
+  assert.notEqual(formatted, '19.624501, -99.100800');
 });
 
 test('creditHoldKindLabel distinguishes Mexy commission from restaurant cash', () => {
