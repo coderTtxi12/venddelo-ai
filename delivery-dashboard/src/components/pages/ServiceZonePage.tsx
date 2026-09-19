@@ -7,6 +7,10 @@ import { ServiceZoneMapDrawer } from '@/components/onboarding/ServiceZoneMapDraw
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import ZoneSwitcher from '@/components/zones/ZoneSwitcher';
+import {
+  ZoneCoordinateVerifier,
+  type VerificationPoint,
+} from '@/components/zones/ZoneCoordinateVerifier';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,6 +53,7 @@ export default function ServiceZonePage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createForm, setCreateForm] = useState<ZoneFormState>(() => createEmptyZoneForm());
   const [creating, setCreating] = useState(false);
+  const [verificationPoint, setVerificationPoint] = useState<VerificationPoint | null>(null);
   const createDialogRef = useRef<HTMLDivElement>(null);
 
   const isDirty = useMemo(() => zoneFieldsDirty(form, initialForm), [form, initialForm]);
@@ -101,6 +106,10 @@ export default function ServiceZonePage() {
       cancelled = true;
     };
   }, [accessToken, effectiveZoneId]);
+
+  useEffect(() => {
+    setVerificationPoint(null);
+  }, [effectiveZoneId]);
 
   const patchForm = useCallback((patch: Partial<ZoneFormState>) => {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -315,6 +324,12 @@ export default function ServiceZonePage() {
                 {success}
               </div>
             ) : null}
+            <ZoneCoordinateVerifier
+              polygon={form.serviceZonePolygon}
+              activePoint={verificationPoint}
+              onVerify={setVerificationPoint}
+              onClear={() => setVerificationPoint(null)}
+            />
             <fieldset disabled={!canWriteProviderConfig} className={styles.readOnlyFieldset}>
               <label className={`${styles.label} ${styles.formGridFull}`}>
                 Nombre de la zona
@@ -331,6 +346,7 @@ export default function ServiceZonePage() {
                   searchAddress={form.serviceZoneSearchAddress}
                   centerLat={form.serviceZoneCenterLat}
                   centerLng={form.serviceZoneCenterLng}
+                  verificationPoint={verificationPoint}
                   onSearchPlaceChange={(place) =>
                     patchForm({
                       serviceZoneSearchAddress: place.address,
