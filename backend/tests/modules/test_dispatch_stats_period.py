@@ -7,10 +7,10 @@ from app.modules.delivery_dispatch.stats import (
 )
 
 
-def test_comparison_date_range_equal_span_for_a_day() -> None:
+def test_comparison_date_range_same_weekday_previous_week_for_a_day() -> None:
     assert comparison_date_range(date(2026, 9, 9), date(2026, 9, 9)) == (
-        date(2026, 9, 8),
-        date(2026, 9, 8),
+        date(2026, 9, 2),
+        date(2026, 9, 2),
     )
 
 

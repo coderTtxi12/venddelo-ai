@@ -54,6 +54,9 @@ def comparison_date_range(start: date, end: date) -> tuple[date, date]:
         prev_end = start - timedelta(days=1)
         return date(prev_end.year, prev_end.month, 1), prev_end
     span = (end - start).days + 1
+    if span == 1:
+        prev = start - timedelta(days=7)
+        return prev, prev
     prev_end = start - timedelta(days=1)
     prev_start = prev_end - timedelta(days=span - 1)
     return prev_start, prev_end
