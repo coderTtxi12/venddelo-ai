@@ -19,6 +19,12 @@ export type ReferenceZoneOverlay = {
   polygon: GeoJsonPolygon;
 };
 
+export type ZoneMapVerificationPoint = {
+  lat: number;
+  lng: number;
+  inside: boolean;
+};
+
 type ServiceZoneMapDrawerProps = {
   polygon: GeoJsonPolygon | null;
   onPolygonChange: (polygon: GeoJsonPolygon | null) => void;
@@ -32,6 +38,7 @@ type ServiceZoneMapDrawerProps = {
   }) => void;
   referenceZones?: ReferenceZoneOverlay[];
   embeddedInScrollable?: boolean;
+  verificationPoint?: ZoneMapVerificationPoint | null;
 };
 
 type MapTool = 'draw' | 'pan';
@@ -247,6 +254,13 @@ function createAnchorContent(): HTMLElement {
   return el;
 }
 
+function createVerificationContent(inside: boolean): HTMLElement {
+  const el = document.createElement('div');
+  el.className = inside ? styles.verificationMarkerInside : styles.verificationMarkerOutside;
+  el.setAttribute('aria-hidden', 'true');
+  return el;
+}
+
 export function ServiceZoneMapDrawer({
   polygon,
   onPolygonChange,
@@ -256,6 +270,7 @@ export function ServiceZoneMapDrawer({
   onSearchPlaceChange,
   referenceZones = [],
   embeddedInScrollable = false,
+  verificationPoint = null,
 }: ServiceZoneMapDrawerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapFrameRef = useRef<HTMLDivElement>(null);
@@ -265,6 +280,7 @@ export function ServiceZoneMapDrawer({
   const referenceOverlaysRef = useRef<google.maps.Polygon[]>([]);
   const referenceLabelsRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const anchorMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const verificationMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
   const embeddedInScrollableRef = useRef(embeddedInScrollable);
   embeddedInScrollableRef.current = embeddedInScrollable;
   const draftMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
@@ -838,6 +854,31 @@ export function ServiceZoneMapDrawer({
   useEffect(() => {
     const map = mapInstanceRef.current;
     const AdvancedMarkerElement = advancedMarkerClassRef.current;
+    if (!ready || !map || !AdvancedMarkerElement) return;
+
+    if (verificationMarkerRef.current) {
+      verificationMarkerRef.current.map = null;
+      verificationMarkerRef.current = null;
+    }
+
+    if (!verificationPoint) return;
+
+    verificationMarkerRef.current = new AdvancedMarkerElement({
+      map,
+      position: { lat: verificationPoint.lat, lng: verificationPoint.lng },
+      title: verificationPoint.inside ? 'Dentro del cerco' : 'Fuera del cerco',
+      gmpClickable: false,
+      zIndex: 5,
+      content: createVerificationContent(verificationPoint.inside),
+    });
+
+    map.panTo({ lat: verificationPoint.lat, lng: verificationPoint.lng });
+    map.setZoom(14);
+  }, [ready, verificationPoint]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const AdvancedMarkerElement = advancedMarkerClassRef.current;
     if (!ready || !map) return;
 
     clearReferenceOverlays();
@@ -974,6 +1015,7 @@ export function ServiceZoneMapDrawer({
       });
       referenceLabelsRef.current = [];
       if (anchorMarkerRef.current) anchorMarkerRef.current.map = null;
+      if (verificationMarkerRef.current) verificationMarkerRef.current.map = null;
       projectionHelperRef.current?.detach();
       projectionHelperRef.current = null;
       mapInstanceRef.current = null;
