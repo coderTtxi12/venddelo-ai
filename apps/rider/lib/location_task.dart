@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
@@ -6,12 +9,17 @@ import 'package:http/http.dart' as http;
 
 import 'app_build.dart';
 import 'location_auth.dart';
+import 'location_ping.dart';
 
 const _apiBaseUrlKey = 'apiBaseUrl';
 const _accessTokenKey = 'accessToken';
 const _refreshTokenKey = 'refreshToken';
 const _supabaseUrlKey = 'supabaseUrl';
 const _supabaseAnonKey = 'supabaseAnonKey';
+const _locationNotificationIcon = NotificationIcon(
+  metaDataName: 'com.mexy.mexy_rider.notification.ICON',
+  backgroundColor: Color(0xFF2563EB),
+);
 
 @pragma('vm:entry-point')
 void startLocationCallback() {
@@ -19,31 +27,72 @@ void startLocationCallback() {
 }
 
 class LocationTaskHandler extends TaskHandler {
+  StreamSubscription<Position>? _positionSub;
+  Position? _lastPosition;
+  DateTime? _lastSentAt;
+  bool _pingInFlight = false;
+
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
+    _listenPositionStream();
     await _pingLocation();
   }
 
   @override
   void onRepeatEvent(DateTime timestamp) {
-    _pingLocation();
+    unawaited(_pingLocation());
   }
 
   @override
-  Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {}
+  Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
+    await _positionSub?.cancel();
+    _positionSub = null;
+  }
 
-  Future<void> _pingLocation() async {
+  void _listenPositionStream() {
+    if (Platform.isIOS || _positionSub != null) {
+      return;
+    }
+    _positionSub = Geolocator.getPositionStream(
+      locationSettings: riderBackgroundLocationSettings(),
+    ).listen(
+      (position) {
+        _lastPosition = position;
+        unawaited(_pingLocation(position: position));
+      },
+      onError: (_) {},
+    );
+  }
+
+  Future<void> _pingLocation({Position? position}) async {
+    if (Platform.isIOS) {
+      // iOS keeps GPS alive on the UI isolate; this timer is not reliable
+      // when the phone is locked. Android posts from this foreground service.
+      return;
+    }
+    if (_pingInFlight) {
+      return;
+    }
+    final now = DateTime.now();
+    if (!shouldSendLocationPing(now: now, lastSentAt: _lastSentAt)) {
+      return;
+    }
     final credentials = await loadLocationTaskCredentials();
     if (credentials == null) {
       return;
     }
+    _pingInFlight = true;
     try {
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
+      final next =
+          position ??
+          _lastPosition ??
+          await Geolocator.getLastKnownPosition() ??
+          await Geolocator.getCurrentPosition(
+            locationSettings: riderBackgroundLocationSettings(
+              timeLimit: const Duration(seconds: 4),
+            ),
+          );
+      _lastPosition = next;
       final result = await postLocationWithAuthRetry(
         credentials: credentials,
         postLocation: (creds) {
@@ -55,8 +104,8 @@ class LocationTaskHandler extends TaskHandler {
             },
             body: jsonEncode(
               riderLocationBody(
-                latitude: position.latitude,
-                longitude: position.longitude,
+                latitude: next.latitude,
+                longitude: next.longitude,
               ),
             ),
           );
@@ -70,10 +119,14 @@ class LocationTaskHandler extends TaskHandler {
           supabaseAnonKey: creds.supabaseAnonKey,
         ),
       );
+      _lastSentAt = DateTime.now();
       if (result == LocationPingResult.authFailed) {
         FlutterForegroundTask.sendDataToMain(locationAuthFailedEvent);
       }
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      _pingInFlight = false;
+    }
   }
 }
 
@@ -163,11 +216,14 @@ void initLocationForegroundTask() {
       playSound: false,
     ),
     foregroundTaskOptions: ForegroundTaskOptions(
-      eventAction: ForegroundTaskEventAction.repeat(15000),
+      eventAction: ForegroundTaskEventAction.repeat(
+        locationPingInterval.inMilliseconds,
+      ),
       autoRunOnBoot: false,
       autoRunOnMyPackageReplaced: false,
       allowWakeLock: true,
       allowWifiLock: true,
+      stopWithTask: false,
     ),
   );
 }
@@ -181,6 +237,7 @@ Future<void> startLocationForegroundTask() async {
     serviceTypes: [ForegroundServiceTypes.location],
     notificationTitle: 'Mexy usa tu ubicación',
     notificationText: 'En línea',
+    notificationIcon: _locationNotificationIcon,
     callback: startLocationCallback,
   );
 }

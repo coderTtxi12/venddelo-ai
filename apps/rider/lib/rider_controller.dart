@@ -13,6 +13,7 @@ import 'config.dart';
 import 'countdown.dart';
 import 'friendly_error.dart';
 import 'location_auth.dart';
+import 'location_ping.dart';
 import 'location_task.dart';
 import 'models.dart';
 import 'offer_push.dart';
@@ -44,6 +45,9 @@ class RiderController extends ChangeNotifier {
 
   Timer? _offerPoll;
   Timer? _mePoll;
+  Timer? _locationPing;
+  DateTime? _lastLocationPingAt;
+  bool _locationPingInFlight = false;
   RiderSocket? _socket;
   RiderSocketStatus _socketStatus = RiderSocketStatus.offline;
   final Set<String> _dismissedExpiredOfferIds = {};
@@ -52,6 +56,7 @@ class RiderController extends ChangeNotifier {
   StreamSubscription<String>? _fcmTokenRefresh;
   StreamSubscription<AuthState>? _authSub;
   StreamSubscription<Position>? _positionSub;
+  StreamSubscription<Position>? _onlineLocationSub;
   bool _listeningTaskData = false;
   String? _alarmedOfferId;
 
@@ -279,9 +284,60 @@ class RiderController extends ChangeNotifier {
     await _persistSessionToLocationTask();
     initLocationForegroundTask();
     await startLocationForegroundTask();
+    _startIosLocationPings();
     await _ensureRiderSocket();
     _syncOfferPollWithSocket();
     await refreshOffers();
+  }
+
+  void _startIosLocationPings() {
+    _locationPing?.cancel();
+    _locationPing = null;
+    unawaited(_onlineLocationSub?.cancel());
+    _onlineLocationSub = null;
+    if (kIsWeb || !Platform.isIOS) {
+      return;
+    }
+    _onlineLocationSub = Geolocator.getPositionStream(
+      locationSettings: riderBackgroundLocationSettings(),
+    ).listen(
+      (position) {
+        currentPosition = position;
+        notifyListeners();
+        unawaited(_postLiveLocation(position: position));
+      },
+      onError: (_) {},
+    );
+    _locationPing = Timer.periodic(locationPingInterval, (_) {
+      unawaited(_postLiveLocation());
+    });
+    unawaited(_postLiveLocation());
+  }
+
+  Future<void> _postLiveLocation({Position? position}) async {
+    if (profile?.isOnline != true || _locationPingInFlight) {
+      return;
+    }
+    final now = DateTime.now();
+    if (!shouldSendLocationPing(now: now, lastSentAt: _lastLocationPingAt)) {
+      return;
+    }
+    _locationPingInFlight = true;
+    try {
+      var next = position ?? currentPosition;
+      next ??= await Geolocator.getLastKnownPosition();
+      next ??= await Geolocator.getCurrentPosition(
+        locationSettings: riderBackgroundLocationSettings(
+          timeLimit: const Duration(seconds: 4),
+        ),
+      );
+      currentPosition = next;
+      await _api.postLocation(next.latitude, next.longitude);
+      _lastLocationPingAt = DateTime.now();
+    } catch (_) {
+    } finally {
+      _locationPingInFlight = false;
+    }
   }
 
   Future<void> _ensureRiderSocket() async {
@@ -389,6 +445,10 @@ class RiderController extends ChangeNotifier {
   Future<void> _stopOnlineServices() async {
     _offerPoll?.cancel();
     _offerPoll = null;
+    _locationPing?.cancel();
+    _locationPing = null;
+    await _onlineLocationSub?.cancel();
+    _onlineLocationSub = null;
     await _socket?.stop();
     _socket = null;
     _socketStatus = RiderSocketStatus.offline;
@@ -515,6 +575,7 @@ class RiderController extends ChangeNotifier {
   void dispose() {
     _offerPoll?.cancel();
     _mePoll?.cancel();
+    _locationPing?.cancel();
     unawaited(_socket?.stop());
     _socket = null;
     unawaited(stopOfferAlarm());
@@ -523,6 +584,7 @@ class RiderController extends ChangeNotifier {
     unawaited(_fcmTokenRefresh?.cancel());
     unawaited(_authSub?.cancel());
     unawaited(_positionSub?.cancel());
+    unawaited(_onlineLocationSub?.cancel());
     if (_listeningTaskData) {
       FlutterForegroundTask.removeTaskDataCallback(_onTaskData);
       _listeningTaskData = false;
