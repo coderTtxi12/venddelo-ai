@@ -4,14 +4,18 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'api.dart';
 import 'config.dart';
 import 'countdown.dart';
 import 'friendly_error.dart';
+import 'job_overlay.dart';
+import 'job_overlay_platform.dart';
 import 'location_auth.dart';
 import 'location_ping.dart';
 import 'location_task.dart';
@@ -21,17 +25,22 @@ import 'rider_permissions.dart';
 import 'rider_socket.dart';
 
 class RiderController extends ChangeNotifier {
-  RiderController({RiderApi? api, Future<bool> Function()? openAppSettingsImpl})
-    : _api =
-          api ??
-          RiderApi(
-            tokenProvider: () =>
-                Supabase.instance.client.auth.currentSession?.accessToken,
-          ),
-      _openAppSettings = openAppSettingsImpl ?? Geolocator.openAppSettings;
+  RiderController({
+    RiderApi? api,
+    Future<bool> Function()? openAppSettingsImpl,
+    JobOverlayPlatform? overlayPlatform,
+  }) : _api =
+           api ??
+           RiderApi(
+             tokenProvider: () =>
+                 Supabase.instance.client.auth.currentSession?.accessToken,
+           ),
+       _openAppSettings = openAppSettingsImpl ?? Geolocator.openAppSettings,
+       _overlay = overlayPlatform ?? JobOverlayPlatform();
 
   final RiderApi _api;
   final Future<bool> Function() _openAppSettings;
+  final JobOverlayPlatform _overlay;
 
   RiderProfile? profile;
   RiderOffer? offer;
@@ -41,7 +50,9 @@ class RiderController extends ChangeNotifier {
   bool onlineBusy = false;
   bool offerBusy = false;
   bool needsLocationSettings = false;
+  bool overlayEnabled = true;
   Position? currentPosition;
+  AppLifecycleState lifecycleState = AppLifecycleState.resumed;
 
   Timer? _offerPoll;
   Timer? _mePoll;
@@ -59,6 +70,8 @@ class RiderController extends ChangeNotifier {
   StreamSubscription<Position>? _onlineLocationSub;
   bool _listeningTaskData = false;
   String? _alarmedOfferId;
+  String? _dismissedOverlaySignature;
+  bool _askedOverlayPermission = false;
 
   Future<void> bootstrap() async {
     loading = true;
@@ -67,6 +80,8 @@ class RiderController extends ChangeNotifier {
     notifyListeners();
     _listenTaskData();
     _listenAuth();
+    _listenOverlay();
+    await _loadOverlaySetting();
     try {
       await refreshMe();
       if (profile?.mustUpdate == true) {
@@ -102,6 +117,7 @@ class RiderController extends ChangeNotifier {
   Future<void> refreshMe() async {
     profile = await _api.getMe();
     notifyListeners();
+    unawaited(syncJobOverlay());
   }
 
   void _startMePoll() {
@@ -131,6 +147,7 @@ class RiderController extends ChangeNotifier {
           unawaited(_startOnlineServices());
         }
       }
+      unawaited(syncJobOverlay());
     } catch (_) {}
   }
 
@@ -571,6 +588,93 @@ class RiderController extends ChangeNotifier {
 
   bool get showIosKillWarning => !kIsWeb && Platform.isIOS;
 
+  void _listenOverlay() {
+    _overlay.onDismissed = onOverlayDismissed;
+    _overlay.listen();
+  }
+
+  Future<void> _loadOverlaySetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    overlayEnabled = jobOverlayEnabledFromStored(
+      prefs.getBool(jobOverlayPrefKey),
+    );
+  }
+
+  Iterable<String> _activeJobIds() {
+    return (profile?.assignments ?? const [])
+        .where((item) => isActiveDeliveryJob(item.status))
+        .map((item) => item.id);
+  }
+
+  void onAppLifecycle(AppLifecycleState state) {
+    lifecycleState = state;
+    unawaited(syncJobOverlay());
+  }
+
+  void onOverlayDismissed() {
+    _dismissedOverlaySignature = jobOverlaySignature(_activeJobIds());
+    unawaited(syncJobOverlay());
+  }
+
+  Future<void> setOverlayEnabled(bool value) async {
+    overlayEnabled = value;
+    if (value) {
+      _dismissedOverlaySignature = null;
+      _askedOverlayPermission = false;
+    }
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(jobOverlayPrefKey, value);
+    if (value) {
+      final granted = await _overlay.hasPermission();
+      if (!granted) {
+        await _overlay.requestPermission();
+      }
+      _askedOverlayPermission = true;
+    }
+    await syncJobOverlay();
+  }
+
+  Future<void> syncJobOverlay() async {
+    if (!_overlay.isSupported) {
+      return;
+    }
+    final jobs = _activeJobIds();
+    final signature = jobOverlaySignature(jobs);
+    if (signature.isEmpty) {
+      _dismissedOverlaySignature = null;
+    }
+    final dismissed = isOverlayDismissed(
+      dismissedSignature: _dismissedOverlaySignature,
+      currentSignature: signature,
+    );
+    if (overlayEnabled &&
+        jobs.isNotEmpty &&
+        lifecycleState == AppLifecycleState.resumed &&
+        !_askedOverlayPermission) {
+      final granted = await _overlay.hasPermission();
+      if (!granted) {
+        _askedOverlayPermission = true;
+        await _overlay.requestPermission();
+      }
+    }
+    final hasPermission = await _overlay.hasPermission();
+    final show = shouldShowJobOverlay(
+      JobOverlayDecision(
+        enabledInSettings: overlayEnabled,
+        hasActiveJob: jobs.isNotEmpty,
+        appInBackground: lifecycleState != AppLifecycleState.resumed,
+        overlayPermissionGranted: hasPermission,
+        dismissedThisJob: dismissed,
+      ),
+    );
+    if (show) {
+      await _overlay.show();
+    } else {
+      await _overlay.hide();
+    }
+  }
+
   @override
   void dispose() {
     _offerPoll?.cancel();
@@ -585,6 +689,7 @@ class RiderController extends ChangeNotifier {
     unawaited(_authSub?.cancel());
     unawaited(_positionSub?.cancel());
     unawaited(_onlineLocationSub?.cancel());
+    unawaited(_overlay.hide());
     if (_listeningTaskData) {
       FlutterForegroundTask.removeTaskDataCallback(_onTaskData);
       _listeningTaskData = false;
