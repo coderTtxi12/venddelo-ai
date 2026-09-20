@@ -37,6 +37,7 @@ export type WhatsAppOrderMessageInput = {
   productsById: Map<string, Product>;
   promotionsById: Map<string, Promotion>;
   itemCount: number;
+  trackingUrl?: string | null;
 };
 
 function bold(text: string): string {
@@ -175,6 +176,7 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
     productsById,
     promotionsById,
     itemCount,
+    trackingUrl,
   } = input;
 
   const quoteNow = new Date(quote.server_now);
@@ -208,11 +210,23 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
     bold(`Nuevo pedido — ${restaurantName}`),
     `${bold('Pedido')} ${formatCheckoutOrderIdLabel(orderId)}`,
     '',
+  ];
+
+  const trimmedTrackingUrl = trackingUrl?.trim() ?? '';
+  if (trimmedTrackingUrl) {
+    parts.push(
+      bold('Rastrea tu pedido'),
+      trimmedTrackingUrl,
+      '',
+    );
+  }
+
+  parts.push(
     `${bold('Cliente:')} ${fulfillment.customerName.trim()}`,
     `${bold('WhatsApp:')} ${formatOrderCustomerPhone(buildCheckoutCustomerPhoneE164(fulfillment))}`,
     '',
     `${bold('Tipo de pedido:')} ${RESTAURANT_SERVICE_LABELS[fulfillment.serviceType]}`,
-  ];
+  );
 
   const deliveryMapsUrl =
     fulfillment.serviceType === 'delivery' ? buildGoogleMapsDeliveryUrl(fulfillment) : null;

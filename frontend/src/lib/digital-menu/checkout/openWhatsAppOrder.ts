@@ -33,11 +33,14 @@ export function beginWhatsAppNavigation(
     };
   }
 
-  const popup = host.open(url, '_blank');
+  const popup = host.open('about:blank', '_blank');
   return {
-    assign: () => {
+    assign: (targetUrl) => {
       try {
-        if (popup && !popup.closed) popup.focus?.();
+        if (popup && !popup.closed) {
+          popup.location.href = targetUrl;
+          popup.focus?.();
+        }
       } catch {
         // Cross-origin WhatsApp tabs often revoke the handle; never navigate the menu tab.
       }

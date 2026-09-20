@@ -63,6 +63,7 @@ import {
 } from '@/lib/restaurantPaymentConfig';
 import { RESTAURANT_SERVICE_LABELS } from '@/lib/restaurantServices';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
+import { publicMenuOrigin } from '@/lib/restaurantSubdomain';
 import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
 import { CheckoutCashDenominationSection } from '@/components/digital-menu/CheckoutCashDenominationSection';
 import { formatCouponCodeInput } from '@/lib/coupons/code';
@@ -905,18 +906,20 @@ export function PublicMenuCheckoutSummary({
     pendingCheckoutRef.current = pending;
     const { orderId, idempotencyKey } = pending.ref;
 
-    const message = formatWhatsAppOrderMessage({
-      orderId,
-      restaurantName,
-      restaurantLocation,
-      currency,
-      lines,
-      quote,
-      fulfillment,
-      productsById,
-      promotionsById,
-      itemCount,
-    });
+    const buildWhatsAppMessage = (trackingUrl?: string | null) =>
+      formatWhatsAppOrderMessage({
+        orderId,
+        restaurantName,
+        restaurantLocation,
+        currency,
+        lines,
+        quote,
+        fulfillment,
+        productsById,
+        promotionsById,
+        itemCount,
+        trackingUrl,
+      });
     const payload = buildPublicOrderInput(
       lines,
       fulfillment,
@@ -924,7 +927,7 @@ export function PublicMenuCheckoutSummary({
       quote.coupon?.code ?? null,
     );
     const whatsappNav = beginWhatsAppOrderNavigation(
-      buildWhatsAppOrderUrl(whatsappPhone, message),
+      buildWhatsAppOrderUrl(whatsappPhone, buildWhatsAppMessage()),
     );
     let saved = false;
     try {
@@ -947,8 +950,9 @@ export function PublicMenuCheckoutSummary({
 
       setStockErrors([]);
 
+      let created;
       try {
-        await submitCheckoutOrder(subdomain, payload, idempotencyKey);
+        created = await submitCheckoutOrder(subdomain, payload, idempotencyKey);
       } catch (error) {
         setSaveErrorMessage(formatCheckoutSaveError(error));
         return;
@@ -956,7 +960,11 @@ export function PublicMenuCheckoutSummary({
 
       pendingCheckoutRef.current = null;
       saved = true;
-      completeWhatsAppOrder(whatsappNav, whatsappPhone, message);
+      const trackingToken = created.dispatch?.tracking_token?.trim();
+      const trackingUrl = trackingToken
+        ? `${publicMenuOrigin(subdomain)}/rastreo/${trackingToken}`
+        : null;
+      completeWhatsAppOrder(whatsappNav, whatsappPhone, buildWhatsAppMessage(trackingUrl));
       onOrderSent();
     } finally {
       if (!saved) {

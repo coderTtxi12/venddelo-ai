@@ -1,4 +1,4 @@
-import { createPublicOrder, type PublicOrderInput } from '@/lib/api/public';
+import { createPublicOrder, type PublicOrderCreated, type PublicOrderInput } from '@/lib/api/public';
 import { ApiError } from '@/lib/api/types';
 
 const NETWORK_ATTEMPTS = 2;
@@ -7,14 +7,14 @@ export type CreatePublicOrderFn = (
   subdomain: string,
   data: PublicOrderInput,
   idempotencyKey: string,
-) => Promise<{ id: string }>;
+) => Promise<PublicOrderCreated>;
 
 export async function submitCheckoutOrder(
   subdomain: string,
   payload: PublicOrderInput,
   idempotencyKey: string,
   createOrder: CreatePublicOrderFn = createPublicOrder,
-): Promise<{ id: string }> {
+): Promise<PublicOrderCreated> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < NETWORK_ATTEMPTS; attempt += 1) {

@@ -204,12 +204,21 @@ export function quotePublicDelivery(subdomain: string, data: PublicDeliveryQuote
   );
 }
 
+export type PublicOrderCreated = {
+  id: string;
+  dispatch?: {
+    tracking_token: string;
+    short_id: string;
+    status: string;
+  } | null;
+};
+
 export function createPublicOrder(
   subdomain: string,
   data: PublicOrderInput,
   idempotencyKey: string,
 ) {
-  return apiRequest<{ id: string }>(
+  return apiRequest<PublicOrderCreated>(
     `/public/menu/${encodeURIComponent(subdomain)}/orders`,
     { method: 'POST', body: data, idempotencyKey },
   );

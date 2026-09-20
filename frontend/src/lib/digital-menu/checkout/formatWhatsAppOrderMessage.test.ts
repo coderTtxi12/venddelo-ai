@@ -118,3 +118,21 @@ test('formatWhatsAppOrderMessage includes delivery fee when quote still has 0', 
   assert.match(message, /Envío: \$35\.00/);
   assert.match(message, /\*TOTAL: \$135\.00\*/);
 });
+
+test('formatWhatsAppOrderMessage includes tracking link when provided', () => {
+  const message = formatWhatsAppOrderMessage({
+    orderId: '11111111-2222-3333-4444-555555555555',
+    restaurantName: 'Taquería',
+    currency: 'MXN',
+    lines: [] as PublicMenuCartLine[],
+    quote: { ...baseQuote, coupon: null, total_cents: 10000 },
+    fulfillment: deliveryFulfillment,
+    productsById: new Map(),
+    promotionsById: new Map(),
+    itemCount: 1,
+    trackingUrl: 'https://taqueria.example/rastreo/abc123',
+  });
+
+  assert.match(message, /\*Rastrea tu pedido\*/);
+  assert.match(message, /https:\/\/taqueria\.example\/rastreo\/abc123/);
+});

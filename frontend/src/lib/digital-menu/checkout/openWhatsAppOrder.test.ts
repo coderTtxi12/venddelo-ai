@@ -46,7 +46,7 @@ test('mobile assigns WhatsApp in the same tab and does not open a window', () =>
   assert.equal(host.location.href, WA_URL);
 });
 
-test('desktop opens WhatsApp on tap, not a blank page', () => {
+test('desktop holds a blank tab on tap, then assigns the final WhatsApp URL', () => {
   const popup = createPopup();
   const opened: Array<{ url: string; target: string }> = [];
   const host = {
@@ -58,18 +58,19 @@ test('desktop opens WhatsApp on tap, not a blank page', () => {
       return popup;
     },
   };
+  const finalUrl = 'https://wa.me/521555?text=rastreo';
 
   const navigation = beginWhatsAppNavigation(host, WA_URL);
-  assert.deepEqual(opened, [{ url: WA_URL, target: '_blank' }]);
-  assert.equal(popup.href, WA_URL);
+  assert.deepEqual(opened, [{ url: 'about:blank', target: '_blank' }]);
+  assert.equal(popup.href, 'about:blank');
   assert.equal(host.location.href, 'https://menu.example/checkout');
 
-  navigation.assign(WA_URL);
-  assert.equal(popup.href, WA_URL);
+  navigation.assign(finalUrl);
+  assert.equal(popup.href, finalUrl);
   assert.equal(host.location.href, 'https://menu.example/checkout');
 });
 
-test('tablet opens WhatsApp in a new tab like desktop', () => {
+test('tablet holds a blank tab like desktop, then assigns WhatsApp', () => {
   const popup = createPopup();
   const host = {
     innerWidth: PUBLIC_MENU_TABLET_MIN_WIDTH,
@@ -80,7 +81,9 @@ test('tablet opens WhatsApp in a new tab like desktop', () => {
     },
   };
 
-  beginWhatsAppNavigation(host, WA_URL);
+  const navigation = beginWhatsAppNavigation(host, WA_URL);
+  assert.equal(popup.href, 'about:blank');
+  navigation.assign(WA_URL);
   assert.equal(popup.href, WA_URL);
 });
 
