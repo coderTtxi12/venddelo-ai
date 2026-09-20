@@ -147,6 +147,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _controller?.onAppLifecycle(state);
     if (state == AppLifecycleState.resumed &&
         _controller != null &&
         _controller!.profile != null) {
