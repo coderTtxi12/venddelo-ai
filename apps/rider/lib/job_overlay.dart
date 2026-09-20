@@ -1,4 +1,5 @@
 const jobOverlayPrefKey = 'job_overlay_enabled';
+const jobOverlayAskedPrefKey = 'job_overlay_permission_asked';
 
 class JobOverlayDecision {
   const JobOverlayDecision({
@@ -40,6 +41,16 @@ bool isActiveDeliveryJob(String status) {
 }
 
 bool jobOverlayEnabledFromStored(bool? stored) => stored ?? true;
+
+bool jobOverlayPermissionAskedFromStored(bool? stored) => stored == true;
+
+bool shouldPromptOverlayPermission({
+  required bool enabledInSettings,
+  required bool alreadyAsked,
+  required bool alreadyGranted,
+}) {
+  return enabledInSettings && !alreadyAsked && !alreadyGranted;
+}
 
 String jobOverlaySignature(Iterable<String> ids) {
   final sorted = ids.toList()..sort();

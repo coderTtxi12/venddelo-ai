@@ -65,4 +65,39 @@ void main() {
     expect(jobOverlayEnabledFromStored(true), isTrue);
     expect(jobOverlayEnabledFromStored(false), isFalse);
   });
+
+  test('asks overlay permission once at login, not when a job starts', () {
+    expect(
+      shouldPromptOverlayPermission(
+        enabledInSettings: true,
+        alreadyAsked: false,
+        alreadyGranted: false,
+      ),
+      isTrue,
+    );
+    expect(
+      shouldPromptOverlayPermission(
+        enabledInSettings: true,
+        alreadyAsked: true,
+        alreadyGranted: false,
+      ),
+      isFalse,
+    );
+    expect(
+      shouldPromptOverlayPermission(
+        enabledInSettings: true,
+        alreadyAsked: false,
+        alreadyGranted: true,
+      ),
+      isFalse,
+    );
+    expect(
+      shouldPromptOverlayPermission(
+        enabledInSettings: false,
+        alreadyAsked: false,
+        alreadyGranted: false,
+      ),
+      isFalse,
+    );
+  });
 }
