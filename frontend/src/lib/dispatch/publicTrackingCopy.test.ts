@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import {
   publicTrackingConnectionBar,
+  publicTrackingConnectionIsStale,
+  publicTrackingConnectionSignalsForDisplay,
   publicTrackingMapPendingCopy,
   publicTrackingRouteCaption,
   publicTrackingShowsLiveMap,
@@ -171,5 +173,38 @@ test('connection bar prompts reload with a specific cause', () => {
       detail: 'El enlace puede haber caducado o no ser válido. Recarga por si fue un fallo temporal.',
       action: 'Recargar',
     },
+  );
+});
+
+test('connection bar hides transient wifi and reconnect errors until they settle', () => {
+  const wifi = {
+    ...HEALTHY_CONNECTION,
+    socketStatus: 'live' as const,
+    isOnline: false,
+  };
+  const reconnecting = {
+    ...HEALTHY_CONNECTION,
+    socketStatus: 'reconnecting' as const,
+  };
+  assert.equal(publicTrackingConnectionIsStale(wifi), true);
+  assert.equal(publicTrackingConnectionIsStale(reconnecting), true);
+  assert.deepEqual(publicTrackingConnectionSignalsForDisplay(wifi, false), {
+    socketStatus: 'live',
+    isOnline: true,
+    fetchFailed: false,
+    connectingTimedOut: false,
+    notFound: false,
+  });
+  assert.equal(
+    publicTrackingConnectionBar(publicTrackingConnectionSignalsForDisplay(wifi, false)).title,
+    'En vivo',
+  );
+  assert.equal(
+    publicTrackingConnectionBar(publicTrackingConnectionSignalsForDisplay(reconnecting, false)).title,
+    'Conectando',
+  );
+  assert.equal(
+    publicTrackingConnectionBar(publicTrackingConnectionSignalsForDisplay(wifi, true)).title,
+    'Sin conexión a internet',
   );
 });

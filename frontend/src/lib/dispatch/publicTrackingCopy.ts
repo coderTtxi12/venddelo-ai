@@ -118,6 +118,35 @@ export type PublicTrackingConnectionSignals = {
 };
 
 export const PUBLIC_TRACKING_CONNECTING_TIMEOUT_MS = 8000;
+export const PUBLIC_TRACKING_STALE_GRACE_MS = 700;
+
+export function publicTrackingConnectionIsStale(
+  signals: PublicTrackingConnectionSignals,
+): boolean {
+  return (
+    !signals.isOnline ||
+    Boolean(signals.notFound) ||
+    signals.fetchFailed ||
+    signals.connectingTimedOut ||
+    signals.socketStatus === 'reconnecting'
+  );
+}
+
+export function publicTrackingConnectionSignalsForDisplay(
+  signals: PublicTrackingConnectionSignals,
+  staleReady: boolean,
+): PublicTrackingConnectionSignals {
+  if (staleReady) return signals;
+  const transientDisconnect =
+    signals.socketStatus === 'reconnecting' || signals.socketStatus === 'offline';
+  return {
+    socketStatus: transientDisconnect ? 'connecting' : signals.socketStatus,
+    isOnline: true,
+    fetchFailed: false,
+    connectingTimedOut: false,
+    notFound: false,
+  };
+}
 
 export function publicTrackingConnectionBar(
   signals: PublicTrackingConnectionSignals,
