@@ -55,13 +55,14 @@ export function usePublicTrackingRealtime(
 
   useEffect(() => {
     if (!token || !consume) {
-      onStatusChangeRef.current?.('offline');
       return;
     }
 
     const supabase = createClient();
     let cancelled = false;
-    onStatusChangeRef.current?.('connecting');
+    if (!hasConnectedOnceRef.current) {
+      onStatusChangeRef.current?.('connecting');
+    }
 
     const channel = supabase.channel(trackingBroadcastTopic(token), {
       config: { broadcast: { self: false } },
@@ -105,7 +106,6 @@ export function usePublicTrackingRealtime(
     return () => {
       cancelled = true;
       void supabase.removeChannel(channel);
-      onStatusChangeRef.current?.('offline');
     };
   }, [token, consume]);
 
