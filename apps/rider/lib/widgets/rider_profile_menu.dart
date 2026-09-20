@@ -16,6 +16,9 @@ Future<void> showRiderProfileMenu({
   String? plate,
   String? motorcycleBrand,
   String? motorcycleColor,
+  bool showOverlaySetting = false,
+  bool overlayEnabled = true,
+  ValueChanged<bool>? onOverlayEnabledChanged,
   required VoidCallback onOpenAccount,
   required VoidCallback onSignOut,
 }) {
@@ -39,6 +42,9 @@ Future<void> showRiderProfileMenu({
         plate: plate,
         motorcycleBrand: motorcycleBrand,
         motorcycleColor: motorcycleColor,
+        showOverlaySetting: showOverlaySetting,
+        overlayEnabled: overlayEnabled,
+        onOverlayEnabledChanged: onOverlayEnabledChanged,
         onOpenAccount: () {
           Navigator.of(sheetContext).pop();
           onOpenAccount();
@@ -52,7 +58,7 @@ Future<void> showRiderProfileMenu({
   );
 }
 
-class RiderProfileMenuSheet extends StatelessWidget {
+class RiderProfileMenuSheet extends StatefulWidget {
   const RiderProfileMenuSheet({
     super.key,
     required this.name,
@@ -62,6 +68,9 @@ class RiderProfileMenuSheet extends StatelessWidget {
     this.plate,
     this.motorcycleBrand,
     this.motorcycleColor,
+    this.showOverlaySetting = false,
+    this.overlayEnabled = true,
+    this.onOverlayEnabledChanged,
     required this.onOpenAccount,
     required this.onSignOut,
   });
@@ -73,15 +82,31 @@ class RiderProfileMenuSheet extends StatelessWidget {
   final String? plate;
   final String? motorcycleBrand;
   final String? motorcycleColor;
+  final bool showOverlaySetting;
+  final bool overlayEnabled;
+  final ValueChanged<bool>? onOverlayEnabledChanged;
   final VoidCallback onOpenAccount;
   final VoidCallback onSignOut;
 
   @override
+  State<RiderProfileMenuSheet> createState() => _RiderProfileMenuSheetState();
+}
+
+class _RiderProfileMenuSheetState extends State<RiderProfileMenuSheet> {
+  late bool _overlayEnabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _overlayEnabled = widget.overlayEnabled;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final credit = creditAvailableCents;
-    final vehicle = _vehicleLine(motorcycleBrand, motorcycleColor);
-    final plateLabel = (plate ?? '').trim();
+    final credit = widget.creditAvailableCents;
+    final vehicle = _vehicleLine(widget.motorcycleBrand, widget.motorcycleColor);
+    final plateLabel = (widget.plate ?? '').trim();
 
     return SafeArea(
       child: Padding(
@@ -90,10 +115,14 @@ class RiderProfileMenuSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _ProfileAvatar(name: name, photoUrl: photoUrl, size: 72),
+            _ProfileAvatar(
+              name: widget.name,
+              photoUrl: widget.photoUrl,
+              size: 72,
+            ),
             const SizedBox(height: 14),
             Text(
-              name.isEmpty ? 'Repartidor' : name,
+              widget.name.isEmpty ? 'Repartidor' : widget.name,
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -104,10 +133,10 @@ class RiderProfileMenuSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            _OnlineStatus(isOnline: isOnline),
+            _OnlineStatus(isOnline: widget.isOnline),
             if (vehicle.isNotEmpty) ...[
               const SizedBox(height: 14),
-              _VehicleLine(text: vehicle, color: motorcycleColor),
+              _VehicleLine(text: vehicle, color: widget.motorcycleColor),
             ],
             if (plateLabel.isNotEmpty) ...[
               const SizedBox(height: 6),
@@ -136,13 +165,38 @@ class RiderProfileMenuSheet extends StatelessWidget {
             const SizedBox(height: 22),
             RiderPrimaryButton(
               label: 'Historial y ganancias',
-              onPressed: onOpenAccount,
+              onPressed: widget.onOpenAccount,
             ),
+            if (widget.showOverlaySetting) ...[
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                visualDensity: VisualDensity.standard,
+                title: Text(
+                  'Atajo flotante',
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                subtitle: Text(
+                  'Círculo para volver a Mexy cuando abras Maps',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                value: _overlayEnabled,
+                onChanged: (value) {
+                  setState(() => _overlayEnabled = value);
+                  widget.onOverlayEnabledChanged?.call(value);
+                },
+              ),
+            ],
             const SizedBox(height: 14),
             RiderSlideToConfirm(
               label: 'Desliza para cerrar sesión',
               compact: true,
-              onConfirmed: onSignOut,
+              onConfirmed: widget.onSignOut,
             ),
           ],
         ),

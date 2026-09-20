@@ -49,6 +49,35 @@ void main() {
     expect(signedOut, isFalse);
   });
 
+  testWidgets('floating shortcut toggle is on by default', (tester) async {
+    var overlayEnabled = true;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: RiderProfileMenuSheet(
+            name: 'Ana López',
+            isOnline: true,
+            showOverlaySetting: true,
+            overlayEnabled: true,
+            onOverlayEnabledChanged: (value) => overlayEnabled = value,
+            onOpenAccount: () {},
+            onSignOut: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Atajo flotante'), findsOneWidget);
+    final toggle = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
+    expect(toggle.value, isTrue);
+
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pump();
+    expect(overlayEnabled, isFalse);
+  });
+
   testWidgets('a tap does not sign out; sliding confirms', (tester) async {
     var signedOut = false;
 
