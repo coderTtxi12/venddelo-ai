@@ -1,6 +1,7 @@
 import { apiRequest } from './client';
 
 export type DispatchStatus =
+  | 'accepted'
   | 'scheduled'
   | 'searching'
   | 'offered'
@@ -90,6 +91,7 @@ export type PublicDispatchTracking = {
     latitude: number;
     longitude: number;
     address: string;
+    references: string | null;
   };
   rider: {
     first_name: string;
@@ -124,6 +126,10 @@ export function formatDispatchShortId(shortId: string | null | undefined): strin
 
 export function isDispatchHistoryStatus(status: DispatchStatus): boolean {
   return status === 'delivered' || status === 'cancelled';
+}
+
+export function isDispatchTrackingStubStatus(status: DispatchStatus): boolean {
+  return status === 'accepted';
 }
 
 function restaurantQuery(restaurantId: string): string {

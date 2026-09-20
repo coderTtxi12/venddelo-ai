@@ -21,6 +21,7 @@ import {
   type DispatchRequest,
   formatDispatchShortId,
   isDispatchHistoryStatus,
+  isDispatchTrackingStubStatus,
 } from '@/lib/api/dispatch';
 import { getPublicCheckoutConfig, type PublicDeliveryService } from '@/lib/api/public';
 import { ApiError } from '@/lib/api/types';
@@ -206,13 +207,26 @@ export default function DeliveryPage() {
     visibilityState,
   ]);
 
+  const activeRequests = useMemo(
+    () =>
+      requests.filter(
+        (item) =>
+          !isDispatchHistoryStatus(item.status) && !isDispatchTrackingStubStatus(item.status),
+      ),
+    [requests],
+  );
+  const historyRequests = useMemo(
+    () => requests.filter((item) => isDispatchHistoryStatus(item.status)),
+    [requests],
+  );
+
   useEffect(() => {
     if (loading || didInitFormCollapse.current) return;
-    if (requests.length > 0) {
+    if (activeRequests.length > 0) {
       setFormExpanded(false);
       didInitFormCollapse.current = true;
     }
-  }, [loading, requests.length]);
+  }, [activeRequests.length, loading]);
 
   useEffect(() => {
     if (authLoading || accessLoading) return;
@@ -220,15 +234,6 @@ export default function DeliveryPage() {
     const frame = window.requestAnimationFrame(() => void load());
     return () => window.cancelAnimationFrame(frame);
   }, [accessLoading, accessToken, authLoading, load, selectedRestaurantId]);
-
-  const activeRequests = useMemo(
-    () => requests.filter((item) => !isDispatchHistoryStatus(item.status)),
-    [requests],
-  );
-  const historyRequests = useMemo(
-    () => requests.filter((item) => isDispatchHistoryStatus(item.status)),
-    [requests],
-  );
   const liveCopy = LIVE_COPY[socketStatus];
   const liveDotClass =
     liveCopy.tone === 'live'

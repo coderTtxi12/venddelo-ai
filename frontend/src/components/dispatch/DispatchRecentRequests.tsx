@@ -29,6 +29,7 @@ import { publicMenuOrigin } from '@/lib/restaurantSubdomain';
 import styles from './DispatchRecentRequests.module.css';
 
 const STATUS_LABELS: Record<DispatchStatus, string> = {
+  accepted: 'Aceptado',
   scheduled: 'Cocinando',
   searching: 'Buscando repartidor',
   offered: 'Oferta enviada',
@@ -69,6 +70,7 @@ function packageLabel(request: DispatchRequest): string {
 export function canCancelDispatch(request: DispatchRequest): boolean {
   return (
     !request.assigned_driver_id &&
+    request.status !== 'accepted' &&
     request.status !== 'cancelled' &&
     request.status !== 'delivered' &&
     request.status !== 'assigned' &&

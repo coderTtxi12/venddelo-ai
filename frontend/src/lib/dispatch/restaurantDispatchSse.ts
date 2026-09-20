@@ -63,6 +63,7 @@ export function parseRestaurantDispatchSseBlock(
 }
 
 const DISPATCH_STATUSES = new Set([
+  'accepted',
   'scheduled',
   'searching',
   'offered',
@@ -75,13 +76,14 @@ const DISPATCH_STATUSES = new Set([
 ]);
 
 const STATUS_RANK: Record<string, number> = {
-  scheduled: 0,
-  searching: 1,
-  offered: 2,
-  assigned: 3,
-  picked_up: 4,
-  in_transit: 5,
-  delivered: 6,
+  accepted: 0,
+  scheduled: 1,
+  searching: 2,
+  offered: 3,
+  assigned: 4,
+  picked_up: 5,
+  in_transit: 6,
+  delivered: 7,
 };
 
 export function mergeDispatchStatus(current: string, incoming: string): string {
