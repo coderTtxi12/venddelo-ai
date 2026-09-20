@@ -15,7 +15,7 @@ function snapshot(overrides: Partial<PublicDispatchTracking> = {}): PublicDispat
     restaurant_name: 'Bistro',
     customer_name: 'María',
     pickup: { latitude: 19.43, longitude: -99.13, name: 'Bistro' },
-    dropoff: { latitude: 19.44, longitude: -99.14, address: 'Centro' },
+    dropoff: { latitude: 19.44, longitude: -99.14, address: 'Centro', references: null },
     rider: {
       first_name: 'Ana',
       photo_url: null,
