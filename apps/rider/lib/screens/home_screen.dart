@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:smooth_sheets/smooth_sheets.dart';
@@ -315,6 +317,11 @@ class _HomeScreenState extends State<HomeScreen> {
       plate: profile?.plate,
       motorcycleBrand: profile?.motorcycleBrand,
       motorcycleColor: profile?.motorcycleColor,
+      showOverlaySetting: !kIsWeb && Platform.isAndroid,
+      overlayEnabled: widget.controller.overlayEnabled,
+      onOverlayEnabledChanged: (value) {
+        unawaited(widget.controller.setOverlayEnabled(value));
+      },
       onOpenAccount: () {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
