@@ -108,6 +108,7 @@ def _order_service(
     uow: SqlAlchemyUnitOfWork = Depends(get_uow),
     partnership: DeliveryPartnershipService = Depends(_partnership_service),
     delivery_quotes: PublicDeliveryQuoteService = Depends(_public_delivery_quote_service),
+    dispatch: RestaurantDispatchService = Depends(_restaurant_dispatch_service),
 ) -> OrderService:
     return OrderService(
         uow.orders,
@@ -118,6 +119,7 @@ def _order_service(
         CouponService(uow.coupons),
         partnership=partnership,
         delivery_quotes=delivery_quotes,
+        dispatch=dispatch,
         inventory_changed=lambda restaurant_id: invalidate_restaurant_menu_cache(
             uow, restaurant_id
         ),

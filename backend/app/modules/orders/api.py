@@ -7,7 +7,10 @@ from app.api.cache_helpers import invalidate_restaurant_menu_cache
 from app.api.deps import pagination_params, require_owned_restaurant
 from app.core.pagination import CursorPage, PaginationParams
 from app.db.uow import SqlAlchemyUnitOfWork, get_uow
+from app.infra.storage.factory import build_storage
 from app.modules.coupons.service import CouponService
+from app.modules.delivery_dispatch.service import RestaurantDispatchService
+from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
 from app.modules.orders.schemas import (
     KitchenBoardClearResult,
     OrderBulkStatusResult,
@@ -30,6 +33,12 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> OrderService:
         uow.idempotency,
         uow.promotions,
         CouponService(uow.coupons),
+        dispatch=RestaurantDispatchService(
+            uow.session,
+            SqlAlchemyDeliveryProviderRepository(uow.session),
+            build_storage(),
+            uow.idempotency,
+        ),
         inventory_changed=lambda restaurant_id: invalidate_restaurant_menu_cache(
             uow, restaurant_id
         ),

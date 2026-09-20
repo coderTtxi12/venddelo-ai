@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import uuid
 from collections.abc import Callable
 from datetime import UTC, date, datetime
@@ -11,18 +12,21 @@ from app.core.exceptions import ConflictError, CouponValidationError, NotFoundEr
 from app.core.idempotency import IdempotencyRepository
 from app.core.pagination import CursorPage, PaginationParams
 from app.infra.realtime.order_hub import get_order_realtime_hub
+from app.modules.coupons.pricing import CouponApplyResult, apply_coupon, normalize_coupon_code
+from app.modules.coupons.service import CouponService
+from app.modules.delivery_dispatch.service import RestaurantDispatchService
 from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
 from app.modules.menu.repository import MenuRepository
-from app.modules.orders.coupons import should_redeem_coupon_on_transition
-from app.modules.orders.delivery_fee import (
-    customer_payable_delivery_cents,
-    resolve_delivery_waiver_cents,
-)
 from app.modules.orders.constants import (
     ARCHIVE_ORDER_STATUSES,
     KITCHEN_BULK_STATUS_LIMIT,
     KITCHEN_ORDER_BOARDS,
     KITCHEN_ORDER_VIEWS,
+)
+from app.modules.orders.coupons import should_redeem_coupon_on_transition
+from app.modules.orders.delivery_fee import (
+    customer_payable_delivery_cents,
+    resolve_delivery_waiver_cents,
 )
 from app.modules.orders.inventory import (
     quantities_to_consume,
@@ -38,8 +42,6 @@ from app.modules.orders.schemas import (
     OrderStatusSummaryDTO,
     PublicOrderInput,
 )
-from app.modules.coupons.pricing import CouponApplyResult, apply_coupon, normalize_coupon_code
-from app.modules.coupons.service import CouponService
 from app.modules.promotions.effective import is_promotion_effective, resolve_timezone
 from app.modules.promotions.pricing import (
     CATALOG_DISCOUNT_PREFIX,
@@ -56,6 +58,8 @@ from app.modules.public.checkout_payments import is_public_payment_method_enable
 from app.modules.public.delivery_quote_service import PublicDeliveryQuoteService
 from app.modules.restaurants.repository import RestaurantRepository
 from app.modules.restaurants.schemas import RestaurantDTO
+
+logger = logging.getLogger(__name__)
 
 _BLOCKED_PUBLIC_ORDER_STATUSES = frozenset({"suspended"})
 _ALLOWED_ORDER_TYPES = {"takeout", "delivery"}
@@ -225,6 +229,7 @@ class OrderService:
         *,
         partnership: DeliveryPartnershipService | None = None,
         delivery_quotes: PublicDeliveryQuoteService | None = None,
+        dispatch: RestaurantDispatchService | None = None,
         inventory_changed: Callable[[uuid.UUID], None] | None = None,
         idempotency_ttl_seconds: int | None = None,
     ) -> None:
@@ -236,6 +241,7 @@ class OrderService:
         self._coupons = coupons
         self._partnership = partnership
         self._delivery_quotes = delivery_quotes
+        self._dispatch = dispatch
         self._inventory_changed = inventory_changed
         self._idempotency_ttl = (
             idempotency_ttl_seconds or get_settings().order_idempotency_ttl_seconds
@@ -373,6 +379,8 @@ class OrderService:
         )
         if dto is None:
             raise NotFoundError("Order not found")
+        if status == "cancelled":
+            self._cancel_accepted_tracking(restaurant_id, order_id)
         dto = self._enrich_coupon_stock(dto)
         self._publish_order_event(restaurant_id, "order.updated", dto)
         return dto
@@ -706,6 +714,12 @@ class OrderService:
             )
         )
 
+        self._attach_live_menu_tracking(restaurant, order)
+        refreshed = self._orders.get(order.id)
+        if refreshed is not None:
+            order = refreshed
+        order = self._enrich_coupon_stock(order)
+
         if idempotency_key:
             self._idempotency.put(
                 idempotency_key,
@@ -713,5 +727,29 @@ class OrderService:
                 order.model_dump(mode="json"),
                 self._idempotency_ttl,
             )
-        self._publish_order_event(restaurant.id, "order.created", self._enrich_coupon_stock(order))
-        return self._enrich_coupon_stock(order)
+        self._publish_order_event(restaurant.id, "order.created", order)
+        return order
+
+    def _attach_live_menu_tracking(self, restaurant: RestaurantDTO, order: OrderDTO) -> None:
+        if self._dispatch is None or order.type != "delivery":
+            return
+        try:
+            self._dispatch.create_accepted_for_order(restaurant, order)
+        except Exception:
+            logger.exception(
+                "live menu tracking dispatch failed order_id=%s restaurant_id=%s",
+                order.id,
+                restaurant.id,
+            )
+
+    def _cancel_accepted_tracking(self, restaurant_id: uuid.UUID, order_id: uuid.UUID) -> None:
+        if self._dispatch is None:
+            return
+        try:
+            self._dispatch.cancel_accepted_for_order(restaurant_id, order_id)
+        except Exception:
+            logger.exception(
+                "cancel accepted tracking failed order_id=%s restaurant_id=%s",
+                order_id,
+                restaurant_id,
+            )
