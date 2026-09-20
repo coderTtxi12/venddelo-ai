@@ -691,7 +691,7 @@ class DeliveryDispatchRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ),
         CheckConstraint(
             "status IN ("
-            "'scheduled','searching','offered','assigned','picked_up',"
+            "'accepted','scheduled','searching','offered','assigned','picked_up',"
             "'in_transit','delivered','unassigned','cancelled'"
             ")",
             name="status_allowed",
