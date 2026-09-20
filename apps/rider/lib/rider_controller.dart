@@ -111,6 +111,9 @@ class RiderController extends ChangeNotifier {
       }
       loading = false;
       notifyListeners();
+      if (!notRegistered && profile != null && profile?.mustUpdate != true) {
+        unawaited(promptOverlayPermissionOnce());
+      }
     }
   }
 
@@ -620,7 +623,6 @@ class RiderController extends ChangeNotifier {
     overlayEnabled = value;
     if (value) {
       _dismissedOverlaySignature = null;
-      _askedOverlayPermission = false;
     }
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
@@ -631,8 +633,36 @@ class RiderController extends ChangeNotifier {
         await _overlay.requestPermission();
       }
       _askedOverlayPermission = true;
+      await prefs.setBool(jobOverlayAskedPrefKey, true);
     }
     await syncJobOverlay();
+  }
+
+  Future<void> promptOverlayPermissionOnce() async {
+    if (!_overlay.isSupported || !overlayEnabled) {
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final alreadyAsked =
+        _askedOverlayPermission ||
+        jobOverlayPermissionAskedFromStored(
+          prefs.getBool(jobOverlayAskedPrefKey),
+        );
+    final granted = await _overlay.hasPermission();
+    if (!shouldPromptOverlayPermission(
+      enabledInSettings: overlayEnabled,
+      alreadyAsked: alreadyAsked,
+      alreadyGranted: granted,
+    )) {
+      if (granted || alreadyAsked) {
+        _askedOverlayPermission = true;
+        await prefs.setBool(jobOverlayAskedPrefKey, true);
+      }
+      return;
+    }
+    _askedOverlayPermission = true;
+    await prefs.setBool(jobOverlayAskedPrefKey, true);
+    await _overlay.requestPermission();
   }
 
   Future<void> syncJobOverlay() async {
@@ -648,16 +678,6 @@ class RiderController extends ChangeNotifier {
       dismissedSignature: _dismissedOverlaySignature,
       currentSignature: signature,
     );
-    if (overlayEnabled &&
-        jobs.isNotEmpty &&
-        lifecycleState == AppLifecycleState.resumed &&
-        !_askedOverlayPermission) {
-      final granted = await _overlay.hasPermission();
-      if (!granted) {
-        _askedOverlayPermission = true;
-        await _overlay.requestPermission();
-      }
-    }
     final hasPermission = await _overlay.hasPermission();
     final show = shouldShowJobOverlay(
       JobOverlayDecision(

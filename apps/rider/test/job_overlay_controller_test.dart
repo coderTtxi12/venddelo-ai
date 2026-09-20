@@ -87,7 +87,7 @@ void main() {
     controller.dispose();
   });
 
-  test('asks overlay permission once while an active job is in the app', () async {
+  test('does not ask overlay permission when a new job starts', () async {
     final overlay = _FakeOverlay()..permission = false;
     final controller = RiderController(overlayPlatform: overlay)
       ..profile = _profileWithJob()
@@ -96,8 +96,35 @@ void main() {
     await controller.syncJobOverlay();
     await controller.syncJobOverlay();
 
-    expect(overlay.requestCount, 1);
+    expect(overlay.requestCount, 0);
     expect(overlay.showCount, 0);
+    controller.dispose();
+  });
+
+  test('asks overlay permission once at login, even without a job', () async {
+    final overlay = _FakeOverlay()..permission = false;
+    final controller = RiderController(overlayPlatform: overlay);
+
+    await controller.promptOverlayPermissionOnce();
+    await controller.promptOverlayPermissionOnce();
+    controller.profile = _profileWithJob();
+    await controller.syncJobOverlay();
+
+    expect(overlay.requestCount, 1);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('job_overlay_permission_asked'), isTrue);
+    controller.dispose();
+  });
+
+  test('does not ask overlay permission again after a later login', () async {
+    SharedPreferences.setMockInitialValues({
+      'job_overlay_permission_asked': true,
+    });
+    final overlay = _FakeOverlay()..permission = false;
+    final controller = RiderController(overlayPlatform: overlay);
+    await controller.promptOverlayPermissionOnce();
+
+    expect(overlay.requestCount, 0);
     controller.dispose();
   });
 
