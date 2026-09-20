@@ -6,6 +6,7 @@ import { fetchRoadRoute, fetchStableRoadPath } from '@/lib/dispatch/fetchRoadRou
 import { publicTrackingRouteCaption } from '@/lib/dispatch/publicTrackingCopy';
 import { remainingPathFrom } from '@/lib/dispatch/remainingRoadPath';
 import { getGoogleMapsMapId, loadGoogleMaps } from '@/lib/loadGoogleMapsPlaces';
+import { observeOnceVisible } from '@/lib/maps/observeOnceVisible';
 import styles from './PublicTrackingMap.module.css';
 
 type PublicTrackingMapProps = {
@@ -13,6 +14,7 @@ type PublicTrackingMapProps = {
 };
 
 const PENDING_STATUSES = new Set<DispatchStatus>([
+  'accepted',
   'scheduled',
   'searching',
   'offered',
@@ -85,6 +87,7 @@ function fitBounds(map: google.maps.Map, points: google.maps.LatLngLiteral[], pa
 }
 
 export function PublicTrackingMap({ tracking }: PublicTrackingMapProps) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
@@ -92,13 +95,21 @@ export function PublicTrackingMap({ tracking }: PublicTrackingMapProps) {
   const lastFitKeyRef = useRef<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [mapInView, setMapInView] = useState(false);
 
   const riderLat = tracking.rider?.latitude ?? null;
   const riderLng = tracking.rider?.longitude ?? null;
   const hasLiveRider = riderLat != null && riderLng != null;
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (mapInView) return;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    return observeOnceVisible(wrap, () => setMapInView(true));
+  }, [mapInView]);
+
+  useEffect(() => {
+    if (!mapInView || !mapRef.current) return;
     let cancelled = false;
 
     void loadGoogleMaps()
@@ -130,7 +141,7 @@ export function PublicTrackingMap({ tracking }: PublicTrackingMapProps) {
     return () => {
       cancelled = true;
     };
-  }, [tracking.dropoff.latitude, tracking.dropoff.longitude]);
+  }, [mapInView, tracking.dropoff.latitude, tracking.dropoff.longitude]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -295,7 +306,11 @@ export function PublicTrackingMap({ tracking }: PublicTrackingMapProps) {
   }
 
   return (
-    <div className={styles.wrap}>
+    <div
+      ref={wrapRef}
+      className={styles.wrap}
+      aria-busy={mapInView && !mapReady}
+    >
       <div ref={mapRef} className={styles.map} aria-label="Mapa de rastreo en vivo" />
       <div className={styles.meta}>
         <p className={styles.caption}>{publicTrackingRouteCaption(tracking.status, hasLiveRider)}</p>
