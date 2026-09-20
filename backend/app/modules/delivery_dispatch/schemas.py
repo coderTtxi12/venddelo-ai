@@ -291,6 +291,7 @@ class TrackingDropoffDTO(BaseModel):
     latitude: float
     longitude: float
     address: str
+    references: str | None = None
 
 
 class TrackingPickupDTO(BaseModel):

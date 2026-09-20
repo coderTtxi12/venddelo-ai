@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.core.storage import StorageError, StoragePort
 from app.db.models.delivery import DeliveryDispatchRequest, DeliveryDriver
 from app.db.models.restaurant import Restaurant
+from app.modules.customers.grouping import split_delivery_address
 from app.modules.delivery_dispatch.geo import geodesic_meters
 from app.modules.delivery_dispatch.schemas import (
     PublicDispatchTrackingDTO,
@@ -13,6 +14,18 @@ from app.modules.delivery_dispatch.schemas import (
 
 LIVE_TRACKING_STATUSES = frozenset({"assigned", "picked_up", "in_transit"})
 ETA_SPEED_MPS = 8
+
+
+def tracking_dropoff_display(
+    dropoff_address: str,
+    *,
+    order_delivery_address: str | None = None,
+) -> tuple[str, str | None]:
+    address, references = split_delivery_address(dropoff_address)
+    if not references and order_delivery_address:
+        _, references = split_delivery_address(order_delivery_address)
+    cleaned = address.strip() or dropoff_address.strip()
+    return cleaned, references.strip() or None
 
 
 def public_plate_suffix(plate: str) -> str:
@@ -74,6 +87,7 @@ def build_public_tracking_dto(
     driver: DeliveryDriver | None,
     restaurant: Restaurant | None,
     storage: StoragePort,
+    order_delivery_address: str | None = None,
 ) -> PublicDispatchTrackingDTO:
     pickup = None
     if (
@@ -91,6 +105,10 @@ def build_public_tracking_dto(
 
     show_collect = row.payment_method in {"cash", "card_terminal"}
     customer_total_cents = row.collect_cents + max(0, row.quoted_fee_cents)
+    dropoff_address, dropoff_references = tracking_dropoff_display(
+        row.dropoff_address,
+        order_delivery_address=order_delivery_address,
+    )
     return PublicDispatchTrackingDTO(
         status=row.status,
         short_id=row.short_id,
@@ -100,7 +118,8 @@ def build_public_tracking_dto(
         dropoff=TrackingDropoffDTO(
             latitude=row.dropoff_lat,
             longitude=row.dropoff_lng,
-            address=row.dropoff_address,
+            address=dropoff_address,
+            references=dropoff_references,
         ),
         rider=rider,
         eta_seconds=tracking_eta_seconds(
