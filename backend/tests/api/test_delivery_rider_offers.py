@@ -143,7 +143,7 @@ def _setup_ready_rider(client, engine) -> tuple[str, str]:
     assert me.status_code == 200, me.text
     online = client.patch(
         "/api/v1/rider/me/online",
-        json={"is_online": True, "app_version": "1.0.1", "app_build_number": 2},
+        json={"is_online": True, "app_version": "1.0.2", "app_build_number": 4},
         headers=AUTH,
     )
     assert online.status_code == 200, online.text
@@ -152,8 +152,8 @@ def _setup_ready_rider(client, engine) -> tuple[str, str]:
         json={
             "latitude": COVERED_LAT,
             "longitude": COVERED_LNG,
-            "app_version": "1.0.1",
-            "app_build_number": 2,
+            "app_version": "1.0.2",
+            "app_build_number": 4,
         },
         headers=AUTH,
     )
@@ -263,8 +263,8 @@ def _setup_ready_fleet(
             driver.last_lat = COVERED_LAT
             driver.last_lng = COVERED_LNG
             driver.location_updated_at = now
-            driver.app_version = "1.0.1"
-            driver.app_build_number = 2
+            driver.app_version = "1.0.2"
+            driver.app_build_number = 4
         session.commit()
     return restaurant_id, driver_ids
 

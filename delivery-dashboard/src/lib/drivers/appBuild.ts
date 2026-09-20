@@ -1,5 +1,5 @@
-/** Keep in sync with backend `RIDER_MIN_APP_BUILD` (default 3). */
-export const RIDER_MIN_APP_BUILD = 3;
+/** Keep in sync with backend `RIDER_MIN_APP_BUILD` (default 4). */
+export const RIDER_MIN_APP_BUILD = 4;
 
 export function isCurrentRiderApp(buildNumber: number | null | undefined): boolean {
   return buildNumber != null && buildNumber >= RIDER_MIN_APP_BUILD;

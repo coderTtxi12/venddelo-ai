@@ -7,11 +7,11 @@ void main() {
   test('riderClientFields reports current APK build', () {
     expect(riderClientFields(), {
       'app_version': '1.0.2',
-      'app_build_number': 3,
+      'app_build_number': 4,
     });
     expect(
       riderLocationBody(latitude: 19.43, longitude: -99.13),
-      containsPair('app_build_number', 3),
+      containsPair('app_build_number', 4),
     );
     expect(riderOnlineBody(isOnline: true)['app_version'], '1.0.2');
   });
