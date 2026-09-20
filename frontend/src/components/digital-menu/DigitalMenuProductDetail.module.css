@@ -828,6 +828,20 @@
   box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
 }
 
+.detailFooterPinned {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  z-index: 40;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+}
+
+.detailRootPinnedFooter {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+}
+
 .addValidationBanner {
   display: flex;
   align-items: flex-start;
@@ -1267,6 +1281,10 @@
 /* Tablet band (768–1023px): full-width product detail, mobile layout branch */
 .detailRoot.publicTablet {
   padding-bottom: 88px;
+}
+
+.detailRoot.publicTablet.detailRootPinnedFooter {
+  padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
 }
 
 .detailRoot.publicTablet .productHeroWrap,

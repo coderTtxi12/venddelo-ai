@@ -379,7 +379,9 @@ export function DigitalMenuProductDetail({
 
   const detailContent = (
     <>
-      <div className={`${styles.detailRoot} ${isTabletLayout ? menuStyles.publicTablet : ''}`}>
+      <div className={`${styles.detailRoot} ${isTabletLayout ? menuStyles.publicTablet : ''} ${
+        useDocumentScroll ? styles.detailRootPinnedFooter : ''
+      }`}>
         <section className={styles.productHero} aria-label={product.name}>
           <div className={styles.productHeroWrap}>
             {imageUrl ? (
@@ -826,7 +828,9 @@ export function DigitalMenuProductDetail({
       </div>
 
       <footer
-        className={`${styles.detailFooter} ${isTabletLayout ? menuStyles.publicTablet : ''}`}
+        className={`${styles.detailFooter} ${isTabletLayout ? menuStyles.publicTablet : ''} ${
+          useDocumentScroll ? styles.detailFooterPinned : ''
+        }`}
       >
         {showSelectionValidation && selectionValidationMessage ? (
           <div
