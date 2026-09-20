@@ -249,6 +249,7 @@ _IN_PROGRESS_STATUSES = frozenset(
         "confirmed",
         "preparing",
         "ready",
+        "accepted",
         "scheduled",
         "searching",
         "offered",

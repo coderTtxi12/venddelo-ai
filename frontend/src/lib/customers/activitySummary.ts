@@ -26,6 +26,7 @@ const IN_PROGRESS_STATUSES = new Set([
   'confirmed',
   'preparing',
   'ready',
+  'accepted',
   'scheduled',
   'searching',
   'offered',

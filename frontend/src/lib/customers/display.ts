@@ -52,6 +52,7 @@ export const CUSTOMER_RECENCY_LABELS: Record<CustomerRecencyFilter, string> = {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const DISPATCH_STATUS_LABELS: Record<string, string> = {
+  accepted: 'Aceptado',
   scheduled: 'Cocinando',
   searching: 'Buscando repartidor',
   offered: 'Oferta enviada',
