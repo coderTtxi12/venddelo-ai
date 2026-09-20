@@ -27,7 +27,10 @@ import {
 } from '@/lib/dispatch/usePublicTrackingRealtime';
 import {
   PUBLIC_TRACKING_CONNECTING_TIMEOUT_MS,
+  PUBLIC_TRACKING_STALE_GRACE_MS,
   publicTrackingConnectionBar,
+  publicTrackingConnectionIsStale,
+  publicTrackingConnectionSignalsForDisplay,
   publicTrackingMapPendingCopy,
   publicTrackingShowsLiveMap,
   publicTrackingStatusCopy,
@@ -235,10 +238,9 @@ export function PublicTracking({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [socketStatus, setSocketStatus] = useState<PublicTrackingRealtimeStatus>('connecting');
-  const [isOnline, setIsOnline] = useState(
-    () => typeof navigator === 'undefined' || navigator.onLine,
-  );
+  const [isOnline, setIsOnline] = useState(true);
   const [connectingTimedOut, setConnectingTimedOut] = useState(false);
+  const [staleReady, setStaleReady] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -312,13 +314,32 @@ export function PublicTracking({ token }: { token: string }) {
     return () => window.clearTimeout(timeout);
   }, [isOnline, showLive, socketStatus]);
 
-  const connection = publicTrackingConnectionBar({
+  const connectionSignals = {
     socketStatus,
     isOnline,
     fetchFailed: error === 'load_failed',
     connectingTimedOut,
     notFound: error === 'not_found',
-  });
+  };
+  const confirmedErrorPage = Boolean(error && !tracking);
+  const staleCandidate = publicTrackingConnectionIsStale(connectionSignals);
+
+  useEffect(() => {
+    if (confirmedErrorPage || !staleCandidate) {
+      setStaleReady(confirmedErrorPage);
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setStaleReady(true);
+    }, PUBLIC_TRACKING_STALE_GRACE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [confirmedErrorPage, staleCandidate]);
+
+  const connection = publicTrackingConnectionBar(
+    confirmedErrorPage
+      ? connectionSignals
+      : publicTrackingConnectionSignalsForDisplay(connectionSignals, staleReady),
+  );
   const showConnectionBar = showLive || connection.tone === 'stale';
 
   if (error && !tracking) {
