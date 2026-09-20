@@ -153,7 +153,8 @@ object OfferAlarm {
         )
         val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(context, HEADS_CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_mexy_notification)
+                .setColor(context.getColor(R.color.mexy_notification))
                 .setContentTitle(title)
                 .setContentText(body)
                 .setContentIntent(launch)
@@ -165,7 +166,8 @@ object OfferAlarm {
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(context)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_mexy_notification)
+                .setColor(context.getColor(R.color.mexy_notification))
                 .setContentTitle(title)
                 .setContentText(body)
                 .setContentIntent(launch)
