@@ -45,6 +45,7 @@ export function splitDropoffAddress(raw: string | null | undefined): {
 
 export function requestStatusLabel(status: string): string {
   const labels: Record<string, string> = {
+    accepted: 'Aceptado',
     scheduled: 'Programado',
     searching: 'Buscando',
     offered: 'Ofertado',
