@@ -38,18 +38,17 @@ from app.db.models.orders import Order
 from app.db.models.restaurant import Restaurant
 from app.infra.storage.factory import build_storage
 from app.modules.assistant.image_webp import WEBP_CONTENT_TYPE, convert_image_bytes_to_webp
-from app.modules.orders.delivery_fee import provider_quoted_fee_cents
-from app.modules.delivery_dispatch.create_idempotency import (
-    dispatch_idempotency_storage_key,
-    hash_dispatch_create,
-    normalize_idempotency_key,
-)
 from app.modules.delivery_dispatch.app_client import (
     force_update_payload,
     must_update_app,
     provider_rider_apk_url,
 )
 from app.modules.delivery_dispatch.assignment_log import list_assignment_events
+from app.modules.delivery_dispatch.create_idempotency import (
+    dispatch_idempotency_storage_key,
+    hash_dispatch_create,
+    normalize_idempotency_key,
+)
 from app.modules.delivery_dispatch.credit import (
     HOLD_MEXY_FEE,
     HOLD_RESTAURANT_CASH,
@@ -58,7 +57,6 @@ from app.modules.delivery_dispatch.credit import (
 )
 from app.modules.delivery_dispatch.geo import geodesic_meters
 from app.modules.delivery_dispatch.history import list_active_holds, list_dispatch_history
-from app.modules.delivery_dispatch.stats import list_dispatch_stats
 from app.modules.delivery_dispatch.itinerary import (
     ItineraryStop,
     complete_stop,
@@ -97,13 +95,13 @@ from app.modules.delivery_dispatch.schemas import (
     DispatchRequestCreate,
     DispatchRequestDTO,
     DispatchRetryDTO,
+    DispatchStatsDTO,
     DriverItineraryStopDTO,
     ItineraryUpdate,
     ManualOfferCreate,
     ManualOfferDTO,
     MexyFeeHoldDTO,
     ProviderHistoryPageDTO,
-    DispatchStatsDTO,
     PublicDispatchTrackingDTO,
     RiderAssignmentDTO,
     RiderHistoryPageDTO,
@@ -115,6 +113,7 @@ from app.modules.delivery_dispatch.schemas import (
 )
 from app.modules.delivery_dispatch.search_at import compute_search_at
 from app.modules.delivery_dispatch.short_id import claim_dispatch_short_id
+from app.modules.delivery_dispatch.stats import list_dispatch_stats
 from app.modules.delivery_dispatch.tasks import (
     close_offered_offers,
     enqueue,
@@ -135,7 +134,9 @@ from app.modules.delivery_providers.permissions import (
     require_write_provider_config,
 )
 from app.modules.delivery_providers.repository import DeliveryProviderRepository
+from app.modules.orders.delivery_fee import provider_quoted_fee_cents
 from app.modules.orders.display_id import order_display_id
+from app.modules.orders.schemas import OrderDTO
 from app.modules.public.delivery_quote_service import (
     MEXY_ON_HOLD_REASON,
     PublicDeliveryQuoteService,
@@ -146,6 +147,8 @@ from app.modules.users.schemas import UserDTO
 _ALLOWED_DOCUMENT_TYPES = frozenset({"image/jpeg", "image/png", "image/webp", "application/pdf"})
 _MAX_DOCUMENT_BYTES = 8 * 1024 * 1024
 _DATA_URL_RE = re.compile(r"^data:([^;]+);base64,(.+)$", re.DOTALL)
+_ACCEPTED_STUB_PREP_MINUTES = 30
+_ORDER_REFERENCES_MARKER = "\nReferencias:"
 
 
 def claim_drivers(session: Session, user_id: uuid.UUID, email: str) -> None:
@@ -1093,35 +1096,29 @@ class RestaurantDispatchService:
         if source_order is not None:
             existing = self._existing_order_dispatch(restaurant.id, source_order.id)
             if existing is not None:
+                if existing.status == "accepted":
+                    return self._activate_accepted_dispatch(
+                        restaurant,
+                        existing,
+                        data,
+                        latitude=latitude,
+                        longitude=longitude,
+                        lead_time=lead_time,
+                        storage_key=storage_key,
+                        request_hash=request_hash,
+                    )
                 return self._store_dispatch_idempotency(
                     storage_key,
                     request_hash,
                     self._to_dto(existing),
                 )
 
-        lock_quoted_fee = source_order is not None and _same_dropoff_coords(
+        quoted_fee_cents, mexy_fee_cents = self._quote_dispatch_fees(
+            restaurant,
             source_order,
             latitude,
             longitude,
         )
-        quote = self._quotes.quote_delivery(
-            restaurant,
-            delivery_latitude=latitude,
-            delivery_longitude=longitude,
-        )
-        if lock_quoted_fee:
-            assert source_order is not None
-            quoted_fee_cents = provider_quoted_fee_cents(
-                source_order.delivery_fee_cents,
-                source_order.coupon_waived_delivery_cents or 0,
-            )
-            mexy_fee_cents = quote.mexy_fee_cents if quote.available else 0
-        else:
-            if not quote.available:
-                raise ValidationError(quote.reason or "El servicio de reparto no está disponible.")
-            quoted_fee_cents = quote.delivery_fee_cents
-            mexy_fee_cents = quote.mexy_fee_cents
-
         now = datetime.now(UTC)
         ready_at = now + timedelta(minutes=data.prep_minutes)
         search_at = compute_search_at(
@@ -1180,6 +1177,183 @@ class RestaurantDispatchService:
             request_hash,
             self._to_dto(row),
         )
+
+    def create_accepted_for_order(
+        self,
+        restaurant: RestaurantDTO,
+        order: OrderDTO,
+    ) -> DispatchRequestDTO | None:
+        if order.type != "delivery":
+            return None
+        if order.delivery_latitude is None or order.delivery_longitude is None:
+            return None
+        dropoff_address = _order_dropoff_address(order.delivery_address)
+        if not dropoff_address:
+            return None
+        existing = self._existing_order_dispatch(restaurant.id, order.id)
+        if existing is not None:
+            return self._to_dto(existing)
+        try:
+            partnership = self._active_partnership(restaurant.id)
+        except ForbiddenError:
+            return None
+        try:
+            self._validate_payment(
+                order.payment_method,
+                order.total_cents,
+                order.cash_denomination_cents,
+            )
+        except ValidationError:
+            return None
+
+        latitude = order.delivery_latitude
+        longitude = order.delivery_longitude
+        quote = self._quotes.quote_delivery(
+            restaurant,
+            delivery_latitude=latitude,
+            delivery_longitude=longitude,
+        )
+        quoted_fee_cents = provider_quoted_fee_cents(
+            order.delivery_fee_cents,
+            order.coupon_waived_delivery_cents or 0,
+        )
+        mexy_fee_cents = quote.mexy_fee_cents if quote.available else 0
+        now = datetime.now(UTC)
+        ready_at = now + timedelta(minutes=_ACCEPTED_STUB_PREP_MINUTES)
+        row = DeliveryDispatchRequest(
+            restaurant_id=restaurant.id,
+            order_id=order.id,
+            delivery_provider_id=partnership.delivery_provider_id,
+            zone_id=partnership.zone_id,
+            customer_name=order.customer_name.strip(),
+            customer_phone=order.customer_phone.strip(),
+            dropoff_lat=latitude,
+            dropoff_lng=longitude,
+            dropoff_address=dropoff_address,
+            dropoff_maps_url=None,
+            payment_method=order.payment_method,
+            collect_cents=order.total_cents,
+            cash_denomination_cents=order.cash_denomination_cents,
+            package_size="normal",
+            package_count=1,
+            ready_at=ready_at,
+            search_at=ready_at,
+            next_attempt_at=ready_at,
+            quoted_fee_cents=quoted_fee_cents,
+            mexy_fee_cents=mexy_fee_cents,
+            status="accepted",
+            assigned_driver_id=None,
+            tracking_token=secrets.token_hex(24),
+            short_id=claim_dispatch_short_id(
+                self._session,
+                order_display_id(order_id=order.id, note=order.note),
+            ),
+            notes=None,
+            decision_json=None,
+            cancelled_at=None,
+            cycle_rejected_driver_ids=[],
+            cycle_silent_driver_ids=[],
+        )
+        self._session.add(row)
+        return self._flush_request(row)
+
+    def cancel_accepted_for_order(
+        self,
+        restaurant_id: uuid.UUID,
+        order_id: uuid.UUID,
+    ) -> None:
+        row = self._existing_order_dispatch(restaurant_id, order_id)
+        if row is None or row.status != "accepted":
+            return
+        now = datetime.now(UTC)
+        row.status = "cancelled"
+        row.cancelled_at = now
+        self._flush_request(row)
+
+    def _activate_accepted_dispatch(
+        self,
+        restaurant: RestaurantDTO,
+        row: DeliveryDispatchRequest,
+        data: DispatchRequestCreate,
+        *,
+        latitude: float,
+        longitude: float,
+        lead_time: DeliverySearchLeadTime,
+        storage_key: str | None,
+        request_hash: str,
+    ) -> DispatchRequestDTO:
+        source_order = self._session.get(Order, row.order_id) if row.order_id is not None else None
+        quoted_fee_cents, mexy_fee_cents = self._quote_dispatch_fees(
+            restaurant,
+            source_order,
+            latitude,
+            longitude,
+        )
+        now = datetime.now(UTC)
+        ready_at = now + timedelta(minutes=data.prep_minutes)
+        search_at = compute_search_at(
+            now,
+            ready_at,
+            lead_time.search_ahead_minutes,
+        )
+        row.customer_name = data.customer_name.strip()
+        row.customer_phone = data.customer_phone.strip()
+        row.dropoff_lat = latitude
+        row.dropoff_lng = longitude
+        row.dropoff_address = data.dropoff_address.strip()
+        row.dropoff_maps_url = data.dropoff_maps_url
+        row.payment_method = data.payment_method
+        row.collect_cents = data.collect_cents
+        row.cash_denomination_cents = data.cash_denomination_cents
+        row.package_size = data.package_size
+        row.package_count = data.package_count
+        row.ready_at = ready_at
+        row.search_at = search_at
+        row.next_attempt_at = search_at
+        row.quoted_fee_cents = quoted_fee_cents
+        row.mexy_fee_cents = mexy_fee_cents
+        row.status = "searching" if search_at <= now else "scheduled"
+        row.notes = data.notes.strip() if data.notes else None
+        enqueue(
+            "search",
+            search_at,
+            {"kind": "search", "request_id": str(row.id)},
+            session=self._session,
+        )
+        return self._store_dispatch_idempotency(
+            storage_key,
+            request_hash,
+            self._flush_request(row),
+        )
+
+    def _quote_dispatch_fees(
+        self,
+        restaurant: RestaurantDTO,
+        source_order: Order | None,
+        latitude: float,
+        longitude: float,
+    ) -> tuple[int, int]:
+        lock_quoted_fee = source_order is not None and _same_dropoff_coords(
+            source_order,
+            latitude,
+            longitude,
+        )
+        quote = self._quotes.quote_delivery(
+            restaurant,
+            delivery_latitude=latitude,
+            delivery_longitude=longitude,
+        )
+        if lock_quoted_fee:
+            assert source_order is not None
+            quoted_fee_cents = provider_quoted_fee_cents(
+                source_order.delivery_fee_cents,
+                source_order.coupon_waived_delivery_cents or 0,
+            )
+            mexy_fee_cents = quote.mexy_fee_cents if quote.available else 0
+            return quoted_fee_cents, mexy_fee_cents
+        if not quote.available:
+            raise ValidationError(quote.reason or "El servicio de reparto no está disponible.")
+        return quote.delivery_fee_cents, quote.mexy_fee_cents
 
     def list(
         self,
@@ -1326,11 +1500,13 @@ class RestaurantDispatchService:
         if row is None:
             raise NotFoundError("Solicitud de delivery no encontrada")
         restaurant = self._session.get(Restaurant, row.restaurant_id)
+        order = self._session.get(Order, row.order_id) if row.order_id is not None else None
         return build_public_tracking_dto(
             row,
             driver=row.assigned_driver,
             restaurant=restaurant,
             storage=self._storage or build_storage(),
+            order_delivery_address=order.delivery_address if order is not None else None,
         )
 
     def _store_dispatch_idempotency(
@@ -1516,6 +1692,14 @@ class RestaurantDispatchService:
 _DROPOFF_COORD_EPS = 1e-5
 
 
+def _order_dropoff_address(address: str | None) -> str:
+    text = (address or "").strip()
+    marker = text.find(_ORDER_REFERENCES_MARKER)
+    if marker != -1:
+        text = text[:marker].strip()
+    return text[:500]
+
+
 def _same_dropoff_coords(order: Order, latitude: float, longitude: float) -> bool:
     if order.delivery_latitude is None or order.delivery_longitude is None:
         return False
@@ -1638,7 +1822,7 @@ class RiderDispatchService:
         app_version: str | None = None,
         app_build_number: int | None = None,
     ) -> None:
-        """Persist GPS only — rider app ignores the body; keep this cheap for 15s pings."""
+        """Persist GPS only — rider app ignores the body; keep this cheap for 5s pings."""
         driver = self._require_driver(user)
         driver.last_lat = latitude
         driver.last_lng = longitude

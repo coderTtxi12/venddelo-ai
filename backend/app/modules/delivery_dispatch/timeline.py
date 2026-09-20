@@ -143,6 +143,7 @@ def build_operation_timeline(
 
 
 _STATUS_CURRENT_KIND = {
+    "accepted": "requested",
     "scheduled": "requested",
     "searching": "search_started",
     "assigned": "accepted",
