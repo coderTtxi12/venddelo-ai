@@ -751,3 +751,89 @@ def test_create_dispatch_rejects_reused_idempotency_key_with_new_payload(client,
     assert first.status_code == 201, first.text
     assert conflict.status_code == 409
     assert "Idempotency" in conflict.json()["error"]["message"]
+
+
+@requires_db
+def test_public_live_menu_order_creates_accepted_tracking_reused_on_dispatch(client, engine):
+    from app.db.uow import SqlAlchemyUnitOfWork
+    from app.modules.menu.schemas import CategoryCreate, ProductCreate
+    from app.modules.restaurants.schemas import PaymentMethodCreate
+
+    _create_mexy_provider(client)
+    restaurant_id = _create_restaurant(client, subdomain="dispatch-live-track")
+    _activate_partnership(client, engine, restaurant_id)
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    product_id: uuid.UUID
+    with SqlAlchemyUnitOfWork(factory) as uow:
+        restaurant = uow.restaurants.get(uuid.UUID(restaurant_id))
+        assert restaurant is not None
+        uow.restaurants.set_payment_methods(
+            restaurant.id,
+            [PaymentMethodCreate(method="cash", service_type="delivery")],
+        )
+        cat = uow.menu.add_category(CategoryCreate(restaurant_id=restaurant.id, name="Burgers"))
+        product = uow.menu.add_product(
+            ProductCreate(
+                restaurant_id=restaurant.id,
+                name="Burger",
+                price_cents=18000,
+                status="active",
+                category_ids=[cat.id],
+            )
+        )
+        product_id = product.id
+        uow.commit()
+
+    created = client.post(
+        "/api/v1/public/menu/dispatch-live-track/orders",
+        json={
+            "type": "delivery",
+            "customer_name": "María López",
+            "customer_phone": "+525512345678",
+            "payment_method": "cash",
+            "cash_denomination_cents": 50000,
+            "delivery_address": "Centro Histórico, CDMX",
+            "delivery_latitude": COVERED_LAT,
+            "delivery_longitude": COVERED_LNG,
+            "delivery_fee_cents": 7777,
+            "note": "Ref. pedido #TRK12 | sin cebolla",
+            "items": [{"product_id": str(product_id), "quantity": 1}],
+        },
+        headers={"Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    dispatch = body["dispatch"]
+    assert dispatch is not None
+    assert dispatch["status"] == "accepted"
+    assert dispatch["short_id"] == "TRK12"
+    tracking_token = dispatch["tracking_token"]
+    assert len(tracking_token) >= 48
+
+    tracking = client.get(f"/api/v1/public/dispatch-tracking/{tracking_token}")
+    assert tracking.status_code == 200, tracking.text
+    assert tracking.json()["status"] == "accepted"
+
+    activated = client.post(
+        "/api/v1/restaurants/me/dispatch-requests",
+        params={"restaurant_id": restaurant_id},
+        json=_dispatch_payload(order_id=body["id"]),
+        headers=AUTH,
+    )
+    assert activated.status_code == 201, activated.text
+    activated_body = activated.json()
+    assert activated_body["tracking_token"] == tracking_token
+    assert activated_body["short_id"] == "TRK12"
+    assert activated_body["status"] == "searching"
+
+    tracking_again = client.get(f"/api/v1/public/dispatch-tracking/{tracking_token}")
+    assert tracking_again.status_code == 200
+    assert tracking_again.json()["status"] == "searching"
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        rows = session.scalars(select(DeliveryDispatchRequest)).all()
+        assert len(rows) == 1
+        assert rows[0].tracking_token == tracking_token
+

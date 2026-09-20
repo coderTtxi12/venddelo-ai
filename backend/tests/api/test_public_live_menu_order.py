@@ -129,6 +129,7 @@ def test_public_live_menu_order_persists_all_details(client, engine):
     assert created["idempotency_key"] == idempotency_key
     assert created["delivery_fee_cents"] == 5000
     assert created["total_cents"] > 25900
+    assert created["dispatch"] is None
     assert len(created["items"]) == 1
 
     item = created["items"][0]
