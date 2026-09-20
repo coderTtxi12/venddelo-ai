@@ -1,10 +1,12 @@
 'use client';
 
+import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
 import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlined';
 import DoneAllOutlinedIcon from '@mui/icons-material/DoneAllOutlined';
 import ErrorOutlineOutlinedIcon from '@mui/icons-material/ErrorOutlineOutlined';
 import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
+import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
 import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined';
 import RestaurantOutlinedIcon from '@mui/icons-material/RestaurantOutlined';
@@ -24,8 +26,13 @@ import {
   type PublicTrackingRealtimeStatus,
 } from '@/lib/dispatch/usePublicTrackingRealtime';
 import {
+  PUBLIC_TRACKING_CONNECTING_TIMEOUT_MS,
+  publicTrackingConnectionBar,
+  publicTrackingMapPendingCopy,
+  publicTrackingShowsLiveMap,
   publicTrackingStatusCopy,
   publicTrackingTimelineSteps,
+  type PublicTrackingConnectionBar,
 } from '@/lib/dispatch/publicTrackingCopy';
 import { PublicTrackingMap } from './PublicTrackingMap';
 import styles from './PublicTracking.module.css';
@@ -37,20 +44,22 @@ type StepState = 'complete' | 'current' | 'upcoming' | 'failed';
 
 function timelineIndex(status: DispatchStatus): number {
   switch (status) {
-    case 'scheduled':
+    case 'accepted':
       return 0;
+    case 'scheduled':
+      return 1;
     case 'searching':
     case 'offered':
     case 'unassigned':
-      return 1;
-    case 'assigned':
       return 2;
-    case 'picked_up':
+    case 'assigned':
       return 3;
-    case 'in_transit':
+    case 'picked_up':
       return 4;
-    case 'delivered':
+    case 'in_transit':
       return 5;
+    case 'delivered':
+      return 6;
     case 'cancelled':
       return -1;
   }
@@ -64,7 +73,7 @@ function stepState(
   if (status === 'cancelled') {
     return 'upcoming';
   }
-  if (status === 'unassigned' && index === 1) {
+  if (status === 'unassigned' && index === 2) {
     return 'failed';
   }
   if (current < 0) {
@@ -77,6 +86,7 @@ function stepState(
 
 function icon(status: DispatchStatus) {
   if (status === 'delivered') return <DoneAllOutlinedIcon />;
+  if (status === 'accepted') return <AccessTimeOutlinedIcon />;
   if (status === 'scheduled') return <RestaurantOutlinedIcon />;
   if (status === 'searching' || status === 'offered') {
     return <DeliveryDiningOutlinedIcon />;
@@ -190,11 +200,45 @@ function TrackingTimeline({ status }: { status: DispatchStatus }) {
   );
 }
 
+function reloadTrackingPage() {
+  window.location.reload();
+}
+
+function TrackingConnectionBar({ connection }: { connection: PublicTrackingConnectionBar }) {
+  const announceError = connection.tone === 'stale';
+  return (
+    <header className={`${styles.connectionBar} ${styles[`connection_${connection.tone}`]}`}>
+      <div className={styles.connectionInner}>
+        <div
+          className={styles.connectionCopy}
+          role={announceError ? 'alert' : 'status'}
+          aria-atomic="true"
+        >
+          <p className={styles.connectionTitle}>
+            <span className={styles.liveDot} aria-hidden />
+            {connection.title}
+          </p>
+          <p className={styles.connectionDetail}>{connection.detail}</p>
+        </div>
+        {connection.action ? (
+          <button type="button" className={styles.reloadButton} onClick={reloadTrackingPage}>
+            {connection.action}
+          </button>
+        ) : null}
+      </div>
+    </header>
+  );
+}
+
 export function PublicTracking({ token }: { token: string }) {
   const [tracking, setTracking] = useState<PublicDispatchTracking | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [socketStatus, setSocketStatus] = useState<PublicTrackingRealtimeStatus>('connecting');
+  const [isOnline, setIsOnline] = useState(
+    () => typeof navigator === 'undefined' || navigator.onLine,
+  );
+  const [connectingTimedOut, setConnectingTimedOut] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -204,14 +248,28 @@ export function PublicTracking({ token }: { token: string }) {
     } catch (loadError) {
       setError(
         loadError instanceof ApiError && loadError.httpStatus === 404
-          ? 'No encontramos este enlace de rastreo.'
-          : 'No se pudo actualizar el estado de la entrega.',
+          ? 'not_found'
+          : 'load_failed',
       );
     }
   }, [token]);
 
   useEffect(() => {
     void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    const goOnline = () => {
+      setIsOnline(true);
+      void refresh();
+    };
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
   }, [refresh]);
 
   const { visibilityState } = usePublicTrackingRealtime(token, tracking?.status ?? null, {
@@ -242,13 +300,40 @@ export function PublicTracking({ token }: { token: string }) {
     return () => window.clearInterval(interval);
   }, [refresh, showLive, socketStatus, visibilityState]);
 
+  useEffect(() => {
+    const waiting = socketStatus === 'connecting' || socketStatus === 'offline';
+    if (!showLive || !isOnline || !waiting) {
+      setConnectingTimedOut(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setConnectingTimedOut(true);
+    }, PUBLIC_TRACKING_CONNECTING_TIMEOUT_MS);
+    return () => window.clearTimeout(timeout);
+  }, [isOnline, showLive, socketStatus]);
+
+  const connection = publicTrackingConnectionBar({
+    socketStatus,
+    isOnline,
+    fetchFailed: error === 'load_failed',
+    connectingTimedOut,
+    notFound: error === 'not_found',
+  });
+  const showConnectionBar = showLive || connection.tone === 'stale';
+
   if (error && !tracking) {
     return (
       <main className={styles.shell}>
-        <section className={styles.error} role="alert">
+        <TrackingConnectionBar connection={connection} />
+        <section className={styles.error}>
           <ErrorOutlineOutlinedIcon />
-          <h1>Rastreo no disponible</h1>
-          <p>{error}</p>
+          <h1>{connection.title}</h1>
+          <p>{connection.detail}</p>
+          {connection.action ? (
+            <button type="button" className={styles.reloadButton} onClick={reloadTrackingPage}>
+              {connection.action}
+            </button>
+          ) : null}
         </section>
       </main>
     );
@@ -257,15 +342,15 @@ export function PublicTracking({ token }: { token: string }) {
   if (!tracking) {
     return (
       <main className={styles.shell}>
+        {showConnectionBar ? <TrackingConnectionBar connection={connection} /> : null}
         <p className={styles.loading}>Cargando rastreo…</p>
       </main>
     );
   }
 
-  const copy = STATUS_COPY[tracking.status];
+  const copy = STATUS_COPY[tracking.status] ?? STATUS_COPY.accepted;
   const delivered = tracking.status === 'delivered';
   const restaurantName = tracking.restaurant_name ?? tracking.pickup?.name ?? null;
-  const live = socketStatus === 'live';
   const telHref = !delivered && tracking.rider ? riderTelHref(tracking.rider.phone) : null;
   const whatsappHref =
     !delivered && tracking.rider
@@ -279,19 +364,14 @@ export function PublicTracking({ token }: { token: string }) {
 
   return (
     <main className={styles.shell}>
+      {showConnectionBar ? <TrackingConnectionBar connection={connection} /> : null}
       <section className={styles.card}>
         <div className={styles.brandRow}>
           <div className={styles.brand}>Mexy Delivery</div>
-          {showLive ? (
-            <span className={`${styles.liveBadge} ${live ? styles.liveBadgeOn : ''}`}>
-              <span className={styles.liveDot} aria-hidden />
-              {live ? 'En vivo' : 'Actualizando'}
-            </span>
-          ) : null}
         </div>
         <div className={`${styles.status}${delivered ? ` ${styles.statusDelivered}` : ''}`}>
           <span className={styles.icon}>{icon(tracking.status)}</span>
-          <div aria-live="polite">
+          <div role="status" aria-atomic="true">
             <p className={styles.eyebrow}>Envío {formatDispatchShortId(tracking.short_id)}</p>
             <h1>{copy.title}</h1>
             <p>{copy.detail}</p>
@@ -471,10 +551,28 @@ export function PublicTracking({ token }: { token: string }) {
           </div>
         </div>
 
-        {delivered ? null : <PublicTrackingMap tracking={tracking} />}
+        {publicTrackingShowsLiveMap(tracking.status, Boolean(tracking.rider)) ? (
+          <PublicTrackingMap tracking={tracking} />
+        ) : delivered || tracking.status === 'cancelled' ? null : (
+          <aside className={styles.mapPending} role="status" aria-atomic="true">
+            <span className={styles.mapPendingIcon} aria-hidden>
+              <MapOutlinedIcon />
+            </span>
+            <h2>{publicTrackingMapPendingCopy.title}</h2>
+            <p>{publicTrackingMapPendingCopy.detail}</p>
+          </aside>
+        )}
         <div className={styles.address}>
-          <strong>Destino</strong>
-          <span>{tracking.dropoff.address}</span>
+          <div className={styles.addressBlock}>
+            <strong>Destino</strong>
+            <span>{tracking.dropoff.address}</span>
+          </div>
+          {tracking.dropoff.references ? (
+            <div className={styles.addressBlock}>
+              <strong>Referencias</strong>
+              <span>{tracking.dropoff.references}</span>
+            </div>
+          ) : null}
         </div>
       </section>
     </main>
