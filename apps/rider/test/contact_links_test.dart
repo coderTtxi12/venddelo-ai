@@ -13,9 +13,33 @@ void main() {
 
   test('tel and whatsapp uris are ready to launch', () {
     expect(telUris('+525512345678').first.scheme, 'tel');
-    expect(telUris('+525512345678').first.path, '525512345678');
+    expect(telUris('+525512345678').single.toString(), 'tel:+525512345678');
+    expect(telUris('525512345678').single.toString(), 'tel:+525512345678');
     expect(whatsappUris('5512345678').first.scheme, 'whatsapp');
     expect(whatsappUris('5512345678')[1].host, 'wa.me');
+  });
+
+  test('whatsapp message names the order code when present', () {
+    expect(
+      riderWhatsAppMessage('ab12cd'),
+      'Hola, soy el repartidor de tu pedido #AB12CD.',
+    );
+    expect(
+      riderWhatsAppMessage(''),
+      'Hola, soy el repartidor de tu pedido.',
+    );
+    expect(
+      whatsappUris('5512345678', shortId: 'ab12cd').first.queryParameters['text'],
+      'Hola, soy el repartidor de tu pedido #AB12CD.',
+    );
+    expect(
+      whatsappUris('5512345678', shortId: 'ab12cd')[1].queryParameters['text'],
+      'Hola, soy el repartidor de tu pedido #AB12CD.',
+    );
+    expect(
+      whatsappUris('5512345678').first.queryParameters['text'],
+      'Hola, soy el repartidor de tu pedido.',
+    );
   });
 
   test('openWhatsApp uses the first successful uri', () async {
