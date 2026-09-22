@@ -29,7 +29,7 @@ void startLocationCallback() {
 class LocationTaskHandler extends TaskHandler {
   StreamSubscription<Position>? _positionSub;
   Position? _lastPosition;
-  DateTime? _lastSentAt;
+  DateTime? _lastAttemptAt;
   bool _pingInFlight = false;
 
   @override
@@ -53,15 +53,29 @@ class LocationTaskHandler extends TaskHandler {
     if (Platform.isIOS || _positionSub != null) {
       return;
     }
-    _positionSub = Geolocator.getPositionStream(
+    late final StreamSubscription<Position> subscription;
+    subscription = Geolocator.getPositionStream(
       locationSettings: riderBackgroundLocationSettings(),
     ).listen(
       (position) {
         _lastPosition = position;
         unawaited(_pingLocation(position: position));
       },
-      onError: (_) {},
+      onError: (_) {
+        if (identical(_positionSub, subscription)) {
+          _positionSub = null;
+        }
+        unawaited(subscription.cancel());
+      },
     );
+    _positionSub = subscription;
+  }
+
+  Future<void> _restartPositionStream() async {
+    final subscription = _positionSub;
+    _positionSub = null;
+    await subscription?.cancel();
+    _listenPositionStream();
   }
 
   Future<void> _pingLocation({Position? position}) async {
@@ -70,45 +84,71 @@ class LocationTaskHandler extends TaskHandler {
       // when the phone is locked. Android posts from this foreground service.
       return;
     }
+    _listenPositionStream();
     if (_pingInFlight) {
       return;
     }
     final now = DateTime.now();
-    if (!shouldSendLocationPing(now: now, lastSentAt: _lastSentAt)) {
-      return;
-    }
-    final credentials = await loadLocationTaskCredentials();
-    if (credentials == null) {
+    if (!shouldSendLocationPing(now: now, lastSentAt: _lastAttemptAt)) {
       return;
     }
     _pingInFlight = true;
     try {
-      final next =
-          position ??
-          _lastPosition ??
-          await Geolocator.getLastKnownPosition() ??
-          await Geolocator.getCurrentPosition(
+      final credentials = await loadLocationTaskCredentials();
+      if (credentials == null) {
+        return;
+      }
+      _lastAttemptAt = now;
+      final choice = chooseLocationFix(
+        incomingAt: position?.timestamp,
+        cachedAt: _lastPosition?.timestamp,
+        now: now,
+      );
+      final Position? next;
+      switch (choice) {
+        case LocationFixChoice.incoming:
+          next = position;
+        case LocationFixChoice.cached:
+          next = _lastPosition;
+        case LocationFixChoice.fetchLive:
+          await _restartPositionStream();
+          next = await Geolocator.getCurrentPosition(
             locationSettings: riderBackgroundLocationSettings(
               timeLimit: const Duration(seconds: 4),
             ),
           );
-      _lastPosition = next;
+          if (chooseLocationFix(
+                incomingAt: next.timestamp,
+                cachedAt: null,
+                now: DateTime.now(),
+              ) ==
+              LocationFixChoice.fetchLive) {
+            return;
+          }
+      }
+      if (next == null) {
+        return;
+      }
+      final fix = next;
+      _lastPosition = fix;
       final result = await postLocationWithAuthRetry(
         credentials: credentials,
         postLocation: (creds) {
-          return http.post(
-            Uri.parse('${creds.apiBaseUrl}/rider/me/location'),
-            headers: {
-              'Authorization': 'Bearer ${creds.accessToken}',
-              'Content-Type': 'application/json',
-            },
-            body: jsonEncode(
-              riderLocationBody(
-                latitude: next.latitude,
-                longitude: next.longitude,
-              ),
-            ),
-          );
+          return http
+              .post(
+                Uri.parse('${creds.apiBaseUrl}/rider/me/location'),
+                headers: {
+                  'Authorization': 'Bearer ${creds.accessToken}',
+                  'Content-Type': 'application/json',
+                },
+                body: jsonEncode(
+                  riderLocationBody(
+                    latitude: fix.latitude,
+                    longitude: fix.longitude,
+                  ),
+                ),
+              )
+              .timeout(locationPostTimeout);
         },
         refreshTokens: refreshSupabaseTokens,
         persistCredentials: (creds) => saveLocationTaskCredentials(
@@ -119,7 +159,6 @@ class LocationTaskHandler extends TaskHandler {
           supabaseAnonKey: creds.supabaseAnonKey,
         ),
       );
-      _lastSentAt = DateTime.now();
       if (result == LocationPingResult.authFailed) {
         FlutterForegroundTask.sendDataToMain(locationAuthFailedEvent);
       }
