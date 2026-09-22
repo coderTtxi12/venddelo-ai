@@ -41,6 +41,17 @@ class JobOverlayPlatform {
     await _channel.invokeMethod<void>('hide');
   }
 
+  Future<bool> needsBackgroundPopup() async {
+    if (!_isAndroid) return false;
+    final needed = await _channel.invokeMethod<bool>('needsBackgroundPopup');
+    return needed == true;
+  }
+
+  Future<void> requestBackgroundPopup() async {
+    if (!_isAndroid) return;
+    await _channel.invokeMethod<void>('requestBackgroundPopup');
+  }
+
   bool get isSupported => _isAndroid;
 
   bool get _isAndroid => !kIsWeb && Platform.isAndroid;

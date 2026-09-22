@@ -60,11 +60,28 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "show" -> {
-                    JobOverlay.show(this)
+                    val intent = Intent(this, JobOverlayService::class.java).apply {
+                        action = JobOverlayService.ACTION_SHOW
+                    }
+                    val started = runCatching { startService(intent) }.isSuccess
+                    if (!started) {
+                        JobOverlay.show(applicationContext)
+                    }
                     result.success(null)
                 }
                 "hide" -> {
-                    JobOverlay.hide()
+                    val intent = Intent(this, JobOverlayService::class.java).apply {
+                        action = JobOverlayService.ACTION_HIDE
+                    }
+                    val started = runCatching { startService(intent) }.isSuccess
+                    if (!started) {
+                        JobOverlay.hide()
+                    }
+                    result.success(null)
+                }
+                "needsBackgroundPopup" -> result.success(OemBackgroundPopup.isRequired())
+                "requestBackgroundPopup" -> {
+                    OemBackgroundPopup.open(this)
                     result.success(null)
                 }
                 else -> result.notImplemented()
