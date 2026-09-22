@@ -1191,6 +1191,7 @@ class _JobCard extends StatelessWidget {
           _CustomerContactCard(
             name: assignment.customerName,
             phone: assignment.customerPhone,
+            shortId: assignment.shortId,
           ),
         ],
         const SizedBox(height: 14),
@@ -1314,10 +1315,11 @@ class _JobDetails extends StatelessWidget {
 }
 
 class _CustomerContactCard extends StatelessWidget {
-  const _CustomerContactCard({this.name, this.phone});
+  const _CustomerContactCard({this.name, this.phone, this.shortId = ''});
 
   final String? name;
   final String? phone;
+  final String shortId;
 
   @override
   Widget build(BuildContext context) {
@@ -1368,7 +1370,9 @@ class _CustomerContactCard extends StatelessWidget {
                       label: 'WhatsApp',
                       icon: Icons.chat_rounded,
                       background: const Color(0xFF128C7E),
-                      onPressed: () => unawaited(openWhatsApp(displayPhone)),
+                      onPressed: () => unawaited(
+                        openWhatsApp(displayPhone, shortId: shortId),
+                      ),
                     ),
                   ),
                 ],
