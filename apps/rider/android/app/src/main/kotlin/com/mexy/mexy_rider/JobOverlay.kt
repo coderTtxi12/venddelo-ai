@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.Gravity
@@ -22,29 +24,55 @@ object JobOverlay {
     private var closeHint: View? = null
     private var params: WindowManager.LayoutParams? = null
     private var dragging = false
+    private var wanted = false
+    private var host: Context? = null
+    private var detaching = false
+    private var reattachAttempts = 0
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     fun hasPermission(context: Context): Boolean {
         return Settings.canDrawOverlays(context)
     }
 
     fun show(context: Context) {
-        val app = context.applicationContext
-        if (!hasPermission(app) || bubble != null) {
+        wanted = true
+        host = context
+        reattachAttempts = 0
+        if (!hasPermission(context)) {
             return
         }
-        val wm = app.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val existing = bubble
+        if (existing != null && existing.isAttachedToWindow) {
+            return
+        }
+        attach(context)
+    }
+
+    fun hide() {
+        wanted = false
+        host = null
+        reattachAttempts = 0
+        detach()
+    }
+
+    private fun attach(context: Context) {
+        if (!wanted) {
+            return
+        }
+        detach()
+        val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         windowManager = wm
-        val density = app.resources.displayMetrics
+        val density = context.resources.displayMetrics
         val size = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 56f, density).toInt()
         val margin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 12f, density).toInt()
         val screenW = density.widthPixels
         val screenH = density.heightPixels
 
-        val layout = FrameLayout(app).apply {
+        val layout = FrameLayout(context).apply {
             alpha = 0.82f
             elevation = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 8f, density)
         }
-        val image = ImageView(app).apply {
+        val image = ImageView(context).apply {
             setImageResource(R.mipmap.ic_mexy_bubble)
             scaleType = ImageView.ScaleType.FIT_CENTER
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -86,7 +114,7 @@ object JobOverlay {
                     startY = current.y
                     touchStartX = event.rawX
                     touchStartY = event.rawY
-                    showCloseHint(app, size)
+                    showCloseHint(context, size)
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -105,7 +133,7 @@ object JobOverlay {
                     val dx = event.rawX - touchStartX
                     val dy = event.rawY - touchStartY
                     if (!dragging && hypot(dx.toDouble(), dy.toDouble()) < 12) {
-                        openApp(app)
+                        openApp(context)
                     } else if (current.y + size > screenH - TypedValue.applyDimension(
                             TypedValue.COMPLEX_UNIT_DIP,
                             88f,
@@ -124,25 +152,57 @@ object JobOverlay {
                 else -> false
             }
         }
+        layout.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) {}
+
+            override fun onViewDetachedFromWindow(v: View) {
+                if (!wanted || detaching || v !== bubble) {
+                    return
+                }
+                scheduleReattach()
+            }
+        })
 
         bubble = layout
         runCatching { wm.addView(layout, bubbleParams) }.onFailure {
-            bubble = null
-            params = null
-            windowManager = null
+            if (bubble === layout) {
+                bubble = null
+                params = null
+                windowManager = null
+            }
+            scheduleReattach()
         }
     }
 
-    fun hide() {
-        val wm = windowManager
-        bubble?.let { view ->
-            runCatching { wm?.removeView(view) }
+    private fun scheduleReattach() {
+        if (!wanted || reattachAttempts >= 3) {
+            return
         }
-        hideCloseHint()
-        bubble = null
-        params = null
-        windowManager = null
-        dragging = false
+        reattachAttempts += 1
+        val next = host ?: return
+        mainHandler.post {
+            if (!wanted || bubble?.isAttachedToWindow == true) {
+                return@post
+            }
+            attach(next)
+        }
+    }
+
+    private fun detach() {
+        detaching = true
+        try {
+            val wm = windowManager
+            bubble?.let { view ->
+                runCatching { wm?.removeView(view) }
+            }
+            hideCloseHint()
+        } finally {
+            bubble = null
+            params = null
+            windowManager = null
+            dragging = false
+            detaching = false
+        }
     }
 
     private fun showCloseHint(context: Context, bubbleSize: Int) {
@@ -194,5 +254,12 @@ object JobOverlay {
                 Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
         }
         context.startActivity(launch)
+        runCatching {
+            context.startService(
+                Intent(context, JobOverlayService::class.java).apply {
+                    action = JobOverlayService.ACTION_HIDE
+                },
+            )
+        }
     }
 }
