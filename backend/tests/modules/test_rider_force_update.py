@@ -99,9 +99,9 @@ def test_get_me_keeps_online_when_build_is_current(monkeypatch):
     monkeypatch.setattr(service, "_require_driver", lambda _user: driver)
     monkeypatch.setattr(service, "_to_profile", lambda _driver: SimpleNamespace())
 
-    service.get_me(_user(driver.user_id), app_version="1.0.2", app_build_number=4)
+    service.get_me(_user(driver.user_id), app_version="1.0.2", app_build_number=5)
 
-    assert driver.app_build_number == 4
+    assert driver.app_build_number == 5
     assert driver.is_online is True
 
 

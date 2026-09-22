@@ -10,7 +10,7 @@ void main() {
   test('GET /rider/me query reports this APK build', () {
     expect(riderMeQuery(), {
       'app_version': '1.0.2',
-      'app_build_number': '4',
+      'app_build_number': '5',
     });
   });
 

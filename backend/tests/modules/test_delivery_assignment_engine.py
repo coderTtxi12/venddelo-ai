@@ -86,7 +86,7 @@ def _driver(
     assigned_restaurant_ids: tuple[str, ...] = (),
     last_dropoff_lat: float | None = None,
     last_dropoff_lng: float | None = None,
-    app_build_number: int | None = 4,
+    app_build_number: int | None = 5,
 ) -> EngineDriver:
     occupied = occupied_job_count
     if occupied is None:
@@ -755,7 +755,7 @@ def test_eligibility_blockers_offline_and_gps():
 def test_missing_app_build_is_not_assigned():
     request = _request()
     old = _driver("old", last_lat=19.4330, last_lng=-99.1335, app_build_number=None)
-    fresh = _driver("fresh", last_lat=19.4400, last_lng=-99.1400, app_build_number=4)
+    fresh = _driver("fresh", last_lat=19.4400, last_lng=-99.1400, app_build_number=5)
     result = choose_assignments(_context(request, (old, fresh)))
 
     assert result.case == "A"
@@ -765,7 +765,7 @@ def test_missing_app_build_is_not_assigned():
 def test_stale_app_build_is_not_assigned():
     request = _request()
     stale = _driver("stale", last_lat=19.4330, last_lng=-99.1335, app_build_number=3)
-    fresh = _driver("fresh", last_lat=19.4400, last_lng=-99.1400, app_build_number=4)
+    fresh = _driver("fresh", last_lat=19.4400, last_lng=-99.1400, app_build_number=5)
     result = choose_assignments(_context(request, (stale, fresh)))
 
     assert result.case == "A"
@@ -776,7 +776,7 @@ def test_eligibility_blockers_outdated_app():
     request = _request()
     missing = _driver("missing", last_lat=19.4330, last_lng=-99.1335, app_build_number=None)
     stale = _driver("stale", last_lat=19.4330, last_lng=-99.1335, app_build_number=3)
-    current = _driver("current", last_lat=19.4330, last_lng=-99.1335, app_build_number=4)
+    current = _driver("current", last_lat=19.4330, last_lng=-99.1335, app_build_number=5)
     context = _context(request, (missing, stale, current))
     assert "outdated_app" in eligibility_blockers(context, request, missing)
     assert "outdated_app" in eligibility_blockers(context, request, stale)

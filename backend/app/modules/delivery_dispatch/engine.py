@@ -30,7 +30,7 @@ class EngineSettings:
     max_pickup_detour_meters: int = 1000
     max_destination_detour_meters: int = 3840
     assignment_timeout_seconds: int = 900
-    rider_min_app_build: int = 4
+    rider_min_app_build: int = 5
 
 
 @dataclass(frozen=True)
