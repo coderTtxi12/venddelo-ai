@@ -2,6 +2,37 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 const locationPingInterval = Duration(seconds: 5);
+const locationFixMaxAge = Duration(seconds: 15);
+const locationPostTimeout = Duration(seconds: 8);
+
+enum LocationFixChoice { incoming, cached, fetchLive }
+
+bool isFreshLocationFix({
+  required DateTime? capturedAt,
+  required DateTime now,
+  Duration maxAge = locationFixMaxAge,
+}) {
+  if (capturedAt == null) {
+    return false;
+  }
+  final age = now.difference(capturedAt);
+  return age.isNegative || age <= maxAge;
+}
+
+LocationFixChoice chooseLocationFix({
+  required DateTime? incomingAt,
+  required DateTime? cachedAt,
+  required DateTime now,
+  Duration maxAge = locationFixMaxAge,
+}) {
+  if (isFreshLocationFix(capturedAt: incomingAt, now: now, maxAge: maxAge)) {
+    return LocationFixChoice.incoming;
+  }
+  if (isFreshLocationFix(capturedAt: cachedAt, now: now, maxAge: maxAge)) {
+    return LocationFixChoice.cached;
+  }
+  return LocationFixChoice.fetchLive;
+}
 
 bool shouldSendLocationPing({
   required DateTime now,

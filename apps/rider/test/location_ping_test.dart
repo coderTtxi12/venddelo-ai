@@ -23,6 +23,34 @@ void main() {
     );
   });
 
+  test('a fix older than 15 seconds is not sent again', () {
+    final now = DateTime.utc(2026, 9, 20, 7, 20);
+    expect(
+      chooseLocationFix(
+        incomingAt: now.subtract(const Duration(seconds: 16)),
+        cachedAt: now.subtract(const Duration(seconds: 40)),
+        now: now,
+      ),
+      LocationFixChoice.fetchLive,
+    );
+    expect(
+      chooseLocationFix(
+        incomingAt: null,
+        cachedAt: now.subtract(const Duration(seconds: 10)),
+        now: now,
+      ),
+      LocationFixChoice.cached,
+    );
+    expect(
+      chooseLocationFix(
+        incomingAt: now.subtract(const Duration(seconds: 15)),
+        cachedAt: now.subtract(const Duration(seconds: 40)),
+        now: now,
+      ),
+      LocationFixChoice.incoming,
+    );
+  });
+
   test('android settings request a 5s high-accuracy stream', () {
     final settings = riderBackgroundLocationSettings(
       platform: TargetPlatform.android,
