@@ -40,6 +40,10 @@
             android:foregroundServiceType="location"
             android:exported="false"
             android:stopWithTask="false" />
+        <service
+            android:name=".JobOverlayService"
+            android:exported="false"
+            android:stopWithTask="false" />
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
