@@ -1,5 +1,12 @@
+import 'package:flutter/widgets.dart';
+
 const jobOverlayPrefKey = 'job_overlay_enabled';
 const jobOverlayAskedPrefKey = 'job_overlay_permission_asked';
+const jobOverlayOemPopupAskedPrefKey = 'job_overlay_oem_popup_asked';
+
+bool isJobOverlayBackground(AppLifecycleState state) {
+  return state == AppLifecycleState.paused || state == AppLifecycleState.hidden;
+}
 
 class JobOverlayDecision {
   const JobOverlayDecision({

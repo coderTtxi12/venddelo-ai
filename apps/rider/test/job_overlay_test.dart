@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mexy_rider/job_overlay.dart';
 
@@ -64,6 +65,14 @@ void main() {
     expect(jobOverlayEnabledFromStored(null), isTrue);
     expect(jobOverlayEnabledFromStored(true), isTrue);
     expect(jobOverlayEnabledFromStored(false), isFalse);
+  });
+
+  test('background means paused or hidden, not a brief inactive focus loss', () {
+    expect(isJobOverlayBackground(AppLifecycleState.paused), isTrue);
+    expect(isJobOverlayBackground(AppLifecycleState.hidden), isTrue);
+    expect(isJobOverlayBackground(AppLifecycleState.inactive), isFalse);
+    expect(isJobOverlayBackground(AppLifecycleState.resumed), isFalse);
+    expect(isJobOverlayBackground(AppLifecycleState.detached), isFalse);
   });
 
   test('asks overlay permission once at login, not when a job starts', () {
