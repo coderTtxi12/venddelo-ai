@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mexy_rider/job_overlay_platform.dart';
@@ -10,6 +12,8 @@ class _FakeOverlay extends JobOverlayPlatform {
   int showCount = 0;
   int hideCount = 0;
   int requestCount = 0;
+  int oemPopupCount = 0;
+  bool oemPopupRequired = false;
 
   @override
   bool get isSupported => true;
@@ -32,6 +36,38 @@ class _FakeOverlay extends JobOverlayPlatform {
 
   @override
   Future<void> hide() async {
+    hideCount += 1;
+  }
+
+  @override
+  Future<bool> needsBackgroundPopup() async => oemPopupRequired;
+
+  @override
+  Future<void> requestBackgroundPopup() async {
+    oemPopupCount += 1;
+  }
+}
+
+class _GateOverlay extends _FakeOverlay {
+  _GateOverlay(this.gate);
+
+  final Completer<void> gate;
+  final calls = <String>[];
+  final enteredShow = Completer<void>();
+
+  @override
+  Future<void> show() async {
+    calls.add('show');
+    if (!enteredShow.isCompleted) {
+      enteredShow.complete();
+    }
+    await gate.future;
+    showCount += 1;
+  }
+
+  @override
+  Future<void> hide() async {
+    calls.add('hide');
     hideCount += 1;
   }
 }
@@ -70,6 +106,50 @@ void main() {
 
     expect(overlay.showCount, 1);
     expect(overlay.requestCount, 0);
+    controller.dispose();
+  });
+
+  test('does not show the overlay on a brief inactive focus loss', () async {
+    final overlay = _FakeOverlay();
+    final controller = RiderController(overlayPlatform: overlay)
+      ..profile = _profileWithJob()
+      ..lifecycleState = AppLifecycleState.inactive;
+
+    await controller.syncJobOverlay();
+
+    expect(overlay.showCount, 0);
+    expect(overlay.hideCount, 1);
+    controller.dispose();
+  });
+
+  test('shows the overlay when the app is hidden', () async {
+    final overlay = _FakeOverlay();
+    final controller = RiderController(overlayPlatform: overlay)
+      ..profile = _profileWithJob()
+      ..lifecycleState = AppLifecycleState.hidden;
+
+    await controller.syncJobOverlay();
+
+    expect(overlay.showCount, 1);
+    controller.dispose();
+  });
+
+  test('a later lifecycle wins when two syncs overlap', () async {
+    final gate = Completer<void>();
+    final overlay = _GateOverlay(gate);
+    final controller = RiderController(overlayPlatform: overlay)
+      ..profile = _profileWithJob()
+      ..lifecycleState = AppLifecycleState.paused;
+
+    final first = controller.syncJobOverlay();
+    await overlay.enteredShow.future;
+    controller.lifecycleState = AppLifecycleState.resumed;
+    final second = controller.syncJobOverlay();
+    gate.complete();
+    await first;
+    await second;
+
+    expect(overlay.calls, ['show', 'hide']);
     controller.dispose();
   });
 
@@ -139,6 +219,22 @@ void main() {
 
     expect(overlay.showCount, 0);
     expect(overlay.hideCount, 1);
+    controller.dispose();
+  });
+
+  test('opens the Xiaomi background popup once after overlay permission', () async {
+    final overlay = _FakeOverlay()
+      ..permission = true
+      ..oemPopupRequired = true;
+    final controller = RiderController(overlayPlatform: overlay)
+      ..profile = _profileWithJob();
+
+    await controller.promptOemBackgroundPopupOnce();
+    await controller.promptOemBackgroundPopupOnce();
+
+    expect(overlay.oemPopupCount, 1);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('job_overlay_oem_popup_asked'), isTrue);
     controller.dispose();
   });
 

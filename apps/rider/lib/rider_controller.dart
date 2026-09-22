@@ -72,6 +72,7 @@ class RiderController extends ChangeNotifier {
   String? _alarmedOfferId;
   String? _dismissedOverlaySignature;
   bool _askedOverlayPermission = false;
+  Future<void> _overlaySyncQueue = Future<void>.value();
 
   Future<void> bootstrap() async {
     loading = true;
@@ -612,6 +613,9 @@ class RiderController extends ChangeNotifier {
   void onAppLifecycle(AppLifecycleState state) {
     lifecycleState = state;
     unawaited(syncJobOverlay());
+    if (state == AppLifecycleState.resumed) {
+      unawaited(promptOemBackgroundPopupOnce());
+    }
   }
 
   void onOverlayDismissed() {
@@ -665,7 +669,36 @@ class RiderController extends ChangeNotifier {
     await _overlay.requestPermission();
   }
 
-  Future<void> syncJobOverlay() async {
+  Future<void> promptOemBackgroundPopupOnce() async {
+    if (!_overlay.isSupported || !overlayEnabled) {
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(jobOverlayOemPopupAskedPrefKey) == true) {
+      return;
+    }
+    final needs = await _overlay.needsBackgroundPopup();
+    if (!needs) {
+      await prefs.setBool(jobOverlayOemPopupAskedPrefKey, true);
+      return;
+    }
+    final granted = await _overlay.hasPermission();
+    if (!granted) {
+      return;
+    }
+    await prefs.setBool(jobOverlayOemPopupAskedPrefKey, true);
+    await _overlay.requestBackgroundPopup();
+  }
+
+  Future<void> syncJobOverlay() {
+    final done = _overlaySyncQueue
+        .catchError((Object _) {})
+        .then((_) => _applyJobOverlay());
+    _overlaySyncQueue = done;
+    return done;
+  }
+
+  Future<void> _applyJobOverlay() async {
     if (!_overlay.isSupported) {
       return;
     }
@@ -683,7 +716,7 @@ class RiderController extends ChangeNotifier {
       JobOverlayDecision(
         enabledInSettings: overlayEnabled,
         hasActiveJob: jobs.isNotEmpty,
-        appInBackground: lifecycleState != AppLifecycleState.resumed,
+        appInBackground: isJobOverlayBackground(lifecycleState),
         overlayPermissionGranted: hasPermission,
         dismissedThisJob: dismissed,
       ),
