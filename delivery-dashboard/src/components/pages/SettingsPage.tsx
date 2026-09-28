@@ -10,10 +10,11 @@ import { DeliveryProviderHoursEditor } from '@/components/settings/DeliveryProvi
 import { RiderApkPanel } from '@/components/settings/RiderApkPanel';
 import { PhoneInputWithCountry } from '@/components/onboarding/PhoneInputWithCountry';
 import { PanelPageShell } from '@/components/pages/PanelPageShell';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { useAuth } from '@/hooks/useAuth';
-import { memberRoleLabel } from '@/lib/access/deliveryProviderPermissions';
+import { canRemoveTeamMember, memberRoleLabel } from '@/lib/access/deliveryProviderPermissions';
 import {
   addMyDeliveryProviderAdminInvite,
   getMyDeliveryProvider,
@@ -22,6 +23,7 @@ import {
   listMyDeliveryProviderPaymentMethods,
   listMyDeliveryProviderSchedules,
   removeMyDeliveryProviderAdminInvite,
+  removeMyDeliveryProviderMember,
   setMyDeliveryProviderPaymentMethods,
   setMyDeliveryProviderSchedules,
   updateMyDeliveryProvider,
@@ -118,6 +120,9 @@ export default function SettingsPage() {
   const [adminError, setAdminError] = useState<string | null>(null);
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [removingInviteId, setRemovingInviteId] = useState<string | null>(null);
+  const [memberPendingRemoval, setMemberPendingRemoval] =
+    useState<DeliveryProviderMember | null>(null);
+  const [removingMember, setRemovingMember] = useState(false);
 
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
@@ -494,6 +499,38 @@ export default function SettingsPage() {
     }
   };
 
+  const handleRemoveMember = async () => {
+    if (!memberPendingRemoval) return;
+    if (!accessToken) {
+      setMemberPendingRemoval(null);
+      setAdminError('No hay sesión activa. Inicia sesión de nuevo.');
+      return;
+    }
+
+    const memberId = memberPendingRemoval.id;
+    setRemovingMember(true);
+    setAdminError(null);
+    setAdminSuccess(null);
+
+    try {
+      await removeMyDeliveryProviderMember(accessToken, memberId);
+      setAdminMembers((current) => current.filter((member) => member.id !== memberId));
+      setMemberPendingRemoval(null);
+      setAdminSuccess('Se quitó el acceso.');
+      window.setTimeout(() => setAdminSuccess(null), 4000);
+    } catch (err) {
+      console.error(err);
+      setMemberPendingRemoval(null);
+      if (err instanceof ApiError) {
+        setAdminError(err.message);
+      } else {
+        setAdminError('No se pudo quitar el acceso.');
+      }
+    } finally {
+      setRemovingMember(false);
+    }
+  };
+
   const logoPreview = form.logoDataUrl?.startsWith('data:')
     ? form.logoDataUrl
     : storagePublicUrl(form.logoDataUrl);
@@ -736,6 +773,16 @@ export default function SettingsPage() {
                               </span>
                             ) : null}
                           </div>
+                          {canRemoveTeamMember(member.member_role) ? (
+                            <button
+                              type="button"
+                              className={styles.removeBtn}
+                              disabled={removingMember}
+                              onClick={() => setMemberPendingRemoval(member)}
+                            >
+                              Quitar
+                            </button>
+                          ) : null}
                         </li>
                       );
                     })}
@@ -947,6 +994,26 @@ export default function SettingsPage() {
           </fieldset>
         </>
       )}
+      <ConfirmDialog
+        open={memberPendingRemoval !== null}
+        title="Quitar del equipo"
+        body={
+          memberPendingRemoval ? (
+            <>
+              <strong>{memberPrimaryLabel(memberPendingRemoval)}</strong>
+              {' · '}
+              {memberRoleLabel(memberPendingRemoval.member_role)}. Perderá el acceso al panel
+              de inmediato.
+            </>
+          ) : null
+        }
+        confirmLabel="Quitar"
+        confirming={removingMember}
+        onCancel={() => {
+          if (!removingMember) setMemberPendingRemoval(null);
+        }}
+        onConfirm={() => void handleRemoveMember()}
+      />
     </PanelPageShell>
   );
 }

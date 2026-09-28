@@ -24,6 +24,10 @@ export function canManageMembers(role: string | null | undefined): boolean {
   return role === 'owner';
 }
 
+export function canRemoveTeamMember(role: string | null | undefined): boolean {
+  return role === 'admin' || role === 'operator';
+}
+
 export function canManageRiderApp(role: string | null | undefined): boolean {
   return canManageMembers(role);
 }

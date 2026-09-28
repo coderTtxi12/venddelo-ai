@@ -166,6 +166,13 @@ export function removeMyDeliveryProviderAdminInvite(token: string, inviteId: str
   });
 }
 
+export function removeMyDeliveryProviderMember(token: string, memberId: string) {
+  return apiRequest<void>(`/delivery-providers/me/members/${memberId}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
 export function updateMyDeliveryProvider(token: string, body: DeliveryProviderProfileUpdate) {
   return apiRequest<DeliveryProvider>('/delivery-providers/me', {
     method: 'PATCH',
