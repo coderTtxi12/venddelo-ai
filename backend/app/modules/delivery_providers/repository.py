@@ -273,6 +273,9 @@ class DeliveryProviderRepository(ABC):
     def remove_admin_invite(self, provider_id: uuid.UUID, invite_id: uuid.UUID) -> None: ...
 
     @abstractmethod
+    def remove_admin_member(self, provider_id: uuid.UUID, member_id: uuid.UUID) -> None: ...
+
+    @abstractmethod
     def claim_admin_invites(self, user_id: uuid.UUID, email: str) -> bool: ...
 
     @abstractmethod

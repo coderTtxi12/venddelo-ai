@@ -168,6 +168,10 @@ class DeliveryProviderService:
         provider_id = self._require_owner_provider_id(user_id)
         self._repo.remove_admin_invite(provider_id, invite_id)
 
+    def remove_admin_member(self, user_id: uuid.UUID, member_id: uuid.UUID) -> None:
+        provider_id = self._require_owner_provider_id(user_id)
+        self._repo.remove_admin_member(provider_id, member_id)
+
     def update_profile(
         self, user_id: uuid.UUID, data: DeliveryProviderProfileUpdate
     ) -> DeliveryProviderDTO:

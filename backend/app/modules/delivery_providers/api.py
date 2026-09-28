@@ -238,6 +238,15 @@ def remove_my_delivery_provider_admin_invite(
     service.remove_admin_invite(user.id, invite_id)
 
 
+@router.delete("/me/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_my_delivery_provider_member(
+    member_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    service: DeliveryProviderService = Depends(_service),
+) -> None:
+    service.remove_admin_member(user.id, member_id)
+
+
 @router.get("/me/schedules", response_model=list[DeliveryProviderScheduleDTO])
 def list_my_delivery_provider_schedules(
     zone_id: UUID = Depends(_require_zone_id),
