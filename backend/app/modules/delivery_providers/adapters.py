@@ -1382,7 +1382,7 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
         claimed = False
         for invite in invites:
             existing = self._session.scalar(
-                select(DeliveryProviderMember.id).where(
+                select(DeliveryProviderMember).where(
                     DeliveryProviderMember.delivery_provider_id == invite.delivery_provider_id,
                     DeliveryProviderMember.user_id == user_id,
                 )
@@ -1396,6 +1396,10 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
                         is_active=True,
                     )
                 )
+                claimed = True
+            elif not existing.is_active:
+                existing.is_active = True
+                existing.member_role = invite.member_role
                 claimed = True
             self._session.delete(invite)
 

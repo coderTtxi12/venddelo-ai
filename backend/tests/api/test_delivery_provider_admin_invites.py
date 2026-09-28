@@ -464,3 +464,103 @@ def test_owner_cannot_remove_driver_or_dispatcher(client, engine):
             removed.json()["error"]["message"]
             == "Solo puedes quitar administradores y operadores"
         )
+
+
+@requires_db
+def test_reinvite_reactivates_member_with_new_role(client, engine):
+    provider_id = _create_provider(client)
+    _invite_and_claim(
+        client,
+        email="operador@empresa.com",
+        user_id=OPERATOR,
+        member_role="operator",
+    )
+    member_id = _member_id(client, "operator")
+    removed = client.delete(
+        f"/api/v1/delivery-providers/me/members/{member_id}",
+        headers=AUTH,
+    )
+    assert removed.status_code == 204
+
+    invited = client.post(
+        "/api/v1/delivery-providers/me/admin-invites",
+        json={"email": "operador@empresa.com", "member_role": "admin"},
+        headers=AUTH,
+    )
+    assert invited.status_code == 201, invited.text
+
+    app.dependency_overrides[get_auth] = lambda: FakeAuth(
+        user_id=OPERATOR,
+        email="operador@empresa.com",
+    )
+    try:
+        me = client.get("/api/v1/delivery-providers/me", headers=AUTH)
+        assert me.status_code == 200, me.text
+        assert me.json()["member_role"] == "admin"
+        assert me.json()["provider"]["id"] == str(provider_id)
+    finally:
+        app.dependency_overrides.pop(get_auth, None)
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        member = session.scalar(
+            select(DeliveryProviderMember).where(
+                DeliveryProviderMember.delivery_provider_id == provider_id,
+                DeliveryProviderMember.user_id == OPERATOR,
+            )
+        )
+        assert member is not None
+        assert member.is_active is True
+        assert member.member_role == "admin"
+        invite = session.scalar(
+            select(DeliveryProviderAdminInvite).where(
+                DeliveryProviderAdminInvite.delivery_provider_id == provider_id
+            )
+        )
+        assert invite is None
+
+
+@requires_db
+def test_claim_does_not_overwrite_active_member_role(client, engine):
+    provider_id = _create_provider(client)
+    _invite_and_claim(
+        client,
+        email="operador@empresa.com",
+        user_id=OPERATOR,
+        member_role="operator",
+    )
+
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        session.add(
+            DeliveryProviderAdminInvite(
+                delivery_provider_id=provider_id,
+                email="operador@empresa.com",
+                member_role="admin",
+            )
+        )
+        session.commit()
+
+    app.dependency_overrides[get_auth] = lambda: FakeAuth(
+        user_id=OPERATOR,
+        email="operador@empresa.com",
+    )
+    try:
+        me = client.get("/api/v1/delivery-providers/me", headers=AUTH)
+        assert me.status_code == 200, me.text
+        assert me.json()["member_role"] == "operator"
+    finally:
+        app.dependency_overrides.pop(get_auth, None)
+
+    with factory() as session:
+        member = session.scalar(
+            select(DeliveryProviderMember).where(
+                DeliveryProviderMember.delivery_provider_id == provider_id,
+                DeliveryProviderMember.user_id == OPERATOR,
+            )
+        )
+        assert member is not None
+        assert member.member_role == "operator"
+        assert member.is_active is True
+        invite = session.scalar(select(DeliveryProviderAdminInvite))
+        assert invite is None
