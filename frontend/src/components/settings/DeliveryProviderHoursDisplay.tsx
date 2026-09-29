@@ -102,7 +102,7 @@ export function DeliveryProviderHoursDisplay({
   if (blocks.every((block) => block.days.every((day) => day.isClosed))) {
     return (
       <p className={styles.closedHint}>
-        El proveedor aún no ha configurado horarios de reparto.
+        Mexy aún no ha configurado su horario de reparto.
       </p>
     );
   }
@@ -110,7 +110,7 @@ export function DeliveryProviderHoursDisplay({
   return (
     <section
       className={`${styles.hoursSection} ${styles.hoursSectionReadOnly} ${className ?? ''}`.trim()}
-      aria-label="Horario de entrega a domicilio"
+      aria-label="Horario de Mexy"
     >
       <div className={styles.hoursBlocks}>
         {blocks.map((block) => (

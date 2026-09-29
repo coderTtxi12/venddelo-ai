@@ -44,6 +44,9 @@ export function DashboardRestaurantHours({
         <RestaurantHoursFooter
           schedules={schedules}
           serviceTypes={DASHBOARD_SCHEDULE_SERVICE_TYPES}
+          title="Horario de tu negocio"
+          hint="Configura los días y turnos en que atiendes."
+          serviceLabels={{ takeout: 'Horario de tu negocio' }}
           saving={saving}
           onSave={async (payload) => {
             await onSave(mergeScheduleSavePreservingDelivery(payload, schedules));
@@ -54,24 +57,22 @@ export function DashboardRestaurantHours({
       {showDelivery ? (
         <section
           className={`${styles.deliverySection} ${showTakeout ? styles.deliverySectionInset : ''}`}
-          aria-labelledby={showTakeout ? 'delivery-hours-heading' : undefined}
+          aria-labelledby="delivery-hours-heading"
         >
-          {showTakeout ? (
-            <h3 id="delivery-hours-heading" className={styles.deliverySectionTitle}>
-              Entrega a domicilio
-            </h3>
-          ) : null}
+          <h3 id="delivery-hours-heading" className={styles.deliverySectionTitle}>
+            Horario de Mexy
+          </h3>
 
-          <aside className={styles.providerNotice} aria-label="Aviso sobre horario de entrega">
+          <aside className={styles.providerNotice} aria-label="Aviso sobre el horario de Mexy">
             <span className={styles.providerNoticeIcon} aria-hidden>
               <InfoOutlinedIcon sx={{ fontSize: 20 }} />
             </span>
             <div className={styles.providerNoticeBody}>
-              <p className={styles.providerNoticeTitle}>Horario gestionado por el proveedor</p>
+              <p className={styles.providerNoticeTitle}>Solo lectura</p>
               <p className={styles.providerNoticeText}>
                 {deliveryPartnershipActive
-                  ? 'Los horarios de entrega a domicilio los define tu proveedor de entrega.'
-                  : 'Los horarios estarán disponibles cuando tu proveedor de entrega apruebe la solicitud.'}
+                  ? 'Lo define Mexy, tu proveedor de reparto.'
+                  : 'Aparecerá cuando Mexy apruebe tu solicitud.'}
               </p>
             </div>
           </aside>
