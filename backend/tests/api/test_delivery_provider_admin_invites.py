@@ -20,6 +20,7 @@ OWNER = uuid.UUID("11111111-1111-1111-1111-111111111111")
 ADMIN = uuid.UUID("22222222-2222-2222-2222-222222222222")
 OPERATOR = uuid.UUID("33333333-3333-3333-3333-333333333333")
 DRIVER = uuid.UUID("44444444-4444-4444-4444-444444444444")
+OTHER_ADMIN = uuid.UUID("66666666-6666-6666-6666-666666666666")
 
 
 class FakeAuth(AuthPort):
@@ -206,23 +207,23 @@ def test_owner_cannot_invite_active_admin_again(client):
 
 
 @requires_db
-def test_non_owner_cannot_list_admin_members(client):
+def test_operator_cannot_list_admin_members(client):
     _create_provider(client)
-
-    client.post(
-        "/api/v1/delivery-providers/me/admin-invites",
-        json={"email": "activo.admin@empresa.com"},
-        headers=AUTH,
+    _invite_and_claim(
+        client,
+        email="operador@empresa.com",
+        user_id=OPERATOR,
+        member_role="operator",
     )
 
     app.dependency_overrides[get_auth] = lambda: FakeAuth(
-        user_id=ADMIN,
-        email="activo.admin@empresa.com",
+        user_id=OPERATOR,
+        email="operador@empresa.com",
     )
     try:
         me = client.get("/api/v1/delivery-providers/me", headers=AUTH)
         assert me.status_code == 200
-        assert me.json()["member_role"] == "admin"
+        assert me.json()["member_role"] == "operator"
 
         forbidden = client.get("/api/v1/delivery-providers/me/members", headers=AUTH)
         assert forbidden.status_code == 403
@@ -369,7 +370,7 @@ def test_owner_cannot_remove_self(client):
 
 
 @requires_db
-def test_non_owner_cannot_remove_member(client):
+def test_admin_manages_team_without_seeing_or_removing_owner(client):
     _create_provider(client)
     _invite_and_claim(
         client,
@@ -377,20 +378,68 @@ def test_non_owner_cannot_remove_member(client):
         user_id=ADMIN,
         member_role="admin",
     )
+    _invite_and_claim(
+        client,
+        email="otro.admin@empresa.com",
+        user_id=OTHER_ADMIN,
+        member_role="admin",
+    )
+    _invite_and_claim(
+        client,
+        email="operador@empresa.com",
+        user_id=OPERATOR,
+        member_role="operator",
+    )
     owner_id = _member_id(client, "owner")
+    operator_id = _member_id(client, "operator")
 
     app.dependency_overrides[get_auth] = lambda: FakeAuth(
         user_id=ADMIN,
         email="nuevo.admin@empresa.com",
     )
     try:
-        removed = client.delete(
+        listed = client.get("/api/v1/delivery-providers/me/members", headers=AUTH)
+        assert listed.status_code == 200, listed.text
+        roles = {row["member_role"] for row in listed.json()}
+        assert "owner" not in roles
+        assert roles == {"admin", "operator"}
+        self_id = next(row["id"] for row in listed.json() if row["user_id"] == str(ADMIN))
+
+        invited = client.post(
+            "/api/v1/delivery-providers/me/admin-invites",
+            json={"email": "nuevo.operador@empresa.com", "member_role": "operator"},
+            headers=AUTH,
+        )
+        assert invited.status_code == 201, invited.text
+
+        removed_operator = client.delete(
+            f"/api/v1/delivery-providers/me/members/{operator_id}",
+            headers=AUTH,
+        )
+        assert removed_operator.status_code == 204
+
+        removed_self = client.delete(
+            f"/api/v1/delivery-providers/me/members/{self_id}",
+            headers=AUTH,
+        )
+        assert removed_self.status_code == 400
+        assert removed_self.json()["error"]["message"] == "No puedes quitarte a ti mismo"
+
+        removed_owner = client.delete(
             f"/api/v1/delivery-providers/me/members/{owner_id}",
             headers=AUTH,
         )
-        assert removed.status_code == 403
+        assert removed_owner.status_code == 404
+        assert removed_owner.json()["error"]["message"] == "Miembro no encontrado"
     finally:
-        app.dependency_overrides.pop(get_auth, None)
+        _use_owner_auth()
+
+    owner_list = client.get("/api/v1/delivery-providers/me/members", headers=AUTH)
+    assert owner_list.status_code == 200
+    remaining = {row["member_role"] for row in owner_list.json()}
+    assert "owner" in remaining
+    assert "operator" not in remaining
+    assert any(row["user_id"] == str(ADMIN) for row in owner_list.json())
 
 
 @requires_db
@@ -464,6 +513,43 @@ def test_owner_cannot_remove_driver_or_dispatcher(client, engine):
             removed.json()["error"]["message"]
             == "Solo puedes quitar administradores y operadores"
         )
+
+
+@requires_db
+def test_admin_can_remove_another_admin(client):
+    _create_provider(client)
+    _invite_and_claim(
+        client,
+        email="nuevo.admin@empresa.com",
+        user_id=ADMIN,
+        member_role="admin",
+    )
+    _invite_and_claim(
+        client,
+        email="otro.admin@empresa.com",
+        user_id=OTHER_ADMIN,
+        member_role="admin",
+    )
+    other_id = next(
+        row["id"]
+        for row in client.get("/api/v1/delivery-providers/me/members", headers=AUTH).json()
+        if row["user_id"] == str(OTHER_ADMIN)
+    )
+
+    app.dependency_overrides[get_auth] = lambda: FakeAuth(
+        user_id=ADMIN,
+        email="nuevo.admin@empresa.com",
+    )
+    try:
+        removed = client.delete(
+            f"/api/v1/delivery-providers/me/members/{other_id}",
+            headers=AUTH,
+        )
+        assert removed.status_code == 204
+        listed = client.get("/api/v1/delivery-providers/me/members", headers=AUTH)
+        assert all(row["user_id"] != str(OTHER_ADMIN) for row in listed.json())
+    finally:
+        app.dependency_overrides.pop(get_auth, None)
 
 
 @requires_db

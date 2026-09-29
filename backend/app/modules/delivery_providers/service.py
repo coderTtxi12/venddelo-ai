@@ -142,17 +142,20 @@ class DeliveryProviderService:
         self._repo.delete_zone(provider.id, zone_id)
 
     def list_admin_invites(self, user_id: uuid.UUID) -> list[DeliveryProviderAdminInviteDTO]:
-        provider_id = self._require_owner_provider_id(user_id)
+        provider_id, _role = self._require_team_manager(user_id)
         return list(self._repo.list_admin_invites(provider_id))
 
     def list_admin_members(self, user_id: uuid.UUID) -> list[DeliveryProviderMemberDTO]:
-        provider_id = self._require_owner_provider_id(user_id)
-        return list(self._repo.list_admin_members(provider_id))
+        provider_id, role = self._require_team_manager(user_id)
+        members = list(self._repo.list_admin_members(provider_id))
+        if role != "owner":
+            members = [member for member in members if member.member_role != "owner"]
+        return members
 
     def add_admin_invite(
         self, user_id: uuid.UUID, data: DeliveryProviderAdminInviteCreate
     ) -> DeliveryProviderAdminInviteDTO:
-        provider_id = self._require_owner_provider_id(user_id)
+        provider_id, _role = self._require_team_manager(user_id)
         normalized = self._normalize_admin_email(data.email)
         if any(
             member.email and member.email.strip().lower() == normalized
@@ -165,12 +168,17 @@ class DeliveryProviderService:
         return self._repo.add_admin_invite(provider_id, normalized, data.member_role)
 
     def remove_admin_invite(self, user_id: uuid.UUID, invite_id: uuid.UUID) -> None:
-        provider_id = self._require_owner_provider_id(user_id)
+        provider_id, _role = self._require_team_manager(user_id)
         self._repo.remove_admin_invite(provider_id, invite_id)
 
     def remove_admin_member(self, user_id: uuid.UUID, member_id: uuid.UUID) -> None:
-        provider_id = self._require_owner_provider_id(user_id)
-        self._repo.remove_admin_member(provider_id, member_id)
+        provider_id, role = self._require_team_manager(user_id)
+        self._repo.remove_admin_member(
+            provider_id,
+            member_id,
+            actor_user_id=user_id,
+            actor_role=role,
+        )
 
     def update_profile(
         self, user_id: uuid.UUID, data: DeliveryProviderProfileUpdate
@@ -627,14 +635,14 @@ class DeliveryProviderService:
             path=provider.rider_apk_path,
         )
 
-    def _require_owner_provider_id(self, user_id: uuid.UUID) -> uuid.UUID:
+    def _require_team_manager(self, user_id: uuid.UUID) -> tuple[uuid.UUID, str]:
         found = self._repo.get_for_user(user_id)
         if found is None:
             raise NotFoundError("No tienes un proveedor de delivery registrado")
         provider, member_role = found
-        if member_role != "owner":
-            raise ForbiddenError("Solo el propietario puede administrar invitaciones")
-        return provider.id
+        if member_role not in ("owner", "admin"):
+            raise ForbiddenError("Tu rol no permite administrar el equipo")
+        return provider.id, member_role
 
     def _normalize_admin_email(self, email: str) -> str:
         normalized = email.strip().lower()

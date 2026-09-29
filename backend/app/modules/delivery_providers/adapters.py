@@ -1347,7 +1347,14 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
             raise NotFoundError("Invitación no encontrada")
         self._session.delete(invite)
 
-    def remove_admin_member(self, provider_id: uuid.UUID, member_id: uuid.UUID) -> None:
+    def remove_admin_member(
+        self,
+        provider_id: uuid.UUID,
+        member_id: uuid.UUID,
+        *,
+        actor_user_id: uuid.UUID,
+        actor_role: str,
+    ) -> None:
         from app.core.exceptions import NotFoundError, ValidationError
 
         member = self._session.scalar(
@@ -1357,8 +1364,12 @@ class SqlAlchemyDeliveryProviderRepository(DeliveryProviderRepository):
                 DeliveryProviderMember.is_active.is_(True),
             )
         )
-        if member is None:
+        if member is None or (actor_role != "owner" and member.member_role == "owner"):
             raise NotFoundError("Miembro no encontrado")
+        if member.user_id == actor_user_id:
+            if member.member_role == "owner":
+                raise ValidationError("No puedes quitar al propietario")
+            raise ValidationError("No puedes quitarte a ti mismo")
         if member.member_role == "owner":
             raise ValidationError("No puedes quitar al propietario")
         if member.member_role not in ("admin", "operator"):
