@@ -26,6 +26,9 @@ type RestaurantHoursFooterProps = {
   serviceTypes?: RestaurantServiceType[];
   saving?: boolean;
   onSave: (payload: RestaurantScheduleCreateInput[]) => Promise<void>;
+  title?: string;
+  hint?: string;
+  serviceLabels?: Partial<Record<RestaurantServiceType, string>>;
 };
 
 function DayScheduleEditor({
@@ -136,11 +139,13 @@ function serviceBlockSummary(days: DayScheduleDraft[]): string {
 
 function ServiceScheduleBlock({
   block,
+  label,
   expanded,
   onToggle,
   onChangeDay,
 }: {
   block: ServiceScheduleDraft;
+  label: string;
   expanded: boolean;
   onToggle: () => void;
   onChangeDay: (dayIndex: number, next: DayScheduleDraft) => void;
@@ -157,7 +162,7 @@ function ServiceScheduleBlock({
         onClick={onToggle}
       >
         <span className={styles.serviceToggleMain}>
-          <span className={styles.serviceTitle}>{block.label}</span>
+          <span className={styles.serviceTitle}>{label}</span>
           {!expanded ? (
             <span className={styles.serviceSummary}>{serviceBlockSummary(block.days)}</span>
           ) : null}
@@ -187,6 +192,9 @@ export function RestaurantHoursFooter({
   serviceTypes = RESTAURANT_SERVICE_ORDER,
   saving = false,
   onSave,
+  title = 'Horario de tu negocio',
+  hint = 'Configura los días y turnos en que atiendes.',
+  serviceLabels,
 }: RestaurantHoursFooterProps) {
   const [drafts, setDrafts] = useState<ServiceScheduleDraft[]>(() =>
     buildScheduleDrafts(schedules, serviceTypes),
@@ -255,12 +263,12 @@ export function RestaurantHoursFooter({
   const savePending = saving || isSaving;
 
   return (
-    <section className={styles.hoursSection} aria-label="Horario del restaurante">
+    <section className={styles.hoursSection} aria-label={title}>
       <div className={styles.hoursHeader}>
         <AccessTimeOutlinedIcon className={styles.hoursIcon} aria-hidden />
         <div className={styles.hoursHeading}>
-          <h2 className={styles.hoursTitle}>Horarios de Servicio</h2>
-          <p className={styles.hoursHint}>Configura los días y turnos de cada servicio.</p>
+          <h2 className={styles.hoursTitle}>{title}</h2>
+          <p className={styles.hoursHint}>{hint}</p>
         </div>
       </div>
 
@@ -269,6 +277,7 @@ export function RestaurantHoursFooter({
           <ServiceScheduleBlock
             key={block.serviceType}
             block={block}
+            label={serviceLabels?.[block.serviceType] ?? block.label}
             expanded={expandedBlocks[block.serviceType]}
             onToggle={() => toggleBlock(block.serviceType)}
             onChangeDay={(dayIndex, next) => {
