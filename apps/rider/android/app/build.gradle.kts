@@ -1,4 +1,5 @@
 import java.io.File
+import java.util.Properties
 import org.gradle.process.ExecOperations
 import javax.inject.Inject
 
@@ -25,6 +26,12 @@ fun loadRiderEnv(file: File): Map<String, String> {
 val riderEnv = loadRiderEnv(rootProject.file("../.env"))
 val googleMapsApiKey = riderEnv["GOOGLE_MAPS_API_KEY"].orEmpty()
 
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
+}
+
 android {
     namespace = "com.mexy.mexy_rider"
     compileSdk = flutter.compileSdkVersion
@@ -47,11 +54,24 @@ android {
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
