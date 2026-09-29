@@ -108,7 +108,7 @@ const STATIC_ITEMS: Omit<DashboardSearchItem, 'score'>[] = [
     id: 'page:hours',
     kind: 'page',
     title: 'Horario',
-    subtitle: 'Horarios de servicio',
+    subtitle: 'Horario de tu negocio',
     keywords: ['horarios', 'hours', 'apertura', 'cierre', 'schedule'],
     href: '/hours',
   },

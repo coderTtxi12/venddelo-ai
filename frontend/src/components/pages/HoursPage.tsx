@@ -149,12 +149,12 @@ export default function HoursPage() {
         <div>
           <h1 className={styles.title}>Horario</h1>
           <p className={styles.subtitle}>
-            Configura el horario de recoger en tienda y consulta el de entrega a domicilio.
+            Configura el horario de tu negocio y consulta el de Mexy, tu proveedor de reparto.
           </p>
         </div>
       </div>
 
-      <section className={styles.panel} aria-label="Horarios de servicio">
+      <section className={styles.panel} aria-label="Horario de tu negocio y de Mexy">
         <div className={styles.hoursWrap}>
           {showTakeoutEditor ? (
             <div className={styles.takeoutBlock}>

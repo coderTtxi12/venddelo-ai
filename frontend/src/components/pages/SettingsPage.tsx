@@ -769,7 +769,7 @@ export default function SettingsPage() {
           <h1 className={styles.title}>Configuración del restaurante</h1>
           <p className={styles.subtitle}>
             Administra identidad, WhatsApp de pedidos, ubicación, tipos de entrega, métodos de pago y
-            horarios de servicio.
+            horarios.
           </p>
         </div>
         <button
@@ -1233,11 +1233,11 @@ export default function SettingsPage() {
 
       <section className={styles.panel} aria-labelledby="settings-hours">
         <h2 id="settings-hours" className={styles.panelTitle}>
-          Horarios de servicio
+          Horarios
         </h2>
         <p className={styles.panelHint}>
-          Configura el horario de recoger en tienda y consulta el de entrega a domicilio. Los
-          cambios de horario se guardan aparte.
+          Configura el horario de tu negocio y consulta el de Mexy. Los cambios de horario se
+          guardan aparte.
         </p>
         <div className={styles.hoursWrap}>
           <DashboardRestaurantHours
