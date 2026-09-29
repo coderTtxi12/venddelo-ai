@@ -19,7 +19,8 @@ export type LegalPath =
   | '/terminos'
   | '/privacidad'
   | '/rider/terminos'
-  | '/rider/privacidad';
+  | '/rider/privacidad'
+  | '/rider/eliminar-cuenta';
 
 type LegalDocumentProps = {
   title: string;
@@ -41,6 +42,7 @@ export default function LegalDocument({
   const rider = isRiderPath(currentPath);
   const termsHref = rider ? '/rider/terminos' : '/terminos';
   const privacyHref = rider ? '/rider/privacidad' : '/privacidad';
+  const deleteAccountHref = '/rider/eliminar-cuenta';
   const brandHref = rider ? '/rider/privacidad' : '/';
   const brandLabel = rider ? 'Mexy Rider' : 'Mexy AI';
 
@@ -65,6 +67,17 @@ export default function LegalDocument({
           >
             Privacidad
           </Link>
+          {rider && (
+            <Link
+              href={deleteAccountHref}
+              className={
+                currentPath === deleteAccountHref ? styles.navLinkActive : styles.navLink
+              }
+              aria-current={currentPath === deleteAccountHref ? 'page' : undefined}
+            >
+              Eliminar cuenta
+            </Link>
+          )}
           {!rider && (
             <Link href="/login" className={styles.navCta}>
               Entrar
@@ -87,6 +100,7 @@ export default function LegalDocument({
         <div className={styles.footerLinks}>
           <Link href={termsHref}>Términos y Condiciones</Link>
           <Link href={privacyHref}>Política de Privacidad</Link>
+          {rider && <Link href={deleteAccountHref}>Eliminar cuenta</Link>}
         </div>
       </footer>
     </div>
