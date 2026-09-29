@@ -14,7 +14,11 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useDeliveryProviderAccess } from '@/contexts/DeliveryProviderAccessContext';
 import { useDeliveryZone } from '@/contexts/DeliveryZoneContext';
 import { useAuth } from '@/hooks/useAuth';
-import { canRemoveTeamMember, memberRoleLabel } from '@/lib/access/deliveryProviderPermissions';
+import {
+  canRemoveThisMember,
+  memberRoleLabel,
+  visibleTeamMembers,
+} from '@/lib/access/deliveryProviderPermissions';
 import {
   addMyDeliveryProviderAdminInvite,
   getMyDeliveryProvider,
@@ -87,9 +91,10 @@ function memberSecondaryLabel(member: DeliveryProviderMember): string | null {
 }
 
 export default function SettingsPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const { selectedZone, effectiveZoneId } = useDeliveryZone();
-  const { canManageMembers, canWriteProviderConfig, isOperator } = useDeliveryProviderAccess();
+  const { canManageMembers, canWriteProviderConfig, isOperator, memberRole } =
+    useDeliveryProviderAccess();
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<OnboardingData>(() => createDefaultOnboardingData());
@@ -730,11 +735,11 @@ export default function SettingsPage() {
                   <p className={styles.loading} role="status">
                     Cargando equipo…
                   </p>
-                ) : adminMembers.length === 0 ? (
+                ) : visibleTeamMembers(memberRole, adminMembers).length === 0 ? (
                   <p className={styles.empty}>Aún no hay miembros activos.</p>
                 ) : (
                   <ul className={styles.adminMemberList}>
-                    {adminMembers.map((member) => {
+                    {visibleTeamMembers(memberRole, adminMembers).map((member) => {
                       const secondary = memberSecondaryLabel(member);
                       const joinedAt = formatMemberJoinedAt(member.created_at);
                       const isOwner = member.member_role === 'owner';
@@ -773,7 +778,7 @@ export default function SettingsPage() {
                               </span>
                             ) : null}
                           </div>
-                          {canRemoveTeamMember(member.member_role) ? (
+                          {canRemoveThisMember(user?.uid, member) ? (
                             <button
                               type="button"
                               className={styles.removeBtn}
