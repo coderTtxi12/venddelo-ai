@@ -4,4 +4,5 @@ class RiderLegalUrls {
 
   static const String terms = 'https://mxy.mx/rider/terminos';
   static const String privacy = 'https://mxy.mx/rider/privacidad';
+  static const String deleteAccount = 'https://mxy.mx/rider/eliminar-cuenta';
 }

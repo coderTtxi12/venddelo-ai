@@ -12,7 +12,7 @@ export default function RiderPrivacyPage() {
   return (
     <LegalDocument
       title="Política de Privacidad — Mexy Rider"
-      lastUpdated="12 de septiembre de 2026"
+      lastUpdated="22 de septiembre de 2026"
       currentPath="/rider/privacidad"
     >
       <p>
@@ -103,6 +103,11 @@ export default function RiderPrivacyPage() {
         uso o revocar tu consentimiento cuando proceda (incluido el de ubicación desde los
         ajustes del dispositivo). Para ejercerlos, contáctanos indicando el correo de tu
         cuenta Google.
+      </p>
+      <p>
+        Para solicitar la eliminación de tu cuenta de repartidor Mexy Rider y los datos
+        asociados, sigue los pasos de la página{' '}
+        <Link href="/rider/eliminar-cuenta">Eliminar cuenta</Link>.
       </p>
 
       <h2>7. Permisos del dispositivo</h2>

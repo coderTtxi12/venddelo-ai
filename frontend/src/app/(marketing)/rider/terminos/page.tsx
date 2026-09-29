@@ -12,7 +12,7 @@ export default function RiderTermsPage() {
   return (
     <LegalDocument
       title="Términos y Condiciones — Mexy Rider"
-      lastUpdated="12 de septiembre de 2026"
+      lastUpdated="22 de septiembre de 2026"
       currentPath="/rider/terminos"
     >
       <p>
@@ -106,7 +106,9 @@ export default function RiderTermsPage() {
 
       <h2>9. Terminación</h2>
       <p>
-        Puedes dejar de usar la App en cualquier momento. También podemos dar por
+        Puedes dejar de usar la App en cualquier momento. También puedes solicitar la
+        eliminación de tu cuenta y datos asociados en{' '}
+        <Link href="/rider/eliminar-cuenta">Eliminar cuenta</Link>. Podemos dar por
         terminado el acceso si incumples estos términos o dejas de estar autorizado como
         repartidor. Tras el cierre, podremos conservar cierta información cuando la ley o
         la seguridad lo requieran, según la{' '}
