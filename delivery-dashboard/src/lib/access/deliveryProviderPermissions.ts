@@ -21,15 +21,30 @@ export function memberRoleLabel(role: string | null | undefined): string {
 }
 
 export function canManageMembers(role: string | null | undefined): boolean {
-  return role === 'owner';
+  return role === 'owner' || role === 'admin';
 }
 
 export function canRemoveTeamMember(role: string | null | undefined): boolean {
   return role === 'admin' || role === 'operator';
 }
 
+export function canRemoveThisMember(
+  actorUserId: string | null | undefined,
+  member: { user_id: string; member_role: string },
+): boolean {
+  return canRemoveTeamMember(member.member_role) && !!actorUserId && member.user_id !== actorUserId;
+}
+
+export function visibleTeamMembers<T extends { member_role: string }>(
+  actorRole: string | null | undefined,
+  members: T[],
+): T[] {
+  if (actorRole === 'owner') return members;
+  return members.filter((member) => member.member_role !== 'owner');
+}
+
 export function canManageRiderApp(role: string | null | undefined): boolean {
-  return canManageMembers(role);
+  return role === 'owner';
 }
 
 export function canWriteProviderConfig(role: string | null | undefined): boolean {
