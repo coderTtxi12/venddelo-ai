@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Order } from '@/lib/api/types';
+import { shouldOpenKitchenOrdersSocket } from '@/lib/orders/kitchenOrdersActivity';
 import { sortOrdersNewestFirst } from '@/lib/orders/orderDisplay';
 import {
   matchesOrderStatusFilter,
@@ -63,8 +64,24 @@ export function useKitchenOrdersSocket(
     onReconnectRef.current = options.onReconnect;
   });
 
+  const [visibilityState, setVisibilityState] = useState<DocumentVisibilityState>(() =>
+    typeof document === 'undefined' ? 'visible' : document.visibilityState,
+  );
+
   useEffect(() => {
-    if (!restaurantId || !accessToken) {
+    const onVisibility = () => setVisibilityState(document.visibilityState);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
+  const open = shouldOpenKitchenOrdersSocket({
+    restaurantId,
+    accessToken,
+    visibilityState,
+  });
+
+  useEffect(() => {
+    if (!open || !restaurantId || !accessToken) {
       onStatusChangeRef.current?.('offline');
       return;
     }
@@ -128,5 +145,5 @@ export function useKitchenOrdersSocket(
       socket?.close();
       onStatusChangeRef.current?.('offline');
     };
-  }, [restaurantId, accessToken]);
+  }, [open, restaurantId, accessToken]);
 }
