@@ -18,6 +18,7 @@ import BrainOutlinedIcon from '@/components/icons/BrainOutlinedIcon';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import CodeOutlinedIcon from '@mui/icons-material/CodeOutlined';
 import { useAssistantChat } from '@/contexts/AssistantChatContext';
 import { MOBILE_DRAWER_MAX_WIDTH, useMobileSidebar } from '@/contexts/MobileSidebarContext';
 import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
@@ -77,6 +78,7 @@ const navSections: NavSection[] = [
     title: 'Tu negocio',
     items: [
       { label: 'Configuración', path: '/settings', icon: <SettingsOutlinedIcon fontSize="small" /> },
+      { label: 'Webhooks', path: '/settings/developer', icon: <CodeOutlinedIcon fontSize="small" /> },
     ],
   },
 ];

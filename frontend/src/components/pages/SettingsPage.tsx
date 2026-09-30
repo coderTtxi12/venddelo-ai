@@ -770,6 +770,12 @@ export default function SettingsPage() {
           <p className={styles.subtitle}>
             Administra identidad, WhatsApp de pedidos, ubicación, tipos de entrega, métodos de pago y
             horarios.
+            {(memberRole === 'owner' || memberRole === 'admin') && (
+              <>
+                {' '}
+                <Link href="/settings/developer">Webhooks de tracking</Link>
+              </>
+            )}
           </p>
         </div>
         <button
