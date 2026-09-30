@@ -1,4 +1,4 @@
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.pool import NullPool, QueuePool
 
 from app.db.session import build_engine, build_pooler_connect_args, is_pooled, normalize_db_url
 
@@ -34,14 +34,20 @@ def test_pooler_connect_args_set_timeouts_and_application_name():
     assert "idle_in_transaction_session_timeout=15000" in args["options"]
 
 
-def test_pooler_engine_caps_connections_per_cloud_run_instance():
+def test_pooler_engine_uses_nullpool():
     engine = build_engine(
         "postgresql+psycopg://user:password@aws-1.pooler.supabase.com:6543/postgres"
     )
     try:
+        assert isinstance(engine.pool, NullPool)
+    finally:
+        engine.dispose()
+
+
+def test_direct_postgres_engine_uses_queue_pool():
+    engine = build_engine("postgresql+psycopg://u:p@localhost:5434/vendelo")
+    try:
         assert isinstance(engine.pool, QueuePool)
         assert engine.pool.size() == 5
-        assert engine.pool._max_overflow == 0
-        assert engine.pool.timeout() == 10
     finally:
         engine.dispose()

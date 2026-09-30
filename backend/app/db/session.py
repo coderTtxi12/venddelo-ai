@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings, normalize_db_url
 
@@ -37,15 +38,14 @@ def build_pooler_connect_args() -> dict[str, object]:
 def build_engine(raw_url: str) -> Engine:
     url = normalize_db_url(raw_url)
     if is_pooled(url):
+        # Transaction pooler (Supavisor) already multiplexes connections. A small
+        # QueuePool per Cloud Run instance caps concurrent checkouts at 5 and
+        # produces ~10s 500s when many HTTP handlers run in parallel.
         return create_engine(
             url,
             connect_args=build_pooler_connect_args(),
+            poolclass=NullPool,
             pool_pre_ping=True,
-            pool_size=5,
-            max_overflow=0,
-            pool_timeout=10,
-            pool_recycle=300,
-            pool_use_lifo=True,
         )
     return create_engine(url, pool_pre_ping=True, pool_size=5, max_overflow=10)
 
