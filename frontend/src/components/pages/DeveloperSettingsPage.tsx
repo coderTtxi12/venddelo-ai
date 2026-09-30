@@ -14,6 +14,30 @@ import {
 import { ApiError } from '@/lib/api/types';
 import styles from '@/components/settings/DeveloperSettingsPanel.module.css';
 
+function displayWebhookUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  try {
+    const host = new URL(url).hostname;
+    if (host === 'localhost' || host === '127.0.0.1') return '';
+  } catch {
+    return '';
+  }
+  return url;
+}
+
+const TRACKING_STATUSES: { code: string; meaning: string }[] = [
+  { code: 'accepted', meaning: 'El pedido ya existe, pero el restaurante todavía no lo confirma.' },
+  { code: 'scheduled', meaning: 'El restaurante lo aceptó y lo está preparando. Aún no hay repartidor.' },
+  { code: 'searching', meaning: 'Ya se busca un repartidor disponible.' },
+  { code: 'offered', meaning: 'Un repartidor tiene la oferta y puede aceptarla o rechazarla.' },
+  { code: 'assigned', meaning: 'Un repartidor aceptó y va hacia el restaurante. Aquí empieza la ubicación.' },
+  { code: 'picked_up', meaning: 'El repartidor está en el restaurante recogiendo el pedido.' },
+  { code: 'in_transit', meaning: 'Ya salió y va hacia el cliente.' },
+  { code: 'delivered', meaning: 'El pedido se entregó.' },
+  { code: 'unassigned', meaning: 'No se encontró repartidor. El restaurante puede volver a buscar.' },
+  { code: 'cancelled', meaning: 'La entrega se canceló.' },
+];
+
 function Switch({
   checked,
   onChange,
@@ -86,7 +110,7 @@ export default function DeveloperSettingsPage() {
     try {
       const data = await getDeveloperSettings(accessToken, selectedRestaurantId);
       setSettings(data);
-      setWebhookUrl(data.webhook.url ?? '');
+      setWebhookUrl(displayWebhookUrl(data.webhook.url));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo cargar');
     } finally {
@@ -101,7 +125,7 @@ export default function DeveloperSettingsPage() {
 
   const applyWebhook = (webhook: DeveloperWebhook) => {
     setSettings((prev) => (prev ? { ...prev, webhook } : prev));
-    if (webhook.url) setWebhookUrl(webhook.url);
+    setWebhookUrl(displayWebhookUrl(webhook.url));
   };
 
   const saveUrl = async (url: string, extra?: Partial<DeveloperWebhook>) => {
@@ -116,54 +140,6 @@ export default function DeveloperSettingsPage() {
     return webhook;
   };
 
-  const tryNow = async () => {
-    if (!accessToken || !selectedRestaurantId || !settings) return;
-    setBusy(true);
-    setError(null);
-    setNote(null);
-    try {
-      if (!settings.webhook.has_signing_secret) {
-        const secret = await rotateDeveloperWebhookSecret(accessToken, selectedRestaurantId);
-        setSecretOnce(secret.signing_secret);
-        setSettings((prev) =>
-          prev
-            ? {
-                ...prev,
-                webhook: {
-                  ...prev.webhook,
-                  has_signing_secret: true,
-                  secret_hint: secret.secret_hint,
-                },
-              }
-            : prev,
-        );
-      }
-      await updateDeveloperWebhook(accessToken, selectedRestaurantId, {
-        url: settings.test_sink.post_url,
-        is_enabled: true,
-        notify_status: true,
-        notify_location: true,
-      });
-      const fresh = await getDeveloperSettings(accessToken, selectedRestaurantId);
-      setSettings((prev) =>
-        prev
-          ? { ...fresh, webhook: { ...fresh.webhook } }
-          : fresh,
-      );
-      setWebhookUrl(fresh.webhook.url ?? settings.test_sink.post_url);
-      const test = await testDeveloperWebhook(accessToken, selectedRestaurantId);
-      if (!test.ok) {
-        setError(test.error ?? 'La prueba no llegó. Revisa la URL.');
-      } else {
-        setNote('Listo. Ya enviamos un aviso de prueba. Ábrelo abajo.');
-      }
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo configurar la prueba');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const onSaveCustom = async () => {
     if (!settings) return;
     setBusy(true);
@@ -171,7 +147,7 @@ export default function DeveloperSettingsPage() {
     setNote(null);
     try {
       await saveUrl(webhookUrl);
-      setNote('URL guardada.');
+      setNote('Dirección guardada.');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo guardar');
     } finally {
@@ -262,7 +238,7 @@ export default function DeveloperSettingsPage() {
     );
   }
 
-  const live = Boolean(settings?.webhook.is_enabled && settings.webhook.url);
+  const live = Boolean(settings?.webhook.is_enabled && displayWebhookUrl(settings.webhook.url));
 
   return (
     <div className={styles.page}>
@@ -271,13 +247,13 @@ export default function DeveloperSettingsPage() {
           <p className={styles.kicker}>Developer</p>
           <h1 className={styles.title}>Webhooks</h1>
           <p className={styles.lead}>
-            Venddelo hace un POST a tu servidor por cada pedido. Si hay varios a la vez, llega un
-            aviso distinto por cada uno: míralos por <code>request_id</code>.
+            Cada pedido envía un aviso a la dirección que guardes. Si hay varios al mismo tiempo,
+            llega uno por pedido. El campo <code>request_id</code> los distingue.
           </p>
         </div>
         <p className={styles.status}>
           <span className={`${styles.dot} ${live ? styles.dotOn : ''}`} aria-hidden />
-          {live ? 'live' : 'paused'}
+          {live ? 'Activo' : 'Pausado'}
         </p>
       </header>
 
@@ -290,10 +266,9 @@ export default function DeveloperSettingsPage() {
           <section className={styles.card} aria-labelledby="dev-endpoint">
             <h2 id="dev-endpoint" className={styles.cardTitle}>Endpoint</h2>
             <p className={styles.cardText}>
-              Pega la URL de tu API. Si todavía no tienes una, Probar ahora usa un receptor de
-              Venddelo y deja los eventos listos para abrirlos.
+              Pega la dirección de tu servidor. Venddelo enviará ahí un aviso por cada pedido.
             </p>
-            <label className={styles.label} htmlFor="webhook-url">POST URL</label>
+            <label className={styles.label} htmlFor="webhook-url">Dirección del webhook</label>
             <input
               id="webhook-url"
               className={styles.input}
@@ -302,28 +277,22 @@ export default function DeveloperSettingsPage() {
               autoCapitalize="off"
               autoCorrect="off"
               spellCheck={false}
-              placeholder="https://api.tu-dominio.com/venddelo"
+              placeholder="https://tu-servidor.com/webhooks/venddelo"
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
             />
             <div className={styles.actions}>
-              <button type="button" className={styles.primary} disabled={busy || !settings} onClick={() => void tryNow()}>
-                {busy ? 'Enviando…' : 'Probar ahora'}
+              <button type="button" className={styles.primary} disabled={busy || !webhookUrl.trim()} onClick={() => void onSaveCustom()}>
+                Guardar dirección
               </button>
-              <button type="button" className={styles.ghost} disabled={busy || !webhookUrl.trim()} onClick={() => void onSaveCustom()}>
-                Guardar URL
-              </button>
-              <a className={styles.ghost} href={settings.test_sink.events_url} target="_blank" rel="noopener noreferrer">
-                Ver eventos
-              </a>
             </div>
           </section>
 
           <section className={styles.card} aria-labelledby="dev-events">
             <h2 id="dev-events" className={styles.cardTitle}>Eventos</h2>
             <p className={styles.cardText}>
-              Elige qué llega. La ubicación sale al ritmo del repartidor, cerca de cada 5 segundos,
-              solo mientras el pedido está en curso.
+              Elige qué avisos quieres. La ubicación se envía cerca de cada 5 segundos, y solo
+              mientras el repartidor lleva el pedido.
             </p>
             <SettingToggle
               label="tracking.status_changed"
@@ -351,11 +320,12 @@ export default function DeveloperSettingsPage() {
           <section className={styles.card} aria-labelledby="dev-sign">
             <h2 id="dev-sign" className={styles.cardTitle}>Firma</h2>
             <p className={styles.cardText}>
-              Cada POST trae <code>X-Venddelo-Signature</code>. Compárala con un HMAC-SHA256 de
-              <code> timestamp + &quot;.&quot; + cuerpo</code> usando tu clave <code>whsec_</code>.
+              Cada aviso incluye la cabecera <code>X-Venddelo-Signature</code>. Para comprobar que
+              viene de Venddelo, calcula un HMAC-SHA256 de <code>timestamp.raw_body</code> con tu
+              clave <code>whsec_</code>.
               {settings.webhook.has_signing_secret
-                ? ` Activa ${settings.webhook.secret_hint ?? ''}.`
-                : ' Todavía no hay clave.'}
+                ? ` Ya tienes una clave ${settings.webhook.secret_hint ?? ''}.`
+                : ' Aún no hay clave. Créala antes de activar el webhook.'}
             </p>
             <div className={styles.actions}>
               <button type="button" className={styles.ghost} disabled={busy} onClick={() => void onNewSecret()}>
@@ -379,6 +349,24 @@ export default function DeveloperSettingsPage() {
                 </button>
               </div>
             ) : null}
+          </section>
+
+          <section className={styles.card} aria-labelledby="dev-statuses">
+            <h2 id="dev-statuses" className={styles.cardTitle}>Estados</h2>
+            <p className={styles.cardText}>
+              En <code>tracking.status_changed</code> mira <code>data.tracking.status</code>.
+              En <code>tracking.location_updated</code> el mismo valor va en <code>data.status</code>,
+              y solo llega con repartidor en curso: <code>assigned</code>, <code>picked_up</code> o{' '}
+              <code>in_transit</code>.
+            </p>
+            <ul className={styles.statusList}>
+              {TRACKING_STATUSES.map((item) => (
+                <li key={item.code}>
+                  <code>{item.code}</code>
+                  <span>{item.meaning}</span>
+                </li>
+              ))}
+            </ul>
           </section>
 
           <section className={styles.console} aria-labelledby="dev-sample">
