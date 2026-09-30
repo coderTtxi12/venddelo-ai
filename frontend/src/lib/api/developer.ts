@@ -17,9 +17,15 @@ export type DeveloperApiKey = {
   revoked_at: string | null;
 };
 
+export type DeveloperJusto = {
+  inbound_url: string | null;
+  signing_secret: string | null;
+};
+
 export type DeveloperSettings = {
   webhook: DeveloperWebhook;
   api_keys: DeveloperApiKey[];
+  justo: DeveloperJusto;
 };
 
 export type DeveloperWebhookUpdate = {
