@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -10,10 +13,9 @@ const String riderNotRegisteredMessage =
     'Tu correo no está dado de alta. Mexy debe registrarte en el panel de repartidores con el mismo correo de Google.';
 
 Future<void> signInWithGoogle() async {
+  final iosClientId = !kIsWeb && Platform.isIOS ? AppConfig.googleIosClientId : '';
   final googleSignIn = GoogleSignIn(
-    clientId: AppConfig.googleIosClientId.isEmpty
-        ? null
-        : AppConfig.googleIosClientId,
+    clientId: iosClientId.isEmpty ? null : iosClientId,
     serverClientId: AppConfig.googleWebClientId.isEmpty
         ? null
         : AppConfig.googleWebClientId,
