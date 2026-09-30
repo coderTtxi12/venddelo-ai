@@ -19,14 +19,16 @@ export default function ZoneSwitcher({ onAddZone }: ZoneSwitcherProps) {
   const { loading, zones, selectedZoneId, setSelectedZoneId } = useDeliveryZone();
   const showAllChip = showsAllZonesOption(pathname) || selectedZoneId === ALL_ZONES_ID;
 
-  if (pathname === '/repartidores' || pathname === '/asignacion') {
+  if (pathname === '/' || pathname === '/repartidores' || pathname === '/asignacion') {
+    const hint =
+      pathname === '/'
+        ? 'La meta de 100 negocios es de toda Mexy, no de una zona.'
+        : pathname === '/repartidores'
+          ? 'Los repartidores cubren todas las zonas de la empresa.'
+          : 'La asignación aplica por empresa, no por zona.';
     return (
       <div className={styles.bar}>
-        <p className={styles.companyHint}>
-          {pathname === '/repartidores'
-            ? 'Los repartidores cubren todas las zonas de la empresa.'
-            : 'La asignación aplica por empresa, no por zona.'}
-        </p>
+        <p className={styles.companyHint}>{hint}</p>
       </div>
     );
   }
