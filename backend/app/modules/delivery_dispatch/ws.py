@@ -8,7 +8,9 @@ from fastapi import APIRouter, Depends, Query, Request, WebSocket, WebSocketDisc
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
-from app.api.deps import get_auth, get_current_user, get_synced_user
+from app.api.deps import get_auth, get_current_user
+from app.api.synced_user_cache import synced_user_cache
+from app.core.config import get_settings
 from app.core.exceptions import ForbiddenError, NotFoundError, UnauthorizedError
 from app.core.security import AuthenticatedUser, AuthPort
 from app.db.models.delivery import DeliveryDriver
@@ -20,7 +22,7 @@ from app.infra.storage.factory import build_storage
 from app.modules.delivery_dispatch.schemas import DispatchMonitorSnapshotDTO
 from app.modules.delivery_dispatch.service import DeliveryDispatchService
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
-from app.modules.users.schemas import UserDTO
+from app.modules.users.service import UserService
 
 router = APIRouter(tags=["delivery-dispatch-realtime"])
 
@@ -43,7 +45,7 @@ def _assert_can_read_restaurant_dispatch(
         raise ForbiddenError("You do not have access to this restaurant")
 
 
-def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeliveryDispatchService:
+def _dispatch_monitor_service(uow: SqlAlchemyUnitOfWork) -> DeliveryDispatchService:
     return DeliveryDispatchService(
         uow.session,
         SqlAlchemyDeliveryProviderRepository(uow.session),
@@ -51,16 +53,31 @@ def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeliveryDispatchSe
     )
 
 
+def _synced_user_for_request(
+    auth: AuthenticatedUser,
+    uow: SqlAlchemyUnitOfWork,
+) -> uuid.UUID:
+    settings = get_settings()
+    cache_ttl = settings.synced_user_cache_ttl_seconds if settings.app_env == "prod" else 0
+    cached = synced_user_cache.get(auth, ttl_seconds=cache_ttl)
+    if cached is not None:
+        return cached.id
+    user = UserService(uow.users).sync_from_auth(auth)
+    uow.commit()
+    synced_user_cache.set(auth, user, ttl_seconds=cache_ttl)
+    return user.id
+
+
 @router.get("/delivery-providers/me/dispatch-monitor", response_model=DispatchMonitorSnapshotDTO)
 def get_dispatch_monitor(
     zone_id: str | None = Query(default=None),
-    user: UserDTO = Depends(get_synced_user),
-    service: DeliveryDispatchService = Depends(_service),
+    auth: AuthenticatedUser = Depends(get_current_user),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> DispatchMonitorSnapshotDTO:
-    parsed_zone_id = None
-    if zone_id:
-        parsed_zone_id = uuid.UUID(zone_id)
-    return service.get_dispatch_monitor(user.id, zone_id=parsed_zone_id)
+    parsed_zone_id = uuid.UUID(zone_id) if zone_id else None
+    user_id = _synced_user_for_request(auth, uow)
+    service = _dispatch_monitor_service(uow)
+    return service.get_dispatch_monitor(user_id, zone_id=parsed_zone_id)
 
 
 @router.websocket("/ws/delivery-providers/me/dispatch")
