@@ -1,0 +1,111 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.card {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  padding: 1rem 0.85rem 0.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.cardHead h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.cardHead p {
+  margin: 0.3rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.9rem;
+  margin: 0.8rem 0 0.15rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 1.5rem;
+}
+
+.line,
+.bar,
+.goal {
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.line {
+  width: 1.15rem;
+  height: 0;
+  border-top: 2.5px solid #0f172a;
+}
+
+.dashed {
+  border-top-style: dashed;
+  border-top-color: #2563eb;
+}
+
+.goal {
+  width: 1.15rem;
+  height: 0;
+  border-top: 2.5px dashed #15803d;
+}
+
+.bar {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 3px;
+  background: #2563eb;
+}
+
+.hold {
+  background: #d97706;
+}
+
+.chart {
+  width: 100%;
+  min-width: 0;
+}
+
+.tooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.tooltip strong {
+  color: var(--color-text);
+}
+
+@media (min-width: 720px) {
+  .card {
+    padding: 1.1rem 1.15rem 0.65rem;
+  }
+}
