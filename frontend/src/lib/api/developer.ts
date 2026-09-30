@@ -52,6 +52,19 @@ export function rotateDeveloperWebhookSecret(token: string, restaurantId: string
   );
 }
 
+export type DeveloperSentEvent = {
+  received_at: string;
+  body: Record<string, unknown>;
+  delivered: boolean | null;
+};
+
+export function listDeveloperWebhookEvents(token: string, restaurantId: string) {
+  return apiRequest<{ items: DeveloperSentEvent[] }>(
+    `/restaurants/${restaurantId}/developer/webhook/events`,
+    { token },
+  );
+}
+
 export function testDeveloperWebhook(token: string, restaurantId: string) {
   return apiRequest<{ ok: boolean; status_code: number | null; error: string | null }>(
     `/restaurants/${restaurantId}/developer/webhook/test`,
