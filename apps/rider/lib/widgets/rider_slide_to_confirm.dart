@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -34,6 +35,15 @@ class RiderSlideToConfirm extends StatefulWidget {
   State<RiderSlideToConfirm> createState() => _RiderSlideToConfirmState();
 }
 
+class _EagerHorizontalDragGestureRecognizer
+    extends HorizontalDragGestureRecognizer {
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    super.addAllowedPointer(event);
+    resolve(GestureDisposition.accepted);
+  }
+}
+
 class _RiderSlideToConfirmState extends State<RiderSlideToConfirm>
     with SingleTickerProviderStateMixin {
   static const _inset = 6.0;
@@ -46,8 +56,9 @@ class _RiderSlideToConfirmState extends State<RiderSlideToConfirm>
   bool get _interactive =>
       widget.enabled && !widget.busy && widget.onConfirmed != null;
 
-  double get _trackHeight =>
-      widget.compact ? RiderSlideToConfirm.compactHeight : RiderSlideToConfirm.height;
+  double get _trackHeight => widget.compact
+      ? RiderSlideToConfirm.compactHeight
+      : RiderSlideToConfirm.height;
 
   double get _thumbSize => widget.compact
       ? RiderSlideToConfirm.compactThumbSize
@@ -65,7 +76,8 @@ class _RiderSlideToConfirmState extends State<RiderSlideToConfirm>
   @override
   void didUpdateWidget(covariant RiderSlideToConfirm oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.busy && !widget.busy || oldWidget.label != widget.label) {
+    if ((oldWidget.busy && !widget.busy) || oldWidget.label != widget.label) {
+      _snap.stop();
       _dx = 0;
       _hapticStep = -1;
     }
@@ -149,90 +161,109 @@ class _RiderSlideToConfirmState extends State<RiderSlideToConfirm>
           final width = constraints.maxWidth;
           final maxDx = _maxDx(width);
           final progress = maxDx == 0 ? 0.0 : (_dx / maxDx).clamp(0.0, 1.0);
-          return AnimatedOpacity(
-            duration: const Duration(milliseconds: 180),
-            opacity: _interactive ? 1 : 0.55,
-            child: Container(
-              width: double.infinity,
-              height: _trackHeight,
-              decoration: BoxDecoration(
-                color: widget.compact ? AppColors.background : widget.color,
-                borderRadius: BorderRadius.circular(
-                  widget.compact ? 14 : AppTheme.buttonRadius + 2,
+          return RawGestureDetector(
+            behavior: HitTestBehavior.opaque,
+            gestures: {
+              _EagerHorizontalDragGestureRecognizer:
+                  GestureRecognizerFactoryWithHandlers<
+                    _EagerHorizontalDragGestureRecognizer
+                  >(_EagerHorizontalDragGestureRecognizer.new, (instance) {
+                    instance.onStart = (_) {
+                      _onDragStart();
+                    };
+                    instance.onUpdate = (details) {
+                      _onDragUpdate(details, maxDx);
+                    };
+                    instance.onEnd = (_) {
+                      _onDragEnd(maxDx);
+                    };
+                    instance.onCancel = _snapBack;
+                  }),
+            },
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 180),
+              opacity: _interactive ? 1 : 0.55,
+              child: Container(
+                width: double.infinity,
+                height: _trackHeight,
+                decoration: BoxDecoration(
+                  color: widget.compact ? AppColors.background : widget.color,
+                  borderRadius: BorderRadius.circular(
+                    widget.compact ? 14 : AppTheme.buttonRadius + 2,
+                  ),
+                  border: widget.compact
+                      ? Border.all(color: AppColors.border)
+                      : null,
                 ),
-                border: widget.compact
-                    ? Border.all(color: AppColors.border)
-                    : null,
-              ),
-              child: Stack(
-                alignment: Alignment.centerLeft,
-                children: [
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: _thumbSize + 14,
-                      right: 18,
-                    ),
-                    child: Opacity(
-                      opacity: (1 - progress * 1.2).clamp(0.0, 1.0),
-                      child: _SlideLabelShine(
-                        text: widget.busy ? 'Actualizando…' : widget.label,
-                        enabled: _interactive && progress < 0.18,
-                        reduceMotion: reduceMotion || widget.compact,
-                        color: widget.compact
-                            ? AppColors.textMuted
-                            : Colors.white,
-                        fontSize: widget.compact ? 14 : 18,
+                child: Stack(
+                  alignment: Alignment.centerLeft,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.only(
+                        left: _thumbSize + 14,
+                        right: 18,
+                      ),
+                      child: Opacity(
+                        opacity: (1 - progress * 1.2).clamp(0.0, 1.0),
+                        child: _SlideLabelShine(
+                          text: widget.busy ? 'Actualizando…' : widget.label,
+                          enabled: _interactive && progress < 0.18,
+                          reduceMotion: reduceMotion || widget.compact,
+                          color: widget.compact
+                              ? AppColors.textMuted
+                              : Colors.white,
+                          fontSize: widget.compact ? 14 : 18,
+                        ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    left: _inset + _dx,
-                    top: _inset,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onHorizontalDragStart: (_) => _onDragStart(),
-                      onHorizontalDragUpdate: (details) =>
-                          _onDragUpdate(details, maxDx),
-                      onHorizontalDragEnd: (_) => _onDragEnd(maxDx),
-                      child: Container(
-                        width: _thumbSize,
-                        height: _thumbSize,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(
-                            widget.compact ? 12 : 16,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(widget.compact ? 0x14000000 : 0x33000000),
-                              blurRadius: widget.compact ? 4 : 10,
-                              offset: const Offset(0, 2),
+                    Positioned(
+                      left: _inset + _dx,
+                      top: _inset,
+                      child: IgnorePointer(
+                        child: Container(
+                          width: _thumbSize,
+                          height: _thumbSize,
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(
+                              widget.compact ? 12 : 16,
                             ),
-                          ],
-                        ),
-                        child: widget.busy
-                            ? Padding(
-                                padding: EdgeInsets.all(widget.compact ? 10 : 16),
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.6,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Color(
+                                  widget.compact ? 0x14000000 : 0x33000000,
+                                ),
+                                blurRadius: widget.compact ? 4 : 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: widget.busy
+                              ? Padding(
+                                  padding: EdgeInsets.all(
+                                    widget.compact ? 10 : 16,
+                                  ),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.6,
+                                    color: widget.compact
+                                        ? AppColors.textMuted
+                                        : widget.color,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.chevron_right_rounded,
                                   color: widget.compact
                                       ? AppColors.textMuted
                                       : widget.color,
+                                  size: widget.compact
+                                      ? 22
+                                      : (reduceMotion ? 32 : 38),
                                 ),
-                              )
-                            : Icon(
-                                Icons.chevron_right_rounded,
-                                color: widget.compact
-                                    ? AppColors.textMuted
-                                    : widget.color,
-                                size: widget.compact
-                                    ? 22
-                                    : (reduceMotion ? 32 : 38),
-                              ),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
