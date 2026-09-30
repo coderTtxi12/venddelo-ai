@@ -155,10 +155,10 @@ const STATIC_ITEMS: Omit<DashboardSearchItem, 'score'>[] = [
   {
     id: 'page:developer',
     kind: 'page',
-    title: 'Webhooks de tracking',
-    subtitle: 'Integración con tu POS o ERP',
+    title: 'Developer',
+    subtitle: 'Webhooks de tracking',
     keywords: ['developer', 'webhook', 'integracion', 'tracking', 'pos', 'seguimiento'],
-    href: '/settings/developer',
+    href: '/developer',
   },
   {
     id: 'section:whatsapp',
