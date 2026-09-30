@@ -16,6 +16,23 @@ export function listActivePartnerships(token: string, query: PartnershipListQuer
   });
 }
 
+const PARTNERSHIP_FETCH_LIMIT = 100;
+
+export async function listAllActivePartnerships(token: string): Promise<DeliveryPartnershipRequest[]> {
+  const items: DeliveryPartnershipRequest[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await listActivePartnerships(token, {
+      limit: PARTNERSHIP_FETCH_LIMIT,
+      offset,
+      sort: 'activated_at',
+    });
+    items.push(...page.items);
+    if (!page.has_more || page.items.length === 0) return items;
+    offset += page.items.length;
+  }
+}
+
 export function listPartnerships(
   token: string,
   kind: PartnershipListKind,
