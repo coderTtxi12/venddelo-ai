@@ -67,8 +67,13 @@ import { zoneColorForId } from '@/lib/dispatch/zoneColors';
 import panelStyles from './PartnershipsPage.module.css';
 import styles from './MonitorPage.module.css';
 
-function connectionLabel(status: DispatchMonitorSocketStatus): string {
-  if (status === 'live') return 'En vivo';
+function connectionLabel(
+  status: DispatchMonitorSocketStatus,
+  snapshotError: string | null,
+): string {
+  if (status === 'live') {
+    return snapshotError ? 'En vivo (datos pendientes)' : 'En vivo';
+  }
   if (status === 'connecting') return 'Conectando…';
   if (status === 'reconnecting') return 'Reconectando…';
   return 'Sin conexión';
@@ -858,6 +863,9 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
   const [logNonce, setLogNonce] = useState(0);
   const snapshotInFlightRef = useRef(false);
   const snapshotQueuedRef = useRef(false);
+  const lastSnapshotSuccessAtRef = useRef(0);
+  const snapshotThrottleTimerRef = useRef<number | null>(null);
+  const SNAPSHOT_MIN_INTERVAL_MS = 2_500;
   const [weatherSaving, setWeatherSaving] = useState(false);
   const [releasingMexyRequestId, setReleasingMexyRequestId] = useState<string | null>(null);
   const [mexyRelease, setMexyRelease] = useState<{
@@ -882,14 +890,40 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
     return () => window.clearInterval(timer);
   }, []);
 
-  const loadSnapshot = useCallback(async () => {
+  useEffect(
+    () => () => {
+      if (snapshotThrottleTimerRef.current != null) {
+        window.clearTimeout(snapshotThrottleTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  const loadSnapshot = useCallback(async (options?: { force?: boolean }) => {
     if (!shouldLoadSnapshot || !accessToken) return;
+    const now = Date.now();
+    if (
+      !options?.force &&
+      lastSnapshotSuccessAtRef.current > 0 &&
+      now - lastSnapshotSuccessAtRef.current < SNAPSHOT_MIN_INTERVAL_MS
+    ) {
+      snapshotQueuedRef.current = true;
+      if (snapshotThrottleTimerRef.current == null) {
+        const waitMs =
+          SNAPSHOT_MIN_INTERVAL_MS - (now - lastSnapshotSuccessAtRef.current);
+        snapshotThrottleTimerRef.current = window.setTimeout(() => {
+          snapshotThrottleTimerRef.current = null;
+          void loadSnapshot({ force: true });
+        }, waitMs);
+      }
+      return;
+    }
     if (snapshotInFlightRef.current) {
       snapshotQueuedRef.current = true;
       return;
     }
     snapshotInFlightRef.current = true;
-    setLoading(true);
+    setLoading(snapshot == null);
     setError(null);
     try {
       do {
@@ -899,6 +933,7 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
           isAllZones ? null : selectedZoneId,
         );
         setSnapshot(data);
+        lastSnapshotSuccessAtRef.current = Date.now();
       } while (snapshotQueuedRef.current);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el monitor');
@@ -906,7 +941,7 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
       snapshotInFlightRef.current = false;
       setLoading(false);
     }
-  }, [accessToken, isAllZones, selectedZoneId, shouldLoadSnapshot]);
+  }, [accessToken, isAllZones, selectedZoneId, shouldLoadSnapshot, snapshot]);
 
   useEffect(() => {
     if (!shouldLoadSnapshot) return;
@@ -917,6 +952,7 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
   }, [loadSnapshot, shouldLoadSnapshot]);
 
   useDispatchMonitorSocket(socketToken, {
+    eventDebounceMs: 1_200,
     onEvent: () => {
       void loadSnapshot();
       setLogNonce((value) => value + 1);
@@ -1206,7 +1242,7 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
       action={
         <div className={styles.liveBadge} data-status={connectionStatus}>
           <span className={styles.liveDot} aria-hidden />
-          {connectionLabel(connectionStatus)}
+          {connectionLabel(connectionStatus, error)}
           {snapshot ? (
             <span className={styles.updatedAt}>
               · {formatTime(snapshot.generated_at)}
