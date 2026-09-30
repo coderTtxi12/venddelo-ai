@@ -6,6 +6,7 @@ import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
 import {
   getDeveloperSettings,
   rotateDeveloperWebhookSecret,
+  listDeveloperWebhookEvents,
   testDeveloperWebhook,
   updateDeveloperWebhook,
   type DeveloperSettings,
@@ -97,6 +98,7 @@ export default function DeveloperSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [secretOnce, setSecretOnce] = useState<string | null>(null);
+  const [sentEvents, setSentEvents] = useState<string | null>(null);
 
   const canManage = memberRole === 'owner' || memberRole === 'admin';
 
@@ -138,6 +140,23 @@ export default function DeveloperSettingsPage() {
     });
     applyWebhook(webhook);
     return webhook;
+  };
+
+  const onViewEvents = async () => {
+    if (!accessToken || !selectedRestaurantId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await listDeveloperWebhookEvents(accessToken, selectedRestaurantId);
+      setSentEvents(JSON.stringify(data, null, 2));
+      if (data.items.length === 0) {
+        setNote('Todavía no hay avisos enviados.');
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudieron cargar los avisos');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onSaveCustom = async () => {
@@ -266,7 +285,7 @@ export default function DeveloperSettingsPage() {
           <section className={styles.card} aria-labelledby="dev-endpoint">
             <h2 id="dev-endpoint" className={styles.cardTitle}>Endpoint</h2>
             <p className={styles.cardText}>
-              Pega la dirección de tu servidor. Venddelo enviará ahí un aviso por cada pedido.
+              Pega la dirección de tu servidor. Mexy enviará ahí eventos por cada pedido.
             </p>
             <label className={styles.label} htmlFor="webhook-url">Dirección del webhook</label>
             <input
@@ -277,7 +296,7 @@ export default function DeveloperSettingsPage() {
               autoCapitalize="off"
               autoCorrect="off"
               spellCheck={false}
-              placeholder="https://tu-servidor.com/webhooks/venddelo"
+              placeholder="https://tu-servidor.com/webhooks/mexy"
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
             />
@@ -285,7 +304,11 @@ export default function DeveloperSettingsPage() {
               <button type="button" className={styles.primary} disabled={busy || !webhookUrl.trim()} onClick={() => void onSaveCustom()}>
                 Guardar dirección
               </button>
+              <button type="button" className={styles.ghost} disabled={busy} onClick={() => void onViewEvents()}>
+                Ver eventos
+              </button>
             </div>
+            {sentEvents ? <pre className={styles.eventsPreview}>{sentEvents}</pre> : null}
           </section>
 
           <section className={styles.card} aria-labelledby="dev-events">
