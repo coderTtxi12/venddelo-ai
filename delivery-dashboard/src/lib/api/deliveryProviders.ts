@@ -376,7 +376,11 @@ export function getMyDispatchMonitor(token: string, zoneId?: string | null) {
   const path = zoneId
     ? `/delivery-providers/me/dispatch-monitor?zone_id=${encodeURIComponent(zoneId)}`
     : '/delivery-providers/me/dispatch-monitor';
-  return apiRequest<DispatchMonitorSnapshot>(path, { token });
+  return apiRequest<DispatchMonitorSnapshot>(path, {
+    token,
+    retries: 2,
+    timeoutMs: 90_000,
+  });
 }
 
 export function getMyDispatchHistory(token: string, params: DispatchHistoryQuery) {
