@@ -5,9 +5,19 @@ const locationAuthFailedEvent = 'auth_failed';
 const locationAuthFailedMessage =
     'No se pudo verificar tu sesión. Ponte en línea de nuevo.';
 
-enum LocationPingAuthStep { success, ignore, refreshAndRetry, failOffline }
+enum LocationPingAuthStep { success, ignore, refreshAndRetry, failOffline, throttle }
 
-enum LocationPingResult { sent, ignored, authFailed }
+enum LocationPingResult { sent, ignored, authFailed, throttled }
+
+class LocationPingAttemptResult {
+  const LocationPingAttemptResult({
+    required this.result,
+    this.httpStatus,
+  });
+
+  final LocationPingResult result;
+  final int? httpStatus;
+}
 
 class LocationTaskCredentials {
   const LocationTaskCredentials({
@@ -50,6 +60,9 @@ LocationPingAuthStep locationPingAuthStep({
         ? LocationPingAuthStep.failOffline
         : LocationPingAuthStep.refreshAndRetry;
   }
+  if (statusCode == 429 || statusCode == 408 || statusCode >= 500) {
+    return LocationPingAuthStep.throttle;
+  }
   return LocationPingAuthStep.ignore;
 }
 
@@ -70,7 +83,7 @@ LocationTaskCredentials? credentialsFromRefreshResponse({
   );
 }
 
-Future<LocationPingResult> postLocationWithAuthRetry({
+Future<LocationPingAttemptResult> postLocationWithAuthRetry({
   required LocationTaskCredentials credentials,
   required Future<http.Response> Function(LocationTaskCredentials creds)
   postLocation,
@@ -91,20 +104,28 @@ Future<LocationPingResult> postLocationWithAuthRetry({
     );
     switch (step) {
       case LocationPingAuthStep.success:
-        return LocationPingResult.sent;
+        return LocationPingAttemptResult(result: LocationPingResult.sent);
       case LocationPingAuthStep.ignore:
-        return LocationPingResult.ignored;
+        return LocationPingAttemptResult(
+          result: LocationPingResult.ignored,
+          httpStatus: response.statusCode,
+        );
       case LocationPingAuthStep.refreshAndRetry:
         final next = await refreshTokens(creds);
         if (next == null) {
-          return LocationPingResult.authFailed;
+          return LocationPingAttemptResult(result: LocationPingResult.authFailed);
         }
         creds = next;
         await persistCredentials(creds);
         alreadyRefreshed = true;
         continue;
       case LocationPingAuthStep.failOffline:
-        return LocationPingResult.authFailed;
+        return LocationPingAttemptResult(result: LocationPingResult.authFailed);
+      case LocationPingAuthStep.throttle:
+        return LocationPingAttemptResult(
+          result: LocationPingResult.throttled,
+          httpStatus: response.statusCode,
+        );
     }
   }
 }

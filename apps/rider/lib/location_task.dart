@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'app_build.dart';
 import 'location_auth.dart';
 import 'location_ping.dart';
+import 'location_post_backoff.dart';
 
 const _apiBaseUrlKey = 'apiBaseUrl';
 const _accessTokenKey = 'accessToken';
@@ -31,6 +32,7 @@ class LocationTaskHandler extends TaskHandler {
   Position? _lastPosition;
   DateTime? _lastAttemptAt;
   bool _pingInFlight = false;
+  LocationPostBackoffState _postBackoff = kEmptyLocationPostBackoff;
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
@@ -89,6 +91,9 @@ class LocationTaskHandler extends TaskHandler {
       return;
     }
     final now = DateTime.now();
+    if (!shouldAttemptLocationPost(now: now, state: _postBackoff)) {
+      return;
+    }
     if (!shouldSendLocationPing(now: now, lastSentAt: _lastAttemptAt)) {
       return;
     }
@@ -131,7 +136,7 @@ class LocationTaskHandler extends TaskHandler {
       }
       final fix = next;
       _lastPosition = fix;
-      final result = await postLocationWithAuthRetry(
+      final attempt = await postLocationWithAuthRetry(
         credentials: credentials,
         postLocation: (creds) {
           return http
@@ -159,10 +164,32 @@ class LocationTaskHandler extends TaskHandler {
           supabaseAnonKey: creds.supabaseAnonKey,
         ),
       );
+      final result = attempt.result;
+      if (result == LocationPingResult.sent) {
+        _postBackoff = recordLocationPostSuccess(_postBackoff);
+      } else if (result == LocationPingResult.throttled) {
+        _postBackoff = recordLocationPostFailure(
+          state: _postBackoff,
+          now: now,
+          statusCode: attempt.httpStatus,
+          jitterMs: locationPostJitterMs(
+            failureStreak: _postBackoff.failureStreak + 1,
+            seed: now.millisecond,
+          ),
+        );
+      }
       if (result == LocationPingResult.authFailed) {
         FlutterForegroundTask.sendDataToMain(locationAuthFailedEvent);
       }
     } catch (_) {
+      _postBackoff = recordLocationPostFailure(
+        state: _postBackoff,
+        now: DateTime.now(),
+        jitterMs: locationPostJitterMs(
+          failureStreak: _postBackoff.failureStreak + 1,
+          seed: DateTime.now().millisecond,
+        ),
+      );
     } finally {
       _pingInFlight = false;
     }

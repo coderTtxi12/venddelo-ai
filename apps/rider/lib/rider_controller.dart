@@ -18,7 +18,9 @@ import 'job_overlay.dart';
 import 'job_overlay_platform.dart';
 import 'location_auth.dart';
 import 'location_ping.dart';
+import 'location_post_backoff.dart';
 import 'location_task.dart';
+import 'rider_app_lifecycle.dart';
 import 'models.dart';
 import 'offer_push.dart';
 import 'rider_permissions.dart';
@@ -59,6 +61,7 @@ class RiderController extends ChangeNotifier {
   Timer? _locationPing;
   DateTime? _lastLocationPingAt;
   bool _locationPingInFlight = false;
+  LocationPostBackoffState _locationPostBackoff = kEmptyLocationPostBackoff;
   RiderSocket? _socket;
   RiderSocketStatus _socketStatus = RiderSocketStatus.offline;
   final Set<String> _dismissedExpiredOfferIds = {};
@@ -91,9 +94,10 @@ class RiderController extends ChangeNotifier {
       }
       await _setupFcm();
       await startLiveLocation();
-      await _ensureRiderSocket();
       if (profile?.isOnline == true) {
         await _startOnlineServices();
+      } else {
+        await _syncRiderWebSocket();
       }
     } on ApiException catch (error) {
       if (error.statusCode == 403) {
@@ -306,8 +310,7 @@ class RiderController extends ChangeNotifier {
     initLocationForegroundTask();
     await startLocationForegroundTask();
     _startIosLocationPings();
-    await _ensureRiderSocket();
-    _syncOfferPollWithSocket();
+    await _syncRiderWebSocket();
     await refreshOffers();
   }
 
@@ -340,6 +343,9 @@ class RiderController extends ChangeNotifier {
       return;
     }
     final now = DateTime.now();
+    if (!shouldAttemptLocationPost(now: now, state: _locationPostBackoff)) {
+      return;
+    }
     if (!shouldSendLocationPing(now: now, lastSentAt: _lastLocationPingAt)) {
       return;
     }
@@ -355,13 +361,52 @@ class RiderController extends ChangeNotifier {
       currentPosition = next;
       await _api.postLocation(next.latitude, next.longitude);
       _lastLocationPingAt = DateTime.now();
+      _locationPostBackoff = recordLocationPostSuccess(_locationPostBackoff);
+    } on ApiException catch (error) {
+      if (shouldBackoffLocationPostStatus(error.statusCode)) {
+        _locationPostBackoff = recordLocationPostFailure(
+          state: _locationPostBackoff,
+          now: now,
+          statusCode: error.statusCode,
+          jitterMs: locationPostJitterMs(
+            failureStreak: _locationPostBackoff.failureStreak + 1,
+            seed: now.millisecond,
+          ),
+        );
+      }
     } catch (_) {
+      _locationPostBackoff = recordLocationPostFailure(
+        state: _locationPostBackoff,
+        now: now,
+        jitterMs: locationPostJitterMs(
+          failureStreak: _locationPostBackoff.failureStreak + 1,
+          seed: now.millisecond,
+        ),
+      );
     } finally {
       _locationPingInFlight = false;
     }
   }
 
+  Future<void> _syncRiderWebSocket() async {
+    final keepOnlineSocket =
+        profile?.isOnline == true && shouldKeepRiderWebSocket(lifecycleState);
+    if (!keepOnlineSocket) {
+      if (_socket != null) {
+        await _socket!.stop();
+        _socket = null;
+      }
+      _socketStatus = RiderSocketStatus.offline;
+      _syncOfferPollWithSocket();
+      return;
+    }
+    await _ensureRiderSocket();
+  }
+
   Future<void> _ensureRiderSocket() async {
+    if (!shouldKeepRiderWebSocket(lifecycleState) || profile?.isOnline != true) {
+      return;
+    }
     if (_socket != null) {
       return;
     }
@@ -613,8 +658,12 @@ class RiderController extends ChangeNotifier {
   void onAppLifecycle(AppLifecycleState state) {
     lifecycleState = state;
     unawaited(syncJobOverlay());
+    unawaited(_syncRiderWebSocket());
     if (state == AppLifecycleState.resumed) {
       unawaited(promptOemBackgroundPopupOnce());
+      if (profile?.isOnline == true) {
+        unawaited(refreshOffers());
+      }
     }
   }
 

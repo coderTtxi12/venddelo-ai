@@ -21,7 +21,11 @@ void main() {
     );
     expect(
       locationPingAuthStep(statusCode: 500, alreadyRefreshed: false),
-      LocationPingAuthStep.ignore,
+      LocationPingAuthStep.throttle,
+    );
+    expect(
+      locationPingAuthStep(statusCode: 429, alreadyRefreshed: false),
+      LocationPingAuthStep.throttle,
     );
   });
 
@@ -56,7 +60,7 @@ void main() {
       },
     );
 
-    expect(result, LocationPingResult.sent);
+    expect(result.result, LocationPingResult.sent);
     expect(posts, 2);
     expect(refreshes, 1);
     expect(persisted?.accessToken, 'new');
@@ -79,7 +83,7 @@ void main() {
       persistCredentials: (_) async {},
     );
 
-    expect(result, LocationPingResult.authFailed);
+    expect(result.result, LocationPingResult.authFailed);
   });
 
   test('postLocationWithAuthRetry goes offline when retry still 401', () async {
@@ -98,7 +102,27 @@ void main() {
       persistCredentials: (_) async {},
     );
 
-    expect(result, LocationPingResult.authFailed);
+    expect(result.result, LocationPingResult.authFailed);
+  });
+
+  test('postLocationWithAuthRetry backs off on 429', () async {
+    final initial = LocationTaskCredentials(
+      apiBaseUrl: 'http://api',
+      accessToken: 'tok',
+      refreshToken: 'r1',
+      supabaseUrl: 'http://supabase',
+      supabaseAnonKey: 'anon',
+    );
+
+    final result = await postLocationWithAuthRetry(
+      credentials: initial,
+      postLocation: (_) async => http.Response('', 429),
+      refreshTokens: (_) async => null,
+      persistCredentials: (_) async {},
+    );
+
+    expect(result.result, LocationPingResult.throttled);
+    expect(result.httpStatus, 429);
   });
 
   test('credentialsFromRefreshResponse reads tokens', () {
