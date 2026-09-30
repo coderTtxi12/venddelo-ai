@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     menu_import_max_photo_bytes: int = 5 * 1024 * 1024
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
+    synced_user_cache_ttl_seconds: int = 30
+    dispatch_monitor_cache_ttl_seconds: int = 2
     openai_api_key: str | None = None
     openai_model: str = "gpt-5-nano-2025-08-07"
     openai_reasoning_effort: str = "medium"

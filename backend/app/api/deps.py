@@ -5,6 +5,8 @@ import uuid
 from fastapi import Depends, Header, Query
 from starlette.requests import HTTPConnection
 
+from app.api.synced_user_cache import synced_user_cache
+from app.core.config import get_settings
 from app.core.exceptions import ForbiddenError, NotFoundError, UnauthorizedError
 from app.core.pagination import DEFAULT_LIMIT, MAX_LIMIT, PaginationParams
 from app.core.security import AuthenticatedUser, AuthPort
@@ -44,7 +46,19 @@ def get_synced_user(
     uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> UserDTO:
     """Verify JWT and upsert the app user profile (Supabase id → users table)."""
-    return UserService(uow.users).sync_from_auth(auth)
+    settings = get_settings()
+    cache_ttl = (
+        settings.synced_user_cache_ttl_seconds if settings.app_env == "prod" else 0
+    )
+    cached = synced_user_cache.get(auth, ttl_seconds=cache_ttl)
+    if cached is not None:
+        return cached
+    user = UserService(uow.users).sync_from_auth(auth)
+    # User sync is an independent auth concern. Persist it immediately so its
+    # read/upsert transaction cannot span the endpoint's slower business work.
+    uow.commit()
+    synced_user_cache.set(auth, user, ttl_seconds=cache_ttl)
+    return user
 
 
 def pagination_params(
