@@ -20,6 +20,7 @@ from app.db.models.restaurant import Restaurant
 from app.db.session import SessionLocal
 from app.infra.storage.factory import build_storage
 from app.modules.developer.crypto import sign_webhook_payload
+from app.modules.developer.webhook_sink import get_webhook_sink_store
 from app.modules.delivery_dispatch.tracking_view import LIVE_TRACKING_STATUSES, build_public_tracking_dto
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,12 @@ def deliver_test_webhook(restaurant_id: uuid.UUID) -> tuple[bool, int | None, st
                 "restaurant_id": str(restaurant_id),
             },
         )
-        return _post_json(webhook.url, webhook.signing_secret, payload)
+        return _post_json(
+            webhook.url,
+            webhook.signing_secret,
+            payload,
+            restaurant_id=restaurant_id,
+        )
     finally:
         session.close()
 
@@ -98,7 +104,12 @@ def _deliver_status(request_id: uuid.UUID) -> None:
                 "tracking": tracking.model_dump(mode="json"),
             },
         )
-        _post_json(webhook.url, webhook.signing_secret, payload)
+        _post_json(
+            webhook.url,
+            webhook.signing_secret,
+            payload,
+            restaurant_id=request.restaurant_id,
+        )
     except Exception:
         logger.exception("tracking status webhook failed for request %s", request_id)
     finally:
@@ -145,7 +156,12 @@ def _deliver_location_for_driver(driver_id: uuid.UUID) -> None:
                     ),
                 },
             )
-            _post_json(webhook.url, webhook.signing_secret, payload)
+            _post_json(
+                webhook.url,
+                webhook.signing_secret,
+                payload,
+                restaurant_id=request.restaurant_id,
+            )
     except Exception:
         logger.exception("tracking location webhook failed for driver %s", driver_id)
     finally:
@@ -176,10 +192,16 @@ def _envelope(event_type: str, data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def sent_events_key(restaurant_id: uuid.UUID) -> str:
+    return f"sent:{restaurant_id}"
+
+
 def _post_json(
     url: str,
     signing_secret: str,
     payload: dict[str, Any],
+    *,
+    restaurant_id: uuid.UUID | None = None,
 ) -> tuple[bool, int | None, str | None]:
     body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
     timestamp = int(time.time())
@@ -200,10 +222,18 @@ def _post_json(
     try:
         with urlopen(req, timeout=WEBHOOK_TIMEOUT_SECONDS) as resp:
             code = resp.getcode()
-            return 200 <= code < 300, code, None
+            ok, status_code, error = 200 <= code < 300, code, None
     except HTTPError as exc:
-        return False, exc.code, exc.reason
+        ok, status_code, error = False, exc.code, exc.reason
     except URLError as exc:
-        return False, None, str(exc.reason)
+        ok, status_code, error = False, None, str(exc.reason)
     except Exception as exc:
-        return False, None, str(exc)
+        ok, status_code, error = False, None, str(exc)
+    if restaurant_id is not None:
+        get_webhook_sink_store().record(
+            sent_events_key(restaurant_id),
+            headers={"x-venddelo-event-type": str(payload.get("type") or "")},
+            body=payload,
+            signature_valid=ok,
+        )
+    return ok, status_code, error
