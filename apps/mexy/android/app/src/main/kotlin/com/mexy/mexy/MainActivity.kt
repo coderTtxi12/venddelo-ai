@@ -1,4 +1,4 @@
-package com.mexy.mexy_owner
+package com.mexy.mexy
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -133,7 +133,7 @@ class MainActivity : FlutterActivity() {
     }
 
     companion object {
-        private const val CHANNEL = "com.mexy.owner/printer"
+        private const val CHANNEL = "com.mexy.printer"
         private const val BLUETOOTH_REQUEST = 41
     }
 }
