@@ -46,7 +46,11 @@ from app.db.models.promotions import (
     promotion_categories,
     promotion_products,
 )
-from app.db.models.developer import RestaurantDeveloperApiKey, RestaurantTrackingWebhook
+from app.db.models.developer import (
+    RestaurantDeveloperApiKey,
+    RestaurantJustoStore,
+    RestaurantTrackingWebhook,
+)
 from app.db.models.restaurant import (
     Restaurant,
     RestaurantAdminInvite,
@@ -64,6 +68,7 @@ __all__ = [
     "MarketingAgentAccount",
     "MarketingTask",
     "RestaurantTrackingWebhook",
+    "RestaurantJustoStore",
     "RestaurantDeveloperApiKey",
     "Restaurant",
     "RestaurantMember",

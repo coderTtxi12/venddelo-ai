@@ -25,6 +25,20 @@ class RestaurantTrackingWebhook(TimestampMixin, Base):
     sink_token: Mapped[str] = mapped_column(String(48), nullable=False, unique=True, index=True)
 
 
+class RestaurantJustoStore(TimestampMixin, Base):
+    """Justo inbound webhook secret for one Mexy restaurant."""
+
+    __tablename__ = "restaurant_justo_stores"
+
+    restaurant_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("restaurants.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    store_id: Mapped[str | None] = mapped_column(String(80), nullable=True, unique=True)
+    signing_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class RestaurantDeveloperApiKey(Base):
     __tablename__ = "restaurant_developer_api_keys"
 
