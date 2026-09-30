@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -52,3 +53,13 @@ class DeveloperWebhookTestResult(BaseModel):
     ok: bool
     status_code: int | None = None
     error: str | None = None
+
+
+class DeveloperSentEventDTO(BaseModel):
+    received_at: str
+    body: dict[str, Any]
+    delivered: bool | None = None
+
+
+class DeveloperSentEventsResponse(BaseModel):
+    items: list[DeveloperSentEventDTO]
