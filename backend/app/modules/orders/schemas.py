@@ -68,6 +68,8 @@ class OrderCreate(BaseModel):
     status: str = "pending"
     idempotency_key: str | None = None
     note: str | None = None
+    external_source: str | None = None
+    external_id: str | None = None
     items: list[OrderItemCreate] = []
 
 

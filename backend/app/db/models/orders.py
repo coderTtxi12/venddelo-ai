@@ -11,6 +11,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -72,6 +73,8 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     kds_cleared_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    external_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    external_id: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order", cascade="all, delete-orphan"
@@ -89,6 +92,14 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ),
         Index("ix_orders_listing", "restaurant_id", "status", "created_at"),
         Index("ix_orders_kds_cleared_at", "restaurant_id", "kds_cleared_at"),
+        Index(
+            "uq_orders_external",
+            "restaurant_id",
+            "external_source",
+            "external_id",
+            unique=True,
+            postgresql_where=text("external_id IS NOT NULL"),
+        ),
     )
 
 
