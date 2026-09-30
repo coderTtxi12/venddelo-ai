@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
@@ -114,7 +115,8 @@ class RiderSocket {
     }
     onStatusChange?.call(RiderSocketStatus.reconnecting);
     _retryTimer?.cancel();
-    _retryTimer = Timer(Duration(milliseconds: _retryMs), () {
+    final jitter = Random().nextInt(400);
+    _retryTimer = Timer(Duration(milliseconds: _retryMs + jitter), () {
       _retryMs = (_retryMs * 2).clamp(1000, 30000);
       unawaited(_connect());
     });
