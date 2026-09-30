@@ -1002,7 +1002,10 @@ class _HomeBottomSheet extends StatelessWidget {
                       key: ValueKey('${job.id}-${job.status}'),
                       label: jobSlideLabel(job.status),
                       color: AppColors.cta,
-                      onConfirmed: jobAction(job.status) == null
+                      busy: controller.assignmentBusy,
+                      onConfirmed:
+                          jobAction(job.status) == null ||
+                              controller.assignmentBusy
                           ? null
                           : () => controller.transitionAssignment(
                               job.id,

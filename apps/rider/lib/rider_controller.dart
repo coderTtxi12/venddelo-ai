@@ -49,7 +49,7 @@ class RiderController extends ChangeNotifier {
   String? errorMessage;
   bool loading = true;
   bool notRegistered = false;
-  bool onlineBusy = false;
+  bool assignmentBusy = false;
   bool offerBusy = false;
   bool needsLocationSettings = false;
   bool overlayEnabled = true;
@@ -296,11 +296,19 @@ class RiderController extends ChangeNotifier {
   }
 
   Future<void> transitionAssignment(String requestId, String action) async {
+    if (assignmentBusy) {
+      return;
+    }
+    assignmentBusy = true;
+    errorMessage = null;
+    notifyListeners();
     try {
       await _api.transitionAssignment(requestId, action);
       await refreshMe();
     } on ApiException catch (error) {
       errorMessage = error.message;
+    } finally {
+      assignmentBusy = false;
       notifyListeners();
     }
   }
@@ -322,16 +330,14 @@ class RiderController extends ChangeNotifier {
     if (kIsWeb || !Platform.isIOS) {
       return;
     }
-    _onlineLocationSub = Geolocator.getPositionStream(
-      locationSettings: riderBackgroundLocationSettings(),
-    ).listen(
-      (position) {
-        currentPosition = position;
-        notifyListeners();
-        unawaited(_postLiveLocation(position: position));
-      },
-      onError: (_) {},
-    );
+    _onlineLocationSub =
+        Geolocator.getPositionStream(
+          locationSettings: riderBackgroundLocationSettings(),
+        ).listen((position) {
+          currentPosition = position;
+          notifyListeners();
+          unawaited(_postLiveLocation(position: position));
+        }, onError: (_) {});
     _locationPing = Timer.periodic(locationPingInterval, (_) {
       unawaited(_postLiveLocation());
     });
@@ -404,7 +410,8 @@ class RiderController extends ChangeNotifier {
   }
 
   Future<void> _ensureRiderSocket() async {
-    if (!shouldKeepRiderWebSocket(lifecycleState) || profile?.isOnline != true) {
+    if (!shouldKeepRiderWebSocket(lifecycleState) ||
+        profile?.isOnline != true) {
       return;
     }
     if (_socket != null) {
