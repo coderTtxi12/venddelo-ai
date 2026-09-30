@@ -117,29 +117,41 @@ class WorkflowOrchestrator:
     async def stream_chat(
         self,
         *,
-        uow: SqlAlchemyUnitOfWork,
         restaurant_id: uuid.UUID,
         message: str,
         conversation_id: uuid.UUID | None = None,
         attachments: list[ChatAttachmentRef] | None = None,
+        uow: SqlAlchemyUnitOfWork | None = None,
     ) -> AsyncIterator[ChatStreamEvent]:
         yield ChatStreamEvent(event="agent.status", data={"status": "processing"})
         yield phase_event("context")
 
-        runtime = await load_workflow_runtime(
-            uow=uow,
-            restaurant_id=restaurant_id,
-            conversation_id=conversation_id,
-            user_message=message,
-            attachments=attachments or [],
-            settings=self._settings,
-            rollout_skill_ids=self._rollout_skill_ids,
-        )
+        setup_uow = uow
+        entered_owned_uow = False
+        if setup_uow is None:
+            setup_uow = SqlAlchemyUnitOfWork()
+            setup_uow.__enter__()
+            entered_owned_uow = True
+        try:
+            runtime = await load_workflow_runtime(
+                uow=setup_uow,
+                restaurant_id=restaurant_id,
+                conversation_id=conversation_id,
+                user_message=message,
+                attachments=attachments or [],
+                settings=self._settings,
+                rollout_skill_ids=self._rollout_skill_ids,
+            )
+        finally:
+            if entered_owned_uow:
+                setup_uow.__exit__(None, None, None)
+
+        assert setup_uow is not None
         workflow_context = runtime.context
         registry = runtime.registry
         resolved_conversation_id = runtime.conversation_id
         run_context = self._build_run_context(
-            uow=uow,
+            uow=setup_uow,
             restaurant_id=restaurant_id,
             conversation_id=resolved_conversation_id,
             registry=registry,

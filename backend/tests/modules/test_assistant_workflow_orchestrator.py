@@ -84,15 +84,64 @@ class FakeStreamedResult:
         raise AssertionError("No final output configured for streamed run")
 
 
-async def _collect(orchestrator: WorkflowOrchestrator, message: str = "¿Qué categorías tengo?"):
+async def _collect(
+    orchestrator: WorkflowOrchestrator,
+    message: str = "¿Qué categorías tengo?",
+    **kwargs,
+):
     events = []
-    async for event in orchestrator.stream_chat(
-        uow=MagicMock(),
-        restaurant_id=uuid.uuid4(),
-        message=message,
-    ):
+    stream_kwargs = {
+        "uow": MagicMock(),
+        "restaurant_id": uuid.uuid4(),
+        "message": message,
+        **kwargs,
+    }
+    async for event in orchestrator.stream_chat(**stream_kwargs):
         events.append(event)
     return events
+
+
+def test_stream_chat_closes_owned_setup_uow_before_llm_stream():
+    settings = Settings(openai_api_key="sk-test", langsmith_tracing=False)
+    orchestrator = WorkflowOrchestrator(settings=settings, rollout_skill_ids=("menu_read",))
+    runtime = _runtime_bundle()
+    call_order: list[str] = []
+
+    class TrackingUow:
+        def __enter__(self):
+            call_order.append("enter")
+            return self
+
+        def __exit__(self, exc_type, exc, tb):  # noqa: ARG002
+            call_order.append("exit")
+            return None
+
+        def commit(self) -> None:
+            call_order.append("commit")
+
+    def fake_run_streamed(agent, agent_input, context=None, max_turns=1):  # noqa: ARG001
+        call_order.append("llm")
+        return FakeStreamedResult(text_delta="Hola")
+
+    with (
+        patch(
+            "app.modules.assistant.agent.workflow.orchestrator.SqlAlchemyUnitOfWork",
+            TrackingUow,
+        ),
+        patch(
+            "app.modules.assistant.agent.workflow.orchestrator.load_workflow_runtime",
+            return_value=runtime,
+        ),
+        patch("app.modules.assistant.agent.workflow.orchestrator.schedule_persist_turn"),
+        patch(
+            "app.modules.assistant.agent.workflow.orchestrator.Runner.run_streamed",
+            side_effect=fake_run_streamed,
+        ),
+    ):
+        asyncio.run(_collect(orchestrator, uow=None, message="Hola"))
+
+    assert call_order.index("enter") < call_order.index("exit")
+    assert call_order.index("exit") < call_order.index("llm")
 
 
 def test_workflow_orchestrator_reply_only():

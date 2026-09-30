@@ -1,20 +1,23 @@
-from unittest.mock import MagicMock
+import asyncio
 import uuid
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 from app.modules.assistant.agent.workflow.context_loader import (
+    WorkflowContext,
     _build_conversation_history,
+    catalog_agent_input,
+    load_workflow_runtime,
     menu_subagent_input,
     operations_agent_input,
     orchestrator_input,
     resolve_runtime_skill_ids,
-    catalog_agent_input,
 )
-from app.modules.assistant.schemas import AssistantChatHistoryMessage
-from app.modules.assistant.agent.workflow.context_loader import WorkflowContext
 from app.modules.assistant.agent.workflow.schemas import (
     ExecutionRecord,
     clear_execution_approval_gates,
 )
+from app.modules.assistant.schemas import AssistantChatHistoryMessage
 
 
 def test_resolve_runtime_skill_ids_intersects_discovered_skills():
@@ -158,8 +161,6 @@ def test_format_history_strips_chat_attachments_from_user_messages():
 
 
 def test_build_conversation_history_uses_message_limit_without_compression(monkeypatch):
-    import asyncio
-
     from app.core.config import Settings
 
     captured: dict[str, int] = {}
@@ -195,3 +196,82 @@ def test_build_conversation_history_uses_message_limit_without_compression(monke
 
     assert captured["limit"] == 12
     assert rendered == "Usuario: hola"
+
+
+def test_load_workflow_runtime_commits_before_external_history_compression(monkeypatch):
+    from app.core.config import Settings
+
+    conversation_id = uuid.uuid4()
+    uow = MagicMock()
+    profile = SimpleNamespace(
+        enabled_skill_ids=["menu_read", "menu_import"],
+        display_name="Luna",
+    )
+    history = [AssistantChatHistoryMessage(role="user", content="hola")]
+
+    monkeypatch.setattr(
+        "app.modules.assistant.agent.workflow.context_loader.ensure_conversation_committed",
+        lambda **_kwargs: conversation_id,
+    )
+    monkeypatch.setattr(
+        "app.modules.assistant.agent.workflow.context_loader._profile_service",
+        lambda *_args: SimpleNamespace(get_or_create=lambda _restaurant_id: profile),
+    )
+    monkeypatch.setattr(
+        "app.modules.assistant.agent.workflow.context_loader.SqlAlchemyRestaurantEntitlementsRepository",
+        lambda _session: SimpleNamespace(
+            get_or_create_default=lambda *_args, **_kwargs: SimpleNamespace()
+        ),
+    )
+    monkeypatch.setattr(
+        "app.modules.assistant.agent.workflow.context_loader.resolve_entitlements",
+        lambda **_kwargs: SimpleNamespace(
+            effective_skill_ids=["menu_read", "menu_import"]
+        ),
+    )
+    monkeypatch.setattr(
+        "app.modules.assistant.agent.workflow.context_loader._discovered_skill_ids",
+        lambda: {"menu_read", "menu_import"},
+    )
+    monkeypatch.setattr(
+        "app.modules.assistant.agent.workflow.context_loader.compose_system_prompt",
+        lambda *_args, **_kwargs: "system",
+    )
+    monkeypatch.setattr(
+        "app.modules.assistant.agent.workflow.context_loader.assistant_repository",
+        lambda _uow: object(),
+    )
+    monkeypatch.setattr(
+        "app.modules.assistant.agent.workflow.context_loader.load_recent_history",
+        lambda *_args, **_kwargs: history,
+    )
+    monkeypatch.setattr(
+        "app.modules.assistant.agent.workflow.context_loader.get_active_import_for_conversation",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.modules.assistant.agent.workflow.context_loader.replace_import_session_if_needed",
+        lambda **_kwargs: None,
+    )
+
+    async def fake_compress(messages, **_kwargs):
+        assert uow.commit.called, "DB transaction must close before external LLM I/O"
+        return SimpleNamespace(history=messages)
+
+    monkeypatch.setattr(
+        "app.modules.assistant.agent.workflow.context_loader.compress_history_for_llm",
+        fake_compress,
+    )
+
+    asyncio.run(
+        load_workflow_runtime(
+            uow=uow,
+            restaurant_id=uuid.uuid4(),
+            conversation_id=conversation_id,
+            user_message="Hola",
+            settings=Settings(
+                openai_api_key="sk-test",
+                assistant_context_compression_enabled=True,
+            ),
+        )
+    )

@@ -92,21 +92,21 @@ class AssistantAgentService:
     async def stream_chat(
         self,
         *,
-        uow: SqlAlchemyUnitOfWork,
         restaurant_id: uuid.UUID,
         message: str,
         conversation_id: uuid.UUID | None = None,
         attachments: list[ChatAttachmentRef] | None = None,
+        uow: SqlAlchemyUnitOfWork | None = None,
     ) -> AsyncIterator[ChatStreamEvent]:
         self._require_openai_api_key()
         self._prepare_runtime()
 
         async for event in self._orchestrator.stream_chat(
-            uow=uow,
             restaurant_id=restaurant_id,
             message=message,
             conversation_id=conversation_id,
             attachments=attachments or [],
+            uow=uow,
         ):
             yield event
 

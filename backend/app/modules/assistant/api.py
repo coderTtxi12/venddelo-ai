@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from fastapi import APIRouter, Depends, File, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import require_owned_restaurant
+from app.api.deps import get_current_user, require_owned_restaurant
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.core.llm.ports import ChatStreamEvent
-from app.db.uow import SqlAlchemyUnitOfWork, get_uow
+from app.core.security import AuthenticatedUser
+from app.db.uow import SqlAlchemyUnitOfWork, finish_uow_gen, get_uow
 from app.modules.assistant.agent.service import AssistantAgentService
 from app.modules.assistant.agent.workflow.clarify_registry import get_clarify_registry
 from app.modules.assistant.import_assets import upload_import_asset
@@ -83,9 +85,10 @@ async def answer_assistant_clarify(
 
 @router.post("/restaurants/{restaurant_id}/assistant/chat")
 async def assistant_chat(
+    request: Request,
+    restaurant_id: uuid.UUID,
     body: AssistantChatRequest,
-    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
-    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+    user: AuthenticatedUser = Depends(get_current_user),
     service: AssistantAgentService = Depends(_agent_service),
 ) -> StreamingResponse:
     """Stream one assistant turn via SSE (OpenAI Agents SDK, menu_read tools only for now)."""
@@ -94,10 +97,19 @@ async def assistant_chat(
     except ValueError as exc:
         raise ValidationError(str(exc)) from exc
 
+    # Ownership check uses a short-lived UoW. FastAPI would otherwise keep the
+    # request session checked out for the entire OpenAI SSE stream.
+    uow_dep = request.app.dependency_overrides.get(get_uow, get_uow)
+    uow_gen = uow_dep()
+    uow = next(uow_gen)
+    try:
+        restaurant = require_owned_restaurant(restaurant_id, user, uow)
+    finally:
+        finish_uow_gen(uow_gen)
+
     async def event_generator() -> AsyncIterator[str]:
         try:
             async for event in service.stream_chat(
-                uow=uow,
                 restaurant_id=restaurant.id,
                 message=body.message,
                 conversation_id=body.conversation_id,

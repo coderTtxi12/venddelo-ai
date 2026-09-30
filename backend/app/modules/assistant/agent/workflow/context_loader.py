@@ -101,7 +101,9 @@ def build_skill_catalog(registry: SkillRegistry, effective_skill_ids: list[str])
         meta = load_skill_metadata(skill_id)
         description = meta.get("description") or skill_id
         tool_names = sorted(
-            tool.name for sid, tool in registry.entitled_tools(effective_skill_ids) if sid == skill_id
+            tool.name
+            for sid, tool in registry.entitled_tools(effective_skill_ids)
+            if sid == skill_id
         )
         tools_text = ", ".join(tool_names) if tool_names else "(sin tools)"
         lines.append(f"- **{skill_id}**: {description}\n  Tools: {tools_text}")
@@ -250,17 +252,30 @@ async def load_workflow_runtime(
         apply_compression=False,
     )
 
-    menu_import_conversation_history = EMPTY_CONVERSATION_HISTORY
+    menu_import_history: list[AssistantChatHistoryMessage] = []
     if menu_import_enabled:
-        menu_import_conversation_history = await _build_conversation_history(
+        menu_import_history = load_recent_history(
             repo,
             resolved_conversation_id,
             settings=resolved_settings,
-            system_prompt=system_prompt,
-            user_message=user_text,
             message_limit=resolved_settings.assistant_llm_context_message_limit,
-            apply_compression=True,
         )
+
+    # Release all profile, entitlement, import-session, and history reads before
+    # history compression calls the external LLM and before the SSE agent runs.
+    uow.commit()
+
+    menu_import_conversation_history = EMPTY_CONVERSATION_HISTORY
+    if menu_import_enabled:
+        if resolved_settings.assistant_context_compression_enabled:
+            compressed = await compress_history_for_llm(
+                menu_import_history,
+                settings=resolved_settings,
+                system_prompt=system_prompt,
+                user_message=user_text,
+            )
+            menu_import_history = compressed.history
+        menu_import_conversation_history = _format_history(menu_import_history)
 
     if menu_import_enabled:
         import_session_context = build_router_import_session_context(
@@ -283,10 +298,6 @@ async def load_workflow_runtime(
         import_session_context=import_session_context,
         current_turn_attachments_context=current_turn_attachments_context,
     )
-
-    # Commit profile/entitlements/conversation setup before the long-lived SSE stream.
-    # Otherwise a second chat request can block on the uncommitted PK insert.
-    uow.commit()
 
     return WorkflowRuntimeBundle(
         context=context,
