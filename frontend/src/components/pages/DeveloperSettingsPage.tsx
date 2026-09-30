@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRestaurantAccess } from '@/contexts/RestaurantAccessContext';
@@ -15,7 +14,7 @@ import {
 import { ApiError } from '@/lib/api/types';
 import styles from '@/components/settings/DeveloperSettingsPanel.module.css';
 
-function Toggle({
+function Switch({
   checked,
   onChange,
   disabled,
@@ -35,8 +34,32 @@ function Toggle({
         aria-label={ariaLabel}
         onChange={(e) => onChange(e.target.checked)}
       />
-      <span className={styles.switchTrack} aria-hidden />
+      <span className={styles.slider} aria-hidden="true" />
     </label>
+  );
+}
+
+function SettingToggle({
+  label,
+  hint,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  hint: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className={styles.toggleRow}>
+      <div>
+        <div className={styles.toggleLabel}>{label}</div>
+        <div className={styles.toggleHint}>{hint}</div>
+      </div>
+      <Switch checked={checked} disabled={disabled} onChange={onChange} ariaLabel={label} />
+    </div>
   );
 }
 
@@ -234,8 +257,7 @@ export default function DeveloperSettingsPage() {
   if (!canManage && !accessLoading && !authLoading) {
     return (
       <div className={styles.page}>
-        <Link href="/settings" className={styles.backLink}>← Configuración</Link>
-        <p className={styles.subtitle}>Solo el dueño o un administrador puede usar esto.</p>
+        <p className={styles.lead}>Solo el dueño o un administrador puede usar Developer.</p>
       </div>
     );
   }
@@ -244,136 +266,141 @@ export default function DeveloperSettingsPage() {
 
   return (
     <div className={styles.page}>
-      <Link href="/settings" className={styles.backLink}>← Configuración</Link>
       <header className={styles.header}>
         <div>
-          <h1 className={styles.title}>Avisos de seguimiento</h1>
-          <p className={styles.subtitle}>
-            Te mandamos un mensaje a tu sistema cada vez que un pedido avanza o el repartidor se mueve.
+          <p className={styles.kicker}>Developer</p>
+          <h1 className={styles.title}>Webhooks</h1>
+          <p className={styles.lead}>
+            Venddelo hace un POST a tu servidor por cada pedido. Si hay varios a la vez, llega un
+            aviso distinto por cada uno: míralos por <code>request_id</code>.
           </p>
         </div>
-        {settings ? (
-          <p className={styles.status}>
-            <span className={`${styles.dot} ${live ? styles.dotOn : ''}`} aria-hidden />
-            {live ? 'Enviando avisos' : 'Pausado'}
-          </p>
-        ) : null}
+        <p className={styles.status}>
+          <span className={`${styles.dot} ${live ? styles.dotOn : ''}`} aria-hidden />
+          {live ? 'live' : 'paused'}
+        </p>
       </header>
 
-      {loading ? <p className={styles.loading}>Cargando…</p> : null}
-      {error ? <div className={`${styles.banner} ${styles.bannerErr}`} role="alert">{error}</div> : null}
-      {note ? <div className={`${styles.banner} ${styles.bannerOk}`} role="status">{note}</div> : null}
+      {loading ? <p className={styles.lead}>Cargando…</p> : null}
+      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      {note ? <p className={styles.ok} role="status">{note}</p> : null}
 
       {settings ? (
-        <>
-          <section className={styles.panel}>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="webhook-url">Dirección donde llegan los avisos</label>
-              <p className={styles.hint}>
-                Pega la de tu sistema, o pulsa Probar ahora para usar una dirección de prueba de Venddelo.
-              </p>
-              <input
-                id="webhook-url"
-                className={styles.input}
-                type="url"
-                inputMode="url"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-                placeholder="https://tu-sitio.com/avisos"
-                value={webhookUrl}
-                onChange={(e) => setWebhookUrl(e.target.value)}
-              />
-            </div>
-            <div className={styles.saveRow}>
-              <button type="button" className={styles.primaryBtn} disabled={busy} onClick={() => void tryNow()}>
-                {busy ? 'Un momento…' : 'Probar ahora'}
+        <div className={styles.grid}>
+          <section className={styles.card} aria-labelledby="dev-endpoint">
+            <h2 id="dev-endpoint" className={styles.cardTitle}>Endpoint</h2>
+            <p className={styles.cardText}>
+              Pega la URL de tu API. Si todavía no tienes una, Probar ahora usa un receptor de
+              Venddelo y deja los eventos listos para abrirlos.
+            </p>
+            <label className={styles.label} htmlFor="webhook-url">POST URL</label>
+            <input
+              id="webhook-url"
+              className={styles.input}
+              type="url"
+              inputMode="url"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="https://api.tu-dominio.com/venddelo"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+            />
+            <div className={styles.actions}>
+              <button type="button" className={styles.primary} disabled={busy || !settings} onClick={() => void tryNow()}>
+                {busy ? 'Enviando…' : 'Probar ahora'}
               </button>
-              <button type="button" className={styles.secondaryBtn} disabled={busy || !webhookUrl.trim()} onClick={() => void onSaveCustom()}>
-                Guardar dirección
+              <button type="button" className={styles.ghost} disabled={busy || !webhookUrl.trim()} onClick={() => void onSaveCustom()}>
+                Guardar URL
+              </button>
+              <a className={styles.ghost} href={settings.test_sink.events_url} target="_blank" rel="noopener noreferrer">
+                Ver eventos
+              </a>
+            </div>
+          </section>
+
+          <section className={styles.card} aria-labelledby="dev-events">
+            <h2 id="dev-events" className={styles.cardTitle}>Eventos</h2>
+            <p className={styles.cardText}>
+              Elige qué llega. La ubicación sale al ritmo del repartidor, cerca de cada 5 segundos,
+              solo mientras el pedido está en curso.
+            </p>
+            <SettingToggle
+              label="tracking.status_changed"
+              hint="Asignado, recogido, en camino, entregado"
+              checked={settings.webhook.notify_status}
+              disabled={busy}
+              onChange={(next) => void onToggle({ notify_status: next })}
+            />
+            <SettingToggle
+              label="tracking.location_updated"
+              hint="Latitud y longitud de ese pedido"
+              checked={settings.webhook.notify_location}
+              disabled={busy}
+              onChange={(next) => void onToggle({ notify_location: next })}
+            />
+            <SettingToggle
+              label="Webhook activo"
+              hint="Pausa el envío sin borrar la URL ni la clave"
+              checked={settings.webhook.is_enabled}
+              disabled={busy}
+              onChange={(next) => void onToggle({ is_enabled: next })}
+            />
+          </section>
+
+          <section className={styles.card} aria-labelledby="dev-sign">
+            <h2 id="dev-sign" className={styles.cardTitle}>Firma</h2>
+            <p className={styles.cardText}>
+              Cada POST trae <code>X-Venddelo-Signature</code>. Compárala con un HMAC-SHA256 de
+              <code> timestamp + &quot;.&quot; + cuerpo</code> usando tu clave <code>whsec_</code>.
+              {settings.webhook.has_signing_secret
+                ? ` Activa ${settings.webhook.secret_hint ?? ''}.`
+                : ' Todavía no hay clave.'}
+            </p>
+            <div className={styles.actions}>
+              <button type="button" className={styles.ghost} disabled={busy} onClick={() => void onNewSecret()}>
+                {settings.webhook.has_signing_secret ? 'Rotar clave' : 'Crear clave'}
               </button>
               <button
                 type="button"
-                className={styles.secondaryBtn}
+                className={styles.ghost}
                 disabled={busy || !settings.webhook.is_enabled}
                 onClick={() => void onTest()}
               >
-                Enviar un aviso de prueba
-              </button>
-              <a className={styles.linkBtn} href={settings.test_sink.events_url} target="_blank" rel="noopener noreferrer">
-                Ver avisos de prueba
-              </a>
-            </div>
-
-            <div className={styles.toggles}>
-              <div className={styles.row}>
-                <div className={styles.rowText}>
-                  <div className={styles.rowTitle}>Avisos de estado</div>
-                  <div className={styles.rowHint}>Asignado, en camino, entregado…</div>
-                </div>
-                <Toggle
-                  ariaLabel="Avisos de estado"
-                  checked={settings.webhook.notify_status}
-                  disabled={busy}
-                  onChange={(next) => void onToggle({ notify_status: next })}
-                />
-              </div>
-              <div className={styles.row}>
-                <div className={styles.rowText}>
-                  <div className={styles.rowTitle}>Ubicación del repartidor</div>
-                  <div className={styles.rowHint}>Cada 5 segundos por pedido en curso</div>
-                </div>
-                <Toggle
-                  ariaLabel="Ubicación del repartidor"
-                  checked={settings.webhook.notify_location}
-                  disabled={busy}
-                  onChange={(next) => void onToggle({ notify_location: next })}
-                />
-              </div>
-              <div className={styles.row}>
-                <div className={styles.rowText}>
-                  <div className={styles.rowTitle}>Enviar avisos</div>
-                  <div className={styles.rowHint}>Apágalo para pausar sin borrar nada</div>
-                </div>
-                <Toggle
-                  ariaLabel="Enviar avisos"
-                  checked={settings.webhook.is_enabled}
-                  disabled={busy}
-                  onChange={(next) => void onToggle({ is_enabled: next })}
-                />
-              </div>
-            </div>
-
-            <div className={styles.secretRow}>
-              <p className={styles.hint}>
-                {settings.webhook.has_signing_secret
-                  ? `Clave de seguridad activa ${settings.webhook.secret_hint ?? ''}`
-                  : 'Todavía no hay clave de seguridad.'}
-              </p>
-              <button type="button" className={styles.textBtn} disabled={busy} onClick={() => void onNewSecret()}>
-                {settings.webhook.has_signing_secret ? 'Cambiar clave' : 'Crear clave'}
+                Enviar evento de prueba
               </button>
             </div>
             {secretOnce ? (
-              <div className={styles.bannerWarn}>
-                <p className={styles.hint}>Cópiala ahora. No se vuelve a mostrar.</p>
-                <div className={styles.secret}>{secretOnce}</div>
-                <button type="button" className={styles.textBtn} onClick={() => void copySecret()}>
-                  Copiar clave
+              <div className={styles.secretBox}>
+                <p>Cópiala ahora. No se vuelve a mostrar.</p>
+                <code>{secretOnce}</code>
+                <button type="button" className={styles.ghost} onClick={() => void copySecret()}>
+                  Copiar
                 </button>
               </div>
             ) : null}
           </section>
 
-          <details className={styles.details}>
-            <summary>Para quien programa la integración</summary>
-            <div className={styles.detailsBody}>
-              Recibes un POST JSON. La cabecera <code>X-Venddelo-Signature</code> es un HMAC-SHA256 de
-              <code> timestamp.raw_body</code> con tu clave <code>whsec_…</code>. En cambios de estado
-              va el detalle del pedido en <code>data.tracking</code>.
+          <section className={styles.console} aria-labelledby="dev-sample">
+            <div className={styles.consoleBar}>
+              <h2 id="dev-sample">Ejemplo</h2>
+              <span>application/json</span>
             </div>
-          </details>
-        </>
+            <pre>{`{
+  "type": "tracking.status_changed",
+  "data": {
+    "request_id": "…",
+    "tracking_token": "…",
+    "tracking": { "status": "in_transit" }
+  }
+}`}</pre>
+            <p>
+              <code>tracking.location_updated</code> trae latitud y longitud, sin el objeto completo.
+              Varios pedidos del mismo repartidor comparten coordenadas y se distinguen por{' '}
+              <code>request_id</code>.
+            </p>
+          </section>
+        </div>
       ) : null}
     </div>
   );
