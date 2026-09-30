@@ -159,6 +159,28 @@ export default function DeveloperSettingsPage() {
     }
   };
 
+  const copyJustoUrl = async () => {
+    const url = settings?.justo?.inbound_url;
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setNote('URL de Justo copiada.');
+    } catch {
+      setError('No se pudo copiar. Selecciónala a mano.');
+    }
+  };
+
+  const copyJustoSecret = async () => {
+    const secret = settings?.justo?.signing_secret;
+    if (!secret) return;
+    try {
+      await navigator.clipboard.writeText(secret);
+      setNote('Llave de Justo copiada.');
+    } catch {
+      setError('No se pudo copiar. Selecciónala a mano.');
+    }
+  };
+
   const onSaveCustom = async () => {
     if (!settings) return;
     setBusy(true);
@@ -309,6 +331,33 @@ export default function DeveloperSettingsPage() {
               </button>
             </div>
             {sentEvents ? <pre className={styles.eventsPreview}>{sentEvents}</pre> : null}
+          </section>
+
+          <section className={styles.card} aria-labelledby="dev-justo">
+            <h2 id="dev-justo" className={styles.cardTitle}>Pedidos de Justo</h2>
+            <p className={styles.cardText}>
+              En Justo pega la URL y la llave secreta. El tipo de evento es el de pedido creado,
+              no <code>orderStatusUpdated</code>. Marca Activar. Llegan los pedidos a domicilio del
+              propio Justo y los de Uber exclusivo, los que entrega el restaurante.
+            </p>
+            {settings.justo?.inbound_url ? (
+              <div className={styles.secretBox}>
+                <p>URL</p>
+                <code>{settings.justo.inbound_url}</code>
+                <button type="button" className={styles.ghost} onClick={() => void copyJustoUrl()}>
+                  Copiar URL
+                </button>
+              </div>
+            ) : null}
+            {settings.justo?.signing_secret ? (
+              <div className={styles.secretBox}>
+                <p>Llave secreta. Pégala tal cual en Justo.</p>
+                <code>{settings.justo.signing_secret}</code>
+                <button type="button" className={styles.ghost} onClick={() => void copyJustoSecret()}>
+                  Copiar llave
+                </button>
+              </div>
+            ) : null}
           </section>
 
           <section className={styles.card} aria-labelledby="dev-events">
