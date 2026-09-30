@@ -47,6 +47,18 @@ def webhook_api_v1_root(request: Request) -> str:
     return f"{str(request.base_url).rstrip('/')}{prefix}"
 
 
+def justo_inbound_url(restaurant_id: UUID) -> str:
+    """Address Justo calls. Always the public API, never the browser host."""
+    settings = get_settings()
+    prefix = settings.api_v1_prefix
+    if not prefix.startswith("/"):
+        prefix = f"/{prefix}"
+    prefix = prefix.rstrip("/")
+    configured = (settings.public_api_base_url or "").strip().rstrip("/") or _PROD_API_ORIGIN
+    root = configured if configured.endswith(prefix) else f"{configured}{prefix}"
+    return f"{root}/public/justo/restaurants/{restaurant_id}/orders"
+
+
 def _service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeveloperSettingsService:
     return DeveloperSettingsService(uow.session)
 
@@ -56,7 +68,14 @@ def get_developer_settings(
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
     service: DeveloperSettingsService = Depends(_service),
 ) -> DeveloperSettingsDTO:
-    return service.get_settings(restaurant.id)
+    dto = service.get_settings(restaurant.id)
+    return dto.model_copy(
+        update={
+            "justo": dto.justo.model_copy(
+                update={"inbound_url": justo_inbound_url(restaurant.id)}
+            )
+        }
+    )
 
 
 @router.put("/{restaurant_id}/developer/webhook", response_model=DeveloperWebhookDTO)
