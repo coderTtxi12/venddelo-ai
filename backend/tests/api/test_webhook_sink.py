@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import uuid
+
+from sqlalchemy.orm import sessionmaker
+
+from app.db.models.developer import RestaurantTrackingWebhook
 from tests.api.test_api_v1 import AUTH
 from tests.conftest import requires_db
 
 
 @requires_db
-def test_webhook_sink_records_post(client):
+def test_webhook_sink_records_post(client, engine):
     created = client.post(
         "/api/v1/restaurants",
         json={"name": "Webhook Test", "subdomain": "webhook-test-cafe"},
@@ -16,9 +21,16 @@ def test_webhook_sink_records_post(client):
 
     dev = client.get(f"/api/v1/restaurants/{restaurant_id}/developer", headers=AUTH)
     assert dev.status_code == 200
-    post_url = dev.json()["test_sink"]["post_url"]
-    events_url = dev.json()["test_sink"]["events_url"]
-    assert "/public/webhook-sink/" in post_url
+    assert "test_sink" not in dev.json()
+    session = sessionmaker(bind=engine)()
+    try:
+        row = session.get(RestaurantTrackingWebhook, uuid.UUID(restaurant_id))
+        assert row is not None
+        sink_token = row.sink_token
+    finally:
+        session.close()
+    post_url = f"/api/v1/public/webhook-sink/{sink_token}"
+    events_url = f"{post_url}/events"
 
     rotate = client.post(
         f"/api/v1/restaurants/{restaurant_id}/developer/webhook/rotate-secret",

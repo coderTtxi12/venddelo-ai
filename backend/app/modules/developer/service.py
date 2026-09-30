@@ -17,7 +17,6 @@ from app.modules.developer.schemas import (
     DeveloperSettingsDTO,
     DeveloperWebhookDTO,
     DeveloperWebhookSecretDTO,
-    DeveloperWebhookTestSinkDTO,
     DeveloperWebhookUpdate,
 )
 
@@ -40,7 +39,7 @@ class DeveloperSettingsService:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def get_settings(self, restaurant_id: uuid.UUID, *, api_v1_root: str) -> DeveloperSettingsDTO:
+    def get_settings(self, restaurant_id: uuid.UUID) -> DeveloperSettingsDTO:
         webhook = self._ensure_sink_token(self._get_or_create_webhook(restaurant_id))
         keys = self._session.scalars(
             select(RestaurantDeveloperApiKey)
@@ -50,15 +49,9 @@ class DeveloperSettingsService:
             )
             .order_by(RestaurantDeveloperApiKey.created_at.desc())
         ).all()
-        root = api_v1_root.rstrip("/")
-        test_sink = DeveloperWebhookTestSinkDTO(
-            post_url=f"{root}/public/webhook-sink/{webhook.sink_token}",
-            events_url=f"{root}/public/webhook-sink/{webhook.sink_token}/events",
-        )
         return DeveloperSettingsDTO(
             webhook=self._webhook_dto(webhook),
             api_keys=[self._key_dto(row) for row in keys],
-            test_sink=test_sink,
         )
 
     def update_webhook(

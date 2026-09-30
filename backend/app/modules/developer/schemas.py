@@ -23,15 +23,9 @@ class DeveloperWebhookDTO(BaseModel):
     has_signing_secret: bool = False
 
 
-class DeveloperWebhookTestSinkDTO(BaseModel):
-    post_url: str
-    events_url: str
-
-
 class DeveloperSettingsDTO(BaseModel):
     webhook: DeveloperWebhookDTO
     api_keys: list[DeveloperApiKeyDTO]
-    test_sink: DeveloperWebhookTestSinkDTO
 
 
 class DeveloperWebhookUpdate(BaseModel):
