@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import AffiliateGoalPage from '@/components/pages/AffiliateGoalPage';
 
 export default function HomePage() {
-  redirect('/monitor');
+  return <AffiliateGoalPage />;
 }
