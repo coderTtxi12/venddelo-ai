@@ -91,11 +91,11 @@ Timeout 300 s está atado al assistant: `assistant_clarify_timeout_seconds = 288
 | Preview menú live (editor) | WS `/ws/restaurants/{id}/digital-menu` | Sí | No |
 | Dashboard restaurante `/delivery` | **SSE** `GET .../dispatch/events` | Sí mientras el stream vive | No (UoW corto al autorizar) |
 | Link público `/rastreo/{token}` | **Supabase Realtime Broadcast** + GET snapshot | Solo los GET (ms) | N/A en Cloud Run |
-| Assistant chat | SSE `POST .../assistant/chat` | Sí, hasta ~288 s | **Sí — UoW retenido durante el stream** (deuda) |
+| Assistant chat | SSE `POST .../assistant/chat` | Sí, hasta ~288 s | No: commits después de authz y antes de compresión/LLM |
 | GPS rider | `POST /rider/me/location` → **204** | Solo el POST corto | UPDATE GPS, sin armar perfil |
 | Dispatch motor | Cloud Tasks (no loop en el contenedor) | Request del task | Corto |
 
-Poll HTTP de respaldo: **solo si el canal live está caído** (monitor 15 s, delivery restaurante, rastreo 20 s). No poll + WS/SSE a la vez.
+Poll HTTP de respaldo: **solo si el canal live está caído** (monitor 30 s, delivery restaurante, rastreo 20 s). No poll + WS/SSE a la vez.
 
 ---
 
@@ -114,9 +114,9 @@ No añadas un WebSocket nuevo “porque es realtime” si el cliente es anónimo
 
 ### 3.2 Sesión / pooler (obligatorio)
 
-Prod usa Supabase **pooler `:6543`** → SQLAlchemy **`NullPool`**. Cada sesión abierta = 1 conexión real en el pooler. No hay pool local que las reutilice.
+Prod usa Supabase **pooler `:6543`** con un `QueuePool` local de máximo 5 conexiones por instancia. Eso introduce backpressure antes del límite global de Supabase; `prepare_threshold=None` mantiene compatibilidad con transaction pooling.
 
-- **Nunca** `Depends(get_uow)` en un handler que luego hace `while True: receive()` o stream LLM. Eso retenía 1 conexión **horas**.
+- **Nunca** entrar a un `while True`, stream LLM o I/O externo con una transacción DB activa. Haz commit/rollback antes.
 - Patrón correcto: `with SqlAlchemyUnitOfWork() as uow:` para authz, salir del `with`, conectar al hub.
 - SSE de `/delivery`: el generador **no** lleva UoW; autoriza, cierra, luego `hub.subscribe()`.
 - Hot paths (GPS 15 s): **cero lecturas extra**. Location = UPDATE + notify monitor. No `_to_profile`, no itinerario, no `claim_drivers` si el driver ya tiene `user_id`.
@@ -157,7 +157,7 @@ Al lifespan:
 
 | Cambio | Dónde |
 |---|---|
-| NullPool + `prepare_threshold=None` en pooler | `backend/app/db/session.py` |
+| QueuePool acotado (5, sin overflow) + `prepare_threshold=None` en pooler | `backend/app/db/session.py` |
 | Auth singleton + warm JWKS | `backend/app/main.py`, `infra/auth/supabase_jwt.py`, `api/deps.py` |
 | Location ping 204, sin perfil | `rider_api.py`, `RiderDispatchService.update_location` |
 | Skip `claim_drivers` si ya linked | `_require_driver` |
@@ -192,9 +192,9 @@ Monitor y Delivery: debounce + poll solo offline. `RestaurantOrdersProvider` sig
 
 | Ítem | Riesgo |
 |---|---|
-| Assistant SSE retiene `get_uow` todo el turno / clarify | Conexión pooler + slot Cloud Run hasta 288 s |
+| Assistant SSE ocupa un slot Cloud Run durante el turno / clarify | Hasta 288 s, aunque ya no retiene una transacción DB |
 | WS cocina en `MainLayout` | 1 slot por pestaña, todas las rutas |
-| `get_synced_user` SELECT en casi todo request autenticado | Carga extra; no cacheado |
+| Cache de `get_synced_user` es por instancia | Un miss cada 30 s por instancia/usuario; no es coherencia distribuida |
 | Location ping aún notifica al monitor cada 15 s | Refetch snapshot pesado si el WS monitor está live |
 | Hubs in-memory | Multi-instancia parte el realtime |
 | Rate limit no cubre API autenticada | |
