@@ -40,10 +40,7 @@ void main() {
       ),
     );
 
-    await tester.drag(
-      find.byIcon(Icons.chevron_right_rounded),
-      const Offset(320, 0),
-    );
+    await tester.drag(find.byType(RiderSlideToConfirm), const Offset(320, 0));
     await tester.pumpAndSettle();
     expect(confirmed, isTrue);
   });
@@ -114,6 +111,46 @@ void main() {
     expect(find.text('Desliza para aceptar'), findsOneWidget);
   });
 
+  testWidgets('sliding the label, not only the thumb, confirms', (
+    tester,
+  ) async {
+    var confirmed = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 360,
+            child: RiderSlideToConfirm(
+              label: 'Desliza: ya entregué',
+              onConfirmed: () => confirmed = true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.drag(find.text('Desliza: ya entregué'), const Offset(320, 0));
+    await tester.pump();
+    expect(confirmed, isTrue);
+  });
+
+  testWidgets('a failed action returns the thumb so it can slide again', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const _BusySlideHost());
+    await tester.drag(find.text('Desliza: ya entregué'), const Offset(320, 0));
+    await tester.pump();
+    expect(find.text('Actualizando…'), findsOneWidget);
+
+    await tester.tap(find.text('fallar'));
+    await tester.pump();
+    expect(find.text('Desliza: ya entregué'), findsOneWidget);
+
+    await tester.drag(find.text('Desliza: ya entregué'), const Offset(40, 0));
+    await tester.pump();
+    expect(find.text('Actualizando…'), findsNothing);
+  });
+
   test('slide haptic only fires when progress crosses a new tick', () {
     final steps = <int>[];
     playSlideTickHaptic(0.05, 0, steps.add);
@@ -123,4 +160,39 @@ void main() {
     playSlideTickHaptic(0.2, 3, steps.add);
     expect(steps, [3]);
   });
+}
+
+class _BusySlideHost extends StatefulWidget {
+  const _BusySlideHost();
+
+  @override
+  State<_BusySlideHost> createState() => _BusySlideHostState();
+}
+
+class _BusySlideHostState extends State<_BusySlideHost> {
+  var busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        body: Column(
+          children: [
+            SizedBox(
+              width: 360,
+              child: RiderSlideToConfirm(
+                label: 'Desliza: ya entregué',
+                busy: busy,
+                onConfirmed: busy ? null : () => setState(() => busy = true),
+              ),
+            ),
+            TextButton(
+              onPressed: () => setState(() => busy = false),
+              child: const Text('fallar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
