@@ -1,5 +1,5 @@
-import DeveloperSettingsPage from '@/components/pages/DeveloperSettingsPage';
+import { redirect } from 'next/navigation';
 
-export default function DeveloperSettingsRoute() {
-  return <DeveloperSettingsPage />;
+export default function LegacyDeveloperSettingsRoute() {
+  redirect('/developer');
 }
