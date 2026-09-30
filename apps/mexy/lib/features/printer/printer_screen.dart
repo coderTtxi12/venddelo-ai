@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../platform/printer_channel.dart';
-import '../../state/owner_store.dart';
+import '../../state/mexy_store.dart';
 import '../../theme/mexy_theme.dart';
 import '../../widgets/mexy_widgets.dart';
 
@@ -34,7 +34,7 @@ class _PrinterScreenState extends State<PrinterScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_seeded) return;
-    final ticket = OwnerScope.of(context).ticket;
+    final ticket = MexyScope.of(context).ticket;
     _brandController.text = ticket.brandName;
     _footerController.text = ticket.footer;
     _seeded = true;
@@ -118,7 +118,7 @@ class _PrinterScreenState extends State<PrinterScreen> {
       setState(() => _error = 'Escribe una IP válida, por ejemplo 192.168.1.50.');
       return;
     }
-    OwnerScope.of(context).selectPrinter(
+    MexyScope.of(context).selectPrinter(
       PrinterDevice(
         id: 'net-$host',
         name: host,
@@ -134,7 +134,7 @@ class _PrinterScreenState extends State<PrinterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = OwnerScope.of(context);
+    final store = MexyScope.of(context);
     final ticket = store.ticket;
     final pad = context.pagePadding;
     final wide = context.windowWidth >= 960;
@@ -277,7 +277,7 @@ class _Editor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final store = OwnerScope.of(context);
+    final store = MexyScope.of(context);
     final ticket = store.ticket;
     final theme = Theme.of(context);
     return Column(
@@ -474,9 +474,9 @@ class TicketPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ticket = OwnerScope.of(context).ticket;
+    final ticket = MexyScope.of(context).ticket;
     final brand = ticket.brandName.trim().isEmpty ? profileName : ticket.brandName.trim();
-    final sample = OwnerScope.of(context).orders.first;
+    final sample = MexyScope.of(context).orders.first;
     final narrow = ticket.paperWidthMm == 58;
     return SectionCard(
       title: 'Vista del ticket',

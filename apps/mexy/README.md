@@ -1,4 +1,4 @@
-# mexy_owner
+# Mexy
 
 App de dueños de restaurante Mexy.
 

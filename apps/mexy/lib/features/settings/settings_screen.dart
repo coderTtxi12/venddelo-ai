@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../state/owner_store.dart';
+import '../../state/mexy_store.dart';
 import '../../theme/mexy_theme.dart';
 import '../../widgets/mexy_widgets.dart';
 
@@ -48,7 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_loaded) return;
-    final profile = OwnerScope.of(context).profile;
+    final profile = MexyScope.of(context).profile;
     _name.text = profile.name;
     _subdomain.text = profile.subdomain;
     _description.text = profile.description;
@@ -81,7 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool get _dirty {
     if (!_loaded) return false;
-    final profile = OwnerScope.of(context).profile;
+    final profile = MexyScope.of(context).profile;
     if (_name.text.trim() != profile.name) return true;
     if (_subdomain.text.trim() != profile.subdomain) return true;
     if (_description.text.trim() != profile.description) return true;
@@ -118,7 +118,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _saveError = 'Revisa nombre, subdominio y WhatsApp.');
       return;
     }
-    final store = OwnerScope.of(context);
+    final store = MexyScope.of(context);
     store.saveProfile(
       store.profile.copyWith(
         name: _name.text.trim(),
@@ -140,7 +140,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = OwnerScope.of(context);
+    final store = MexyScope.of(context);
     final pad = context.pagePadding;
     final scheme = Theme.of(context).colorScheme;
     final subdomainError = _touched ? validateSubdomain(_subdomain.text) : null;
@@ -433,7 +433,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _inviteStaff(OwnerStore store) {
+  void _inviteStaff(MexyStore store) {
     final email = _invite.text.trim().toLowerCase();
     if (!email.contains('@') || !email.contains('.')) {
       ScaffoldMessenger.of(context).showSnackBar(

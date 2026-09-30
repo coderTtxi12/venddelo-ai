@@ -471,8 +471,8 @@ String? validateWhatsapp(String value) {
   return null;
 }
 
-class OwnerStore extends ChangeNotifier {
-  OwnerStore({DateTime? now}) : _now = now ?? DateTime.now() {
+class MexyStore extends ChangeNotifier {
+  MexyStore({DateTime? now}) : _now = now ?? DateTime.now() {
     _orders = _seedOrders(_now);
     _requests = _seedRequests(_now);
   }
@@ -804,16 +804,16 @@ List<DispatchRequest> _seedRequests(DateTime now) {
   ];
 }
 
-class OwnerScope extends InheritedNotifier<OwnerStore> {
-  const OwnerScope({
-    required OwnerStore store,
+class MexyScope extends InheritedNotifier<MexyStore> {
+  const MexyScope({
+    required MexyStore store,
     required super.child,
     super.key,
   }) : super(notifier: store);
 
-  static OwnerStore of(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<OwnerScope>();
-    assert(scope != null, 'OwnerScope no está en el árbol.');
+  static MexyStore of(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<MexyScope>();
+    assert(scope != null, 'MexyScope no está en el árbol.');
     return scope!.notifier!;
   }
 }

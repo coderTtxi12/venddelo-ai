@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../state/owner_store.dart';
+import '../../state/mexy_store.dart';
 import '../../theme/mexy_theme.dart';
 import '../../widgets/mexy_widgets.dart';
 
@@ -33,7 +33,7 @@ class OrderDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final order = OwnerScope.of(context).orderById(orderId);
+    final order = MexyScope.of(context).orderById(orderId);
     return Scaffold(
       body: SafeArea(
         child: OrderDetailView(
@@ -98,7 +98,7 @@ class _OrderBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final store = OwnerScope.of(context);
+    final store = MexyScope.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final meta = orderStatusMeta[order.status]!;
@@ -246,7 +246,7 @@ class _OrderBody extends StatelessWidget {
     );
   }
 
-  Future<void> _cancel(BuildContext context, OwnerStore store, KitchenOrder order) async {
+  Future<void> _cancel(BuildContext context, MexyStore store, KitchenOrder order) async {
     final scheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -273,7 +273,7 @@ class _OrderBody extends StatelessWidget {
     if (confirmed == true && context.mounted) store.cancelOrder(order.id);
   }
 
-  void _print(BuildContext context, OwnerStore store, KitchenOrder order) {
+  void _print(BuildContext context, MexyStore store, KitchenOrder order) {
     final printer = store.printer;
     final message = printer == null
         ? 'Elige una impresora en Impresora para enviar el ticket.'

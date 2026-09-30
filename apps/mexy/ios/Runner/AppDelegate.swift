@@ -23,7 +23,7 @@ private final class PrinterBridge: NSObject, FlutterPlugin {
 
   static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(
-      name: "com.mexy.owner/printer",
+      name: "com.mexy.printer",
       binaryMessenger: registrar.messenger()
     )
     let instance = PrinterBridge()

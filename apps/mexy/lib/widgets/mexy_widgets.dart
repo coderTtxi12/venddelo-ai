@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../state/owner_store.dart';
+import '../state/mexy_store.dart';
 import '../theme/mexy_theme.dart';
 
 class SectionCard extends StatelessWidget {

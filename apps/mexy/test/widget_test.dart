@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mexy_owner/main.dart';
-import 'package:mexy_owner/state/owner_store.dart';
+import 'package:mexy/main.dart';
+import 'package:mexy/state/mexy_store.dart';
 
 void main() {
   test('formats pesos with grouping', () {
@@ -81,6 +81,6 @@ Future<void> _pump(WidgetTester tester, Size size) async {
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.pumpWidget(const MexyOwnerApp());
+  await tester.pumpWidget(const MexyApp());
   await tester.pump();
 }

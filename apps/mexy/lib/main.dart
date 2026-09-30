@@ -2,23 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'layout/app_shell.dart';
-import 'state/owner_store.dart';
+import 'state/mexy_store.dart';
 import 'theme/mexy_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MexyOwnerApp());
+  runApp(const MexyApp());
 }
 
-class MexyOwnerApp extends StatefulWidget {
-  const MexyOwnerApp({super.key});
+class MexyApp extends StatefulWidget {
+  const MexyApp({super.key});
 
   @override
-  State<MexyOwnerApp> createState() => _MexyOwnerAppState();
+  State<MexyApp> createState() => _MexyAppState();
 }
 
-class _MexyOwnerAppState extends State<MexyOwnerApp> {
-  final _store = OwnerStore();
+class _MexyAppState extends State<MexyApp> {
+  final _store = MexyStore();
 
   @override
   void dispose() {
@@ -28,7 +28,7 @@ class _MexyOwnerAppState extends State<MexyOwnerApp> {
 
   @override
   Widget build(BuildContext context) {
-    return OwnerScope(
+    return MexyScope(
       store: _store,
       child: MaterialApp(
         title: 'Mexy',

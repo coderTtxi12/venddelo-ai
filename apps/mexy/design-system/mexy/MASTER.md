@@ -1,6 +1,6 @@
-# Mexy Owner
+# Mexy
 
-Operational app for restaurant owners. Dense kitchen UI, phone and tablet, portrait and landscape.
+Operational app for a restaurant. Dense kitchen UI, phone and tablet, portrait and landscape.
 
 ## Decisions
 

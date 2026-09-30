@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../state/owner_store.dart';
+import '../state/mexy_store.dart';
 import '../theme/mexy_theme.dart';
 import '../features/delivery/delivery_screen.dart';
 import '../features/orders/orders_screen.dart';
@@ -26,7 +26,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final store = OwnerScope.of(context);
+    final store = MexyScope.of(context);
     final scheme = Theme.of(context).colorScheme;
     final compact = context.isCompact;
     final extendRail = context.windowWidth >= 1080;

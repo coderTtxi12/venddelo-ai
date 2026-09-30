@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 
-import '../state/owner_store.dart';
+import '../state/mexy_store.dart';
 
 class PrinterCapabilities {
   const PrinterCapabilities({
@@ -39,7 +39,7 @@ class PrinterScan {
 }
 
 class PrinterChannel {
-  static const _channel = MethodChannel('com.mexy.owner/printer');
+  static const _channel = MethodChannel('com.mexy.printer');
 
   static Future<PrinterCapabilities> capabilities() async {
     try {

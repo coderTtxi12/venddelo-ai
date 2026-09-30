@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../state/owner_store.dart';
+import '../../state/mexy_store.dart';
 import '../../theme/mexy_theme.dart';
 import '../../widgets/mexy_widgets.dart';
 import 'order_detail.dart';
@@ -18,7 +18,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = OwnerScope.of(context);
+    final store = MexyScope.of(context);
     final split = context.isExpanded;
     final list = _OrderList(
       filter: _filter,
@@ -71,7 +71,7 @@ class _OrderList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final store = OwnerScope.of(context);
+    final store = MexyScope.of(context);
     final theme = Theme.of(context);
     final pad = context.pagePadding;
     final visible = store.orders.where((order) => matchesFilter(order.status, filter)).toList();

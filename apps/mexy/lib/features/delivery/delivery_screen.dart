@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../state/owner_store.dart';
+import '../../state/mexy_store.dart';
 import '../../theme/mexy_theme.dart';
 import '../../widgets/mexy_widgets.dart';
 
@@ -42,7 +42,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   }
 
   void _submit() {
-    final store = OwnerScope.of(context);
+    final store = MexyScope.of(context);
     final phoneDigits = _phone.text.replaceAll(RegExp(r'\D'), '');
     final missing = <String>[];
     if (_name.text.trim().isEmpty) missing.add('el nombre');
@@ -79,7 +79,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final store = OwnerScope.of(context);
+    final store = MexyScope.of(context);
     final pad = context.pagePadding;
     if (!store.profile.deliveryEnabled) {
       return ListView(
@@ -268,7 +268,7 @@ class _RequestList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final store = OwnerScope.of(context);
+    final store = MexyScope.of(context);
     final rows = store.requests.where((item) => item.isHistory == history).toList();
     return SectionCard(
       title: history ? 'Historial' : 'Activos',
@@ -388,7 +388,7 @@ class _DispatchCard extends StatelessWidget {
       danger: true,
     );
     if (second == true && context.mounted) {
-      OwnerScope.of(context).cancelDispatch(request.id);
+      MexyScope.of(context).cancelDispatch(request.id);
     }
   }
 
@@ -412,7 +412,7 @@ class _DispatchCard extends StatelessWidget {
       danger: false,
     );
     if (second == true && context.mounted) {
-      OwnerScope.of(context).confirmCash(request.id);
+      MexyScope.of(context).confirmCash(request.id);
     }
   }
 
