@@ -3,28 +3,18 @@ import test from 'node:test';
 
 import { shouldOpenKitchenOrdersSocket } from './kitchenOrdersActivity.ts';
 
-test('kitchen socket opens only when the dashboard tab is visible', () => {
+test('kitchen socket stays open with restaurant session even if tab is backgrounded', () => {
   assert.equal(
     shouldOpenKitchenOrdersSocket({
       restaurantId: 'r1',
       accessToken: 'tok',
-      visibilityState: 'visible',
     }),
     true,
   );
   assert.equal(
     shouldOpenKitchenOrdersSocket({
-      restaurantId: 'r1',
-      accessToken: 'tok',
-      visibilityState: 'hidden',
-    }),
-    false,
-  );
-  assert.equal(
-    shouldOpenKitchenOrdersSocket({
       restaurantId: null,
       accessToken: 'tok',
-      visibilityState: 'visible',
     }),
     false,
   );
@@ -32,7 +22,6 @@ test('kitchen socket opens only when the dashboard tab is visible', () => {
     shouldOpenKitchenOrdersSocket({
       restaurantId: 'r1',
       accessToken: null,
-      visibilityState: 'visible',
     }),
     false,
   );

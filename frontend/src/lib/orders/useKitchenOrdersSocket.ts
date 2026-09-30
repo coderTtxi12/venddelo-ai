@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Order } from '@/lib/api/types';
 import { shouldOpenKitchenOrdersSocket } from '@/lib/orders/kitchenOrdersActivity';
 import { sortOrdersNewestFirst } from '@/lib/orders/orderDisplay';
@@ -64,20 +64,9 @@ export function useKitchenOrdersSocket(
     onReconnectRef.current = options.onReconnect;
   });
 
-  const [visibilityState, setVisibilityState] = useState<DocumentVisibilityState>(() =>
-    typeof document === 'undefined' ? 'visible' : document.visibilityState,
-  );
-
-  useEffect(() => {
-    const onVisibility = () => setVisibilityState(document.visibilityState);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, []);
-
   const open = shouldOpenKitchenOrdersSocket({
     restaurantId,
     accessToken,
-    visibilityState,
   });
 
   useEffect(() => {
