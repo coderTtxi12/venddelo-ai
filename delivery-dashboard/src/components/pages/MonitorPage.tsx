@@ -54,6 +54,7 @@ import {
 } from '@/lib/dispatch/monitorCopy';
 import { applyDriverLocationToSnapshot, driverLocationAgeSeconds } from '@/lib/dispatch/applyDriverLocation';
 import { isDriverAvailable } from '@/lib/dispatch/assignDriverList';
+import { monitorActivityState } from '@/lib/dispatch/monitorActivity';
 import { publicTrackingUrl } from '@/lib/dispatch/publicTrackingUrl';
 import {
   useDispatchMonitorSocket,
@@ -863,6 +864,16 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
     hold: DispatchMonitorCreditHold;
     step: 1 | 2;
   } | null>(null);
+  const {
+    shouldLoadSnapshot,
+    socketToken,
+    shouldPollFallback,
+  } = monitorActivityState({
+    active,
+    accessToken,
+    zonesLoading,
+    connectionStatus,
+  });
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -872,12 +883,13 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
   }, []);
 
   const loadSnapshot = useCallback(async () => {
-    if (!accessToken || zonesLoading) return;
+    if (!shouldLoadSnapshot || !accessToken) return;
     if (snapshotInFlightRef.current) {
       snapshotQueuedRef.current = true;
       return;
     }
     snapshotInFlightRef.current = true;
+    setLoading(true);
     setError(null);
     try {
       do {
@@ -894,14 +906,17 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
       snapshotInFlightRef.current = false;
       setLoading(false);
     }
-  }, [accessToken, isAllZones, selectedZoneId, zonesLoading]);
+  }, [accessToken, isAllZones, selectedZoneId, shouldLoadSnapshot]);
 
   useEffect(() => {
-    setLoading(true);
-    void loadSnapshot();
-  }, [loadSnapshot]);
+    if (!shouldLoadSnapshot) return;
+    const timer = window.setTimeout(() => {
+      void loadSnapshot();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadSnapshot, shouldLoadSnapshot]);
 
-  useDispatchMonitorSocket(accessToken, {
+  useDispatchMonitorSocket(socketToken, {
     onEvent: () => {
       void loadSnapshot();
       setLogNonce((value) => value + 1);
@@ -920,12 +935,12 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
 
   // Fallback poll only when the websocket is not live — avoids stacking DB load.
   useEffect(() => {
-    if (!accessToken || connectionStatus === 'live') return;
+    if (!shouldPollFallback) return;
     const timer = window.setInterval(() => {
       void loadSnapshot();
-    }, 15_000);
+    }, 30_000);
     return () => window.clearInterval(timer);
-  }, [accessToken, connectionStatus, loadSnapshot]);
+  }, [loadSnapshot, shouldPollFallback]);
 
   const queueRequests = useMemo(
     () =>
