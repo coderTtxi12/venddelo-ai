@@ -9,6 +9,7 @@ test('sidebar groups courier tools into operation, network, service, and account
     ['operacion', 'red', 'servicio', 'cuenta'],
   );
   assert.deepEqual(sidebarNavPaths(), [
+    '/',
     '/monitor',
     '/historial',
     '/estadisticas',

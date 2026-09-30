@@ -11,6 +11,7 @@ import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
+import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import QueryStatsOutlinedIcon from '@mui/icons-material/QueryStatsOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
@@ -20,6 +21,7 @@ import { SIDEBAR_NAV_SECTIONS } from '@/lib/nav/sidebarNav';
 import styles from './Sidebar.module.css';
 
 const NAV_ICONS: Record<string, ReactNode> = {
+  '/': <TrendingUpOutlinedIcon fontSize="small" />,
   '/monitor': <QueryStatsOutlinedIcon fontSize="small" />,
   '/historial': <HistoryOutlinedIcon fontSize="small" />,
   '/estadisticas': <BarChartOutlinedIcon fontSize="small" />,

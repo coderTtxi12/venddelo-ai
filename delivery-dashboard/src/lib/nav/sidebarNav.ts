@@ -14,6 +14,7 @@ export const SIDEBAR_NAV_SECTIONS: SidebarNavSection[] = [
     id: 'operacion',
     label: 'Operación',
     items: [
+      { label: 'KPI', path: '/' },
       { label: 'Monitor', path: '/monitor' },
       { label: 'Historial', path: '/historial' },
       { label: 'Estadísticas', path: '/estadisticas' },
