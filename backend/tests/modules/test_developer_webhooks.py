@@ -8,6 +8,26 @@ from app.modules.developer.crypto import generate_api_key, sign_webhook_payload
 from app.modules.developer.webhook_dispatch import _envelope, _post_json
 
 
+def test_prod_webhook_root_ignores_localhost_host(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.modules.developer.api import webhook_api_v1_root
+
+    monkeypatch.setattr(
+        "app.modules.developer.api.get_settings",
+        lambda: SimpleNamespace(
+            app_env="prod",
+            api_v1_prefix="/api/v1",
+            public_api_base_url=None,
+        ),
+    )
+    request = SimpleNamespace(base_url="http://localhost:8080/")
+    root = webhook_api_v1_root(request)
+    assert root == (
+        "https://venddelo-ai-backend-295432242625.northamerica-south1.run.app/api/v1"
+    )
+
+
 def test_sign_webhook_payload_is_stable():
     body = b'{"type":"tracking.test"}'
     sig = sign_webhook_payload("whsec_test", body, 1_700_000_000)
