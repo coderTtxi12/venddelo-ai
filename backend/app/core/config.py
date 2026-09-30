@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     log_level: str = "INFO"
     api_v1_prefix: str = "/api/v1"
+    public_api_base_url: str | None = None
     app_version: str = "0.1.0"
     database_url: str = "postgresql+psycopg://vendelo:vendelo@localhost:5434/vendelo"
     database_url_test: str | None = None
