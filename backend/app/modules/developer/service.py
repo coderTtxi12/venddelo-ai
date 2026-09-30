@@ -9,11 +9,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError, ValidationError
-from app.db.models.developer import RestaurantDeveloperApiKey, RestaurantTrackingWebhook
+from app.db.models.developer import (
+    RestaurantDeveloperApiKey,
+    RestaurantJustoStore,
+    RestaurantTrackingWebhook,
+)
 from app.modules.developer.crypto import generate_api_key, generate_webhook_signing_secret
 from app.modules.developer.schemas import (
     DeveloperApiKeyCreatedDTO,
     DeveloperApiKeyDTO,
+    DeveloperJustoDTO,
     DeveloperSettingsDTO,
     DeveloperWebhookDTO,
     DeveloperWebhookSecretDTO,
@@ -52,7 +57,21 @@ class DeveloperSettingsService:
         return DeveloperSettingsDTO(
             webhook=self._webhook_dto(webhook),
             api_keys=[self._key_dto(row) for row in keys],
+            justo=DeveloperJustoDTO(signing_secret=self.ensure_justo_secret(restaurant_id)),
         )
+
+    def ensure_justo_secret(self, restaurant_id: uuid.UUID) -> str:
+        row = self._session.get(RestaurantJustoStore, restaurant_id)
+        if row is not None and row.signing_secret:
+            return row.signing_secret
+        secret, _hint = generate_webhook_signing_secret()
+        if row is None:
+            row = RestaurantJustoStore(restaurant_id=restaurant_id, signing_secret=secret)
+            self._session.add(row)
+        else:
+            row.signing_secret = secret
+        self._session.flush()
+        return secret
 
     def update_webhook(
         self,

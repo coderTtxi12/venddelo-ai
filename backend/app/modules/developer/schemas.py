@@ -24,9 +24,15 @@ class DeveloperWebhookDTO(BaseModel):
     has_signing_secret: bool = False
 
 
+class DeveloperJustoDTO(BaseModel):
+    inbound_url: str | None = None
+    signing_secret: str | None = None
+
+
 class DeveloperSettingsDTO(BaseModel):
     webhook: DeveloperWebhookDTO
     api_keys: list[DeveloperApiKeyDTO]
+    justo: DeveloperJustoDTO = Field(default_factory=DeveloperJustoDTO)
 
 
 class DeveloperWebhookUpdate(BaseModel):
