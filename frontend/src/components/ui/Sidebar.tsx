@@ -78,7 +78,13 @@ const navSections: NavSection[] = [
     title: 'Tu negocio',
     items: [
       { label: 'Configuración', path: '/settings', icon: <SettingsOutlinedIcon fontSize="small" /> },
-      { label: 'Webhooks', path: '/settings/developer', icon: <CodeOutlinedIcon fontSize="small" /> },
+    ],
+  },
+  {
+    id: 'developer',
+    title: 'Integración',
+    items: [
+      { label: 'Developer', path: '/developer', icon: <CodeOutlinedIcon fontSize="small" /> },
     ],
   },
 ];
