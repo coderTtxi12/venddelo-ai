@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 
 from app.api.deps import require_owned_restaurant
 from app.core.config import get_settings
@@ -11,11 +11,14 @@ from app.modules.developer.schemas import (
     DeveloperSettingsDTO,
     DeveloperWebhookDTO,
     DeveloperWebhookSecretDTO,
+    DeveloperSentEventDTO,
+    DeveloperSentEventsResponse,
     DeveloperWebhookTestResult,
     DeveloperWebhookUpdate,
 )
 from app.modules.developer.service import DeveloperSettingsService
-from app.modules.developer.webhook_dispatch import deliver_test_webhook
+from app.modules.developer.webhook_dispatch import deliver_test_webhook, sent_events_key
+from app.modules.developer.webhook_sink import get_webhook_sink_store
 from app.modules.restaurants.schemas import RestaurantDTO
 
 router = APIRouter(prefix="/restaurants", tags=["developer"])
@@ -80,6 +83,27 @@ def rotate_developer_webhook_secret(
     dto = service.rotate_webhook_secret(restaurant.id)
     uow.commit()
     return dto
+
+
+@router.get(
+    "/{restaurant_id}/developer/webhook/events",
+    response_model=DeveloperSentEventsResponse,
+)
+def list_sent_webhook_events(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    limit: int = Query(default=20, ge=1, le=50),
+) -> DeveloperSentEventsResponse:
+    events = get_webhook_sink_store().list_events(sent_events_key(restaurant.id), limit=limit)
+    return DeveloperSentEventsResponse(
+        items=[
+            DeveloperSentEventDTO(
+                received_at=event.received_at,
+                body=event.body,
+                delivered=event.signature_valid,
+            )
+            for event in events
+        ]
+    )
 
 
 @router.post(
