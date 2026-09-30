@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import re
 import uuid
 from typing import Any
@@ -46,6 +47,9 @@ _OWN_SOURCES = frozenset(
 _BLOCKED_SOURCES = frozenset(
     {"rappi", "pedidosya", "didi", "didifood", "hubster", "ordatic"}
 )
+_CREATE_EVENT_TYPES = frozenset({"ecommerce.order.created", "neworder"})
+
+logger = logging.getLogger(__name__)
 
 
 def justo_signing_secret(session, restaurant_id: uuid.UUID) -> str | None:
@@ -78,14 +82,14 @@ def classify_justo_order(order: dict[str, Any]) -> str | None:
         return None
     if order.get("hasExternalDeliveryProvider") is True:
         return None
-    source = normalize_source(order.get("source"))
+    source = normalize_source(order.get("source") or order.get("channel"))
     if source in _BLOCKED_SOURCES:
         return None
     if "uber" in source:
         if _uber_courier_delivers(order):
             return None
         return "uber_exclusive"
-    if source in _OWN_SOURCES or source.startswith("justo"):
+    if source in _OWN_SOURCES or source.startswith("justo") or source.startswith("web"):
         return "justo"
     return None
 
@@ -233,7 +237,12 @@ def build_order_create(
 
 def ingest_justo_event(session, restaurant_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any]:
     event_type = str(payload.get("type") or "")
-    if event_type and event_type != "ecommerce.order.created":
+    if event_type and normalize_source(event_type) not in _CREATE_EVENT_TYPES:
+        logger.info(
+            "justo inbound ignored restaurant=%s type=%s",
+            restaurant_id,
+            event_type,
+        )
         return {"accepted": False, "reason": "ignored_event"}
     restaurant = session.get(Restaurant, restaurant_id)
     if restaurant is None or restaurant.deleted_at is not None:
