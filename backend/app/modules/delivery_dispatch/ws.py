@@ -4,8 +4,6 @@ import asyncio
 import json
 import uuid
 
-from collections.abc import Iterator
-
 from fastapi import APIRouter, Depends, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
@@ -14,7 +12,7 @@ from app.api.deps import get_auth, get_current_user, get_synced_user
 from app.core.exceptions import ForbiddenError, NotFoundError, UnauthorizedError
 from app.core.security import AuthenticatedUser, AuthPort
 from app.db.models.delivery import DeliveryDriver
-from app.db.uow import SqlAlchemyUnitOfWork, get_uow
+from app.db.uow import SqlAlchemyUnitOfWork, finish_uow_gen, get_uow
 from app.infra.realtime.dispatch_hub import get_dispatch_realtime_hub
 from app.infra.realtime.restaurant_dispatch_hub import get_restaurant_dispatch_realtime_hub
 from app.infra.realtime.rider_hub import get_rider_realtime_hub
@@ -25,13 +23,6 @@ from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRe
 from app.modules.users.schemas import UserDTO
 
 router = APIRouter(tags=["delivery-dispatch-realtime"])
-
-
-def _finish_uow_gen(uow_gen: Iterator[SqlAlchemyUnitOfWork]) -> None:
-    try:
-        next(uow_gen)
-    except StopIteration:
-        pass
 
 
 def _assert_can_read_restaurant_dispatch(
@@ -119,7 +110,7 @@ async def restaurant_dispatch_events(
     try:
         _assert_can_read_restaurant_dispatch(uow, restaurant_id, user)
     finally:
-        _finish_uow_gen(uow_gen)
+        finish_uow_gen(uow_gen)
 
     hub = get_restaurant_dispatch_realtime_hub()
     queue = hub.subscribe(restaurant_id)

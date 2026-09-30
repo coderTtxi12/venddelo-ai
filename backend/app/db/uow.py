@@ -103,3 +103,11 @@ def get_uow() -> Iterator[SqlAlchemyUnitOfWork]:
             flush_delivery_tasks(uow.session)
         finally:
             discard_delivery_tasks(uow.session)
+
+
+def finish_uow_gen(uow_gen: Iterator[SqlAlchemyUnitOfWork]) -> None:
+    """Close a manually opened ``get_uow`` generator before a long-lived stream."""
+    try:
+        next(uow_gen)
+    except StopIteration:
+        pass
