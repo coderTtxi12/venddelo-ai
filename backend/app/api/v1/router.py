@@ -19,6 +19,7 @@ from app.modules.orders.ws import router as orders_ws_router
 from app.modules.coupons.api import router as coupons_router
 from app.modules.promotions.api import router as promotions_router
 from app.modules.public.api import router as public_router
+from app.modules.developer.api import router as developer_router
 from app.modules.restaurants.api import router as restaurants_router
 from app.modules.users.api import router as users_router
 
@@ -31,6 +32,7 @@ api_v1_router.include_router(delivery_dispatch_ws_router)
 api_v1_router.include_router(rider_router)
 api_v1_router.include_router(delivery_internal_router)
 api_v1_router.include_router(restaurants_router)
+api_v1_router.include_router(developer_router)
 api_v1_router.include_router(menu_router)
 api_v1_router.include_router(promotions_router)
 api_v1_router.include_router(coupons_router)

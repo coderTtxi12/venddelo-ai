@@ -11,6 +11,10 @@ from app.infra.realtime.dispatch_hub import get_dispatch_realtime_hub
 from app.infra.realtime.restaurant_dispatch_hub import get_restaurant_dispatch_realtime_hub
 from app.infra.realtime.rider_hub import get_rider_realtime_hub
 from app.modules.delivery_dispatch.monitor_cache import dispatch_monitor_snapshot_cache
+from app.modules.developer.webhook_dispatch import (
+    enqueue_tracking_location_webhooks,
+    enqueue_tracking_status_webhook,
+)
 
 _AFTER_COMMIT_HOOKS = "rider_notify_after_commit_hooks"
 _AFTER_COMMIT_REGISTERED = "rider_notify_after_commit_registered"
@@ -63,7 +67,11 @@ def notify_request_realtime(session: Session, request: DeliveryDispatchRequest) 
         notify_dispatch_monitor_changed(provider_id)
         get_restaurant_dispatch_realtime_hub().publish_sync(restaurant_id, payload)
 
+    def publish_tracking_webhook() -> None:
+        enqueue_tracking_status_webhook(request.id)
+
     _publish_after_commit(session, publish_request_hubs)
+    _publish_after_commit(session, publish_tracking_webhook)
     if request.assigned_driver_id is None:
         return
     driver = request.assigned_driver
@@ -93,7 +101,11 @@ def notify_driver_location_realtime(session: Session, driver: DeliveryDriver) ->
     def publish() -> None:
         get_dispatch_realtime_hub().publish_sync(driver.delivery_provider_id, payload)
 
+    def publish_location_webhook() -> None:
+        enqueue_tracking_location_webhooks(driver.id)
+
     _publish_after_commit(session, publish)
+    _publish_after_commit(session, publish_location_webhook)
 
 
 def _publish_after_commit(session: Session | None, hook: Callable[[], None]) -> None:

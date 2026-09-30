@@ -1,6 +1,9 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, Header, Query, status
+from typing import Any
+
+from fastapi import APIRouter, Depends, Header, Query, Request, status
+from pydantic import BaseModel
 
 from app.api.cache_helpers import invalidate_restaurant_menu_cache
 from app.core.exceptions import NotFoundError
@@ -46,8 +49,29 @@ from app.modules.restaurants.social_links import (
     normalize_live_menu_social_placement,
 )
 from app.modules.translations.service import TranslationService
+from app.modules.developer.service import DeveloperSettingsService
+from app.modules.developer.webhook_sink import (
+    get_webhook_sink_store,
+    parse_json_body,
+    verify_incoming_signature,
+)
 
 router = APIRouter(prefix="/public", tags=["public"])
+
+
+class WebhookSinkEventDTO(BaseModel):
+    received_at: str
+    headers: dict[str, str]
+    body: dict[str, Any]
+    signature_valid: bool | None = None
+
+
+class WebhookSinkEventsResponse(BaseModel):
+    items: list[WebhookSinkEventDTO]
+
+
+def _developer_service(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> DeveloperSettingsService:
+    return DeveloperSettingsService(uow.session)
 
 
 def _menu_cache(uow: SqlAlchemyUnitOfWork = Depends(get_uow)) -> MenuCacheService:
@@ -440,3 +464,48 @@ def create_public_order(
     service: OrderService = Depends(_order_service),
 ) -> OrderDTO:
     return service.create_public(subdomain, data, idempotency_key)
+
+
+@router.post("/webhook-sink/{sink_token}", status_code=status.HTTP_200_OK)
+async def receive_webhook_sink(
+    sink_token: str,
+    request: Request,
+    developer: DeveloperSettingsService = Depends(_developer_service),
+) -> dict[str, bool]:
+    row = developer.get_webhook_by_sink_token(sink_token)
+    if row is None:
+        raise NotFoundError("Webhook sink no encontrado")
+    raw = await request.body()
+    headers = {k: v for k, v in request.headers.items()}
+    headers_lower = {k.lower(): v for k, v in headers.items()}
+    signature_valid = verify_incoming_signature(row.signing_secret, headers_lower, raw)
+    body = parse_json_body(raw)
+    get_webhook_sink_store().record(
+        sink_token,
+        headers=headers_lower,
+        body=body,
+        signature_valid=signature_valid,
+    )
+    return {"ok": True}
+
+
+@router.get("/webhook-sink/{sink_token}/events", response_model=WebhookSinkEventsResponse)
+def list_webhook_sink_events(
+    sink_token: str,
+    limit: int = Query(default=20, ge=1, le=50),
+    developer: DeveloperSettingsService = Depends(_developer_service),
+) -> WebhookSinkEventsResponse:
+    if developer.get_webhook_by_sink_token(sink_token) is None:
+        raise NotFoundError("Webhook sink no encontrado")
+    events = get_webhook_sink_store().list_events(sink_token, limit=limit)
+    return WebhookSinkEventsResponse(
+        items=[
+            WebhookSinkEventDTO(
+                received_at=e.received_at,
+                headers=e.headers,
+                body=e.body,
+                signature_valid=e.signature_valid,
+            )
+            for e in events
+        ]
+    )
