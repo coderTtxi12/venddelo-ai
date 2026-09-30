@@ -17,15 +17,9 @@ export type DeveloperApiKey = {
   revoked_at: string | null;
 };
 
-export type DeveloperTestSink = {
-  post_url: string;
-  events_url: string;
-};
-
 export type DeveloperSettings = {
   webhook: DeveloperWebhook;
   api_keys: DeveloperApiKey[];
-  test_sink: DeveloperTestSink;
 };
 
 export type DeveloperWebhookUpdate = {
