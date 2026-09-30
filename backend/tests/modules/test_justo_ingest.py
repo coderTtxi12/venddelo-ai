@@ -14,6 +14,11 @@ def test_justo_signature_is_hmac_sha1_of_raw_body():
     assert not verify_justo_signature(None, raw, signature)
 
 
+def test_justo_admin_channel_without_source_is_imported():
+    order = {"deliveryType": "delivery", "channel": "web-delivery", "hasManagedDelivery": False}
+    assert classify_justo_order(order) == "justo"
+
+
 def test_justo_delivery_is_imported():
     assert classify_justo_order({"deliveryType": "delivery", "source": "justo"}) == "justo"
 
