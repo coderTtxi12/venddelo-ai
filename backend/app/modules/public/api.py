@@ -1,8 +1,10 @@
+import json
+import uuid
 from datetime import UTC, datetime
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, Query, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel
 
 from app.api.cache_helpers import invalidate_restaurant_menu_cache
@@ -50,6 +52,11 @@ from app.modules.restaurants.social_links import (
 )
 from app.modules.translations.service import TranslationService
 from app.modules.developer.service import DeveloperSettingsService
+from app.modules.justo.ingest import (
+    ingest_justo_event,
+    justo_signing_secret,
+    verify_justo_signature,
+)
 from app.modules.developer.webhook_sink import (
     get_webhook_sink_store,
     parse_json_body,
@@ -509,3 +516,23 @@ def list_webhook_sink_events(
             for e in events
         ]
     )
+
+
+@router.post("/justo/restaurants/{restaurant_id}/orders")
+async def receive_justo_order(
+    restaurant_id: uuid.UUID,
+    request: Request,
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+) -> dict[str, Any]:
+    """Justo calls this when an order is created. One URL per Mexy restaurant."""
+    raw = await request.body()
+    secret = justo_signing_secret(uow.session, restaurant_id)
+    if not verify_justo_signature(secret, raw, request.headers.get("x-orion-signature")):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Firma de Justo inválida")
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return {"accepted": False, "reason": "invalid_json"}
+    if not isinstance(payload, dict):
+        return {"accepted": False, "reason": "invalid_json"}
+    return ingest_justo_event(uow.session, restaurant_id, payload)
