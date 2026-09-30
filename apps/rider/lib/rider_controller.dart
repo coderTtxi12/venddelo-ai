@@ -49,6 +49,7 @@ class RiderController extends ChangeNotifier {
   String? errorMessage;
   bool loading = true;
   bool notRegistered = false;
+  bool onlineBusy = false;
   bool assignmentBusy = false;
   bool offerBusy = false;
   bool needsLocationSettings = false;
