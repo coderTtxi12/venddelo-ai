@@ -82,6 +82,35 @@ def test_notify_offer_uses_fcm_by_default() -> None:
     send.assert_called_once()
 
 
+def test_notify_offer_defers_fcm_until_after_commit(monkeypatch) -> None:
+    sent: list[str] = []
+    listeners: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "app.modules.delivery_dispatch.monitor_notify.event.listen",
+        lambda _session, name, fn, once=False: listeners.update({name: fn}),
+    )
+    monkeypatch.setattr(
+        "app.modules.delivery_dispatch.notify.notify_rider_updated",
+        lambda *_args, **_kwargs: None,
+    )
+    set_offer_notifier(lambda _driver, offer: sent.append(str(offer.id)))
+
+    session = SimpleNamespace(in_transaction=lambda: True, info={})
+
+    notify_offer(
+        SimpleNamespace(fcm_token="token-abc"),
+        SimpleNamespace(id="offer-1"),
+        session=session,
+    )
+
+    assert sent == []
+
+    listeners["after_commit"](session)
+
+    assert sent == ["offer-1"]
+
+
 def test_notify_offer_logs_when_driver_has_no_token(caplog) -> None:
     caplog.set_level("INFO")
     with patch("app.modules.delivery_dispatch.notify.send_fcm_offer") as send:

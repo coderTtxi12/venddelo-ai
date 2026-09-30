@@ -74,6 +74,7 @@ from app.modules.delivery_dispatch.maps_url import (
     should_follow_maps_redirect,
 )
 from app.modules.delivery_dispatch.monitor import build_dispatch_monitor_snapshot
+from app.modules.delivery_dispatch.monitor_cache import dispatch_monitor_snapshot_cache
 from app.modules.delivery_dispatch.monitor_notify import (
     notify_dispatch_monitor_changed,
     notify_driver_location_realtime,
@@ -517,10 +518,16 @@ class DeliveryDispatchService:
         zone_id: uuid.UUID | None = None,
     ) -> DispatchMonitorSnapshotDTO:
         provider_id = self._require_provider_id(user_id)
-        return build_dispatch_monitor_snapshot(
-            self._session,
+        settings = get_settings()
+        return dispatch_monitor_snapshot_cache.get_or_build(
             provider_id,
-            zone_id=zone_id,
+            zone_id,
+            ttl_seconds=settings.dispatch_monitor_cache_ttl_seconds,
+            build=lambda: build_dispatch_monitor_snapshot(
+                self._session,
+                provider_id,
+                zone_id=zone_id,
+            ),
         )
 
     def list_history(
@@ -696,7 +703,7 @@ class DeliveryDispatchService:
         if offer is None:
             raise ConflictError("No se pudo crear la oferta. Intenta de nuevo.")
         self._session.flush()
-        notify_dispatch_monitor_changed(provider_id)
+        notify_dispatch_monitor_changed(provider_id, session=self._session)
         return ManualOfferDTO(
             id=offer.id,
             request_id=request.id,
@@ -730,7 +737,6 @@ class DeliveryDispatchService:
         self._session.flush()
         self._session.refresh(request)
         notify_request_realtime(self._session, request)
-        notify_dispatch_monitor_changed(provider_id)
         return DispatchRetryDTO(
             id=request.id,
             status=request.status,
@@ -768,9 +774,8 @@ class DeliveryDispatchService:
         self._session.flush()
         self._session.refresh(hold)
         notify_request_realtime(self._session, request)
-        notify_dispatch_monitor_changed(provider_id)
         if request.assigned_driver_id is not None:
-            notify_rider_updated(request.assigned_driver_id)
+            notify_rider_updated(request.assigned_driver_id, session=self._session)
         return MexyFeeHoldDTO(
             request_id=request.id,
             short_id=request.short_id,
@@ -848,8 +853,8 @@ class DeliveryDispatchService:
             raise ValidationError("No se puede entregar un pedido antes de recogerlo.")
         replace_plan(self._session, driver.id, incoming)
         self._session.flush()
-        notify_dispatch_monitor_changed(provider_id)
-        notify_rider_updated(driver.id)
+        notify_dispatch_monitor_changed(provider_id, session=self._session)
+        notify_rider_updated(driver.id, session=self._session)
         return hydrate_itinerary(self._session, driver.id)
 
     def _upload_document(

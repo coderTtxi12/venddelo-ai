@@ -6,6 +6,37 @@ from unittest.mock import MagicMock
 from app.modules.delivery_dispatch import monitor_notify
 
 
+def test_notify_dispatch_monitor_changed_waits_for_commit(monkeypatch):
+    actions: list[str] = []
+    listeners: dict[str, object] = {}
+    provider_id = uuid.uuid4()
+    session = SimpleNamespace(in_transaction=lambda: True, info={})
+
+    monkeypatch.setattr(
+        monitor_notify.dispatch_monitor_snapshot_cache,
+        "invalidate_provider",
+        lambda _provider_id: actions.append("invalidate"),
+    )
+    monkeypatch.setattr(
+        monitor_notify.get_dispatch_realtime_hub(),
+        "publish_sync",
+        lambda _provider_id, _payload: actions.append("publish"),
+    )
+    monkeypatch.setattr(
+        monitor_notify.event,
+        "listen",
+        lambda _session, name, fn, once=False: listeners.update({name: fn}),
+    )
+
+    monitor_notify.notify_dispatch_monitor_changed(provider_id, session=session)
+
+    assert actions == []
+
+    listeners["after_commit"](session)
+
+    assert actions == ["invalidate", "publish"]
+
+
 def test_notify_rider_updated_includes_credit(monkeypatch):
     published: list[dict] = []
     monkeypatch.setattr(

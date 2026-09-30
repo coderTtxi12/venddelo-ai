@@ -43,7 +43,10 @@ from app.modules.delivery_dispatch.engine import (
     nn_last_dropoff,
 )
 from app.modules.delivery_dispatch.geo import geodesic_meters
-from app.modules.delivery_dispatch.monitor_notify import notify_request_realtime, notify_rider_updated
+from app.modules.delivery_dispatch.monitor_notify import (
+    notify_request_realtime,
+    notify_rider_updated,
+)
 from app.modules.delivery_dispatch.notify import notify_offer
 
 logger = logging.getLogger(__name__)
@@ -736,7 +739,7 @@ def _persist_dispatch_offer(
         "group_id": group_id,
         **(extra_score or {}),
     }
-    notify_offer(driver, offer)
+    notify_offer(driver, offer, session=session)
     enqueue(
         "expire_offer",
         expires_at,

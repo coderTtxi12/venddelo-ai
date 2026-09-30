@@ -10,16 +10,25 @@ from app.db.models.delivery import DeliveryDispatchRequest, DeliveryDriver
 from app.infra.realtime.dispatch_hub import get_dispatch_realtime_hub
 from app.infra.realtime.restaurant_dispatch_hub import get_restaurant_dispatch_realtime_hub
 from app.infra.realtime.rider_hub import get_rider_realtime_hub
+from app.modules.delivery_dispatch.monitor_cache import dispatch_monitor_snapshot_cache
 
 _AFTER_COMMIT_HOOKS = "rider_notify_after_commit_hooks"
 _AFTER_COMMIT_REGISTERED = "rider_notify_after_commit_registered"
 
 
-def notify_dispatch_monitor_changed(provider_id: uuid.UUID) -> None:
-    get_dispatch_realtime_hub().publish_sync(
-        provider_id,
-        {"type": "monitor.updated"},
-    )
+def notify_dispatch_monitor_changed(
+    provider_id: uuid.UUID,
+    *,
+    session: Session | None = None,
+) -> None:
+    def publish() -> None:
+        dispatch_monitor_snapshot_cache.invalidate_provider(provider_id)
+        get_dispatch_realtime_hub().publish_sync(
+            provider_id,
+            {"type": "monitor.updated"},
+        )
+
+    _publish_after_commit(session, publish)
 
 
 def notify_rider_updated(
