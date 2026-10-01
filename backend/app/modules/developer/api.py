@@ -13,11 +13,14 @@ from app.modules.developer.schemas import (
     DeveloperWebhookSecretDTO,
     DeveloperSentEventDTO,
     DeveloperSentEventsResponse,
+    JustoReceiptDTO,
+    JustoReceiptsResponse,
     DeveloperWebhookTestResult,
     DeveloperWebhookUpdate,
 )
 from app.modules.developer.service import DeveloperSettingsService
 from app.modules.developer.webhook_dispatch import deliver_test_webhook, sent_events_key
+from app.modules.justo.ingest import list_justo_receipts
 from app.modules.developer.webhook_sink import get_webhook_sink_store
 from app.modules.restaurants.schemas import RestaurantDTO
 
@@ -121,6 +124,24 @@ def list_sent_webhook_events(
                 delivered=event.signature_valid,
             )
             for event in events
+        ]
+    )
+
+
+@router.get(
+    "/{restaurant_id}/developer/justo/receipts",
+    response_model=JustoReceiptsResponse,
+)
+def list_justo_webhook_receipts(
+    restaurant: RestaurantDTO = Depends(require_owned_restaurant),
+    service: DeveloperSettingsService = Depends(_service),
+    limit: int = Query(default=5, ge=1, le=15),
+) -> JustoReceiptsResponse:
+    rows = list_justo_receipts(service._session, restaurant.id, limit=limit)
+    return JustoReceiptsResponse(
+        items=[
+            JustoReceiptDTO(received_at=row.created_at, result=row.result, payload=row.payload)
+            for row in rows
         ]
     )
 
