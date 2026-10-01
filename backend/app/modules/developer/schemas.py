@@ -69,3 +69,13 @@ class DeveloperSentEventDTO(BaseModel):
 
 class DeveloperSentEventsResponse(BaseModel):
     items: list[DeveloperSentEventDTO]
+
+
+class JustoReceiptDTO(BaseModel):
+    received_at: datetime
+    result: str
+    payload: dict[str, Any]
+
+
+class JustoReceiptsResponse(BaseModel):
+    items: list[JustoReceiptDTO]
