@@ -17,6 +17,7 @@ from app.db.models.menu import Category, OptionGroup, OptionItem, Product, produ
 from app.infra.storage.factory import build_storage
 from app.modules.menu.inventory import apply_inventory_consume
 from app.modules.menu.repository import MenuRepository
+from app.modules.menu.schedule_fields import menu_schedule_from_product, menu_schedule_to_db_fields
 from app.modules.menu.schemas import (
     CategoryCreate,
     CategoryDTO,
@@ -168,6 +169,11 @@ def _product_to_dto(
         shelf_life_days=obj.shelf_life_days,
         expires_on=obj.expires_on,
         batch_started_at=obj.batch_started_at,
+        menu_schedule=menu_schedule_from_product(
+            obj.menu_schedule_weekdays,
+            obj.menu_schedule_start_time,
+            obj.menu_schedule_end_time,
+        ),
         show_low_stock=False,
         created_at=obj.created_at,
         updated_at=obj.updated_at,
@@ -355,7 +361,9 @@ class SqlAlchemyMenuRepository(MenuRepository):
             )
 
     def add_product(self, data: ProductCreate) -> ProductDTO:
-        payload = data.model_dump(exclude={"category_ids"})
+        payload = data.model_dump(exclude={"category_ids", "menu_schedule"})
+        if "menu_schedule" in data.model_fields_set:
+            payload.update(menu_schedule_to_db_fields(data.menu_schedule))
         obj = Product(**payload)
         self._session.add(obj)
         self._session.flush()
@@ -434,8 +442,10 @@ class SqlAlchemyMenuRepository(MenuRepository):
         obj = self._session.get(Product, id)
         if obj is None:
             return None
-        values = data.model_dump(exclude_unset=True)
+        values = data.model_dump(exclude_unset=True, exclude={"menu_schedule"})
         category_ids = values.pop("category_ids", None)
+        if "menu_schedule" in data.model_fields_set:
+            values.update(menu_schedule_to_db_fields(data.menu_schedule))
         for field, value in values.items():
             setattr(obj, field, value)
         if category_ids is not None:
