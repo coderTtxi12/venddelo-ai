@@ -55,6 +55,7 @@ from app.modules.developer.service import DeveloperSettingsService
 from app.modules.justo.ingest import (
     ingest_justo_event,
     justo_signing_secret,
+    record_justo_receipt,
     verify_justo_signature,
 )
 from app.modules.developer.webhook_sink import (
@@ -535,4 +536,6 @@ async def receive_justo_order(
         return {"accepted": False, "reason": "invalid_json"}
     if not isinstance(payload, dict):
         return {"accepted": False, "reason": "invalid_json"}
-    return ingest_justo_event(uow.session, restaurant_id, payload)
+    result = ingest_justo_event(uow.session, restaurant_id, payload)
+    record_justo_receipt(uow.session, restaurant_id, payload, result)
+    return result
