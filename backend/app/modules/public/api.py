@@ -529,7 +529,7 @@ async def receive_justo_order(
     request: Request,
     uow: SqlAlchemyUnitOfWork = Depends(get_uow),
 ) -> dict[str, Any]:
-    """Justo calls this when an order is created. One URL per Mexy restaurant."""
+    """Justo posts newOrder and orderItemsUpdated here. One URL per restaurant."""
     raw = await request.body()
     secret = justo_signing_secret(uow.session, restaurant_id)
     if not verify_justo_signature(secret, raw, request.headers.get("x-orion-signature")):
@@ -541,7 +541,12 @@ async def receive_justo_order(
     if not isinstance(payload, dict):
         return {"accepted": False, "reason": "invalid_json"}
     result = ingest_justo_event(uow.session, restaurant_id, payload)
-    if result.get("accepted") and result.get("order_id") and not result.get("duplicate"):
+    if (
+        result.get("accepted")
+        and result.get("order_id")
+        and not result.get("duplicate")
+        and not result.get("updated")
+    ):
         tracking_url = attach_justo_tracking(
             uow.session,
             restaurant_id,
