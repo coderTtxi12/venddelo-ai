@@ -47,6 +47,7 @@ from app.db.models.promotions import (
     promotion_products,
 )
 from app.db.models.developer import (
+    JustoWebhookReceipt,
     RestaurantDeveloperApiKey,
     RestaurantJustoStore,
     RestaurantTrackingWebhook,
@@ -69,6 +70,7 @@ __all__ = [
     "MarketingTask",
     "RestaurantTrackingWebhook",
     "RestaurantJustoStore",
+    "JustoWebhookReceipt",
     "RestaurantDeveloperApiKey",
     "Restaurant",
     "RestaurantMember",

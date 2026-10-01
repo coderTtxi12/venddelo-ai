@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -37,6 +39,25 @@ class RestaurantJustoStore(TimestampMixin, Base):
     )
     store_id: Mapped[str | None] = mapped_column(String(80), nullable=True, unique=True)
     signing_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class JustoWebhookReceipt(Base):
+    """Raw Justo webhook body, kept so the real payload shape can be inspected."""
+
+    __tablename__ = "justo_webhook_receipts"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    restaurant_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("restaurants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    result: Mapped[str] = mapped_column(String(32), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
 
 
 class RestaurantDeveloperApiKey(Base):
