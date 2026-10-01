@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from sqlalchemy import (
     Boolean,
@@ -10,11 +10,13 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    SmallInteger,
     String,
     Table,
     Text,
+    Time,
 )
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import ARRAY, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -86,6 +88,11 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     batch_started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    menu_schedule_weekdays: Mapped[list[int] | None] = mapped_column(
+        ARRAY(SmallInteger), nullable=True
+    )
+    menu_schedule_start_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    menu_schedule_end_time: Mapped[time | None] = mapped_column(Time, nullable=True)
 
     categories: Mapped[list["Category"]] = relationship(
         secondary=product_categories, back_populates="products"
