@@ -16,15 +16,19 @@ from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 
+from app.db.models.delivery import DeliveryDispatchRequest
 from app.db.models.developer import JustoWebhookReceipt, RestaurantJustoStore
-from app.db.models.orders import Order
+from app.db.models.orders import Order, OrderItem
 from app.db.models.restaurant import Restaurant
 from app.infra.realtime.order_hub import get_order_realtime_hub
 from app.modules.orders.adapters import SqlAlchemyOrderRepository
 from app.modules.orders.schemas import OrderCreate, OrderItemCreate
 
 _CREATE_EVENT_TYPES = frozenset({"ecommerce.order.created", "neworder"})
+_UPDATE_EVENT_TYPES = frozenset({"orderitemsupdated"})
+_CLOSED_DISPATCH_STATUSES = frozenset({"delivered", "cancelled"})
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +53,23 @@ def verify_justo_signature(secret: str | None, raw_body: bytes, signature: str |
 
 def normalize_source(value: object) -> str:
     return re.sub(r"[^a-z0-9]", "", str(value or "").strip().lower())
+
+
+def justo_event_action(event_type: str) -> str:
+    """Justo registers one event per webhook. Both can post to the same URL."""
+    if not event_type:
+        return "create"
+    normalized = normalize_source(event_type)
+    if normalized in _CREATE_EVENT_TYPES:
+        return "create"
+    if normalized in _UPDATE_EVENT_TYPES:
+        return "update"
+    return "ignore"
+
+
+def adjusted_collect_cents(current_collect: int, previous_total: int, new_total: int) -> int:
+    """Move the rider collect by the same pesos the Justo total moved."""
+    return max(0, int(current_collect) + int(new_total) - int(previous_total))
 
 
 def classify_justo_order(order: dict[str, Any]) -> str | None:
@@ -268,9 +289,10 @@ def build_order_create(
     address, latitude, longitude = _address(order)
     items = _items(order)
     items_total = sum(item.line_total_cents for item in items)
-    # Justo's deliveryFee is not Mexy's shipping cost. The accept drawer
-    # quotes Mexy and that quote becomes the dispatch fee. The order total
-    # stays what the customer paid on Justo (totalPrice).
+    # deliveryFee is what the customer paid Justo for shipping. /orders shows it.
+    # The accept drawer quotes Mexy separately and does not use this amount.
+    # The order total stays what the customer paid (totalPrice).
+    delivery_fee = _money_to_cents(order.get("deliveryFee"))
     total = _money_to_cents(order.get("totalPrice") or order.get("amountToPay")) or items_total
     code = str(order.get("fullCode") or order.get("code") or "").strip()
     origin = str(order.get("source") or order.get("channel") or channel).strip()
@@ -296,7 +318,7 @@ def build_order_create(
         delivery_address=address,
         delivery_latitude=latitude,
         delivery_longitude=longitude,
-        delivery_fee_cents=0,
+        delivery_fee_cents=delivery_fee,
         cash_denomination_cents=cash_denomination,
         note=" · ".join(note_bits),
         external_source=channel,
@@ -353,6 +375,8 @@ def record_justo_receipt(
     """Keep the raw body. Justo does not retry a 200, so this is the only copy."""
     if result.get("duplicate"):
         label = "duplicate"
+    elif result.get("updated"):
+        label = "updated"
     elif result.get("accepted"):
         label = "created"
     else:
@@ -403,9 +427,45 @@ def list_justo_receipts(session, restaurant_id: uuid.UUID, limit: int = 10) -> l
     )
 
 
+def apply_justo_order_contents(order: Order, justo_order: dict[str, Any], channel: str) -> int:
+    """Replace items and what the customer pays. Mexy's shipping fee stays put."""
+    previous_total = order.total_cents
+    created = build_order_create(order.restaurant_id, justo_order, channel)
+    order.customer_name = created.customer_name
+    order.customer_phone = created.customer_phone
+    order.payment_method = created.payment_method
+    order.subtotal_cents = created.subtotal_cents
+    order.subtotal_before_discount_cents = created.subtotal_before_discount_cents
+    order.total_cents = created.total_cents
+    order.delivery_fee_cents = created.delivery_fee_cents
+    order.cash_denomination_cents = created.cash_denomination_cents
+    order.items.clear()
+    order.items.extend(OrderItem(**item.model_dump()) for item in created.items)
+    return previous_total
+
+
+def sync_justo_dispatch_payment(session, order: Order, previous_total: int) -> None:
+    """Keep the assigned rider's collect and change in step with the new total."""
+    row = session.scalar(
+        select(DeliveryDispatchRequest).where(DeliveryDispatchRequest.order_id == order.id)
+    )
+    if row is None or row.status in _CLOSED_DISPATCH_STATUSES:
+        return
+    row.collect_cents = adjusted_collect_cents(row.collect_cents, previous_total, order.total_cents)
+    row.cash_denomination_cents = order.cash_denomination_cents
+    row.payment_method = order.payment_method
+    row.customer_name = order.customer_name
+    row.customer_phone = order.customer_phone
+    session.flush()
+    from app.modules.delivery_dispatch.monitor_notify import notify_request_realtime
+
+    notify_request_realtime(session, row)
+
+
 def ingest_justo_event(session, restaurant_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any]:
     event_type = str(payload.get("type") or "")
-    if event_type and normalize_source(event_type) not in _CREATE_EVENT_TYPES:
+    action = justo_event_action(event_type)
+    if action == "ignore":
         logger.info(
             "justo inbound ignored restaurant=%s type=%s",
             restaurant_id,
@@ -426,12 +486,24 @@ def ingest_justo_event(session, restaurant_id: uuid.UUID, payload: dict[str, Any
     if not external_id:
         return {"accepted": False, "reason": "missing_order_id"}
     existing = session.scalar(
-        select(Order).where(
+        select(Order)
+        .options(selectinload(Order.items))
+        .where(
             Order.restaurant_id == restaurant_id,
-            Order.external_source == channel,
             Order.external_id == external_id,
         )
     )
+    if existing is not None and action == "update":
+        previous_total = apply_justo_order_contents(existing, order, channel)
+        session.flush()
+        sync_justo_dispatch_payment(session, existing, previous_total)
+        dto = SqlAlchemyOrderRepository(session).get(existing.id)
+        if dto is not None:
+            get_order_realtime_hub().publish_sync(
+                restaurant_id,
+                {"type": "order.updated", "order": dto.model_dump(mode="json")},
+            )
+        return {"accepted": True, "updated": True, "order_id": str(existing.id)}
     if existing is not None:
         return {"accepted": True, "duplicate": True, "order_id": str(existing.id)}
     created = build_order_create(restaurant_id, order, channel)
