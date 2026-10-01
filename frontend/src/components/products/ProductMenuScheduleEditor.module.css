@@ -1,0 +1,122 @@
+.card {
+  border: 1px solid var(--border-subtle, #e8e8ec);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--surface-raised, #fafafa);
+}
+
+.title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.hint {
+  margin: 4px 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted, #6b6b76);
+  line-height: 1.4;
+}
+
+.toggleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.toggleCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toggleLabel {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.toggleHint {
+  font-size: 0.75rem;
+  color: var(--text-muted, #6b6b76);
+  line-height: 1.35;
+}
+
+.toggleInput {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.weekdayRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.weekdayChip {
+  min-width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle, #e0e0e6);
+  background: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.weekdayChip:hover {
+  border-color: var(--accent, #2563eb);
+}
+
+.weekdayChipActive {
+  background: var(--accent, #2563eb);
+  border-color: var(--accent, #2563eb);
+  color: #fff;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle, #e0e0e6);
+  font-size: 0.875rem;
+}
+
+.helpText {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted, #6b6b76);
+  line-height: 1.4;
+}
+
+.preview {
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #444);
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px dashed var(--border-subtle, #dcdce4);
+}
+
+.previewMuted {
+  color: var(--text-muted, #6b6b76);
+}
