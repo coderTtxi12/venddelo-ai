@@ -19,6 +19,7 @@ from app.modules.delivery_dispatch.schemas import PublicDispatchTrackingDTO
 from app.modules.delivery_dispatch.service import RestaurantDispatchService
 from app.modules.delivery_providers.adapters import SqlAlchemyDeliveryProviderRepository
 from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
+from app.modules.menu.menu_schedule import is_product_menu_schedule_active
 from app.modules.menu.schemas import FullMenuDTO
 from app.modules.menu.service import MenuService
 from app.modules.orders.schemas import OrderDTO, PublicOrderInput
@@ -53,6 +54,7 @@ from app.modules.restaurants.social_links import (
 from app.modules.translations.service import TranslationService
 from app.modules.developer.service import DeveloperSettingsService
 from app.modules.justo.ingest import (
+    attach_justo_tracking,
     ingest_justo_event,
     justo_signing_secret,
     record_justo_receipt,
@@ -359,6 +361,8 @@ def quote_public_cart(
             raise NotFoundError(f"Product {line.product_id} not found")
         if product.status != "active":
             raise NotFoundError(f"Product {line.product_id} not found")
+        if not is_product_menu_schedule_active(product, now, tz):
+            raise NotFoundError(f"Product {line.product_id} not found")
         products_by_id[product.id] = product
 
     quote = price_cart(
@@ -537,5 +541,14 @@ async def receive_justo_order(
     if not isinstance(payload, dict):
         return {"accepted": False, "reason": "invalid_json"}
     result = ingest_justo_event(uow.session, restaurant_id, payload)
+    if result.get("accepted") and result.get("order_id") and not result.get("duplicate"):
+        tracking_url = attach_justo_tracking(
+            uow.session,
+            restaurant_id,
+            str(result["order_id"]),
+            uow.idempotency,
+        )
+        if tracking_url:
+            result = {**result, "tracking_url": tracking_url}
     record_justo_receipt(uow.session, restaurant_id, payload, result)
     return result
