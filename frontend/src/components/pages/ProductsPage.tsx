@@ -50,6 +50,12 @@ import {
   type ProductVisibilityState,
 } from '@/lib/menu/productVisibility';
 import { ProductVisibilitySelect } from '@/components/products/ProductVisibilitySelect';
+import { ProductMenuScheduleEditor } from '@/components/products/ProductMenuScheduleEditor';
+import {
+  DEFAULT_PRODUCT_MENU_SCHEDULE_DRAFT,
+  validateProductMenuScheduleDraft,
+  type ProductMenuScheduleDraft,
+} from '@/lib/menu/productMenuSchedule';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { ListPagination } from '@/components/ui/ListPagination';
 import { buildDeleteConfirmCopy } from '@/lib/menu/deleteConfirmCopy';
@@ -2345,6 +2351,7 @@ export default function ProductsPage() {
                         inventoryQty: payload.inventoryQty,
                         shelfLifeDays: payload.shelfLifeDays,
                         expiresOn: payload.expiresOn,
+                        menuSchedule: payload.menuSchedule,
                       },
                     );
                     catalogPromotionsRef.current = catalogPromotions;
@@ -2655,6 +2662,7 @@ function ProductEditor({
     inventoryQty: number | null;
     shelfLifeDays: number | null;
     expiresOn: string | null;
+    menuSchedule: ProductMenuScheduleDraft;
   }) => Promise<void>;
   supplierId: string | null;
   supplierIdError: string | null;
@@ -2677,6 +2685,9 @@ function ProductEditor({
   );
   const [shelfLifeDays, setShelfLifeDays] = useState<number | null>(initial?.shelfLifeDays ?? null);
   const [expiresOn, setExpiresOn] = useState(initial?.expiresOn ?? '');
+  const [menuSchedule, setMenuSchedule] = useState<ProductMenuScheduleDraft>(
+    initial?.menuSchedule ?? DEFAULT_PRODUCT_MENU_SCHEDULE_DRAFT,
+  );
 
   useEffect(() => {
     setName(initial?.name ?? '');
@@ -2693,6 +2704,7 @@ function ProductEditor({
     setInventoryQty(initial?.inventoryQty == null ? '' : String(initial.inventoryQty));
     setShelfLifeDays(initial?.shelfLifeDays ?? null);
     setExpiresOn(initial?.expiresOn ?? '');
+    setMenuSchedule(initial?.menuSchedule ?? DEFAULT_PRODUCT_MENU_SCHEDULE_DRAFT);
     setDragGroupId(null);
     setDropGroupId(null);
     setError(null);
@@ -2798,6 +2810,11 @@ function ProductEditor({
           setError(supplierIdError ?? 'No se pudo determinar tu supplierId.');
           return;
         }
+        const scheduleError = validateProductMenuScheduleDraft(menuSchedule);
+        if (scheduleError) {
+          setError(scheduleError);
+          return;
+        }
         void (async () => {
           try {
             setSaving(true);
@@ -2816,6 +2833,7 @@ function ProductEditor({
               inventoryQty: inventoryQty.trim() === '' ? null : Math.max(0, Number.parseInt(inventoryQty, 10) || 0),
               shelfLifeDays: expiresOn ? null : shelfLifeDays,
               expiresOn: expiresOn || null,
+              menuSchedule,
             });
           } catch (err) {
             console.error(err);
@@ -2846,6 +2864,12 @@ function ProductEditor({
           </div>
         </div>
       ) : null}
+
+      <ProductMenuScheduleEditor
+        value={menuSchedule}
+        onChange={setMenuSchedule}
+        disabled={saving}
+      />
 
       <div className={styles.formGrid2}>
         <div className={styles.field}>
