@@ -28,6 +28,11 @@ import {
 import { resolveImagePathForUpload } from '@/lib/storage/resolveImagePath';
 import type { ProductVisibilityState } from '@/lib/menu/productVisibility';
 import { visibilityUpdateForState } from '@/lib/menu/productVisibility';
+import {
+  DEFAULT_PRODUCT_MENU_SCHEDULE_DRAFT,
+  productMenuScheduleToApi,
+} from '@/lib/menu/productMenuSchedule';
+import type { ProductMenuScheduleDraft } from '@/lib/menu/productMenuSchedule';
 import type { LegacyDbClient, LegacyStorageClient } from '../legacyDb';
 import type {
   Id,
@@ -171,6 +176,7 @@ export type SaveSupplierProductPayload = {
   inventoryQty?: number | null;
   shelfLifeDays?: number | null;
   expiresOn?: string | null;
+  menuSchedule?: ProductMenuScheduleDraft;
 };
 
 export type SaveSupplierProductResult = {
@@ -505,6 +511,7 @@ export async function saveSupplierProduct(
       inventory_qty?: number | null;
       shelf_life_days?: number | null;
       expires_on?: string | null;
+      menu_schedule?: ReturnType<typeof productMenuScheduleToApi>;
     } = {
       name: payload.name,
       description,
@@ -513,6 +520,9 @@ export async function saveSupplierProduct(
       inventory_qty: payload.inventoryQty ?? null,
       shelf_life_days: payload.shelfLifeDays ?? null,
       expires_on: payload.expiresOn ?? null,
+      menu_schedule: productMenuScheduleToApi(
+        payload.menuSchedule ?? DEFAULT_PRODUCT_MENU_SCHEDULE_DRAFT,
+      ),
     };
     if (imagePath !== undefined) {
       body.image_path = imagePath;
@@ -560,6 +570,9 @@ export async function saveSupplierProduct(
     inventory_qty: payload.inventoryQty ?? null,
     shelf_life_days: payload.shelfLifeDays ?? null,
     expires_on: payload.expiresOn ?? null,
+    menu_schedule: productMenuScheduleToApi(
+      payload.menuSchedule ?? DEFAULT_PRODUCT_MENU_SCHEDULE_DRAFT,
+    ),
   });
 
   const [syncedGroups, catalogPromotions] = await Promise.all([

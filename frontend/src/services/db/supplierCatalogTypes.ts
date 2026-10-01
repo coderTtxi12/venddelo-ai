@@ -1,3 +1,4 @@
+import type { ProductMenuScheduleDraft } from '@/lib/menu/productMenuSchedule';
 import type { ProductStatus } from '@/lib/api/types';
 
 export type Id = string;
@@ -54,6 +55,7 @@ export type ProductDraft = {
   shelfLifeDays?: number | null;
   expiresOn?: string | null;
   batchStartedAt?: string | null;
+  menuSchedule: ProductMenuScheduleDraft;
   createdAt: string;
   updatedAt: string;
 };

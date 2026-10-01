@@ -1,6 +1,13 @@
 import { DEFAULT_CURRENCY } from '@/lib/currency';
 import { apiRequest } from './client';
-import type { Category, CategoryDisplayLayout, CursorPage, Product, ProductStatus } from './types';
+import type {
+  Category,
+  CategoryDisplayLayout,
+  CursorPage,
+  Product,
+  ProductMenuSchedule,
+  ProductStatus,
+} from './types';
 
 export function listCategories(
   token: string,
@@ -134,6 +141,7 @@ export function createProduct(
     inventory_qty?: number | null;
     shelf_life_days?: number | null;
     expires_on?: string | null;
+    menu_schedule?: ProductMenuSchedule | null;
   },
 ) {
   return apiRequest<Product>(`/restaurants/${restaurantId}/products`, {
@@ -163,6 +171,7 @@ export function updateProduct(
     inventory_qty?: number | null;
     shelf_life_days?: number | null;
     expires_on?: string | null;
+    menu_schedule?: ProductMenuSchedule | null;
   },
 ) {
   return apiRequest<Product>(

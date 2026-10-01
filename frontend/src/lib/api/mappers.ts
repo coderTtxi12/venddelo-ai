@@ -1,3 +1,4 @@
+import { productMenuScheduleFromApi } from '@/lib/menu/productMenuSchedule';
 import type { Category, OptionGroup, Product } from './types';
 import type { CategoryDraft, OptionGroupDraft, ProductDraft } from '@/services/db/supplierCatalogTypes';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
@@ -56,6 +57,7 @@ export function mapProductToDraft(product: Product, discountUsd = 0): ProductDra
     shelfLifeDays: product.shelf_life_days ?? null,
     expiresOn: product.expires_on ?? null,
     batchStartedAt: product.batch_started_at ?? null,
+    menuSchedule: productMenuScheduleFromApi(product.menu_schedule),
     createdAt: product.created_at,
     updatedAt: product.updated_at,
   };

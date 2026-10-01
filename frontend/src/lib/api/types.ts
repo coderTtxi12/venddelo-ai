@@ -32,6 +32,7 @@ export type Restaurant = {
   name: string;
   subdomain: string;
   original_language: string;
+  timezone?: string;
   status: string;
   description: string | null;
   address: string | null;
@@ -196,6 +197,13 @@ export type OptionItem = {
 
 export type ProductStatus = 'active' | 'inactive' | 'draft';
 
+export type ProductMenuSchedule = {
+  weekdays: number[];
+  use_time_window: boolean;
+  daily_start_time: string | null;
+  daily_end_time: string | null;
+};
+
 export type OptionGroup = {
   id: string;
   product_id: string;
@@ -229,6 +237,7 @@ export type Product = {
   expires_on?: string | null;
   batch_started_at?: string | null;
   show_low_stock?: boolean;
+  menu_schedule?: ProductMenuSchedule | null;
 };
 
 export type Promotion = {
