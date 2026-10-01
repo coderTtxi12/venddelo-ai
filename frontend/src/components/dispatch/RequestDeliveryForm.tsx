@@ -199,6 +199,7 @@ export function RequestDeliveryForm({
 
   const usingLockedFee =
     lockedOrigin != null &&
+    (lockedOrigin.feeCents ?? 0) > 0 &&
     !kitchenDispatchLocationChanged(lockedOrigin, {
       address: location.address,
       latitude: location.latitude,
