@@ -7,6 +7,7 @@ import {
   getDeveloperSettings,
   rotateDeveloperWebhookSecret,
   listDeveloperWebhookEvents,
+  listJustoReceipts,
   testDeveloperWebhook,
   updateDeveloperWebhook,
   type DeveloperSettings,
@@ -99,6 +100,7 @@ export default function DeveloperSettingsPage() {
   const [note, setNote] = useState<string | null>(null);
   const [secretOnce, setSecretOnce] = useState<string | null>(null);
   const [sentEvents, setSentEvents] = useState<string | null>(null);
+  const [justoReceipt, setJustoReceipt] = useState<string | null>(null);
 
   const canManage = memberRole === 'owner' || memberRole === 'admin';
 
@@ -167,6 +169,23 @@ export default function DeveloperSettingsPage() {
       setNote('URL de Justo copiada.');
     } catch {
       setError('No se pudo copiar. Selecciónala a mano.');
+    }
+  };
+
+  const onViewJustoReceipt = async () => {
+    if (!accessToken || !selectedRestaurantId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await listJustoReceipts(accessToken, selectedRestaurantId);
+      setJustoReceipt(JSON.stringify(data, null, 2));
+      if (data.items.length === 0) {
+        setNote('Justo todavía no ha enviado un aviso a esta dirección.');
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo cargar el aviso de Justo');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -358,6 +377,12 @@ export default function DeveloperSettingsPage() {
                 </button>
               </div>
             ) : null}
+            <div className={styles.actions}>
+              <button type="button" className={styles.ghost} disabled={busy} onClick={() => void onViewJustoReceipt()}>
+                Ver aviso de Justo
+              </button>
+            </div>
+            {justoReceipt ? <pre className={styles.eventsPreview}>{justoReceipt}</pre> : null}
           </section>
 
           <section className={styles.card} aria-labelledby="dev-events">
