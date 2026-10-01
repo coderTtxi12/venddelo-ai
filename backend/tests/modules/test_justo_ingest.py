@@ -3,9 +3,13 @@ import hmac
 
 import uuid
 
+from app.db.models.orders import Order, OrderItem
 from app.modules.justo.ingest import (
+    adjusted_collect_cents,
+    apply_justo_order_contents,
     build_order_create,
     classify_justo_order,
+    justo_event_action,
     public_tracking_url,
     verify_justo_signature,
 )
@@ -126,7 +130,7 @@ def test_real_justo_payload_maps_readable_address_items_and_cash():
     assert created.delivery_latitude == 19.6354625305732
     assert created.delivery_longitude == -99.11067045524045
     assert created.total_cents == 17000
-    assert created.delivery_fee_cents == 0
+    assert created.delivery_fee_cents == 2000
     assert created.cash_denomination_cents == 20000
     assert created.payment_method == "cash"
     assert created.external_source == "commander"
@@ -141,6 +145,85 @@ def test_real_justo_payload_maps_readable_address_items_and_cash():
     ]
     assert groups[1]["choices"][0]["label"] == "Jalapeños"
     assert groups[1]["choices"][0]["price_cents"] == 0
+
+
+def test_order_items_updated_uses_the_same_url_as_new_order():
+    assert justo_event_action("newOrder") == "create"
+    assert justo_event_action("orderItemsUpdated") == "update"
+    assert justo_event_action("orderStatusUpdated") == "ignore"
+
+
+def test_order_items_updated_replaces_items_total_and_change():
+    restaurant_id = uuid.uuid4()
+    order = Order(
+        restaurant_id=restaurant_id,
+        type="delivery",
+        customer_name="Luis Laymon",
+        customer_phone="+525512238144",
+        payment_method="cash",
+        subtotal_cents=15000,
+        subtotal_before_discount_cents=15000,
+        total_cents=17000,
+        status="confirmed",
+        delivery_fee_cents=2000,
+        cash_denomination_cents=20000,
+        external_source="commander",
+        external_id="nsKdB9mEhbHwGcmQE",
+    )
+    order.items = [
+        OrderItem(
+            product_name="Bagui Persa",
+            quantity=1,
+            unit_price_cents=15000,
+            line_subtotal_cents=15000,
+            line_total_cents=15000,
+        )
+    ]
+    previous = apply_justo_order_contents(
+        order,
+        {
+            "_id": "nsKdB9mEhbHwGcmQE",
+            "source": "commander",
+            "buyerName": "Luis Laymon",
+            "phone": "+525512238144",
+            "paymentType": "cash",
+            "cashAmount": 300,
+            "deliveryFee": 25,
+            "totalPrice": 245,
+            "items": [
+                {
+                    "amount": 1,
+                    "unitPrice": 220,
+                    "product": {"name": "Bagui Persa"},
+                    "options": [
+                        {
+                            "title": "Elige tu picante",
+                            "optionId": "picante",
+                            "selections": ["Habanero"],
+                            "selectionsPrices": [0],
+                        }
+                    ],
+                }
+            ],
+        },
+        "commander",
+    )
+    assert previous == 17000
+    assert order.total_cents == 24500
+    assert order.cash_denomination_cents == 30000
+    assert order.delivery_fee_cents == 2500
+    assert order.status == "confirmed"
+    assert order.external_id == "nsKdB9mEhbHwGcmQE"
+    assert len(order.items) == 1
+    assert order.items[0].product_name == "Bagui Persa"
+    groups = order.items[0].selected_options["__groups__"]
+    assert groups[0]["choices"][0]["label"] == "Habanero"
+
+
+def test_assigned_rider_collect_moves_with_the_order_total():
+    assert adjusted_collect_cents(12500, 17000, 22000) == 17500
+    assert adjusted_collect_cents(17000, 17000, 22000) == 22000
+    assert adjusted_collect_cents(1000, 17000, 0) == 0
 
 
 def test_tracking_link_uses_the_restaurant_subdomain():
