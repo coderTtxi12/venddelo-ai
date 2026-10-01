@@ -64,6 +64,12 @@ export type DeveloperSentEvent = {
   delivered: boolean | null;
 };
 
+export function listJustoReceipts(token: string, restaurantId: string) {
+  return apiRequest<{
+    items: { received_at: string; result: string; payload: Record<string, unknown> }[];
+  }>(`/restaurants/${restaurantId}/developer/justo/receipts`, { token });
+}
+
 export function listDeveloperWebhookEvents(token: string, restaurantId: string) {
   return apiRequest<{ items: DeveloperSentEvent[] }>(
     `/restaurants/${restaurantId}/developer/webhook/events`,
