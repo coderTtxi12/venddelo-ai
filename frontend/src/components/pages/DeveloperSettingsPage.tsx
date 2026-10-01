@@ -355,9 +355,9 @@ export default function DeveloperSettingsPage() {
           <section className={styles.card} aria-labelledby="dev-justo">
             <h2 id="dev-justo" className={styles.cardTitle}>Pedidos de Justo</h2>
             <p className={styles.cardText}>
-              En Justo pega la URL y la llave secreta. El tipo de evento es el de pedido creado,
-              no <code>orderStatusUpdated</code>. Marca Activar. Llegan los pedidos a domicilio del
-              propio Justo y los de Uber exclusivo, los que entrega el restaurante.
+              En Justo pega la URL y la llave secreta. El tipo de evento es <code>newOrder</code>.
+              Entra cualquier origen si es domicilio y Justo no reparte. El enlace de rastreo sale
+              en <code>/orders</code> como <code>https://tu-local.mxy.mx/rastreo/…</code>.
             </p>
             {settings.justo?.inbound_url ? (
               <div className={styles.secretBox}>
