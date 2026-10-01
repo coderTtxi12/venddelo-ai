@@ -355,9 +355,12 @@ export default function DeveloperSettingsPage() {
           <section className={styles.card} aria-labelledby="dev-justo">
             <h2 id="dev-justo" className={styles.cardTitle}>Pedidos de Justo</h2>
             <p className={styles.cardText}>
-              En Justo pega la URL y la llave secreta. El tipo de evento es <code>newOrder</code>.
-              Entra cualquier origen si es domicilio y Justo no reparte. El enlace de rastreo sale
-              en <code>/orders</code> como <code>https://tu-local.mxy.mx/rastreo/…</code>.
+              En Justo crea dos webhooks con esta misma URL y la misma llave. Uno con evento{' '}
+              <code>newOrder</code> y otro con <code>orderItemsUpdated</code>. Justo solo deja un
+              evento por webhook. Entra cualquier origen si es domicilio y Justo no reparte. Si el
+              cliente cambia el pedido, <code>/orders</code> actualiza productos, total y cambio,
+              también cuando ya hay repartidor. El enlace de rastreo sale como{' '}
+              <code>https://tu-local.mxy.mx/rastreo/…</code>.
             </p>
             {settings.justo?.inbound_url ? (
               <div className={styles.secretBox}>
