@@ -105,6 +105,7 @@ class OrderDTO(BaseModel):
     delivery_latitude: float | None = None
     delivery_longitude: float | None = None
     delivery_fee_cents: int = 0
+    external_source: str | None = None
     cash_denomination_cents: int | None = None
     cancellation_reason: str | None = None
     idempotency_key: str | None = None
