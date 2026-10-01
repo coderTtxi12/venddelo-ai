@@ -199,6 +199,7 @@ export function RequestDeliveryForm({
 
   const usingLockedFee =
     lockedOrigin != null &&
+    !sourceOrder?.external_source &&
     (lockedOrigin.feeCents ?? 0) > 0 &&
     !kitchenDispatchLocationChanged(lockedOrigin, {
       address: location.address,

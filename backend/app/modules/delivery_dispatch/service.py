@@ -1218,10 +1218,13 @@ class RestaurantDispatchService:
             delivery_latitude=latitude,
             delivery_longitude=longitude,
         )
-        quoted_fee_cents = provider_quoted_fee_cents(
-            order.delivery_fee_cents,
-            order.coupon_waived_delivery_cents or 0,
-        )
+        if order.external_id:
+            quoted_fee_cents = quote.delivery_fee_cents if quote.available else 0
+        else:
+            quoted_fee_cents = provider_quoted_fee_cents(
+                order.delivery_fee_cents,
+                order.coupon_waived_delivery_cents or 0,
+            )
         mexy_fee_cents = quote.mexy_fee_cents if quote.available else 0
         now = datetime.now(UTC)
         ready_at = now + timedelta(minutes=_ACCEPTED_STUB_PREP_MINUTES)
@@ -1348,14 +1351,11 @@ class RestaurantDispatchService:
             delivery_latitude=latitude,
             delivery_longitude=longitude,
         )
-        if lock_quoted_fee:
-            assert source_order is not None
+        if lock_quoted_fee and source_order is not None and not source_order.external_id:
             quoted_fee_cents = provider_quoted_fee_cents(
                 source_order.delivery_fee_cents,
                 source_order.coupon_waived_delivery_cents or 0,
             )
-            # A zero fee means the order did not carry a Mexy quote (Justo
-            # inbound). Use the live quote instead of locking $0.
             if quoted_fee_cents > 0:
                 mexy_fee_cents = quote.mexy_fee_cents if quote.available else 0
                 return quoted_fee_cents, mexy_fee_cents
