@@ -21,6 +21,41 @@ export type ResolvedOrderOption = {
   choices: ResolvedOrderOptionChoice[];
 };
 
+function embeddedOrderItemOptions(selected: Record<string, unknown>): ResolvedOrderOption[] {
+  const raw = selected.__groups__;
+  if (!Array.isArray(raw)) return [];
+  const rows: ResolvedOrderOption[] = [];
+  for (const group of raw) {
+    if (group == null || typeof group !== 'object') continue;
+    const record = group as Record<string, unknown>;
+    const groupTitle = typeof record.title === 'string' ? record.title.trim() : '';
+    const groupId = typeof record.id === 'string' && record.id.trim() ? record.id : groupTitle;
+    if (!groupTitle || !Array.isArray(record.choices)) continue;
+    const choices: ResolvedOrderOptionChoice[] = [];
+    for (const choice of record.choices) {
+      if (choice == null || typeof choice !== 'object') continue;
+      const row = choice as Record<string, unknown>;
+      const label = typeof row.label === 'string' ? row.label.trim() : '';
+      if (!label) continue;
+      const price = typeof row.price_cents === 'number' && Number.isFinite(row.price_cents) ? row.price_cents : 0;
+      choices.push({
+        id: typeof row.id === 'string' && row.id.trim() ? row.id : label,
+        label,
+        priceDeltaCents: price,
+      });
+    }
+    if (choices.length > 0) {
+      rows.push({
+        groupId,
+        groupTitle,
+        labels: choices.map((choice) => choice.label),
+        choices,
+      });
+    }
+  }
+  return rows;
+}
+
 function selectedOptionIdsForGroup(
   selected: Record<string, unknown>,
   groupId: string,
@@ -101,7 +136,7 @@ export function resolveOrderItemOptions(
   if (!selected || Object.keys(selected).length === 0) return [];
 
   const product = item.product_id ? productsById.get(item.product_id) : undefined;
-  if (!product) return [];
+  if (!product) return embeddedOrderItemOptions(selected as Record<string, unknown>);
 
   const rows: ResolvedOrderOption[] = [];
   for (const group of historicalOptionGroups(product)) {

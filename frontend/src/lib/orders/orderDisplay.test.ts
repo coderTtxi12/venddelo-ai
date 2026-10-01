@@ -96,6 +96,41 @@ test('resolveOrderItemOptions does not expose raw option ids when the product is
   );
 });
 
+test('resolveOrderItemOptions renders a stored complement snapshot without a product', () => {
+  const item = buildItem({
+    product_id: null,
+    product_name: 'Bagui Persa',
+    selected_options: {
+      __groups__: [
+        {
+          id: 'papas',
+          title: 'Incluye papas',
+          choices: [{ id: 'porcion', label: '1 porción de papas', price_cents: 0 }],
+        },
+        {
+          id: 'picante',
+          title: 'Elige tu picante',
+          choices: [{ id: 'jalapenos', label: 'Jalapeños', price_cents: 0 }],
+        },
+      ],
+    } as unknown as OrderItem['selected_options'],
+  });
+  assert.deepEqual(resolveOrderItemOptions(item, new Map()), [
+    {
+      groupId: 'papas',
+      groupTitle: 'Incluye papas',
+      labels: ['1 porción de papas'],
+      choices: [{ id: 'porcion', label: '1 porción de papas', priceDeltaCents: 0 }],
+    },
+    {
+      groupId: 'picante',
+      groupTitle: 'Elige tu picante',
+      labels: ['Jalapeños'],
+      choices: [{ id: 'jalapenos', label: 'Jalapeños', priceDeltaCents: 0 }],
+    },
+  ]);
+});
+
 test('resolveOrderItemOptions resolves labels from the product catalog', () => {
   const product = buildProduct();
   assert.deepEqual(resolveOrderItemOptions(buildItem(), new Map([[product.id, product]])), [
