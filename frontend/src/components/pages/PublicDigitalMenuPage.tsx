@@ -60,6 +60,8 @@ import {
   filterOrderableProducts,
   filterPublicMenuProducts,
 } from '@/lib/digital-menu/orderableProducts';
+import { hasProductMenuSchedule } from '@/lib/menu/productMenuSchedule';
+import { useMenuScheduleNow } from '@/hooks/useMenuScheduleNow';
 import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
 import {
   DOCUMENT_SCROLL_ROOT,
@@ -133,7 +135,7 @@ function resolveInitialCriticalState(
   return {
     restaurant: initialRestaurant,
     categories: sortedCategories,
-    products: filterPublicMenuProducts(initialMenu.products),
+    menuProducts: initialMenu.products,
     activeCategoryId: sortedCategories[0]?.id ?? null,
   };
 }
@@ -168,9 +170,9 @@ export default function PublicDigitalMenuPage({
   const [categories, setCategories] = useState<
     Awaited<ReturnType<typeof getPublicMenu>>['categories']
   >(initialCritical?.categories ?? []);
-  const [products, setProducts] = useState<Awaited<ReturnType<typeof getPublicMenu>>['products']>(
-    initialCritical?.products ?? [],
-  );
+  const [menuProducts, setMenuProducts] = useState<
+    Awaited<ReturnType<typeof getPublicMenu>>['products']
+  >(initialCritical?.menuProducts ?? []);
   const [schedules, setSchedules] = useState<Awaited<ReturnType<typeof getPublicRestaurantSchedules>>>([]);
   const [checkoutDeliveryService, setCheckoutDeliveryService] =
     useState<PublicDeliveryService | null>(null);
@@ -189,6 +191,17 @@ export default function PublicDigitalMenuPage({
 
   const cart = usePublicMenuCart(subdomain);
 
+  const promotionTimezone = promotionsContext?.timezone ?? restaurant?.timezone ?? 'America/Mexico_City';
+  const menuScheduleTickActive = useMemo(
+    () => menuProducts.some(hasProductMenuSchedule),
+    [menuProducts],
+  );
+  const menuScheduleNow = useMenuScheduleNow(menuScheduleTickActive);
+  const products = useMemo(
+    () => filterPublicMenuProducts(menuProducts, menuScheduleNow, promotionTimezone),
+    [menuProducts, menuScheduleNow, promotionTimezone],
+  );
+
   const validProductIds = useMemo(
     () => new Set(filterOrderableProducts(products).map((product) => product.id)),
     [products],
@@ -200,7 +213,6 @@ export default function PublicDigitalMenuPage({
   }, [cart.pruneInvalidLines, validProductIds]);
 
   const cartSubtotalCents = useMemo(() => sumCartSubtotalCents(cart.lines), [cart.lines]);
-  const promotionTimezone = promotionsContext?.timezone ?? restaurant?.timezone ?? 'America/Mexico_City';
 
   const themeId = restaurant?.digital_menu_theme_id ?? DEFAULT_DIGITAL_MENU_THEME_ID;
   const menuTheme = useMemo(() => getDigitalMenuThemeOrDefault(themeId), [themeId]);
@@ -280,7 +292,7 @@ export default function PublicDigitalMenuPage({
         const sortedCategories = sortCategories(menuData.categories);
         setRestaurant(restaurantData);
         setCategories(sortedCategories);
-        setProducts(filterPublicMenuProducts(menuData.products));
+        setMenuProducts(menuData.products);
         setActiveCategoryId(sortedCategories[0]?.id ?? null);
         setCheckoutDeliveryService(checkoutConfig?.delivery_service ?? null);
 
