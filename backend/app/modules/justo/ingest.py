@@ -17,12 +17,13 @@ import json
 import logging
 import re
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 
-from app.db.models.developer import RestaurantJustoStore
+from app.db.models.developer import JustoWebhookReceipt, RestaurantJustoStore
 from app.db.models.orders import Order
 from app.db.models.restaurant import Restaurant
 from app.infra.realtime.order_hub import get_order_realtime_hub
@@ -232,6 +233,65 @@ def build_order_create(
         external_id=external_id or None,
         idempotency_key=f"justo:{external_id}" if external_id else None,
         items=items,
+    )
+
+
+def record_justo_receipt(
+    session,
+    restaurant_id: uuid.UUID,
+    payload: dict[str, Any],
+    result: dict[str, Any],
+) -> None:
+    """Keep the raw body. Justo does not retry a 200, so this is the only copy."""
+    if result.get("duplicate"):
+        label = "duplicate"
+    elif result.get("accepted"):
+        label = "created"
+    else:
+        label = str(result.get("reason") or "unknown")[:32]
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    order = data.get("order") if isinstance(data.get("order"), dict) else {}
+    logger.info(
+        "justo inbound restaurant=%s type=%s result=%s deliveryType=%s source=%s channel=%s managed=%s external=%s order_keys=%s",
+        restaurant_id,
+        payload.get("type"),
+        label,
+        order.get("deliveryType"),
+        order.get("source"),
+        order.get("channel"),
+        order.get("hasManagedDelivery"),
+        order.get("hasExternalDeliveryProvider"),
+        sorted(str(key) for key in order.keys()),
+    )
+    session.add(
+        JustoWebhookReceipt(
+            restaurant_id=restaurant_id,
+            result=label,
+            payload=payload,
+            created_at=datetime.now(UTC),
+        )
+    )
+    session.flush()
+    stale_ids = list(
+        session.scalars(
+            select(JustoWebhookReceipt.id)
+            .where(JustoWebhookReceipt.restaurant_id == restaurant_id)
+            .order_by(JustoWebhookReceipt.created_at.desc(), JustoWebhookReceipt.id.desc())
+            .offset(15)
+        )
+    )
+    if stale_ids:
+        session.execute(delete(JustoWebhookReceipt).where(JustoWebhookReceipt.id.in_(stale_ids)))
+
+
+def list_justo_receipts(session, restaurant_id: uuid.UUID, limit: int = 10) -> list[JustoWebhookReceipt]:
+    return list(
+        session.scalars(
+            select(JustoWebhookReceipt)
+            .where(JustoWebhookReceipt.restaurant_id == restaurant_id)
+            .order_by(JustoWebhookReceipt.created_at.desc(), JustoWebhookReceipt.id.desc())
+            .limit(limit)
+        )
     )
 
 
