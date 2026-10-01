@@ -541,7 +541,7 @@ function OrderDetailContent({
           </div>
           {totals.customerDeliveryFeeCents > 0 ? (
             <div className={styles.totalRow}>
-              <span>Envío</span>
+              <span>{order.external_source ? 'Envío Justo' : 'Envío'}</span>
               <span>{formatCents(totals.customerDeliveryFeeCents)}</span>
             </div>
           ) : totals.providerDeliveryFeeCents > 0 && totals.couponWaivedDeliveryCents > 0 ? (

@@ -238,7 +238,7 @@ export function buildKitchenTicketDocument(opts: {
   if (totals.deliveryFeeCents > 0) {
     lines.push({
       kind: 'total',
-      label: 'Envío',
+      label: opts.order.external_source ? 'Envío Justo' : 'Envío',
       value: formatCents(totals.deliveryFeeCents),
     });
   }
