@@ -2,9 +2,31 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ProductStatus = Literal["active", "inactive", "draft"]
+
+
+class ProductMenuScheduleInput(BaseModel):
+    weekdays: list[int] = Field(default_factory=list)
+    use_time_window: bool = False
+    daily_start_time: str | None = None  # HH:MM
+    daily_end_time: str | None = None
+
+    @field_validator("weekdays")
+    @classmethod
+    def validate_weekdays(cls, v: list[int]) -> list[int]:
+        for day in v:
+            if day < 0 or day > 6:
+                raise ValueError("weekday must be 0-6")
+        return v
+
+
+class ProductMenuScheduleDTO(BaseModel):
+    weekdays: list[int] = Field(default_factory=list)
+    use_time_window: bool = False
+    daily_start_time: str | None = None
+    daily_end_time: str | None = None
 
 
 class CategoryCreate(BaseModel):
@@ -111,6 +133,7 @@ class ProductCreate(BaseModel):
     expires_on: date | None = None
     batch_started_at: datetime | None = None
     category_ids: list[uuid.UUID] = []
+    menu_schedule: ProductMenuScheduleInput | None = None
 
 
 class ProductUpdate(BaseModel):
@@ -125,6 +148,7 @@ class ProductUpdate(BaseModel):
     expires_on: date | None = None
     batch_started_at: datetime | None = None
     category_ids: list[uuid.UUID] | None = None
+    menu_schedule: ProductMenuScheduleInput | None = None
 
 
 class ProductPermanentBulkDelete(BaseModel):
@@ -150,6 +174,7 @@ class ProductDTO(BaseModel):
     shelf_life_days: int | None = None
     expires_on: date | None = None
     batch_started_at: datetime | None = None
+    menu_schedule: ProductMenuScheduleDTO | None = None
     show_low_stock: bool = False
     created_at: datetime
     updated_at: datetime
