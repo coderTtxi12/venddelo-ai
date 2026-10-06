@@ -282,16 +282,14 @@
   height: 16px;
 }
 
-.predictionSlotIcon,
-:global(.dispatch-place-prediction-icon) {
+.predictionSlotIcon {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
   color: var(--color-primary);
 }
 
-.clearSlotIcon,
-:global(.dispatch-place-clear-icon) {
+.clearSlotIcon {
   width: 18px;
   height: 18px;
   flex-shrink: 0;

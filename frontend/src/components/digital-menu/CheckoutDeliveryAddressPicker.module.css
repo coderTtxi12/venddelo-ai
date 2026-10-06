@@ -42,23 +42,20 @@
   color: var(--dm-primary, #111827);
 }
 
-.predictionSlotIcon,
-:global(.dm-place-prediction-icon) {
+.predictionSlotIcon {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
   color: var(--dm-primary, #111827);
 }
 
-.clearSlotIcon,
-:global(.dm-place-clear-icon) {
+.clearSlotIcon {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
   color: var(--dm-text-secondary, #64748b);
 }
 
-.searchShell:focus-within :global(.dm-place-clear-icon),
 .searchShell:focus-within .clearSlotIcon {
   color: var(--dm-primary, #111827);
 }
