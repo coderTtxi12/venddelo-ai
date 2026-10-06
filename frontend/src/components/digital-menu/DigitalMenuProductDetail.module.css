@@ -163,6 +163,10 @@
   line-height: 1.45;
 }
 
+.unavailableNotice.scheduleNotice {
+  color: var(--dm-text, #111827);
+}
+
 .productDescription {
   margin: 8px 0 0;
   font-size: 0.82rem;

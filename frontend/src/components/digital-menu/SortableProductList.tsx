@@ -5,6 +5,7 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import type { Product } from '@/lib/api/types';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
 import { attachDragOverlay } from '@/lib/dragOverlay';
+import { useMenuScheduleClock } from '@/components/digital-menu/MenuScheduleClock';
 import {
   ProductCardContent,
   ProductListThumb,
@@ -134,6 +135,7 @@ export function SortableProductList({
   onProductDrop,
   onProductClick,
 }: SortableProductListProps) {
+  const scheduleClock = useMenuScheduleClock();
   const renderProductButton = useCallback(
     (
       product: Product,
@@ -144,12 +146,12 @@ export function SortableProductList({
         type="button"
         className={productCardClassName(buttonClassName, product)}
         onClick={() => onProductClick(product.id)}
-        aria-label={productAriaLabel(product)}
+        aria-label={productAriaLabel(product, scheduleClock)}
       >
         {content}
       </button>
     ),
-    [onProductClick],
+    [onProductClick, scheduleClock],
   );
 
   if (products.length === 0) {

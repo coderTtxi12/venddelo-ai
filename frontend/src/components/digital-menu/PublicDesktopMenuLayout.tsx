@@ -11,7 +11,8 @@ import {
   productAriaLabel,
   productsForCategory,
 } from '@/components/digital-menu/menuProductUi';
-import { ProductLowStockSignals } from '@/components/digital-menu/ProductLowStockSignals';
+import { useMenuScheduleClock } from '@/components/digital-menu/MenuScheduleClock';
+import { ProductAvailabilitySignals } from '@/components/digital-menu/ProductScheduleNote';
 import { PromotionShortcutBanners } from '@/components/digital-menu/PromotionShortcutBanners';
 import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
@@ -81,6 +82,7 @@ export function PublicDesktopMenuLayout({
   children,
   themeStyle,
 }: PublicDesktopMenuLayoutProps) {
+  const scheduleClock = useMenuScheduleClock();
   const [searchShortcut, setSearchShortcut] = useState('⌘K');
 
   useEffect(() => {
@@ -265,7 +267,7 @@ export function PublicDesktopMenuLayout({
                               !isProductAvailable(product) ? styles.productUnavailable : ''
                             }`}
                             onClick={() => onProductClick(product.id)}
-                            aria-label={productAriaLabel(product)}
+                            aria-label={productAriaLabel(product, scheduleClock)}
                           >
                             <ProductListThumb
                               product={product}
@@ -273,7 +275,7 @@ export function PublicDesktopMenuLayout({
                             />
                             <div className={styles.limitedTimeBody}>
                               <span className={styles.productName}>{product.name}</span>
-                              <ProductLowStockSignals
+                              <ProductAvailabilitySignals
                                 product={product}
                                 hasPromoCountdown={
                                   productTimeLimitedPromotions.has(product.id) &&
@@ -327,11 +329,11 @@ export function PublicDesktopMenuLayout({
                             !isProductAvailable(product) ? styles.productUnavailable : ''
                           }`}
                           onClick={() => onProductClick(product.id)}
-                          aria-label={productAriaLabel(product)}
+                          aria-label={productAriaLabel(product, scheduleClock)}
                         >
                           <div className={styles.productBody}>
                             <span className={styles.productName}>{product.name}</span>
-                            <ProductLowStockSignals
+                            <ProductAvailabilitySignals
                               product={product}
                               hasPromoCountdown={
                                 productTimeLimitedPromotions.has(product.id) &&

@@ -11,6 +11,7 @@ import {
   ProductPrice,
   isProductAvailable,
 } from '@/components/digital-menu/menuProductUi';
+import { ProductScheduleNote } from '@/components/digital-menu/ProductScheduleNote';
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
 import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import {
@@ -71,6 +72,7 @@ function ResultRow({
           <div className={styles.resultTitleRow}>
             <span className={styles.resultTitle}>{hit.title}</span>
           </div>
+          {product ? <ProductScheduleNote product={product} /> : null}
           {hit.subtitle ? <span className={styles.resultSubtitle}>{hit.subtitle}</span> : null}
           {hit.matchLabels.length > 0 ? (
             <div className={styles.matchBadges}>

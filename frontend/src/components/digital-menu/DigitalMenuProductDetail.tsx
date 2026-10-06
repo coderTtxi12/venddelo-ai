@@ -42,6 +42,11 @@ import {
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import { PRODUCT_UNAVAILABLE_LABEL } from '@/components/digital-menu/menuProductUi';
 import { ProductLowStockSignals } from '@/components/digital-menu/ProductLowStockSignals';
+import {
+  ProductScheduleTitleBadge,
+  useProductOutsideSchedule,
+} from '@/components/digital-menu/ProductScheduleNote';
+import { PRODUCT_OUTSIDE_SCHEDULE_LABEL } from '@/lib/menu/productMenuSchedule';
 import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
 import {
   computeLineTotal,
@@ -196,7 +201,8 @@ export function DigitalMenuProductDetail({
   const displayGroups = displayOptionGroups(product);
   const activeGroups = activeOptionGroups(product);
   const canReorder = onReorderGroups != null && onReorderItems != null;
-  const isAvailable = product.status === 'active';
+  const outsideSchedule = useProductOutsideSchedule(product);
+  const isAvailable = product.status === 'active' && outsideSchedule == null;
   const unitPrice =
     discount != null && discount.amountOff > 0
       ? discount.finalPrice
@@ -439,9 +445,13 @@ export function DigitalMenuProductDetail({
           <div className={styles.productTitleRow}>
             <h1 className={styles.productTitle}>{product.name}</h1>
             {!isAvailable ? (
-              <span className={`${menuStyles.productUnavailableBadge} ${styles.unavailableBadge}`}>
-                {PRODUCT_UNAVAILABLE_LABEL}
-              </span>
+              outsideSchedule ? (
+                <ProductScheduleTitleBadge product={product} />
+              ) : (
+                <span className={`${menuStyles.productUnavailableBadge} ${styles.unavailableBadge}`}>
+                  {PRODUCT_UNAVAILABLE_LABEL}
+                </span>
+              )
             ) : null}
           </div>
           {isAvailable ? (
@@ -453,9 +463,14 @@ export function DigitalMenuProductDetail({
             />
           ) : null}
           {!isAvailable ? (
-            <p className={styles.unavailableNotice} role="status">
-              Este producto no está disponible por ahora. Puedes ver los detalles, pero no agregarlo al
-              pedido.
+            <p
+              id={`product-schedule-notice-${product.id}`}
+              className={`${styles.unavailableNotice} ${outsideSchedule ? styles.scheduleNotice : ''}`}
+              role="status"
+            >
+              {outsideSchedule
+                ? outsideSchedule.notice
+                : 'Este producto no está disponible por ahora. Puedes ver los detalles, pero no agregarlo al pedido.'}
             </p>
           ) : null}
           {product.description ? (
@@ -885,12 +900,22 @@ export function DigitalMenuProductDetail({
             disabled={!isAvailable || !onAddToCart}
             aria-disabled={!canAdd || !onAddToCart}
             aria-describedby={
-              showSelectionValidation ? `product-add-validation-${product.id}` : undefined
+              outsideSchedule
+                ? `product-schedule-notice-${product.id}`
+                : showSelectionValidation
+                  ? `product-add-validation-${product.id}`
+                  : undefined
             }
             onClick={handleAddToCart}
           >
             <span className={styles.addBtnLabel}>
-              {!isAvailable ? PRODUCT_UNAVAILABLE_LABEL : justAdded ? 'Agregado' : 'Agregar'}
+              {!isAvailable
+                ? outsideSchedule
+                  ? PRODUCT_OUTSIDE_SCHEDULE_LABEL
+                  : PRODUCT_UNAVAILABLE_LABEL
+                : justAdded
+                  ? 'Agregado'
+                  : 'Agregar'}
             </span>
             {isAvailable ? (
             <span className={styles.addBtnPrice} aria-live="polite">

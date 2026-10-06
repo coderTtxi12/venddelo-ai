@@ -1,3 +1,5 @@
+'use client';
+
 import type { CategoryDisplayLayout, Product, Promotion } from '@/lib/api/types';
 import { formatMoney } from '@/lib/currency';
 import { isPublicMenuListed } from '@/lib/menu/productVisibility';
@@ -5,7 +7,9 @@ import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscou
 import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
-import { ProductLowStockSignals } from '@/components/digital-menu/ProductLowStockSignals';
+import { useMenuScheduleClock } from '@/components/digital-menu/MenuScheduleClock';
+import { ProductAvailabilitySignals } from '@/components/digital-menu/ProductScheduleNote';
+import { productOutsideScheduleCopy } from '@/lib/menu/productMenuSchedule';
 import {
   PRODUCT_LOW_STOCK_LABEL,
   ProductLowStockBadge,
@@ -168,7 +172,7 @@ export function ProductCardContent({
   const content = (
     <>
       <div className={styles.productName}>{product.name}</div>
-      <ProductLowStockSignals
+      <ProductAvailabilitySignals
         product={product}
         hasPromoCountdown={timeLimitedPromotion != null && promotionTimezone != null}
         timezone={promotionTimezone}
@@ -204,9 +208,16 @@ export function productCardClassName(baseClass: string, product: Product): strin
   return classes.join(' ');
 }
 
-export function productAriaLabel(product: Product): string {
+export function productAriaLabel(
+  product: Product,
+  clock?: { now: Date; timezone: string },
+): string {
   if (!isProductAvailable(product)) {
     return `${product.name}, ${PRODUCT_UNAVAILABLE_LABEL.toLowerCase()}`;
+  }
+  if (clock) {
+    const outsideSchedule = productOutsideScheduleCopy(product, clock.now, clock.timezone);
+    if (outsideSchedule) return `${product.name}, ${outsideSchedule.aria}`;
   }
   if (shouldShowProductLowStock(product)) {
     return `Ver ${product.name}, ${PRODUCT_LOW_STOCK_LABEL}`;
@@ -231,6 +242,8 @@ export function ProductList({
   countdownContext?: PromotionCountdownContext;
   onProductClick: (productId: string) => void;
 }) {
+  const scheduleClock = useMenuScheduleClock();
+
   if (products.length === 0) {
     return <div className={styles.emptyProducts}>Sin productos en esta categoría</div>;
   }
@@ -244,7 +257,7 @@ export function ProductList({
             type="button"
             className={productCardClassName(styles.productCardTablet, product)}
             onClick={() => onProductClick(product.id)}
-            aria-label={productAriaLabel(product)}
+            aria-label={productAriaLabel(product, scheduleClock)}
           >
             <ProductListThumb product={product} className={styles.productThumb} />
             <ProductCardContent
@@ -270,7 +283,7 @@ export function ProductList({
             type="button"
             className={productCardClassName(styles.productCardH, product)}
             onClick={() => onProductClick(product.id)}
-            aria-label={productAriaLabel(product)}
+            aria-label={productAriaLabel(product, scheduleClock)}
           >
             <ProductListThumb product={product} className={styles.productThumb} />
             <ProductCardContent
@@ -295,7 +308,7 @@ export function ProductList({
             type="button"
             className={productCardClassName(styles.productCardG, product)}
             onClick={() => onProductClick(product.id)}
-            aria-label={productAriaLabel(product)}
+            aria-label={productAriaLabel(product, scheduleClock)}
           >
             <ProductListThumb product={product} className={styles.productThumb} />
             <ProductCardContent
@@ -319,7 +332,7 @@ export function ProductList({
           type="button"
           className={productCardClassName(styles.productRow, product)}
           onClick={() => onProductClick(product.id)}
-          aria-label={productAriaLabel(product)}
+          aria-label={productAriaLabel(product, scheduleClock)}
         >
           <div className={styles.productRowBody}>
             <ProductCardContent

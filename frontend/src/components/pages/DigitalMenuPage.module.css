@@ -907,6 +907,66 @@
 }
 
 /* Product detail page badge (not used in list thumbnails) */
+.productScheduleNote {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-top: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.productScheduleBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(
+    --dm-unavailable-badge-bg,
+    color-mix(in srgb, var(--dm-text-secondary, #94a3b8) 18%, var(--dm-surface, #fff))
+  );
+  color: var(--dm-unavailable-badge-text, var(--dm-text-muted, #64748b));
+  border: 1px solid
+    var(
+      --dm-unavailable-badge-border,
+      color-mix(in srgb, var(--dm-border, #e2e8f0) 68%, var(--dm-text-muted, #64748b) 32%)
+    );
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.productScheduleBadge span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.productScheduleBadge svg {
+  flex-shrink: 0;
+}
+
+.productScheduleWhen {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--dm-text, #111827);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .productUnavailableBadge {
   display: inline-flex;
   align-items: center;
