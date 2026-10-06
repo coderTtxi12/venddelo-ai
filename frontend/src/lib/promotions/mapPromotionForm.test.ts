@@ -48,3 +48,19 @@ test('maps combo price kind to combo_price_cents', () => {
   assert.equal(api.amount_cents, null);
   assert.equal(api.percent, null);
 });
+
+test('maps a named 2x combo price to combo_pick_quantity', () => {
+  const base = createEmptyPromotionDraft();
+  const payload = {
+    ...base,
+    name: '2 Hamburguesas x 100',
+    kind: 'combo_price' as const,
+    scope: 'product' as const,
+    productIds: ['p1', 'p2', 'p3', 'p4'],
+    amount: 100,
+  };
+
+  const api = mapPromotionFormToApi(payload, 'combo');
+  assert.equal(api.combo_pick_quantity, 2);
+  assert.equal(api.combo_price_cents, 10000);
+});

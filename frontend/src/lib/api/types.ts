@@ -251,6 +251,9 @@ export type Promotion = {
   percent: number | null;
   amount_cents: number | null;
   combo_price_cents?: number | null;
+  combo_pick_quantity?: number | null;
+  bundle_get_quantity?: number | null;
+  bundle_pay_quantity?: number | null;
   min_order_cents: number | null;
   starts_at: string | null;
   ends_at: string | null;

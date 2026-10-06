@@ -23,7 +23,7 @@ export const PROMOTION_TEMPLATE_OPTIONS: {
   {
     id: 'combo',
     title: 'Combo',
-    description: 'Descuento cuando el cliente lleva todos los productos del combo.',
+    description: 'Precio o descuento al armar el combo. Puede ser todos los productos, o cualquier N de la lista.',
   },
   {
     id: 'order_threshold',

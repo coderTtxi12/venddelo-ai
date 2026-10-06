@@ -1,5 +1,6 @@
 import type { PromotionFormSubmitPayload } from '@/components/marketing/PromotionForm';
 import type { CreateManualPromotionInput, PromotionType } from '@/lib/api/promotions';
+import { inferredComboPickQuantity } from '@/lib/promotions/comboPick';
 import type { PromotionTemplate } from '@/lib/promotions/templates';
 
 function toIsoOrNull(value: string): string | null {
@@ -76,6 +77,17 @@ export function mapPromotionFormToApi(
       input.percent = payload.percent;
       input.amount_cents = null;
       input.combo_price_cents = null;
+    }
+    const pick =
+      payload.comboPickQuantity === 0
+        ? 0
+        : payload.comboPickQuantity != null && payload.comboPickQuantity >= 2
+          ? payload.comboPickQuantity
+          : payload.kind === 'combo_price'
+            ? inferredComboPickQuantity(payload.name, payload.productIds.length)
+            : null;
+    if (pick != null) {
+      input.combo_pick_quantity = pick;
     }
   } else if (type === 'percent') {
     input.percent = payload.percent;

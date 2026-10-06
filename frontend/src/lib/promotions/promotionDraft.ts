@@ -50,6 +50,8 @@ export type PromotionDraft = {
   percent: number;
   amount: number;
   bundle: BundleDeal;
+  /** null = automático (todos, o la cantidad del nombre). 0 = forzar todos. 2+ = cualquier N de la lista. */
+  comboPickQuantity: number | null;
   minOrderAmount: number;
   productIds: string[];
   categoryIds: string[];
@@ -89,6 +91,7 @@ export function createEmptyPromotionDraft(): Omit<
     percent: 10,
     amount: 0,
     bundle: { getQuantity: 2, payQuantity: 1, pairingMode: 'same_product' },
+    comboPickQuantity: null,
     minOrderAmount: 0,
     productIds: [],
     categoryIds: [],

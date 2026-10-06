@@ -55,6 +55,11 @@ export function mapPromotionToForm(promotion: Promotion): PromotionFormSubmitPay
         (promotion.bundle?.pairing_mode as 'cross_product' | 'same_product' | undefined) ??
         'same_product',
     },
+    comboPickQuantity:
+      promotion.type === 'combo'
+        ? (promotion.combo_pick_quantity ??
+          (promotion.bundle == null ? (promotion.bundle_get_quantity ?? null) : null))
+        : null,
     minOrderAmount: (promotion.min_order_cents ?? 0) / 100,
     productIds: [...(promotion.product_ids ?? [])],
     categoryIds: [...(promotion.category_ids ?? [])],
