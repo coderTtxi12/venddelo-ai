@@ -757,3 +757,190 @@ def test_combo_free_shipping_when_complete():
         tz=tz,
     )
     assert complete.applied_free_shipping_promotion_id == promo.id
+
+
+def test_combo_price_any_two_from_the_list_excludes_complements():
+    """'2 Hamburguesas x 100' lists a pool. Any 2 bases cost the combo price."""
+    bbq = _product(18900)
+    clasica = _product(12900)
+    doble = _product(15900)
+    picante = _product(14900)
+    option_id = uuid.uuid4()
+    group_id = uuid.uuid4()
+    bbq.option_groups = [
+        OptionGroupDTO(
+            id=group_id,
+            product_id=bbq.id,
+            title="Salsa",
+            required=False,
+            selection="single",
+            min_selections=0,
+            max_selections=1,
+            sort_index=0,
+            is_active=True,
+            items=[
+                OptionItemDTO(
+                    id=option_id,
+                    label="Salsa BBQ",
+                    price_delta_cents=2500,
+                    sort_index=0,
+                    is_active=True,
+                )
+            ],
+        )
+    ]
+    promo = PromotionDTO(
+        id=uuid.uuid4(),
+        restaurant_id=uuid.uuid4(),
+        name="2 Hamburguesas x 100",
+        type="combo",
+        scope="product",
+        percent=None,
+        amount_cents=None,
+        combo_price_cents=10000,
+        min_order_cents=None,
+        starts_at=None,
+        ends_at=None,
+        bundle_get_quantity=None,
+        bundle_pay_quantity=None,
+        recurrence_weekdays=None,
+        recurrence_start_time=None,
+        recurrence_end_time=None,
+        is_active=True,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        product_ids=[bbq.id, clasica.id, doble.id, picante.id],
+        category_ids=[],
+        option_item_ids=[],
+    )
+    products = {item.id: item for item in (bbq, clasica, doble, picante)}
+    tz = resolve_timezone("America/Mexico_City")
+    now = datetime.now(UTC)
+
+    quote = price_cart(
+        lines=[
+            CartLineInput(
+                product_id=bbq.id,
+                quantity=1,
+                selected_options={str(group_id): [str(option_id)]},
+            ),
+            CartLineInput(product_id=clasica.id, quantity=1),
+        ],
+        products_by_id=products,
+        promotions=[promo],
+        now_utc=now,
+        tz=tz,
+    )
+
+    # Bases 189+129=318; combo price 100 → discount 218. Complement 25 stays full price.
+    assert quote.order_discount_cents == 21800
+    assert quote.total_cents == 10000 + 2500
+    assert quote.applied_order_promotion_id == promo.id
+
+    one = price_cart(
+        lines=[CartLineInput(product_id=bbq.id, quantity=1)],
+        products_by_id=products,
+        promotions=[promo],
+        now_utc=now,
+        tz=tz,
+    )
+    assert one.order_discount_cents == 0
+
+    same_burger = price_cart(
+        lines=[CartLineInput(product_id=clasica.id, quantity=2)],
+        products_by_id=products,
+        promotions=[promo],
+        now_utc=now,
+        tz=tz,
+    )
+    # 129+129=258; combo price 100 → discount 158.
+    assert same_burger.order_discount_cents == 15800
+    assert same_burger.total_cents == 10000
+
+
+def test_combo_pick_quantity_overrides_the_name():
+    product_a = _product(18900)
+    product_b = _product(12900)
+    product_c = _product(15900)
+    promo = PromotionDTO(
+        id=uuid.uuid4(),
+        restaurant_id=uuid.uuid4(),
+        name="Combo hamburguesas",
+        type="combo",
+        scope="product",
+        percent=None,
+        amount_cents=None,
+        combo_price_cents=10000,
+        min_order_cents=None,
+        starts_at=None,
+        ends_at=None,
+        bundle_get_quantity=2,
+        bundle_pay_quantity=None,
+        recurrence_weekdays=None,
+        recurrence_start_time=None,
+        recurrence_end_time=None,
+        is_active=True,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        product_ids=[product_a.id, product_b.id, product_c.id],
+        category_ids=[],
+        option_item_ids=[],
+    )
+    products = {item.id: item for item in (product_a, product_b, product_c)}
+    tz = resolve_timezone("America/Mexico_City")
+    now = datetime.now(UTC)
+
+    quote = price_cart(
+        lines=[
+            CartLineInput(product_id=product_a.id, quantity=1),
+            CartLineInput(product_id=product_b.id, quantity=1),
+            CartLineInput(product_id=product_c.id, quantity=1),
+        ],
+        products_by_id=products,
+        promotions=[promo],
+        now_utc=now,
+        tz=tz,
+    )
+    # Highest bases first: 189+159=348, discount 248. The $129 stays full price.
+    assert quote.order_discount_cents == 24800
+    assert quote.total_cents == 10000 + 12900
+
+
+def test_combo_pick_quantity_zero_keeps_fixed_set():
+    product_a = _product(18900)
+    product_b = _product(12900)
+    promo = PromotionDTO(
+        id=uuid.uuid4(),
+        restaurant_id=uuid.uuid4(),
+        name="2 Hamburguesas x 100",
+        type="combo",
+        scope="product",
+        percent=None,
+        amount_cents=None,
+        combo_price_cents=10000,
+        min_order_cents=None,
+        starts_at=None,
+        ends_at=None,
+        bundle_get_quantity=0,
+        bundle_pay_quantity=None,
+        recurrence_weekdays=None,
+        recurrence_start_time=None,
+        recurrence_end_time=None,
+        is_active=True,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        product_ids=[product_a.id, product_b.id],
+        category_ids=[],
+        option_item_ids=[],
+    )
+    tz = resolve_timezone("America/Mexico_City")
+    now = datetime.now(UTC)
+
+    missing = price_cart(
+        lines=[CartLineInput(product_id=product_a.id, quantity=2)],
+        products_by_id={product_a.id: product_a, product_b.id: product_b},
+        promotions=[promo],
+        now_utc=now,
+        tz=tz,
+    )
+    assert missing.order_discount_cents == 0
