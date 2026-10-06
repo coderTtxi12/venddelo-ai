@@ -13,6 +13,7 @@ import {
   type PromotionDraft,
   WEEKDAY_SHORT,
 } from '@/lib/promotions/promotionDraft';
+import { activeComboPickQuantity } from '@/lib/promotions/comboPick';
 import type { PromotionTemplate } from '@/lib/promotions/templates';
 import {
   resolveProductDiscountScope,
@@ -360,6 +361,13 @@ export function PromotionForm({
 
     if (template === 'combo') {
       if (form.productIds.length < 2) return false;
+      if (
+        form.comboPickQuantity != null &&
+        form.comboPickQuantity !== 0 &&
+        form.comboPickQuantity < 2
+      ) {
+        return false;
+      }
       if (form.kind === 'percent' && (form.percent < 1 || form.percent > 100)) return false;
       if (form.kind === 'amount' && form.amount <= 0) return false;
       if (form.kind === 'combo_price' && form.amount <= 0) return false;
@@ -473,6 +481,17 @@ export function PromotionForm({
     return percentInput.trim() ? `${percentInput}%` : '—';
   }, [amountInput, form.bundle, form.kind, percentInput, template]);
 
+  const comboPick = useMemo(
+    () =>
+      activeComboPickQuantity({
+        comboPickQuantity: form.comboPickQuantity,
+        kind: form.kind,
+        name: form.name,
+        productCount: form.productIds.length,
+      }),
+    [form.comboPickQuantity, form.kind, form.name, form.productIds.length],
+  );
+
   const liveBenefit = useMemo(() => {
     if (template === 'bundle') {
       return `Lleva ${form.bundle.getQuantity} y paga ${form.bundle.payQuantity} (mismo producto)`;
@@ -494,9 +513,11 @@ export function PromotionForm({
     if (template === 'combo') {
       if (form.kind === 'free_shipping') return 'Envío gratis al llevar todo el combo';
       if (form.kind === 'combo_price') {
-        return amountInput.trim()
-          ? `Combo a ${formatMoney(Number(amountInput) || 0)} · complementos aparte`
-          : 'Define el precio total del combo';
+        if (!amountInput.trim()) return 'Define el precio total del combo';
+        const price = formatMoney(Number(amountInput) || 0);
+        return comboPick != null
+          ? `Cualquier ${comboPick} a ${price} · complementos aparte`
+          : `Combo a ${price} · complementos aparte`;
       }
       if (form.kind === 'amount') {
         return amountInput.trim()
@@ -515,7 +536,7 @@ export function PromotionForm({
     return percentInput.trim()
       ? `${percentInput}% en cada producto`
       : 'Define el porcentaje de descuento';
-  }, [amountInput, form.bundle, form.kind, minOrderInput, percentInput, template]);
+  }, [amountInput, comboPick, form.bundle, form.kind, minOrderInput, percentInput, template]);
 
   const liveScopeEmpty = useMemo(() => {
     if (template === 'order_threshold') return null;
@@ -893,7 +914,11 @@ export function PromotionForm({
       {template === 'combo' ? (
         <FormSection
           title="Beneficio del combo"
-          hint="Se aplica solo cuando el carrito incluye todos los productos del combo. Los complementos se cobran aparte."
+          hint={
+            comboPick != null
+              ? `Cualquier ${comboPick} de la lista arman el combo. Puede repetir el mismo producto. Los complementos se cobran aparte.`
+              : 'Se aplica solo cuando el carrito incluye todos los productos del combo. Los complementos se cobran aparte.'
+          }
         >
           <div className={styles.chipGrid} role="group" aria-label="Beneficio">
             {(
@@ -914,6 +939,46 @@ export function PromotionForm({
               </ChipOption>
             ))}
           </div>
+          <label className={styles.toggleRow}>
+            <input
+              type="checkbox"
+              checked={comboPick == null}
+              disabled={saving}
+              onChange={(event) => {
+                setForm((prev) => ({
+                  ...prev,
+                  comboPickQuantity: event.target.checked ? 0 : (comboPick ?? 2),
+                }));
+              }}
+            />
+            <span>Tiene que llevar todos los productos</span>
+          </label>
+          {comboPick != null ? (
+            <label className={styles.field} htmlFor="combo-pick-quantity">
+              <span className={styles.label}>Cantidad que arma el cliente</span>
+              <input
+                id="combo-pick-quantity"
+                className={styles.input}
+                type="number"
+                min={2}
+                inputMode="numeric"
+                value={comboPick}
+                disabled={saving}
+                onChange={(event) => {
+                  const next = Number(event.target.value);
+                  setForm((prev) => ({
+                    ...prev,
+                    comboPickQuantity:
+                      Number.isInteger(next) && next >= 2 ? next : prev.comboPickQuantity,
+                  }));
+                }}
+              />
+              <p className={styles.helpText}>
+                Cualquier combinación de esta cantidad, eligiendo de la lista. Los complementos se
+                cobran aparte.
+              </p>
+            </label>
+          ) : null}
           {form.kind === 'percent' ? (
             <label className={styles.field} htmlFor="combo-percent">
               <span className={styles.label}>Porcentaje de descuento</span>
@@ -1219,7 +1284,9 @@ export function PromotionForm({
         title={template === 'combo' ? 'Productos del combo' : 'Productos incluidos'}
         hint={
           template === 'combo'
-            ? 'Elige al menos 2 productos. El beneficio aplica solo si están todos en el carrito.'
+            ? comboPick != null
+              ? `Elige los productos que pueden entrar. El cliente arma el combo con ${comboPick}.`
+              : 'Elige al menos 2 productos. El beneficio aplica solo si están todos en el carrito.'
             : 'La oferta N×M aplica solo entre unidades del mismo producto seleccionado.'
         }
       >
