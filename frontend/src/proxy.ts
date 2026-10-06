@@ -26,7 +26,7 @@ function maybeRewriteMenuSubdomain(request: NextRequest): NextResponse | null {
   return NextResponse.rewrite(new URL(rewritePath, request.url));
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const menuRewrite = maybeRewriteMenuSubdomain(request);
   if (menuRewrite) return menuRewrite;
 
