@@ -60,6 +60,7 @@ import {
   filterOrderableProducts,
   filterPublicMenuProducts,
 } from '@/lib/digital-menu/orderableProducts';
+import { MenuScheduleClockProvider } from '@/components/digital-menu/MenuScheduleClock';
 import { hasProductMenuSchedule } from '@/lib/menu/productMenuSchedule';
 import { useMenuScheduleNow } from '@/hooks/useMenuScheduleNow';
 import { triggerHaptic } from '@/lib/haptics/triggerHaptic';
@@ -197,14 +198,16 @@ export default function PublicDigitalMenuPage({
     [menuProducts],
   );
   const menuScheduleNow = useMenuScheduleNow(menuScheduleTickActive);
-  const products = useMemo(
-    () => filterPublicMenuProducts(menuProducts, menuScheduleNow, promotionTimezone),
-    [menuProducts, menuScheduleNow, promotionTimezone],
-  );
+  const products = useMemo(() => filterPublicMenuProducts(menuProducts), [menuProducts]);
 
   const validProductIds = useMemo(
-    () => new Set(filterOrderableProducts(products).map((product) => product.id)),
-    [products],
+    () =>
+      new Set(
+        filterOrderableProducts(products, menuScheduleNow, promotionTimezone).map(
+          (product) => product.id,
+        ),
+      ),
+    [products, menuScheduleNow, promotionTimezone],
   );
 
   useEffect(() => {
@@ -749,6 +752,7 @@ export default function PublicDigitalMenuPage({
   }
 
   return (
+    <MenuScheduleClockProvider now={menuScheduleNow} timezone={promotionTimezone}>
     <div
       className={styles.publicShell}
       style={menuThemeStyle}
@@ -1220,5 +1224,6 @@ export default function PublicDigitalMenuPage({
         themeStyle={menuThemeStyle}
       />
     </div>
+    </MenuScheduleClockProvider>
   );
 }

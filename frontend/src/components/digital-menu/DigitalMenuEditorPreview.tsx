@@ -18,6 +18,7 @@ import type {
   RestaurantSchedule,
 } from '@/lib/api/types';
 import { DigitalMenuProductDetail } from '@/components/digital-menu/DigitalMenuProductDetail';
+import { MenuScheduleClockProvider } from '@/components/digital-menu/MenuScheduleClock';
 import { DigitalMenuEditorCategoryBar } from '@/components/digital-menu/DigitalMenuEditorCategoryBar';
 import { DigitalMenuEditorCategorySections } from '@/components/digital-menu/DigitalMenuEditorCategorySections';
 import { DigitalMenuEditorDesktopLayout } from '@/components/digital-menu/DigitalMenuEditorDesktopLayout';
@@ -33,6 +34,8 @@ import type { ProductDragTarget } from '@/components/digital-menu/SortableProduc
 import type { MenuProductDiscountInfo } from '@/lib/promotions/menuProductDiscount';
 import type { PromotionCountdownContext } from '@/lib/promotions/promotionCountdown';
 import { PUBLIC_MENU_SCHEDULE_SERVICE_TYPES, type RestaurantServiceType } from '@/lib/restaurantServices';
+import { hasProductMenuSchedule } from '@/lib/menu/productMenuSchedule';
+import { useMenuScheduleNow } from '@/hooks/useMenuScheduleNow';
 import {
   getCategoryScrollAnchorPosition,
   getSectionOffsetTop,
@@ -413,8 +416,14 @@ export function DigitalMenuEditorPreview({
     : isTabletLayout
       ? 'tablet'
       : 'mobile';
+  const scheduleClockActive = useMemo(
+    () => products.some((product) => hasProductMenuSchedule(product)),
+    [products],
+  );
+  const scheduleNow = useMenuScheduleNow(scheduleClockActive);
 
   return (
+    <MenuScheduleClockProvider now={scheduleNow} timezone={promotionTimezone}>
     <div ref={previewPanelRef} className={styles.previewPanel}>
       <div className={styles.deviceToolbar} role="tablist" aria-label="Vista previa por dispositivo">
         <DevicePreviewTab
@@ -721,5 +730,6 @@ export function DigitalMenuEditorPreview({
         en vivo.
       </p>
     </div>
+    </MenuScheduleClockProvider>
   );
 }

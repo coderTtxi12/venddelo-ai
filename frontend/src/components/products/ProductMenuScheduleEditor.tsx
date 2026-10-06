@@ -99,7 +99,8 @@ export function ProductMenuScheduleEditor({
             Horario en el menú
           </h3>
           <p className={styles.hint}>
-            Elige cuándo aparece en el menú público. Sin horario, sigue el estado del producto.
+            Elige cuándo se puede pedir. Fuera de ese horario sigue en el menú, con una etiqueta, y no
+            se puede agregar al pedido.
           </p>
         </div>
         <button
@@ -107,7 +108,7 @@ export function ProductMenuScheduleEditor({
           className={value.enabled ? `${styles.switch} ${styles.switchOn}` : styles.switch}
           role="switch"
           aria-checked={value.enabled}
-          aria-label="Visibilidad programada"
+          aria-label="Horario de pedido"
           disabled={disabled}
           onClick={() =>
             onChange(

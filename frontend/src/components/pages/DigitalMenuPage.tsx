@@ -37,8 +37,6 @@ import { DigitalMenuThemePicker } from '@/components/digital-menu/DigitalMenuThe
 import type { ProductDragTarget } from '@/components/digital-menu/SortableProductList';
 import { productsForCategory, sortCategories, categoryProductOrderWithDraftTail } from '@/components/digital-menu/menuProductUi';
 import { filterPublicMenuProducts } from '@/lib/digital-menu/orderableProducts';
-import { hasProductMenuSchedule } from '@/lib/menu/productMenuSchedule';
-import { useMenuScheduleNow } from '@/hooks/useMenuScheduleNow';
 import {
   DEFAULT_DIGITAL_MENU_THEME_ID,
   getDigitalMenuThemeOrDefault,
@@ -95,11 +93,6 @@ export default function DigitalMenuPage() {
   const menuTheme = useMemo(() => getDigitalMenuThemeOrDefault(themeId), [themeId]);
   const menuThemeStyle = useMemo(() => digitalMenuThemeToStyle(menuTheme), [menuTheme]);
   const promotionTimezone = restaurant?.timezone ?? 'America/Mexico_City';
-  const menuScheduleTickActive = useMemo(
-    () => products.some(hasProductMenuSchedule),
-    [products],
-  );
-  const menuScheduleNow = useMenuScheduleNow(menuScheduleTickActive);
 
   useEffect(() => {
     loadDigitalMenuThemeFonts(menuTheme);
@@ -272,10 +265,7 @@ export default function DigitalMenuPage() {
     };
   }, []);
 
-  const previewProducts = useMemo(
-    () => filterPublicMenuProducts(products, menuScheduleNow, promotionTimezone),
-    [products, menuScheduleNow, promotionTimezone],
-  );
+  const previewProducts = useMemo(() => filterPublicMenuProducts(products), [products]);
 
   const productDiscounts = useMemo(
     () => buildMenuProductDiscountMap(previewProducts, promotions, new Date(), promotionTimezone),
