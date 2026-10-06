@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -27,6 +28,7 @@ def promotion_display_name_from_raw(raw_name: str) -> str:
 BUNDLE_PAIRING_CROSS = "cross_product"
 BUNDLE_PAIRING_SAME = "same_product"
 PROMO_WARNING_COMPLEMENT_EXCLUDED = "complement_excluded"
+_LEADING_COMBO_PICK = re.compile(r"^\s*(\d+)\b")
 
 
 @dataclass
@@ -377,10 +379,57 @@ def _line_discount_for_promo(
     return base_line + options_line, 0, None
 
 
+def combo_pick_quantity(promo: PromotionDTO) -> int | None:
+    """Units that form one combo set.
+
+    None means the cart must include every listed product.
+    An explicit ``bundle_get_quantity`` of 0 forces that fixed set, even when
+    the name starts with a number. A value of 2 or more is a pool: any of the
+    listed products can fill the set. Saved promos like "2 Hamburguesas x 100"
+    keep that pool size from the name when no quantity was stored.
+    """
+    if promo.type != "combo":
+        return None
+    explicit = promo.bundle_get_quantity
+    if explicit == 0 and promo.bundle_pay_quantity is None:
+        return None
+    if explicit is not None and explicit >= 2 and promo.bundle_pay_quantity is None:
+        return explicit
+    if promo.combo_price_cents is None:
+        return None
+    match = _LEADING_COMBO_PICK.match(promo.name or "")
+    if match is None:
+        return None
+    count = int(match.group(1))
+    if count < 2 or count >= len(set(promo.product_ids)):
+        return None
+    return count
+
+
+def _eligible_combo_unit_bases(
+    promo: PromotionDTO,
+    lines: list[CartLineInput],
+    priced_lines: list[PricedCartLine],
+) -> list[int]:
+    required = set(promo.product_ids)
+    bases: list[int] = []
+    for line, priced in zip(lines, priced_lines, strict=True):
+        if line.product_id not in required:
+            continue
+        bases.extend([priced.unit_base_cents] * line.quantity)
+    return bases
+
+
 def _combo_is_satisfied(
     lines: list[CartLineInput],
     product_ids: list[uuid.UUID],
+    promo: PromotionDTO | None = None,
+    priced_lines: list[PricedCartLine] | None = None,
 ) -> bool:
+    if promo is not None and priced_lines is not None:
+        pick = combo_pick_quantity(promo)
+        if pick is not None:
+            return len(_eligible_combo_unit_bases(promo, lines, priced_lines)) >= pick
     return _combo_complete_sets(lines, product_ids) >= 1
 
 
@@ -413,24 +462,57 @@ def _combo_set_base_cents(
     return sum(base_by_product.get(product_id, 0) for product_id in promo.product_ids)
 
 
+def _discount_for_combo_set(promo: PromotionDTO, set_base: int) -> int:
+    if set_base <= 0:
+        return 0
+    if promo.combo_price_cents is not None:
+        return max(0, set_base - promo.combo_price_cents)
+    if promo.percent is not None:
+        return round(set_base * promo.percent / 100)
+    if promo.amount_cents is not None:
+        return min(promo.amount_cents, set_base)
+    return 0
+
+
+def _combo_pool_discount(
+    promo: PromotionDTO,
+    lines: list[CartLineInput],
+    priced_lines: list[PricedCartLine],
+    pick: int,
+) -> int:
+    bases = _eligible_combo_unit_bases(promo, lines, priced_lines)
+    sets = len(bases) // pick
+    if sets < 1:
+        return 0
+    # Highest bases first, so each set takes the largest available discount.
+    bases.sort(reverse=True)
+    discount = 0
+    for index in range(sets):
+        chunk = bases[index * pick : (index + 1) * pick]
+        discount += _discount_for_combo_set(promo, sum(chunk))
+    return discount
+
+
 def _combo_discount_for_promo(
     promo: PromotionDTO,
     lines: list[CartLineInput],
     priced_lines: list[PricedCartLine],
 ) -> int:
+    pick = combo_pick_quantity(promo)
+    if pick is not None:
+        return _combo_pool_discount(promo, lines, priced_lines, pick)
     sets = _combo_complete_sets(lines, promo.product_ids)
     if sets < 1:
         return 0
     set_base = _combo_set_base_cents(promo, lines, priced_lines)
     if set_base <= 0:
         return 0
-    eligible = set_base * sets
     if promo.combo_price_cents is not None:
         return max(0, set_base - promo.combo_price_cents) * sets
     if promo.percent is not None:
-        return round(eligible * promo.percent / 100)
+        return round(set_base * sets * promo.percent / 100)
     if promo.amount_cents is not None:
-        return min(promo.amount_cents * sets, eligible)
+        return min(promo.amount_cents * sets, set_base * sets)
     return 0
 
 
@@ -559,7 +641,7 @@ def price_cart(
     for promo in combo_promos:
         if not _combo_grants_free_shipping(promo):
             continue
-        if not _combo_is_satisfied(lines, promo.product_ids):
+        if not _combo_is_satisfied(lines, promo.product_ids, promo, priced_lines):
             continue
         applied_free_shipping_promotion_id = promo.id
         break
