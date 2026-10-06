@@ -3,13 +3,9 @@ import { isProductMenuScheduleActive } from '@/lib/menu/productMenuSchedule';
 
 const DEFAULT_MENU_TIMEZONE = 'America/Mexico_City';
 
-/** Products shown on the public menu (En menú + Inactivo, not Draft). */
-export function filterPublicMenuProducts(
-  products: Product[],
-  now: Date = new Date(),
-  timezone: string = DEFAULT_MENU_TIMEZONE,
-): Product[] {
-  return products.filter((product) => isPublicMenuDisplayedNow(product, now, timezone));
+/** Products shown on the public menu (En menú + Inactivo, not Draft). Schedule does not hide them. */
+export function filterPublicMenuProducts(products: Product[]): Product[] {
+  return products.filter((product) => isPublicMenuDisplayed(product));
 }
 
 /** Listed on the public menu (active or inactive — not draft). */
@@ -20,16 +16,6 @@ export function isPublicMenuListed(product: Product): boolean {
 /** Products shown on the public menu (En menú + Inactivo, not Draft). */
 export function isPublicMenuDisplayed(product: Product): boolean {
   return product.status !== 'draft';
-}
-
-/** Listed on the public menu and within the product's visibility schedule. */
-export function isPublicMenuDisplayedNow(
-  product: Product,
-  now: Date = new Date(),
-  timezone: string = DEFAULT_MENU_TIMEZONE,
-): boolean {
-  if (!isPublicMenuDisplayed(product)) return false;
-  return isProductMenuScheduleActive(product, now, timezone);
 }
 
 /** Products the public menu may sell and the cart quote API accepts. */

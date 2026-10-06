@@ -143,6 +143,63 @@ function formatPreviewTime(value: string): string {
   return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
 }
 
+export const PRODUCT_OUTSIDE_SCHEDULE_LABEL = 'Fuera de horario';
+
+export type ProductOutsideScheduleCopy = {
+  badge: string;
+  when: string;
+  notice: string;
+  aria: string;
+};
+
+const WEEKDAY_PLURAL = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados', 'domingos'] as const;
+
+function weekdayPhrase(weekdays: number[]): string | null {
+  const unique = [...new Set(weekdays.filter((day) => day >= 0 && day <= 6))].sort((a, b) => a - b);
+  if (unique.length === 0 || unique.length === 7) return null;
+  const names = unique.map((day) => WEEKDAY_PLURAL[day]);
+  if (names.length === 1) return `los ${names[0]}`;
+  if (names.length === 2) return `los ${names[0]} y ${names[1]}`;
+  return `los ${names.slice(0, -1).join(', ')} y ${names[names.length - 1]}`;
+}
+
+function timePhrase(schedule: ProductMenuSchedule): string | null {
+  if (!schedule.use_time_window || !schedule.daily_start_time || !schedule.daily_end_time) {
+    return null;
+  }
+  return `de ${formatPreviewTime(schedule.daily_start_time)} a ${formatPreviewTime(schedule.daily_end_time)}`;
+}
+
+function capitalizeSentence(value: string): string {
+  if (!value) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/** Copy for a listed product that cannot be ordered until its schedule opens. */
+export function productOutsideScheduleCopy(
+  product: Product,
+  now: Date,
+  timezone = 'America/Mexico_City',
+): ProductOutsideScheduleCopy | null {
+  if (product.status !== 'active') return null;
+  if (!hasProductMenuSchedule(product)) return null;
+  if (isProductMenuScheduleActive(product, now, timezone)) return null;
+  const schedule = product.menu_schedule;
+  if (!schedule) return null;
+
+  const days = weekdayPhrase(schedule.weekdays);
+  const time = timePhrase(schedule);
+  const when = days && time ? `${days}, ${time}` : days ? `solo ${days}` : time ? time : 'en su horario';
+  const notice = `Se puede pedir ${when.replace(/\.$/, '')}. Ahora está fuera de ese horario.`;
+
+  return {
+    badge: PRODUCT_OUTSIDE_SCHEDULE_LABEL,
+    when: capitalizeSentence(when),
+    notice,
+    aria: `fuera de horario. ${notice}`,
+  };
+}
+
 export function formatProductMenuScheduleSummary(
   schedule: ProductMenuSchedule | null | undefined,
 ): string | null {
@@ -165,7 +222,7 @@ export function formatProductMenuScheduleSummary(
 export function validateProductMenuScheduleDraft(draft: ProductMenuScheduleDraft): string | null {
   if (!draft.enabled) return null;
   if (!draft.useWeekdays && !draft.useTimeWindow) {
-    return 'Activa días específicos o un horario del día, o desactiva la visibilidad programada.';
+    return 'Activa días específicos o un horario del día, o desactiva el horario de pedido.';
   }
   if (draft.useWeekdays && draft.weekdays.length === 0) {
     return 'Selecciona al menos un día.';

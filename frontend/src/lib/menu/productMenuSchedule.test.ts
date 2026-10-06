@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { Product } from '@/lib/api/types';
+import { filterPublicMenuProducts } from '@/lib/digital-menu/orderableProducts';
 import {
   isProductMenuScheduleActive,
   productMenuScheduleToApi,
+  productOutsideScheduleCopy,
   validateProductMenuScheduleDraft,
 } from './productMenuSchedule';
 
@@ -50,7 +52,7 @@ test('validateProductMenuScheduleDraft requires a rule when enabled', () => {
       dailyStartTime: '09:00',
       dailyEndTime: '22:00',
     }),
-    'Activa días específicos o un horario del día, o desactiva la visibilidad programada.',
+    'Activa días específicos o un horario del día, o desactiva el horario de pedido.',
   );
 });
 
@@ -65,4 +67,28 @@ test('isProductMenuScheduleActive respects weekdays', () => {
   const monday = new Date('2026-03-16T18:00:00Z');
   assert.equal(isProductMenuScheduleActive(tacos, sunday, 'America/Mexico_City'), true);
   assert.equal(isProductMenuScheduleActive(tacos, monday, 'America/Mexico_City'), false);
+  assert.equal(productOutsideScheduleCopy(tacos, sunday, 'America/Mexico_City'), null);
+  const closed = productOutsideScheduleCopy(tacos, monday, 'America/Mexico_City');
+  assert.equal(closed?.badge, 'Fuera de horario');
+  assert.equal(closed?.when, 'Solo los domingos');
+  assert.match(closed?.notice ?? '', /Se puede pedir solo los domingos/);
+});
+
+test('scheduled products stay on the public menu outside their window', () => {
+  const breakfast = product({
+    weekdays: [],
+    use_time_window: true,
+    daily_start_time: '07:00',
+    daily_end_time: '11:00',
+  });
+  const afternoon = new Date('2026-03-16T20:00:00Z');
+  assert.equal(isProductMenuScheduleActive(breakfast, afternoon, 'America/Mexico_City'), false);
+  assert.deepEqual(
+    filterPublicMenuProducts([breakfast]).map((item) => item.id),
+    ['p1'],
+  );
+  assert.equal(
+    productOutsideScheduleCopy(breakfast, afternoon, 'America/Mexico_City')?.when,
+    'De 7:00 a.m. a 11:00 a.m.',
+  );
 });
