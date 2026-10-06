@@ -16,6 +16,7 @@ from app.modules.coupons.pricing import CouponApplyResult, apply_coupon, normali
 from app.modules.coupons.service import CouponService
 from app.modules.delivery_dispatch.service import RestaurantDispatchService
 from app.modules.delivery_providers.partnerships import DeliveryPartnershipService
+from app.modules.menu.menu_schedule import is_product_menu_schedule_active
 from app.modules.menu.repository import MenuRepository
 from app.modules.orders.constants import (
     ARCHIVE_ORDER_STATUSES,
@@ -510,6 +511,8 @@ class OrderService:
                 raise NotFoundError(f"Product {line.product_id} not found")
             if product.status != "active":
                 raise ValidationError(f"Product {line.product_id} is not available")
+            if not is_product_menu_schedule_active(product, now, tz):
+                raise ValidationError(f"Product {line.product_id} is outside its menu schedule")
             products_by_id[product.id] = product
             cart_lines.append(
                 CartLineInput(
