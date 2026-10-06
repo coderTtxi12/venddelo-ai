@@ -49,6 +49,7 @@ class PromotionCreate(BaseModel):
     percent: int | None = None
     amount_cents: int | None = None
     combo_price_cents: int | None = None
+    combo_pick_quantity: int | None = None
     min_order_cents: int | None = None
     starts_at: datetime | None = None
     ends_at: datetime | None = None
@@ -85,6 +86,7 @@ class PromotionUpdate(BaseModel):
     percent: int | None = None
     amount_cents: int | None = None
     combo_price_cents: int | None = None
+    combo_pick_quantity: int | None = None
     min_order_cents: int | None = None
     starts_at: datetime | None = None
     ends_at: datetime | None = None
@@ -133,6 +135,7 @@ class PromotionDTO(BaseModel):
     percent: int | None = None
     amount_cents: int | None = None
     combo_price_cents: int | None = None
+    combo_pick_quantity: int | None = None
     min_order_cents: int | None = None
     starts_at: datetime | None = None
     ends_at: datetime | None = None
@@ -158,6 +161,12 @@ class PromotionDTO(BaseModel):
 
 
 def enrich_promotion_dto(dto: PromotionDTO) -> PromotionDTO:
+    if (
+        dto.type == "combo"
+        and dto.bundle_pay_quantity is None
+        and dto.bundle_get_quantity is not None
+    ):
+        dto.combo_pick_quantity = dto.bundle_get_quantity
     if dto.bundle_get_quantity and dto.bundle_pay_quantity:
         dto.bundle = PromotionBundle(
             get_quantity=dto.bundle_get_quantity,

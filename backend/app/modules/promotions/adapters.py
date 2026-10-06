@@ -28,10 +28,24 @@ from app.modules.promotions.schemas import (
 )
 
 
+def _apply_combo_pick_quantity(payload: dict, quantity: int | None) -> None:
+    payload["bundle_get_quantity"] = quantity
+    payload["bundle_pay_quantity"] = None
+
+
 def _storage_fields_from_create(data: PromotionCreate) -> dict:
     payload = data.model_dump(
-        exclude={"product_ids", "category_ids", "option_item_ids", "bundle", "schedule"},
+        exclude={
+            "product_ids",
+            "category_ids",
+            "option_item_ids",
+            "bundle",
+            "schedule",
+            "combo_pick_quantity",
+        },
     )
+    if data.combo_pick_quantity is not None:
+        _apply_combo_pick_quantity(payload, data.combo_pick_quantity)
     if data.bundle:
         payload["bundle_get_quantity"] = data.bundle.get_quantity
         payload["bundle_pay_quantity"] = data.bundle.pay_quantity
@@ -50,8 +64,17 @@ def _storage_fields_from_create(data: PromotionCreate) -> dict:
 def _storage_fields_from_update(data: PromotionUpdate) -> dict:
     payload = data.model_dump(
         exclude_unset=True,
-        exclude={"bundle", "schedule", "product_ids", "category_ids", "option_item_ids"},
+        exclude={
+            "bundle",
+            "schedule",
+            "product_ids",
+            "category_ids",
+            "option_item_ids",
+            "combo_pick_quantity",
+        },
     )
+    if "combo_pick_quantity" in data.model_fields_set:
+        _apply_combo_pick_quantity(payload, data.combo_pick_quantity)
     if data.bundle is not None:
         payload["bundle_get_quantity"] = data.bundle.get_quantity
         payload["bundle_pay_quantity"] = data.bundle.pay_quantity

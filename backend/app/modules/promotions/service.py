@@ -54,6 +54,11 @@ class PromotionService:
             raise ValidationError("amount_cents must be positive")
         if combo_price_cents is not None and combo_price_cents <= 0:
             raise ValidationError("combo_price_cents must be positive")
+        combo_pick_quantity = getattr(data, "combo_pick_quantity", None)
+        if combo_pick_quantity is not None and combo_pick_quantity != 0 and combo_pick_quantity < 2:
+            raise ValidationError("combo_pick_quantity must be 0 or at least 2")
+        if combo_pick_quantity is not None and ptype not in (None, "combo"):
+            raise ValidationError("combo_pick_quantity is only valid for combo promotions")
         if starts_at is not None and ends_at is not None and starts_at >= ends_at:
             raise ValidationError("starts_at must be before ends_at")
         if ptype == "two_for_one" or bundle is not None:
