@@ -7,7 +7,7 @@ No DB access here — callers pass the id→name maps. See ``docs/promociones-re
 
 from __future__ import annotations
 
-from app.modules.promotions.pricing import CATALOG_DISCOUNT_PREFIX
+from app.modules.promotions.pricing import CATALOG_DISCOUNT_PREFIX, combo_pick_quantity
 from app.modules.promotions.schemas import PromotionDTO
 from app.modules.promotions.types import serialize_promotion_type
 
@@ -157,8 +157,15 @@ def _pricing_note(promo: PromotionDTO, api_type: str) -> str:
         return f"Descuenta ${(promo.amount_cents or 0) / 100:.2f} del subtotal afectado."
     if api_type == "combo":
         if promo.combo_price_cents is not None:
+            pick = combo_pick_quantity(promo)
+            price = f"${(promo.combo_price_cents or 0) / 100:.2f}"
+            if pick is not None:
+                return (
+                    f"Cualquier {pick} de la lista salen a {price} "
+                    "(complementos aparte)."
+                )
             return (
-                f"Precio del combo ${(promo.combo_price_cents or 0) / 100:.2f} "
+                f"Precio del combo {price} "
                 "al llevar todos los productos (complementos aparte)."
             )
         if promo.percent is not None:
