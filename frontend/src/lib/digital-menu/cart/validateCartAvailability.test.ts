@@ -82,6 +82,37 @@ test('validateCartAvailability includes stock after product checks', () => {
   );
 });
 
+test('validateCartAvailability flags products outside their menu schedule', () => {
+  const mondayAfternoon = new Date('2026-03-16T20:00:00Z');
+  const products = new Map([
+    [
+      'p1',
+      product({
+        id: 'p1',
+        name: 'Chilaquiles',
+        menu_schedule: {
+          weekdays: [],
+          use_time_window: true,
+          daily_start_time: '07:00',
+          daily_end_time: '11:00',
+        },
+      }),
+    ],
+  ]);
+  const issues = validateCartAvailability(
+    [line({ id: 'l1', productId: 'p1', productName: 'Chilaquiles' })],
+    products,
+    new Set(['p1']),
+    mondayAfternoon,
+    'America/Mexico_City',
+  );
+  assert.equal(issues[0]?.kind, 'product');
+  if (issues[0]?.kind === 'product') {
+    assert.equal(issues[0].reason, 'schedule');
+  }
+  assert.equal(cartAvailabilityIssueMessage(issues[0]!, 'line'), 'Fuera de horario · Quítalo');
+});
+
 test('validateCartStock allows exact available quantity', () => {
   const products = new Map([['p1', product({ id: 'p1', name: 'Tacos', inventory_qty: 2 })]]);
   const issues = validateCartStock(

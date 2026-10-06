@@ -1,5 +1,9 @@
 import { isOrderablePublicProduct } from '@/lib/digital-menu/orderableProducts';
 import type { Product } from '@/lib/api/types';
+import {
+  hasProductMenuSchedule,
+  isProductMenuScheduleActive,
+} from '@/lib/menu/productMenuSchedule';
 import type { PublicMenuCartLine } from './types';
 
 export type CartAvailabilityIssue =
@@ -7,6 +11,7 @@ export type CartAvailabilityIssue =
       kind: 'product';
       lineId: string;
       productName: string;
+      reason?: 'schedule' | 'unavailable';
     }
   | {
       kind: 'complement';
@@ -110,6 +115,8 @@ export function validateCartAvailability(
   lines: PublicMenuCartLine[],
   productsById: ReadonlyMap<string, Product>,
   validProductIds?: ReadonlySet<string>,
+  now: Date = new Date(),
+  timezone = 'America/Mexico_City',
 ): CartAvailabilityIssue[] {
   const issues: CartAvailabilityIssue[] = [];
   const unavailableLineIds = new Set<string>();
@@ -118,15 +125,21 @@ export function validateCartAvailability(
     const product = productsById.get(line.productId);
     const productNotOrderable =
       !product ||
-      !isOrderablePublicProduct(product) ||
+      !isOrderablePublicProduct(product, now, timezone) ||
       (validProductIds != null && !validProductIds.has(line.productId));
 
     if (productNotOrderable) {
       unavailableLineIds.add(line.id);
+      const outsideSchedule =
+        product != null &&
+        product.status === 'active' &&
+        hasProductMenuSchedule(product) &&
+        !isProductMenuScheduleActive(product, now, timezone);
       issues.push({
         kind: 'product',
         lineId: line.id,
         productName: line.productName,
+        reason: outsideSchedule ? 'schedule' : 'unavailable',
       });
       continue;
     }
@@ -178,6 +191,11 @@ export function cartAvailabilityIssueMessage(
   }
 
   if (issue.kind === 'product') {
+    if (issue.reason === 'schedule') {
+      return context === 'line'
+        ? 'Fuera de horario · Quítalo'
+        : `Fuera de horario: quita «${issue.productName}»`;
+    }
     return context === 'line'
       ? 'Producto agotado · Quítalo'
       : `Producto agotado: quita «${issue.productName}»`;

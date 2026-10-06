@@ -18,10 +18,14 @@ export type FreshMenuAvailabilityContext = {
 
 export async function fetchFreshMenuAvailabilityContext(
   subdomain: string,
+  now: Date = new Date(),
+  timezone = 'America/Mexico_City',
 ): Promise<FreshMenuAvailabilityContext> {
   const menuData = await getPublicMenu(subdomain);
   const products = filterPublicMenuProducts(menuData.products);
-  const validProductIds = new Set(filterOrderableProducts(products).map((product) => product.id));
+  const validProductIds = new Set(
+    filterOrderableProducts(products, now, timezone).map((product) => product.id),
+  );
 
   return {
     products,
@@ -33,8 +37,10 @@ export async function fetchFreshMenuAvailabilityContext(
 export function validateCartAgainstMenu(
   lines: PublicMenuCartLine[],
   menu: FreshMenuAvailabilityContext,
+  now: Date = new Date(),
+  timezone = 'America/Mexico_City',
 ): CartAvailabilityIssue[] {
-  return validateCartAvailability(lines, menu.productsById, menu.validProductIds);
+  return validateCartAvailability(lines, menu.productsById, menu.validProductIds, now, timezone);
 }
 
 export function fallbackCartAvailabilityIssues(

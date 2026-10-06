@@ -19,6 +19,7 @@ import {
   validateCartAgainstMenu,
 } from '@/lib/digital-menu/cart/freshMenuAvailability';
 import { formatCartAvailabilityMessages } from '@/lib/digital-menu/cart/validateCartAvailability';
+import { useMenuScheduleClock } from '@/components/digital-menu/MenuScheduleClock';
 import { buildPublicOrderInput } from '@/lib/digital-menu/checkout/buildPublicOrderInput';
 import {
   resolveCheckoutOrderRef,
@@ -700,6 +701,7 @@ export function PublicMenuCheckoutSummary({
   onOrderSent,
   isTabletLayout = false,
 }: PublicMenuCheckoutSummaryProps) {
+  const scheduleClock = useMenuScheduleClock();
   const [collapsedLineIds, setCollapsedLineIds] = useState<Set<string>>(() => new Set());
   const [sendAttempted, setSendAttempted] = useState(false);
   const [closedSendMessage, setClosedSendMessage] = useState<string | null>(null);
@@ -933,7 +935,11 @@ export function PublicMenuCheckoutSummary({
     try {
       let freshMenu;
       try {
-        freshMenu = await fetchFreshMenuAvailabilityContext(subdomain);
+        freshMenu = await fetchFreshMenuAvailabilityContext(
+          subdomain,
+          scheduleClock.now,
+          scheduleClock.timezone,
+        );
       } catch {
         freshMenu = {
           products,
@@ -942,7 +948,12 @@ export function PublicMenuCheckoutSummary({
         };
       }
 
-      const availabilityIssues = validateCartAgainstMenu(lines, freshMenu);
+      const availabilityIssues = validateCartAgainstMenu(
+        lines,
+        freshMenu,
+        scheduleClock.now,
+        scheduleClock.timezone,
+      );
       if (availabilityIssues.length > 0) {
         setStockErrors(formatCartAvailabilityMessages(availabilityIssues, 'summary'));
         return;

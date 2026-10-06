@@ -29,6 +29,7 @@ import { promoWarningLabel } from '@/lib/promotions/bundlePromoEligibility';
 import { formatMoney } from '@/lib/currency';
 import { storagePublicUrl } from '@/lib/storage/publicUrl';
 import { ProductImagePlaceholder } from '@/components/digital-menu/ProductImagePlaceholder';
+import { useMenuScheduleClock } from '@/components/digital-menu/MenuScheduleClock';
 import menuStyles from '@/components/pages/DigitalMenuPage.module.css';
 import type { WhatsAppRestaurantLocation } from '@/lib/digital-menu/checkout/formatWhatsAppOrderMessage';
 import { PublicMenuCheckoutDetails } from './PublicMenuCheckoutDetails';
@@ -224,6 +225,7 @@ export function PublicMenuCart({
   onRemoveLine,
   isTabletLayout = false,
 }: PublicMenuCartProps) {
+  const scheduleClock = useMenuScheduleClock();
   const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>('cart');
   const [fulfillment, setFulfillment] = useState<CheckoutFulfillment>(() =>
     createFallbackFulfillment(subdomain),
@@ -340,7 +342,11 @@ export function PublicMenuCart({
 
     let freshMenu;
     try {
-      freshMenu = await fetchFreshMenuAvailabilityContext(subdomain);
+      freshMenu = await fetchFreshMenuAvailabilityContext(
+        subdomain,
+        scheduleClock.now,
+        scheduleClock.timezone,
+      );
     } catch {
       freshMenu = {
         products,
@@ -349,7 +355,12 @@ export function PublicMenuCart({
       };
     }
 
-    const issues = validateCartAgainstMenu(lines, freshMenu);
+    const issues = validateCartAgainstMenu(
+      lines,
+      freshMenu,
+      scheduleClock.now,
+      scheduleClock.timezone,
+    );
     if (issues.length > 0) {
       revealAvailabilityIssues(issues);
       setContinueLoading(false);
