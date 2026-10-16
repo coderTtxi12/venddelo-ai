@@ -681,6 +681,14 @@ export type DispatchStatsTopEntity = {
   earnings_cents: number;
 };
 
+export type DispatchStatsRestaurant = {
+  id: string;
+  name: string;
+  on_hold: boolean;
+  order_count: number;
+  counts: number[];
+};
+
 export type DispatchStatsHourCell = {
   weekday: number;
   hour: number;
@@ -699,6 +707,7 @@ export type DispatchStats = {
   sources: DispatchStatsSource[];
   top_restaurants: DispatchStatsTopEntity[];
   top_drivers: DispatchStatsTopEntity[];
+  restaurants: DispatchStatsRestaurant[];
   recent: DispatchHistoryItem[];
 };
 
