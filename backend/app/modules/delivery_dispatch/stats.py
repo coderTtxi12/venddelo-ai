@@ -8,7 +8,12 @@ from typing import Literal
 from sqlalchemy import Date, Integer, case, cast, extract, func, select
 from sqlalchemy.orm import Session
 
-from app.db.models.delivery import DeliveryDispatchOffer, DeliveryDispatchRequest, DeliveryDriver
+from app.db.models.delivery import (
+    DeliveryDispatchOffer,
+    DeliveryDispatchRequest,
+    DeliveryDriver,
+    RestaurantDeliveryProvider,
+)
 from app.db.models.restaurant import Restaurant
 from app.modules.delivery_dispatch.history import (
     HISTORY_STATUSES,
@@ -402,6 +407,92 @@ def _top_drivers(session: Session, filters: list) -> list[dict]:
         }
         for driver_id, first, last, count, cents in rows
     ]
+
+
+def _normalize_series_key(key, granularity: StatsGranularity):
+    if granularity == "hourly":
+        return int(key)
+    if granularity == "weekly" and hasattr(key, "date"):
+        return key.date()
+    return key
+
+
+def _restaurant_bucket_counts(
+    session: Session,
+    filters: list,
+    granularity: StatsGranularity,
+) -> dict[uuid.UUID, dict]:
+    bucket = _series_bucket(granularity)
+    rows = session.execute(
+        select(
+            DeliveryDispatchRequest.restaurant_id,
+            bucket,
+            func.count(),
+        )
+        .where(*filters)
+        .group_by(DeliveryDispatchRequest.restaurant_id, bucket)
+    ).all()
+    grouped: dict[uuid.UUID, dict] = {}
+    for restaurant_id, key, count in rows:
+        if key is None:
+            continue
+        grouped.setdefault(restaurant_id, {})[
+            _normalize_series_key(key, granularity)
+        ] = int(count or 0)
+    return grouped
+
+
+def _restaurant_orders(
+    session: Session,
+    *,
+    provider_id: uuid.UUID,
+    zone_id: uuid.UUID | None,
+    start: date,
+    end: date,
+    granularity: StatsGranularity,
+    current_filters: list,
+    exclude_restaurant_id: uuid.UUID | list[uuid.UUID] | None,
+) -> list[dict]:
+    link_filters = [
+        RestaurantDeliveryProvider.delivery_provider_id == provider_id,
+        RestaurantDeliveryProvider.status == "active",
+        Restaurant.deleted_at.is_(None),
+    ]
+    if zone_id is not None:
+        link_filters.append(RestaurantDeliveryProvider.zone_id == zone_id)
+    excluded = _normalize_ids(exclude_restaurant_id)
+    if excluded:
+        link_filters.append(Restaurant.id.notin_(excluded))
+
+    links = session.execute(
+        select(
+            Restaurant.id,
+            Restaurant.name,
+            RestaurantDeliveryProvider.on_hold,
+        )
+        .join(
+            RestaurantDeliveryProvider,
+            RestaurantDeliveryProvider.restaurant_id == Restaurant.id,
+        )
+        .where(*link_filters)
+        .order_by(Restaurant.name.asc())
+    ).all()
+    buckets = _restaurant_bucket_counts(session, current_filters, granularity)
+    labels = _bucket_labels(start, end, granularity)
+    rows: list[dict] = []
+    for restaurant_id, name, on_hold in links:
+        series = buckets.get(restaurant_id, {})
+        counts = [int(series.get(key, 0)) for key, _label in labels]
+        rows.append(
+            {
+                "id": restaurant_id,
+                "name": name,
+                "on_hold": bool(on_hold),
+                "order_count": sum(counts),
+                "counts": counts,
+            }
+        )
+    return rows
 
 
 def _sources(counts: dict[str, int]) -> list[dict]:
@@ -819,5 +910,15 @@ def list_dispatch_stats(
         "sources": _sources(current),
         "top_restaurants": _top_restaurants(session, current_filters),
         "top_drivers": _top_drivers(session, current_filters),
+        "restaurants": _restaurant_orders(
+            session,
+            provider_id=provider_id,
+            zone_id=zone_id,
+            start=start_d,
+            end=end_d,
+            granularity=granularity,
+            current_filters=current_filters,
+            exclude_restaurant_id=exclude_restaurant_id,
+        ),
         "recent": recent_items,
     }
