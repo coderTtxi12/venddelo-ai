@@ -497,6 +497,11 @@ def test_provider_dispatch_stats_aggregates_closed_orders(client, engine):
     assert {row["source"] for row in body["sources"]} == {"web_app", "manual"}
     assert any(row["id"] == driver_id for row in body["top_drivers"])
     assert any(row["id"] == restaurant_id for row in body["top_restaurants"])
+    restaurant = next(row for row in body["restaurants"] if row["id"] == restaurant_id)
+    assert restaurant["order_count"] == 1
+    assert restaurant["on_hold"] is False
+    assert sum(restaurant["counts"]) == 1
+    assert len(restaurant["counts"]) == len(body["series"])
 
 
 @requires_db
