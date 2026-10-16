@@ -6,6 +6,7 @@ import ExpandMoreOutlinedIcon from '@mui/icons-material/ExpandMoreOutlined';
 import { EntityFilterCombobox } from '@/components/history/EntityFilterCombobox';
 import { HistoryDetailDrawer } from '@/components/history/HistoryDetailDrawer';
 import { PanelPageShell, type PanelPageStyles } from '@/components/pages/PanelPageShell';
+import { StatsBusinessBoard } from '@/components/stats/StatsBusinessBoard';
 import { StatsDurationChart } from '@/components/stats/StatsDurationChart';
 import { StatsPeakHours } from '@/components/stats/StatsPeakHours';
 import { StatsRankChart } from '@/components/stats/StatsRankChart';
@@ -542,6 +543,11 @@ export default function StatsPage() {
               </div>
             ))}
           </dl>
+
+          <StatsBusinessBoard
+            restaurants={stats.restaurants ?? []}
+            labels={(stats.series ?? []).map((point) => point.label)}
+          />
 
           {empty ? (
             <div className={historyStyles.empty}>
