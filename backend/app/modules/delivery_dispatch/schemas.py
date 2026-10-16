@@ -539,6 +539,14 @@ class DispatchStatsHourCellDTO(BaseModel):
     count: int = 0
 
 
+class DispatchStatsRestaurantDTO(BaseModel):
+    id: uuid.UUID
+    name: str
+    on_hold: bool = False
+    order_count: int = 0
+    counts: list[int] = Field(default_factory=list)
+
+
 class DispatchStatsDTO(BaseModel):
     start: date
     end: date
@@ -551,6 +559,7 @@ class DispatchStatsDTO(BaseModel):
     sources: list[DispatchStatsSourceDTO] = Field(default_factory=list)
     top_restaurants: list[DispatchStatsTopEntityDTO] = Field(default_factory=list)
     top_drivers: list[DispatchStatsTopEntityDTO] = Field(default_factory=list)
+    restaurants: list[DispatchStatsRestaurantDTO] = Field(default_factory=list)
     recent: list[ProviderHistoryItemDTO] = Field(default_factory=list)
 
 
