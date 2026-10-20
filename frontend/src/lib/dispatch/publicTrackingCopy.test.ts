@@ -9,6 +9,7 @@ import {
   publicTrackingRouteCaption,
   publicTrackingShowsLiveMap,
   publicTrackingStatusCopy,
+  publicTrackingTimelineHint,
   publicTrackingTimelineSteps,
 } from './publicTrackingCopy.ts';
 
@@ -23,10 +24,40 @@ test('timeline marks accepted as waiting for the restaurant', () => {
   assert.ok(step);
   assert.equal(step.label, 'Recibido');
   assert.equal(step.hint, 'Aún no se ha aceptado el pedido.');
+  assert.equal(publicTrackingTimelineHint(step, 'current'), 'Aún no se ha aceptado el pedido.');
+  assert.equal(publicTrackingTimelineHint(step, 'complete'), 'Pedido aceptado.');
   assert.equal(publicTrackingStatusCopy.accepted.title, 'Pedido recibido');
   assert.equal(
     publicTrackingStatusCopy.accepted.detail,
     'Aún no se ha aceptado el pedido. En cuanto el restaurante lo confirme, empezará a prepararlo.',
+  );
+});
+
+test('completed timeline steps use the past subtitle', () => {
+  const doneById = {
+    accepted: 'Pedido aceptado.',
+    scheduled: 'Empezó a prepararlo.',
+    searching: 'Repartidor encontrado.',
+    assigned: 'Llegó al restaurante.',
+    picked_up: 'Pedido recogido.',
+    in_transit: 'Llegó a tu ubicación.',
+  } as const;
+
+  for (const step of publicTrackingTimelineSteps) {
+    if (step.id === 'delivered') {
+      assert.equal(publicTrackingTimelineHint(step, 'complete'), step.hint);
+      continue;
+    }
+    assert.equal(publicTrackingTimelineHint(step, 'complete'), doneById[step.id]);
+    assert.equal(publicTrackingTimelineHint(step, 'upcoming'), step.hint);
+  }
+
+  const searching = publicTrackingTimelineSteps.find((item) => item.id === 'searching');
+  assert.ok(searching);
+  assert.equal(publicTrackingTimelineHint(searching, 'failed'), 'No encontramos repartidor.');
+  assert.equal(
+    publicTrackingTimelineHint(searching, 'current'),
+    'El sistema busca al repartidor más cercano.',
   );
 });
 
