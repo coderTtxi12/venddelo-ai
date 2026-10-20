@@ -48,31 +48,38 @@ export const publicTrackingTimelineSteps = [
     id: 'accepted',
     label: 'Recibido',
     hint: 'Aún no se ha aceptado el pedido.',
+    doneHint: 'Pedido aceptado.',
   },
   {
     id: 'scheduled',
     label: 'Cocinando',
     hint: 'El restaurante está preparando tu pedido.',
+    doneHint: 'Empezó a prepararlo.',
   },
   {
     id: 'searching',
     label: 'Buscando repartidor',
     hint: 'El sistema busca al repartidor más cercano.',
+    doneHint: 'Repartidor encontrado.',
+    failedHint: 'No encontramos repartidor.',
   },
   {
     id: 'assigned',
     label: 'Repartidor asignado',
     hint: 'Va rumbo al restaurante a recoger.',
+    doneHint: 'Llegó al restaurante.',
   },
   {
     id: 'picked_up',
     label: 'En el restaurante',
     hint: 'Está recogiendo tu pedido.',
+    doneHint: 'Pedido recogido.',
   },
   {
     id: 'in_transit',
     label: 'En camino',
     hint: 'Se dirige a tu ubicación.',
+    doneHint: 'Llegó a tu ubicación.',
   },
   {
     id: 'delivered',
@@ -80,6 +87,21 @@ export const publicTrackingTimelineSteps = [
     hint: 'Tu pedido llegó a destino.',
   },
 ] as const;
+
+export type PublicTrackingTimelineStepState = 'complete' | 'current' | 'upcoming' | 'failed';
+
+export function publicTrackingTimelineHint(
+  step: {
+    hint: string;
+    doneHint?: string;
+    failedHint?: string;
+  },
+  state: PublicTrackingTimelineStepState,
+): string {
+  if (state === 'complete' && step.doneHint) return step.doneHint;
+  if (state === 'failed' && step.failedHint) return step.failedHint;
+  return step.hint;
+}
 
 const PENDING_STATUSES = new Set<DispatchStatus>([
   'accepted',
