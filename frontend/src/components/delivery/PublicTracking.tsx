@@ -34,6 +34,7 @@ import {
   publicTrackingMapPendingCopy,
   publicTrackingShowsLiveMap,
   publicTrackingStatusCopy,
+  publicTrackingTimelineHint,
   publicTrackingTimelineSteps,
   type PublicTrackingConnectionBar,
 } from '@/lib/dispatch/publicTrackingCopy';
@@ -194,7 +195,7 @@ function TrackingTimeline({ status }: { status: DispatchStatus }) {
             <span className={styles.timelineMarker} aria-hidden />
             <div className={styles.timelineCopy}>
               <p className={styles.timelineLabel}>{step.label}</p>
-              <p className={styles.timelineHint}>{step.hint}</p>
+              <p className={styles.timelineHint}>{publicTrackingTimelineHint(step, state)}</p>
             </div>
           </li>
         );
