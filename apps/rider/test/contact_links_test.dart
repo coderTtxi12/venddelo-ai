@@ -19,26 +19,29 @@ void main() {
     expect(whatsappUris('5512345678')[1].host, 'wa.me');
   });
 
-  test('whatsapp message names the order code when present', () {
+  test('whatsapp message names the restaurant when present', () {
     expect(
-      riderWhatsAppMessage('ab12cd'),
-      'Hola, soy el repartidor de tu pedido #AB12CD.',
+      riderWhatsAppMessage('Tacos El Güero'),
+      'Hola, traigo su pedido de Tacos El Güero. Agradezco si sale a recibirlo.',
     );
     expect(
       riderWhatsAppMessage(''),
-      'Hola, soy el repartidor de tu pedido.',
+      'Hola, traigo su pedido. Agradezco si sale a recibirlo.',
     );
     expect(
-      whatsappUris('5512345678', shortId: 'ab12cd').first.queryParameters['text'],
-      'Hola, soy el repartidor de tu pedido #AB12CD.',
+      whatsappUris('5512345678', restaurantName: 'Tacos El Güero')
+          .first
+          .queryParameters['text'],
+      'Hola, traigo su pedido de Tacos El Güero. Agradezco si sale a recibirlo.',
     );
     expect(
-      whatsappUris('5512345678', shortId: 'ab12cd')[1].queryParameters['text'],
-      'Hola, soy el repartidor de tu pedido #AB12CD.',
+      whatsappUris('5512345678', restaurantName: 'Tacos El Güero')[1]
+          .queryParameters['text'],
+      'Hola, traigo su pedido de Tacos El Güero. Agradezco si sale a recibirlo.',
     );
     expect(
       whatsappUris('5512345678').first.queryParameters['text'],
-      'Hola, soy el repartidor de tu pedido.',
+      'Hola, traigo su pedido. Agradezco si sale a recibirlo.',
     );
   });
 

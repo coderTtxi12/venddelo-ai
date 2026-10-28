@@ -1,15 +1,13 @@
 import 'package:url_launcher/url_launcher.dart';
 
-import '../models.dart';
-
 typedef ContactLaunch = Future<bool> Function(Uri uri);
 
-String riderWhatsAppMessage(String shortId) {
-  final code = formatShortId(shortId);
-  if (code.isEmpty) {
-    return 'Hola, soy el repartidor de tu pedido.';
+String riderWhatsAppMessage(String restaurantName) {
+  final name = restaurantName.trim();
+  if (name.isEmpty) {
+    return 'Hola, traigo su pedido. Agradezco si sale a recibirlo.';
   }
-  return 'Hola, soy el repartidor de tu pedido $code.';
+  return 'Hola, traigo su pedido de $name. Agradezco si sale a recibirlo.';
 }
 
 String phoneDigits(String phone) => phone.replaceAll(RegExp(r'\D'), '');
@@ -30,12 +28,12 @@ List<Uri> telUris(String phone) {
   return [Uri.parse('tel:+$digits')];
 }
 
-List<Uri> whatsappUris(String phone, {String shortId = ''}) {
+List<Uri> whatsappUris(String phone, {String restaurantName = ''}) {
   final digits = whatsappDigits(phone);
   if (digits.isEmpty) {
     return const [];
   }
-  final text = riderWhatsAppMessage(shortId);
+  final text = riderWhatsAppMessage(restaurantName);
   return [
     Uri(
       scheme: 'whatsapp',
@@ -52,10 +50,13 @@ Future<void> openPhoneCall(String phone, {ContactLaunch? launch}) {
 
 Future<void> openWhatsApp(
   String phone, {
-  String shortId = '',
+  String restaurantName = '',
   ContactLaunch? launch,
 }) {
-  return _openFirst(whatsappUris(phone, shortId: shortId), launch: launch);
+  return _openFirst(
+    whatsappUris(phone, restaurantName: restaurantName),
+    launch: launch,
+  );
 }
 
 Future<void> _openFirst(List<Uri> uris, {ContactLaunch? launch}) async {
