@@ -355,6 +355,19 @@ def confirm_dispatch_rider_cash(
     return service.confirm_rider_cash(restaurant, request_id, user.id)
 
 
+@router.post(
+    "/me/dispatch-requests/{request_id}/confirm-terminal-return",
+    response_model=DispatchRequestDTO,
+)
+def confirm_dispatch_terminal_return(
+    request_id: UUID,
+    user: UserDTO = Depends(get_synced_user),
+    restaurant: RestaurantDTO = Depends(_owned_me_restaurant),
+    service: RestaurantDispatchService = Depends(_dispatch_service),
+) -> DispatchRequestDTO:
+    return service.confirm_terminal_return(restaurant, request_id, user.id)
+
+
 @router.get("/{restaurant_id}", response_model=RestaurantDTO)
 def get_restaurant(
     restaurant: RestaurantDTO = Depends(require_owned_restaurant),
