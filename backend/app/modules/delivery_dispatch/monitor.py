@@ -37,10 +37,12 @@ from app.modules.delivery_dispatch.schemas import (
     DispatchMonitorRouteDTO,
     DispatchMonitorSearchBlockerDTO,
     DispatchMonitorSnapshotDTO,
+    DispatchMonitorTerminalHoldDTO,
     DispatchMonitorTimelineEventDTO,
     DispatchMonitorZoneWeatherDTO,
     dispatch_request_source,
 )
+from app.modules.delivery_dispatch.terminal import list_held_terminal_holds
 from app.modules.delivery_dispatch.timeline import (
     TimelineOffer,
     TimelineRequest,
@@ -341,6 +343,28 @@ def build_dispatch_monitor_snapshot(
     )
     if zone_id is not None:
         credit_holds = [hold for hold in credit_holds if hold.request.zone_id == zone_id]
+
+    terminal_holds = list_held_terminal_holds(session, provider_id=provider_id)
+    if zone_id is not None:
+        terminal_holds = [
+            hold
+            for hold in terminal_holds
+            if hold.request is not None and hold.request.zone_id == zone_id
+        ]
+    missing_restaurant_ids = {
+        hold.request.restaurant_id
+        for hold in terminal_holds
+        if hold.request is not None and hold.request.restaurant_id not in restaurants
+    }
+    if missing_restaurant_ids:
+        restaurants.update(
+            {
+                row.id: row
+                for row in session.scalars(
+                    select(Restaurant).where(Restaurant.id.in_(missing_restaurant_ids))
+                ).all()
+            }
+        )
 
     driver_active_requests: dict[uuid.UUID, list[DeliveryDispatchRequest]] = {
         driver.id: [] for driver in drivers
@@ -661,6 +685,27 @@ def build_dispatch_monitor_snapshot(
             )
         )
 
+    terminal_hold_dtos: list[DispatchMonitorTerminalHoldDTO] = []
+    for hold in terminal_holds:
+        request = hold.request
+        if request is None:
+            continue
+        restaurant = restaurants.get(request.restaurant_id)
+        terminal_hold_dtos.append(
+            DispatchMonitorTerminalHoldDTO(
+                id=hold.id,
+                request_id=hold.request_id,
+                short_id=request.short_id,
+                driver_id=hold.driver_id,
+                driver_name=_driver_name(hold.driver),
+                restaurant_id=request.restaurant_id,
+                restaurant_name=restaurant.name if restaurant is not None else "Restaurante",
+                customer_name=request.customer_name,
+                held_at=hold.held_at,
+                request_status=request.status,
+            )
+        )
+
     hold_dtos: list[DispatchMonitorCreditHoldDTO] = []
     for hold in credit_holds:
         request = hold.request
@@ -725,6 +770,7 @@ def build_dispatch_monitor_snapshot(
         requests_in_progress=requests_in_progress,
         offers_open=len(offer_dtos),
         credit_holds_active=len(hold_dtos),
+        terminal_holds_active=len(terminal_hold_dtos),
         drivers_credit_blocked=drivers_credit_blocked,
         high_demand=high_demand,
         requests_unassigned=requests_unassigned,
@@ -751,6 +797,7 @@ def build_dispatch_monitor_snapshot(
         requests=request_dtos,
         offers=offer_dtos,
         credit_holds=hold_dtos,
+        terminal_holds=terminal_hold_dtos,
         routes=routes,
         weather_modes=weather_modes,
     )
