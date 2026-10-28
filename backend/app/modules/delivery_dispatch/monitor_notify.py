@@ -41,12 +41,15 @@ def notify_rider_updated(
     session: Session | None = None,
     credit_limit_cents: int | None = None,
     credit_held_cents: int | None = None,
+    terminal_holds: list[dict[str, object]] | None = None,
 ) -> None:
     payload: dict[str, object] = {"type": "rider.updated"}
     if credit_limit_cents is not None:
         payload["credit_limit_cents"] = credit_limit_cents
     if credit_held_cents is not None:
         payload["credit_held_cents"] = credit_held_cents
+    if terminal_holds is not None:
+        payload["terminal_holds"] = terminal_holds
 
     def publish() -> None:
         get_rider_realtime_hub().publish_sync(driver_id, payload)
