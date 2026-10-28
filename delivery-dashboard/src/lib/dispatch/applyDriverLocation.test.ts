@@ -47,6 +47,7 @@ function snapshot(drivers: DispatchMonitorDriver[]): DispatchMonitorSnapshot {
       requests_in_progress: 0,
       offers_open: 0,
       credit_holds_active: 0,
+      terminal_holds_active: 0,
       drivers_credit_blocked: 0,
       high_demand: false,
       requests_unassigned: 0,
@@ -55,6 +56,7 @@ function snapshot(drivers: DispatchMonitorDriver[]): DispatchMonitorSnapshot {
     requests: [],
     offers: [],
     credit_holds: [],
+    terminal_holds: [],
     routes: [],
   };
 }

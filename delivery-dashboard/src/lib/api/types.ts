@@ -365,6 +365,7 @@ export type DispatchMonitorMetrics = {
   requests_in_progress: number;
   offers_open: number;
   credit_holds_active: number;
+  terminal_holds_active?: number;
   drivers_credit_blocked: number;
   high_demand: boolean;
   requests_unassigned: number;
@@ -506,6 +507,19 @@ export type DispatchMonitorOffer = {
   score_json?: Record<string, unknown> | null;
 };
 
+export type DispatchMonitorTerminalHold = {
+  id: string;
+  request_id: string;
+  short_id: string;
+  driver_id: string;
+  driver_name: string;
+  restaurant_id: string;
+  restaurant_name: string;
+  customer_name: string;
+  held_at: string;
+  request_status: string;
+};
+
 export type DispatchMonitorCreditHold = {
   id: string;
   driver_id: string;
@@ -547,6 +561,7 @@ export type DispatchMonitorSnapshot = {
   requests: DispatchMonitorRequest[];
   offers: DispatchMonitorOffer[];
   credit_holds: DispatchMonitorCreditHold[];
+  terminal_holds?: DispatchMonitorTerminalHold[];
   routes: DispatchMonitorRoute[];
   weather_modes?: DispatchMonitorZoneWeather[];
 };
