@@ -32,6 +32,7 @@ from app.db.models.delivery import (
     DeliveryProviderMember,
     DeliveryProviderZone,
     DeliverySearchLeadTime,
+    DeliveryTerminalHold,
     RestaurantDeliveryProvider,
 )
 from app.db.models.orders import Order
@@ -56,7 +57,11 @@ from app.modules.delivery_dispatch.credit import (
     mark_holds_released,
 )
 from app.modules.delivery_dispatch.geo import geodesic_meters
-from app.modules.delivery_dispatch.history import list_active_holds, list_dispatch_history
+from app.modules.delivery_dispatch.history import (
+    list_active_holds,
+    list_active_terminal_holds,
+    list_dispatch_history,
+)
 from app.modules.delivery_dispatch.itinerary import (
     ItineraryStop,
     complete_stop,
@@ -72,6 +77,11 @@ from app.modules.delivery_dispatch.maps_url import (
     MapsResolveResult,
     resolve_maps_coordinates,
     should_follow_maps_redirect,
+)
+from app.modules.delivery_dispatch.terminal import (
+    ensure_terminal_hold,
+    release_terminal_hold,
+    serialize_held_terminal_holds,
 )
 from app.modules.delivery_dispatch.monitor import build_dispatch_monitor_snapshot
 from app.modules.delivery_dispatch.monitor_cache import dispatch_monitor_snapshot_cache
@@ -111,6 +121,7 @@ from app.modules.delivery_dispatch.schemas import (
     RiderProfileDTO,
     SearchLeadTimeDTO,
     SearchLeadTimeUpdate,
+    TerminalHolderDTO,
 )
 from app.modules.delivery_dispatch.search_at import compute_search_at
 from app.modules.delivery_dispatch.short_id import claim_dispatch_short_id
@@ -1373,6 +1384,9 @@ class RestaurantDispatchService:
             .options(
                 selectinload(DeliveryDispatchRequest.assigned_driver),
                 selectinload(DeliveryDispatchRequest.credit_holds),
+                selectinload(DeliveryDispatchRequest.terminal_hold).selectinload(
+                    DeliveryTerminalHold.driver
+                ),
             )
             .where(DeliveryDispatchRequest.restaurant_id == restaurant.id)
             .order_by(DeliveryDispatchRequest.created_at.desc())
@@ -1499,6 +1513,25 @@ class RestaurantDispatchService:
         )
         return self._flush_request(row)
 
+    def confirm_terminal_return(
+        self,
+        restaurant: RestaurantDTO,
+        request_id: uuid.UUID,
+        user_id: uuid.UUID,
+    ) -> DispatchRequestDTO:
+        row = self._request(restaurant.id, request_id)
+        hold = row.terminal_hold
+        if hold is None or hold.status != "held":
+            raise ValidationError("No hay terminal retenida para esta solicitud")
+        now = datetime.now(UTC)
+        release_terminal_hold(hold, released_by_user_id=user_id, now=now)
+        notify_rider_updated(
+            hold.driver_id,
+            session=self._session,
+            terminal_holds=serialize_held_terminal_holds(self._session, hold.driver_id),
+        )
+        return self._flush_request(row)
+
     def public_tracking(self, token: str) -> PublicDispatchTrackingDTO:
         row = self._session.scalar(
             select(DeliveryDispatchRequest)
@@ -1589,6 +1622,9 @@ class RestaurantDispatchService:
             .options(
                 selectinload(DeliveryDispatchRequest.assigned_driver),
                 selectinload(DeliveryDispatchRequest.credit_holds),
+                selectinload(DeliveryDispatchRequest.terminal_hold).selectinload(
+                    DeliveryTerminalHold.driver
+                ),
             )
             .where(
                 DeliveryDispatchRequest.id == request_id,
@@ -1669,6 +1705,22 @@ class RestaurantDispatchService:
         if driver is None and row.assigned_driver_id is not None:
             driver = self._session.get(DeliveryDriver, row.assigned_driver_id)
         hold = hold_of_kind(row.credit_holds, HOLD_RESTAURANT_CASH)
+        terminal = row.terminal_hold
+        holder = None
+        if terminal is not None:
+            holder_driver = terminal.driver
+            if holder_driver is None:
+                holder_driver = self._session.get(DeliveryDriver, terminal.driver_id)
+            if holder_driver is not None:
+                rider = build_tracking_rider_dto(
+                    holder_driver,
+                    self._storage or build_storage(),
+                )
+                holder = TerminalHolderDTO(
+                    driver_id=holder_driver.id,
+                    first_name=holder_driver.first_name,
+                    photo_url=rider.photo_url if rider is not None else None,
+                )
         return dto.model_copy(
             update={
                 "rider": build_tracking_rider_dto(
@@ -1677,6 +1729,8 @@ class RestaurantDispatchService:
                 ),
                 "credit_hold_status": hold.status if hold is not None else None,
                 "credit_hold_cents": hold.amount_cents if hold is not None else 0,
+                "terminal_hold_status": terminal.status if terminal is not None else None,
+                "terminal_holder": holder,
             }
         )
 
@@ -1798,6 +1852,7 @@ class RiderDispatchService:
             credit_held_cents=driver.credit_held_cents,
             credit_available_cents=available,
             active_holds=list_active_holds(self._session, driver.id),
+            active_terminal_holds=list_active_terminal_holds(self._session, driver.id),
         )
 
     def set_online(
@@ -2035,6 +2090,7 @@ class RiderDispatchService:
         request = self._session.scalar(
             select(DeliveryDispatchRequest)
             .where(DeliveryDispatchRequest.id == request_id)
+            .options(selectinload(DeliveryDispatchRequest.terminal_hold))
             .with_for_update()
         )
         if request is None or request.assigned_driver_id != driver.id:
@@ -2046,6 +2102,13 @@ class RiderDispatchService:
         if new_status == "picked_up":
             request.picked_up_at = now
             complete_stop(self._session, driver.id, request.id, "restaurant")
+            hold = ensure_terminal_hold(self._session, request, driver, now=now)
+            if hold is not None:
+                notify_rider_updated(
+                    hold.driver_id,
+                    session=self._session,
+                    terminal_holds=serialize_held_terminal_holds(self._session, hold.driver_id),
+                )
         elif new_status == "in_transit":
             request.in_transit_at = now
         elif new_status == "delivered":
@@ -2166,7 +2229,10 @@ class RiderDispatchService:
         )
 
     def _to_profile(self, driver: DeliveryDriver) -> RiderProfileDTO:
-        profile = RiderProfileDTO.model_validate(driver)
+        profile = RiderProfileDTO.model_validate(DeliveryDriverDTO.model_validate(driver))
+        profile.last_lat = driver.last_lat
+        profile.last_lng = driver.last_lng
+        profile.location_updated_at = driver.location_updated_at
         profile.assignments = self._list_assignments(driver.id)
         profile.itinerary = hydrate_itinerary(self._session, driver.id)
         settings = get_settings()
@@ -2178,6 +2244,7 @@ class RiderDispatchService:
         )
         profile.must_update = must
         profile.update_apk_url = url
+        profile.terminal_holds = list_active_terminal_holds(self._session, driver.id)
         return profile
 
     def _force_offline_if_outdated(self, driver: DeliveryDriver) -> bool:
