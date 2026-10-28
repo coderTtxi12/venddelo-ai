@@ -23,8 +23,10 @@ from app.modules.delivery_dispatch.schemas import (
     ProviderHistoryItemDTO,
     RiderHistoryHoldDTO,
     RiderHistoryItemDTO,
+    RiderTerminalHoldDTO,
     dispatch_request_source,
 )
+from app.modules.delivery_dispatch.terminal import list_held_terminal_holds
 
 MEXICO_TZ = ZoneInfo("America/Mexico_City")
 HISTORY_STATUSES = frozenset({"delivered", "cancelled"})
@@ -242,6 +244,29 @@ def _to_provider_item(
             offers=offers,
         ),
     )
+
+
+def list_active_terminal_holds(
+    session: Session,
+    driver_id: uuid.UUID,
+) -> list[RiderTerminalHoldDTO]:
+    holds = list_held_terminal_holds(session, driver_id=driver_id)
+    items: list[RiderTerminalHoldDTO] = []
+    for hold in holds:
+        request = hold.request
+        if request is None:
+            continue
+        restaurant = session.get(Restaurant, request.restaurant_id)
+        items.append(
+            RiderTerminalHoldDTO(
+                request_id=hold.request_id,
+                short_id=request.short_id,
+                restaurant_name=restaurant.name if restaurant is not None else "",
+                restaurant_id=request.restaurant_id,
+                held_at=hold.held_at,
+            )
+        )
+    return items
 
 
 def list_active_holds(session: Session, driver_id: uuid.UUID) -> list[RiderHistoryHoldDTO]:
