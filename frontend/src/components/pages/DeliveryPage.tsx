@@ -7,6 +7,7 @@ import { CourierUnavailableAlert } from '@/components/dispatch/CourierUnavailabl
 import { DispatchRecentRequests } from '@/components/dispatch/DispatchRecentRequests';
 import { DispatchRequestSuccess } from '@/components/dispatch/DispatchRequestSuccess';
 import { DispatchRiderCreditPanel } from '@/components/dispatch/DispatchRiderCreditPanel';
+import { DispatchTerminalHoldPanel } from '@/components/dispatch/DispatchTerminalHoldPanel';
 import { MexyOnHoldNotice } from '@/components/dispatch/MexyOnHoldNotice';
 import { RequestDeliveryForm } from '@/components/dispatch/RequestDeliveryForm';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -15,6 +16,7 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   cancelDispatchRequest,
   confirmDispatchCash,
+  confirmDispatchTerminalReturn,
   listDispatchLeadTimes,
   listDispatchRequests,
   retryDispatchRequest,
@@ -77,7 +79,7 @@ export default function DeliveryPage() {
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<DispatchRequest | null>(null);
   const [confirm, setConfirm] = useState<{
-    kind: 'cancel' | 'cash';
+    kind: 'cancel' | 'cash' | 'terminal';
     request: DispatchRequest;
     step: 1 | 2;
   } | null>(null);
@@ -246,7 +248,7 @@ export default function DeliveryPage() {
 
   async function runAction(
     request: DispatchRequest,
-    action: 'retry' | 'cancel' | 'cash',
+    action: 'retry' | 'cancel' | 'cash' | 'terminal',
   ): Promise<boolean> {
     if (!accessToken || !selectedRestaurantId) return false;
     setError(null);
@@ -256,7 +258,13 @@ export default function DeliveryPage() {
           ? await cancelDispatchRequest(accessToken, selectedRestaurantId, request.id)
           : action === 'retry'
             ? await retryDispatchRequest(accessToken, selectedRestaurantId, request.id)
-            : await confirmDispatchCash(accessToken, selectedRestaurantId, request.id);
+            : action === 'terminal'
+              ? await confirmDispatchTerminalReturn(
+                  accessToken,
+                  selectedRestaurantId,
+                  request.id,
+                )
+              : await confirmDispatchCash(accessToken, selectedRestaurantId, request.id);
       setRequests((current) =>
         current.map((item) => (item.id === updated.id ? updated : item)),
       );
@@ -301,22 +309,39 @@ export default function DeliveryPage() {
             cancelLabel: 'Volver',
             variant: 'danger' as const,
           }
-      : confirm.step === 1
-        ? {
-            title: '¿El rider ya te pagó?',
-            description:
-              'Esto libera el crédito retenido al repartidor.\n\nConfírmalo solo si ya recibiste el efectivo en tu negocio.',
-            confirmLabel: 'Continuar',
-            cancelLabel: 'Todavía no',
-            variant: 'primary' as const,
-          }
-        : {
-            title: 'Confirma el pago',
-            description: `Vas a marcar que el rider ya te entregó el cobro de ${formatDispatchShortId(confirm.request.short_id)} (${formatMoney(confirm.request.collect_cents / 100, 'MXN')}).`,
-            confirmLabel: 'Sí, ya me pagó',
-            cancelLabel: 'Volver',
-            variant: 'primary' as const,
-          }
+      : confirm.kind === 'terminal'
+        ? confirm.step === 1
+          ? {
+              title: '¿Ya te devolvió la terminal?',
+              description:
+                'Esto quita la retención al repartidor. Confírmalo solo si ya tienes la terminal en tu negocio.',
+              confirmLabel: 'Continuar',
+              cancelLabel: 'Todavía no',
+              variant: 'primary' as const,
+            }
+          : {
+              title: 'Confirma la devolución',
+              description: `Vas a marcar que ${confirm.request.terminal_holder?.first_name?.trim() || 'el repartidor'} ya te entregó la terminal de ${formatDispatchShortId(confirm.request.short_id)}.`,
+              confirmLabel: 'Sí, ya la tengo',
+              cancelLabel: 'Volver',
+              variant: 'primary' as const,
+            }
+        : confirm.step === 1
+          ? {
+              title: '¿El rider ya te pagó?',
+              description:
+                'Esto libera el crédito retenido al repartidor.\n\nConfírmalo solo si ya recibiste el efectivo en tu negocio.',
+              confirmLabel: 'Continuar',
+              cancelLabel: 'Todavía no',
+              variant: 'primary' as const,
+            }
+          : {
+              title: 'Confirma el pago',
+              description: `Vas a marcar que el rider ya te entregó el cobro de ${formatDispatchShortId(confirm.request.short_id)} (${formatMoney(confirm.request.collect_cents / 100, 'MXN')}).`,
+              confirmLabel: 'Sí, ya me pagó',
+              cancelLabel: 'Volver',
+              variant: 'primary' as const,
+            }
     : null;
 
   if (loading || authLoading || accessLoading) {
@@ -419,6 +444,13 @@ export default function DeliveryPage() {
         onConfirmCash={(request) => setConfirm({ kind: 'cash', request, step: 1 })}
       />
 
+      <DispatchTerminalHoldPanel
+        requests={requests}
+        subdomain={subdomain}
+        busy={confirming}
+        onConfirmReturn={(request) => setConfirm({ kind: 'terminal', request, step: 1 })}
+      />
+
       <div className={styles.listTabs} role="tablist" aria-label="Solicitudes de delivery">
         <button
           type="button"
@@ -460,6 +492,7 @@ export default function DeliveryPage() {
           onRetry={(request) => void runAction(request, 'retry')}
           onCancel={(request) => setConfirm({ kind: 'cancel', request, step: 1 })}
           onConfirmCash={(request) => setConfirm({ kind: 'cash', request, step: 1 })}
+          onConfirmTerminal={(request) => setConfirm({ kind: 'terminal', request, step: 1 })}
         />
       </div>
       <ConfirmDialog

@@ -19,6 +19,7 @@ import {
   type DispatchStatus,
 } from '@/lib/api/dispatch';
 import { hasHeldRiderCredit, wasRiderCreditReleased } from '@/lib/dispatch/riderCreditDebt';
+import { hasHeldTerminal } from '@/lib/dispatch/riderTerminalHold';
 import {
   motorcycleColorHex,
   riderTelHref,
@@ -144,6 +145,7 @@ type DispatchRecentRequestsProps = {
   onRetry: (request: DispatchRequest) => void;
   onCancel: (request: DispatchRequest) => void;
   onConfirmCash: (request: DispatchRequest) => void;
+  onConfirmTerminal: (request: DispatchRequest) => void;
 };
 
 export function DispatchRecentRequests({
@@ -154,6 +156,7 @@ export function DispatchRecentRequests({
   onRetry,
   onCancel,
   onConfirmCash,
+  onConfirmTerminal,
 }: DispatchRecentRequestsProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -271,6 +274,17 @@ export function DispatchRecentRequests({
                         >
                           <CheckOutlinedIcon fontSize="small" />
                           <span>Liberar crédito</span>
+                        </button>
+                      ) : null}
+                      {hasHeldTerminal(request) ? (
+                        <button
+                          type="button"
+                          className={styles.creditButton}
+                          disabled={busy}
+                          onClick={() => onConfirmTerminal(request)}
+                        >
+                          <CheckOutlinedIcon fontSize="small" />
+                          <span>Liberar terminal</span>
                         </button>
                       ) : null}
                       {!isHistory && trackingUrl ? (
@@ -463,6 +477,16 @@ export function DispatchRecentRequests({
                           onClick={() => onConfirmCash(request)}
                         >
                           Liberar crédito
+                        </button>
+                      ) : null}
+                      {hasHeldTerminal(request) ? (
+                        <button
+                          type="button"
+                          className={styles.creditButton}
+                          disabled={busy}
+                          onClick={() => onConfirmTerminal(request)}
+                        >
+                          Liberar terminal
                         </button>
                       ) : null}
                       {wasRiderCreditReleased(request) ? (
