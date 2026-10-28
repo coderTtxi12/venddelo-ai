@@ -254,6 +254,12 @@ class TrackingRiderDTO(BaseModel):
     phone: str
 
 
+class TerminalHolderDTO(BaseModel):
+    driver_id: uuid.UUID
+    first_name: str
+    photo_url: str | None = None
+
+
 class DispatchRequestDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -285,6 +291,8 @@ class DispatchRequestDTO(BaseModel):
     rider: TrackingRiderDTO | None = None
     credit_hold_status: Literal["held", "released"] | None = None
     credit_hold_cents: int = 0
+    terminal_hold_status: Literal["held", "released"] | None = None
+    terminal_holder: TerminalHolderDTO | None = None
 
 
 class TrackingDropoffDTO(BaseModel):
@@ -341,6 +349,14 @@ class RiderAssignmentDTO(BaseModel):
     dispatch_group_id: uuid.UUID | None = None
 
 
+class RiderTerminalHoldDTO(BaseModel):
+    request_id: uuid.UUID
+    short_id: str
+    restaurant_name: str
+    restaurant_id: uuid.UUID
+    held_at: datetime
+
+
 class RiderProfileDTO(DeliveryDriverDTO):
     last_lat: float | None = None
     last_lng: float | None = None
@@ -349,6 +365,7 @@ class RiderProfileDTO(DeliveryDriverDTO):
     itinerary: list[DriverItineraryStopDTO] = Field(default_factory=list)
     must_update: bool = False
     update_apk_url: str | None = None
+    terminal_holds: list[RiderTerminalHoldDTO] = Field(default_factory=list)
 
 
 class RiderOnlineUpdate(BaseModel):
@@ -413,6 +430,7 @@ class RiderHistoryPageDTO(BaseModel):
     credit_held_cents: int
     credit_available_cents: int
     active_holds: list[RiderHistoryHoldDTO] = Field(default_factory=list)
+    active_terminal_holds: list[RiderTerminalHoldDTO] = Field(default_factory=list)
 
 
 class DispatchMonitorTimelineEventDTO(BaseModel):
@@ -618,6 +636,7 @@ class DispatchMonitorMetricsDTO(BaseModel):
     requests_in_progress: int
     offers_open: int
     credit_holds_active: int
+    terminal_holds_active: int = 0
     drivers_credit_blocked: int
     high_demand: bool
     requests_unassigned: int
@@ -746,6 +765,19 @@ class DispatchMonitorCreditHoldDTO(BaseModel):
     restaurant_name: str
 
 
+class DispatchMonitorTerminalHoldDTO(BaseModel):
+    id: uuid.UUID
+    request_id: uuid.UUID
+    short_id: str
+    driver_id: uuid.UUID
+    driver_name: str
+    restaurant_id: uuid.UUID
+    restaurant_name: str
+    customer_name: str
+    held_at: datetime
+    request_status: str
+
+
 class DispatchMonitorRouteDTO(BaseModel):
     request_id: uuid.UUID
     short_id: str
@@ -774,6 +806,7 @@ class DispatchMonitorSnapshotDTO(BaseModel):
     requests: list[DispatchMonitorRequestDTO]
     offers: list[DispatchMonitorOfferDTO]
     credit_holds: list[DispatchMonitorCreditHoldDTO]
+    terminal_holds: list[DispatchMonitorTerminalHoldDTO] = Field(default_factory=list)
     routes: list[DispatchMonitorRouteDTO]
     weather_modes: list[DispatchMonitorZoneWeatherDTO] = Field(default_factory=list)
 
