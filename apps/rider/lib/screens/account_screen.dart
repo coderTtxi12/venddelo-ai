@@ -183,6 +183,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         page?.creditHeldCents ?? profile?.creditHeldCents ?? 0,
                     limitCents: page?.creditLimitCents ?? 0,
                     holds: page?.activeHolds ?? const [],
+                    terminalHolds: page?.activeTerminalHolds ?? const [],
                     period: _period,
                     customStart: _customStart,
                     customEnd: _customEnd,
@@ -257,6 +258,7 @@ class _HistoryHeader extends StatelessWidget {
     required this.heldCents,
     required this.limitCents,
     required this.holds,
+    required this.terminalHolds,
     required this.period,
     required this.customStart,
     required this.customEnd,
@@ -271,6 +273,7 @@ class _HistoryHeader extends StatelessWidget {
   final int heldCents;
   final int limitCents;
   final List<RiderHistoryHold> holds;
+  final List<RiderTerminalHold> terminalHolds;
   final HistoryPeriod period;
   final DateTime? customStart;
   final DateTime? customEnd;
@@ -305,6 +308,10 @@ class _HistoryHeader extends StatelessWidget {
           limitCents: limitCents,
           holds: holds,
         ),
+        if (terminalHolds.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _TerminalHoldCard(holds: terminalHolds),
+        ],
         const SizedBox(height: 20),
         Semantics(
           label: 'Periodo del historial',
@@ -403,6 +410,80 @@ class _EarningsHero extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TerminalHoldCard extends StatelessWidget {
+  const _TerminalHoldCard({required this.holds});
+
+  final List<RiderTerminalHold> holds;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Terminales retenidas',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMuted,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 10),
+          for (final hold in holds)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.point_of_sale_rounded,
+                      color: AppColors.warning,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          hold.restaurantName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        Text(
+                          formatShortId(hold.shortId),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

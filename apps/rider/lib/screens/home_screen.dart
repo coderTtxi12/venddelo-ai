@@ -468,7 +468,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   if (profile != null) ...[
                     const SizedBox(height: 8),
-                    _CreditChip(availableCents: profile.creditAvailableCents),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _CreditChip(availableCents: profile.creditAvailableCents),
+                        if (profile.terminalHolds.isNotEmpty)
+                          _TerminalHoldChip(count: profile.terminalHolds.length),
+                      ],
+                    ),
                   ],
                 ],
               ),
@@ -643,6 +651,50 @@ class _CreditChip extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               'Crédito ${formatMoneyCents(availableCents)}',
+              style: Theme.of(context).textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TerminalHoldChip extends StatelessWidget {
+  const _TerminalHoldChip({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = count == 1 ? 'Terminal retenida' : '$count terminales retenidas';
+    return Semantics(
+      label: label,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1A000000),
+              blurRadius: 16,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.point_of_sale_rounded,
+              size: 18,
+              color: AppColors.textPrimary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
               style: Theme.of(context).textTheme.titleSmall
                   ?.copyWith(fontWeight: FontWeight.w700),
             ),
@@ -1194,7 +1246,7 @@ class _JobCard extends StatelessWidget {
           _CustomerContactCard(
             name: assignment.customerName,
             phone: assignment.customerPhone,
-            shortId: assignment.shortId,
+            restaurantName: assignment.restaurantName,
           ),
         ],
         const SizedBox(height: 14),
@@ -1318,11 +1370,15 @@ class _JobDetails extends StatelessWidget {
 }
 
 class _CustomerContactCard extends StatelessWidget {
-  const _CustomerContactCard({this.name, this.phone, this.shortId = ''});
+  const _CustomerContactCard({
+    this.name,
+    this.phone,
+    this.restaurantName = '',
+  });
 
   final String? name;
   final String? phone;
-  final String shortId;
+  final String restaurantName;
 
   @override
   Widget build(BuildContext context) {
@@ -1374,7 +1430,10 @@ class _CustomerContactCard extends StatelessWidget {
                       icon: Icons.chat_rounded,
                       background: const Color(0xFF128C7E),
                       onPressed: () => unawaited(
-                        openWhatsApp(displayPhone, shortId: shortId),
+                        openWhatsApp(
+                          displayPhone,
+                          restaurantName: restaurantName,
+                        ),
                       ),
                     ),
                   ),
