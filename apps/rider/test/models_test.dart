@@ -168,4 +168,31 @@ void main() {
     expect(assignment.customerName, 'María López');
     expect(assignment.customerPhone, '+525512345678');
   });
+
+  test('RiderProfile parses terminal holds and realtime replace', () {
+    final profile = RiderProfile.fromJson({
+      'id': 'd1',
+      'first_name': 'Ana',
+      'last_name': 'Pérez',
+      'is_online': true,
+      'assignments': const [],
+      'terminal_holds': [
+        {
+          'request_id': 'req-1',
+          'short_id': 'AB12C',
+          'restaurant_name': 'Tacos',
+          'restaurant_id': 'rest-1',
+          'held_at': '2026-10-22T12:00:00+00:00',
+        },
+      ],
+    });
+    expect(profile.terminalHolds, hasLength(1));
+    expect(profile.terminalHolds.first.restaurantName, 'Tacos');
+    expect(
+      applyRiderTerminalHoldsFromEvent(profile, {
+        'terminal_holds': [],
+      }).terminalHolds,
+      isEmpty,
+    );
+  });
 }

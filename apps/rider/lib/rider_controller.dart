@@ -446,7 +446,8 @@ class RiderController extends ChangeNotifier {
     if (current == null) {
       return;
     }
-    final next = applyRiderCreditFromEvent(current, event);
+    var next = applyRiderCreditFromEvent(current, event);
+    next = applyRiderTerminalHoldsFromEvent(next, event);
     if (identical(next, current)) {
       return;
     }

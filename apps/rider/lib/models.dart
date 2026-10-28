@@ -91,6 +91,7 @@ class RiderProfile {
     this.motorcycleColor = '',
     this.mustUpdate = false,
     this.updateApkUrl,
+    this.terminalHolds = const [],
   });
 
   final String id;
@@ -107,13 +108,18 @@ class RiderProfile {
   final String motorcycleColor;
   final bool mustUpdate;
   final String? updateApkUrl;
+  final List<RiderTerminalHold> terminalHolds;
 
   int get creditAvailableCents {
     final available = creditLimitCents - creditHeldCents;
     return available < 0 ? 0 : available;
   }
 
-  RiderProfile copyWith({int? creditLimitCents, int? creditHeldCents}) {
+  RiderProfile copyWith({
+    int? creditLimitCents,
+    int? creditHeldCents,
+    List<RiderTerminalHold>? terminalHolds,
+  }) {
     return RiderProfile(
       id: id,
       firstName: firstName,
@@ -129,6 +135,7 @@ class RiderProfile {
       motorcycleColor: motorcycleColor,
       mustUpdate: mustUpdate,
       updateApkUrl: updateApkUrl,
+      terminalHolds: terminalHolds ?? this.terminalHolds,
     );
   }
 
@@ -157,6 +164,7 @@ class RiderProfile {
                 PersistedItineraryStop.fromJson(item as Map<String, dynamic>),
           )
           .toList(),
+      terminalHolds: _parseTerminalHolds(json['terminal_holds']),
     );
   }
 }
@@ -174,6 +182,42 @@ RiderProfile applyRiderCreditFromEvent(
     creditHeldCents: held is num ? held.toInt() : null,
     creditLimitCents: limit is num ? limit.toInt() : null,
   );
+}
+
+RiderProfile applyRiderTerminalHoldsFromEvent(
+  RiderProfile profile,
+  Map<String, dynamic> event,
+) {
+  if (event['terminal_holds'] is! List) {
+    return profile;
+  }
+  return profile.copyWith(terminalHolds: _parseTerminalHolds(event['terminal_holds']));
+}
+
+class RiderTerminalHold {
+  const RiderTerminalHold({
+    required this.requestId,
+    required this.shortId,
+    required this.restaurantName,
+    required this.restaurantId,
+    required this.heldAt,
+  });
+
+  final String requestId;
+  final String shortId;
+  final String restaurantName;
+  final String restaurantId;
+  final DateTime heldAt;
+
+  factory RiderTerminalHold.fromJson(Map<String, dynamic> json) {
+    return RiderTerminalHold(
+      requestId: json['request_id'] as String,
+      shortId: json['short_id'] as String? ?? '',
+      restaurantName: json['restaurant_name'] as String? ?? '',
+      restaurantId: json['restaurant_id'] as String? ?? '',
+      heldAt: DateTime.parse(json['held_at'] as String),
+    );
+  }
 }
 
 class PersistedItineraryStop {
@@ -328,6 +372,18 @@ int? _asInt(dynamic value) {
   return null;
 }
 
+List<RiderTerminalHold> _parseTerminalHolds(dynamic raw) {
+  if (raw is! List) {
+    return const [];
+  }
+  return raw
+      .whereType<Map>()
+      .map(
+        (item) => RiderTerminalHold.fromJson(Map<String, dynamic>.from(item)),
+      )
+      .toList();
+}
+
 class RiderHistoryHold {
   const RiderHistoryHold({
     required this.requestId,
@@ -441,6 +497,7 @@ class RiderHistoryPage {
     required this.creditHeldCents,
     required this.creditAvailableCents,
     this.activeHolds = const [],
+    this.activeTerminalHolds = const [],
   });
 
   final String start;
@@ -455,6 +512,7 @@ class RiderHistoryPage {
   final int creditHeldCents;
   final int creditAvailableCents;
   final List<RiderHistoryHold> activeHolds;
+  final List<RiderTerminalHold> activeTerminalHolds;
 
   factory RiderHistoryPage.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'] as List<dynamic>? ?? const [];
@@ -480,6 +538,7 @@ class RiderHistoryPage {
             (item) => RiderHistoryHold.fromJson(item as Map<String, dynamic>),
           )
           .toList(),
+      activeTerminalHolds: _parseTerminalHolds(json['active_terminal_holds']),
     );
   }
 }
