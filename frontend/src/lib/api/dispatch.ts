@@ -53,6 +53,14 @@ export type DispatchRequest = {
   rider?: DispatchAssignedRider | null;
   credit_hold_status: 'held' | 'released' | null;
   credit_hold_cents: number;
+  terminal_hold_status?: 'held' | 'released' | null;
+  terminal_holder?: DispatchTerminalHolder | null;
+};
+
+export type DispatchTerminalHolder = {
+  driver_id: string;
+  first_name: string;
+  photo_url: string | null;
 };
 
 export type DispatchLeadTime = {
@@ -199,6 +207,17 @@ export function retryDispatchRequest(token: string, restaurantId: string, reques
 export function confirmDispatchCash(token: string, restaurantId: string, requestId: string) {
   return apiRequest<DispatchRequest>(
     `/restaurants/me/dispatch-requests/${requestId}/confirm-rider-cash?${restaurantQuery(restaurantId)}`,
+    { method: 'POST', token },
+  );
+}
+
+export function confirmDispatchTerminalReturn(
+  token: string,
+  restaurantId: string,
+  requestId: string,
+) {
+  return apiRequest<DispatchRequest>(
+    `/restaurants/me/dispatch-requests/${requestId}/confirm-terminal-return?${restaurantQuery(restaurantId)}`,
     { method: 'POST', token },
   );
 }
