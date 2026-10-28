@@ -29,6 +29,7 @@ import type {
   DeliveryWeatherMode,
   DispatchMonitorCreditHold,
   DispatchMonitorDriver,
+  DispatchMonitorTerminalHold,
   DispatchMonitorOffer,
   DispatchMonitorRequest,
   DispatchMonitorSnapshot,
@@ -508,6 +509,29 @@ function OffersList({ offers, nowMs }: { offers: DispatchMonitorOffer[]; nowMs: 
   );
 }
 
+function TerminalList({ holds }: { holds: DispatchMonitorTerminalHold[] }) {
+  if (holds.length === 0) {
+    return <p className={styles.emptyHint}>Sin terminales retenidas.</p>;
+  }
+  return (
+    <ul className={styles.list}>
+      {holds.map((hold) => (
+        <li key={hold.id} className={styles.listItem}>
+          <div className={styles.listMain}>
+            <span className={styles.listTitle}>{hold.driver_name}</span>
+            <span className={styles.listMeta}>
+              {formatShortId(hold.short_id)} · {hold.customer_name} · {hold.restaurant_name}
+            </span>
+          </div>
+          <div className={styles.listActions}>
+            <span className={styles.creditChip}>{requestStatusLabel(hold.request_status)}</span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function CreditList({
   holds,
   canRelease,
@@ -857,6 +881,7 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
     active: 'desc',
     offers: 'desc',
     credit: 'desc',
+    terminal: 'desc',
   });
   const [collapsedPanels, setCollapsedPanels] = useState<Record<string, boolean>>({});
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -1059,6 +1084,13 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
       compareTime(recency.get(a.request_id), recency.get(b.request_id), timeSort.credit),
     );
   }, [snapshot?.credit_holds, snapshot?.requests, timeSort.credit]);
+  const sortedTerminal = useMemo(
+    () =>
+      [...(snapshot?.terminal_holds ?? [])].sort((a, b) =>
+        compareTime(a.held_at, b.held_at, timeSort.terminal),
+      ),
+    [snapshot?.terminal_holds, timeSort.terminal],
+  );
 
   function togglePanel(id: string) {
     setCollapsedPanels((current) => ({ ...current, [id]: !current[id] }));
@@ -1309,6 +1341,10 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
               value={metrics?.credit_holds_active ?? 0}
             />
             <MetricCard
+              label="Terminales retenidas"
+              value={metrics?.terminal_holds_active ?? 0}
+            />
+            <MetricCard
               label="Sin crédito"
               value={metrics?.drivers_credit_blocked ?? 0}
               tone={(metrics?.drivers_credit_blocked ?? 0) > 0 ? 'toneDue' : undefined}
@@ -1466,6 +1502,17 @@ export default function MonitorPage({ active = true }: { active?: boolean }) {
                   releasingId={releasingMexyRequestId}
                   onRelease={(hold) => setMexyRelease({ hold, step: 1 })}
                 />
+              </MonitorPanel>
+
+              <MonitorPanel
+                title="Terminales retenidas"
+                count={sortedTerminal.length}
+                collapsed={Boolean(collapsedPanels.terminal)}
+                onToggle={() => togglePanel('terminal')}
+                sortDir={timeSort.terminal}
+                onToggleSort={() => toggleSort('terminal')}
+              >
+                <TerminalList holds={sortedTerminal} />
               </MonitorPanel>
 
               <MonitorPanel
