@@ -483,6 +483,7 @@ class DeliveryDriver(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     offers: Mapped[list["DeliveryDispatchOffer"]] = relationship(back_populates="driver")
     credit_holds: Mapped[list["DeliveryCreditHold"]] = relationship(back_populates="driver")
+    terminal_holds: Mapped[list["DeliveryTerminalHold"]] = relationship(back_populates="driver")
     itinerary_stops: Mapped[list["DeliveryDriverItineraryStop"]] = relationship(
         back_populates="driver"
     )
@@ -674,6 +675,11 @@ class DeliveryDispatchRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="request",
         cascade="all, delete-orphan",
     )
+    terminal_hold: Mapped["DeliveryTerminalHold | None"] = relationship(
+        back_populates="request",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         CheckConstraint("package_count >= 1", name="package_count_min"),
@@ -830,6 +836,42 @@ class DeliveryCreditHold(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="kind_allowed",
         ),
         UniqueConstraint("request_id", "kind", name="uq_delivery_credit_holds_request_kind"),
+    )
+
+
+class DeliveryTerminalHold(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "delivery_terminal_holds"
+
+    driver_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_drivers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("delivery_dispatch_requests.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    held_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    released_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    driver: Mapped["DeliveryDriver"] = relationship(back_populates="terminal_holds")
+    request: Mapped["DeliveryDispatchRequest"] = relationship(back_populates="terminal_hold")
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('held','released')",
+            name="status_allowed",
+        ),
+        Index("ix_delivery_terminal_holds_driver_status", "driver_id", "status"),
+        Index("ix_delivery_terminal_holds_status", "status"),
     )
 
 

@@ -11,6 +11,7 @@ from app.db.models.menu_import_session import MenuImportSession
 from app.db.models.delivery import (
     DeliveryAssignment,
     DeliveryCreditHold,
+    DeliveryTerminalHold,
     DeliveryDispatchAssignmentEvent,
     DeliveryDispatchOffer,
     DeliveryDispatchRequest,
@@ -101,6 +102,7 @@ __all__ = [
     "RestaurantDeliveryProvider",
     "DeliveryAssignment",
     "DeliveryCreditHold",
+    "DeliveryTerminalHold",
     "DeliveryDispatchAssignmentEvent",
     "DeliveryDispatchOffer",
     "DeliveryDispatchRequest",
