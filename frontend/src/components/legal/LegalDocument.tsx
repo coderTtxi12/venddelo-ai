@@ -1,19 +1,7 @@
-import { EB_Garamond, Lato } from 'next/font/google';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { ebGaramond as display, lato as body } from '@/fonts';
 import styles from './LegalDocument.module.css';
-
-const display = EB_Garamond({
-  subsets: ['latin'],
-  variable: '--font-legal-display',
-  weight: ['500', '600', '700'],
-});
-
-const body = Lato({
-  subsets: ['latin'],
-  variable: '--font-legal-body',
-  weight: ['400', '700'],
-});
 
 export type LegalPath =
   | '/terminos'
