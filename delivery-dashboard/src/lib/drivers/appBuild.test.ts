@@ -11,18 +11,18 @@ test('isCurrentRiderApp rejects missing and stale builds', () => {
   assert.equal(isCurrentRiderApp(null), false);
   assert.equal(isCurrentRiderApp(undefined), false);
   assert.equal(isCurrentRiderApp(1), false);
-  assert.equal(isCurrentRiderApp(5), false);
-  assert.equal(isCurrentRiderApp(6), true);
+  assert.equal(isCurrentRiderApp(7), false);
+  assert.equal(isCurrentRiderApp(8), true);
 });
 
 test('riderAppTagLabel uses words, not color, for old APKs', () => {
   assert.equal(riderAppTagLabel(null, null), 'App antigua');
   assert.equal(riderAppTagLabel('1.0.0', 1), 'App 1.0.0');
-  assert.equal(riderAppTagLabel('1.0.3', 6), 'App 1.0.3');
+  assert.equal(riderAppTagLabel('1.0.5', 8), 'App 1.0.5');
 });
 
 test('riderAppTagTitle explains why the rider is skipped', () => {
   assert.match(riderAppTagTitle(null, null), /APK anterior/);
   assert.match(riderAppTagTitle('1.0.0', 1), /no recibe pedidos nuevos/);
-  assert.equal(riderAppTagTitle('1.0.3', 6), 'Build 6');
+  assert.equal(riderAppTagTitle('1.0.5', 8), 'Build 8');
 });
