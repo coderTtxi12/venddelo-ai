@@ -9,8 +9,8 @@ import 'package:mexy_rider/theme/app_theme.dart';
 void main() {
   test('GET /rider/me query reports this APK build', () {
     expect(riderMeQuery(), {
-      'app_version': '1.0.3',
-      'app_build_number': '6',
+      'app_version': '1.0.5',
+      'app_build_number': '8',
     });
   });
 
