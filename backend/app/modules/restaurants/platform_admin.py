@@ -4,6 +4,7 @@ PLATFORM_RESTAURANT_ADMIN_EMAILS = frozenset(
     {
         "marco.marc.181818@gmail.com",
         "alfredoquijanoflores@gmail.com",
+        "donovan282108@gmail.com",
     }
 )
 
