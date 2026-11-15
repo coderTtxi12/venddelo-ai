@@ -18,6 +18,7 @@ STRANGER = uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 PLATFORM_EMAILS = (
     "marco.marc.181818@gmail.com",
     "alfredoquijanoflores@gmail.com",
+    "donovan282108@gmail.com",
 )
 
 
