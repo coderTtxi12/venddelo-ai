@@ -11,7 +11,10 @@ import {
 } from '@/lib/dispatch/driverItinerary';
 import { liveBusinessesFromRequests } from '@/lib/dispatch/liveBusinesses';
 import { fetchRoadRoute, fetchStableRoadPath } from '@/lib/dispatch/fetchRoadRoute';
-import { shouldShowDriverOnMonitorMap } from '@/lib/dispatch/monitorMapDrivers';
+import {
+  formatMonitorDriverMapLabel,
+  shouldShowDriverOnMonitorMap,
+} from '@/lib/dispatch/monitorMapDrivers';
 import { densifyStraightPath, isMonitorPolylineVisible, monitorOverviewRoutes, monitorRestaurantRiderLegs, monitorRestaurantSpokes, resolveMonitorRoadPath } from '@/lib/dispatch/monitorRoadPath';
 import { remainingPathFrom } from '@/lib/dispatch/remainingRoadPath';
 import {
@@ -638,7 +641,7 @@ export function DispatchMonitorMap({
 
         const label = document.createElement('span');
         label.className = styles.driverLabel;
-        label.textContent = driver.plate;
+        label.textContent = formatMonitorDriverMapLabel(driver);
         pin.appendChild(label);
 
         markersRef.current.push(
