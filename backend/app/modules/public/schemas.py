@@ -83,6 +83,14 @@ class CartQuoteLineDTO(BaseModel):
     promo_warnings: list[str] = Field(default_factory=list)
 
 
+class CartQuoteOrderDiscountDTO(BaseModel):
+    label: str
+    badge: str | None = None
+    discount_cents: int = 0
+    applied: bool = True
+    promotion_id: uuid.UUID | None = None
+
+
 class CartQuoteDTO(BaseModel):
     server_now: datetime
     timezone: str
@@ -91,6 +99,7 @@ class CartQuoteDTO(BaseModel):
     order_discount_cents: int
     total_cents: int
     applied_order_promotion_id: uuid.UUID | None = None
+    applied_order_discounts: list[CartQuoteOrderDiscountDTO] = Field(default_factory=list)
     applied_free_shipping_promotion_id: uuid.UUID | None = None
     coupon: CartQuoteCouponDTO | None = None
     coupon_error: CartQuoteCouponErrorDTO | None = None
