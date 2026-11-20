@@ -369,8 +369,7 @@ function TotalsPanel({
   itemCount,
   subtotalBefore,
   lineDiscountTotal,
-  orderDiscount,
-  orderPromoLabel,
+  orderDiscounts,
   couponDiscount,
   couponLabel,
   total,
@@ -386,8 +385,7 @@ function TotalsPanel({
   itemCount: number;
   subtotalBefore: number;
   lineDiscountTotal: number;
-  orderDiscount: number;
-  orderPromoLabel: string | null;
+  orderDiscounts: { key: string; label: string; amount: number }[];
   couponDiscount: number;
   couponLabel: string | null;
   total: number;
@@ -418,74 +416,72 @@ function TotalsPanel({
         <h3 className={styles.mobileTotalsTitle}>Resumen de costos</h3>
       )}
 
-      <div className={styles.totalsRows}>
+      <dl className={styles.totalsRows}>
         <div className={styles.totalsRow}>
-          <span className={styles.totalsRowLabel}>Subtotal ({itemLabel})</span>
-          <span className={styles.totalsRowValue}>{formatMoney(subtotalBefore, currency)}</span>
+          <dt className={styles.totalsRowLabel}>Subtotal ({itemLabel})</dt>
+          <dd className={styles.totalsRowValue}>{formatMoney(subtotalBefore, currency)}</dd>
         </div>
 
         {lineDiscountTotal > 0 ? (
           <div className={styles.totalsRow}>
-            <span className={styles.totalsRowLabel}>Descuentos por artículo</span>
-            <span className={`${styles.totalsRowValue} ${styles.totalsRowDiscount}`}>
+            <dt className={styles.totalsRowLabel}>Descuentos por artículo</dt>
+            <dd className={`${styles.totalsRowValue} ${styles.totalsRowDiscount}`}>
               -{formatMoney(lineDiscountTotal, currency)}
-            </span>
+            </dd>
           </div>
         ) : null}
 
-        {orderDiscount > 0 ? (
-          <div className={styles.totalsRow}>
-            <span className={styles.totalsRowLabel}>
+        {orderDiscounts.map((discount) => (
+          <div key={discount.key} className={styles.totalsRow}>
+            <dt className={styles.totalsRowLabel}>
               Descuento del pedido
-              {orderPromoLabel ? (
-                <span className={styles.totalsRowHint}>{orderPromoLabel}</span>
-              ) : null}
-            </span>
-            <span className={`${styles.totalsRowValue} ${styles.totalsRowDiscount}`}>
-              -{formatMoney(orderDiscount, currency)}
-            </span>
+              <span className={styles.totalsRowHint}>{discount.label}</span>
+            </dt>
+            <dd className={`${styles.totalsRowValue} ${styles.totalsRowDiscount}`}>
+              -{formatMoney(discount.amount, currency)}
+            </dd>
           </div>
-        ) : null}
+        ))}
 
         {promoFreeShippingLabel ? (
           <div className={styles.totalsRow}>
-            <span className={styles.totalsRowLabel}>
+            <dt className={styles.totalsRowLabel}>
               Promoción
               <span className={styles.totalsRowHint}>{promoFreeShippingLabel}</span>
-            </span>
-            <span className={`${styles.totalsRowValue} ${styles.totalsRowDiscount}`}>
+            </dt>
+            <dd className={`${styles.totalsRowValue} ${styles.totalsRowDiscount}`}>
               Envío gratis
-            </span>
+            </dd>
           </div>
         ) : null}
 
         {showCouponRow ? (
           <div className={styles.totalsRow}>
-            <span className={styles.totalsRowLabel}>
+            <dt className={styles.totalsRowLabel}>
               Cupón
               <span className={styles.totalsRowHint}>{couponLabel}</span>
-            </span>
-            <span className={`${styles.totalsRowValue} ${styles.totalsRowDiscount}`}>
+            </dt>
+            <dd className={`${styles.totalsRowValue} ${styles.totalsRowDiscount}`}>
               {couponDeliveryWaived && couponDiscount <= 0
                 ? 'Envío gratis'
                 : `-${formatMoney(couponDiscount, currency)}`}
-            </span>
+            </dd>
           </div>
         ) : null}
 
         {showDeliveryRow ? (
           <div className={styles.totalsRow}>
-            <span className={styles.totalsRowLabel}>Costo de envío</span>
-            <span className={deliveryFeeWaived ? styles.priceRowValueFree : styles.totalsRowValue}>
+            <dt className={styles.totalsRowLabel}>Costo de envío</dt>
+            <dd className={deliveryFeeWaived ? styles.priceRowValueFree : styles.totalsRowValue}>
               {deliveryFeeWaived
                 ? 'Gratis'
                 : deliveryFee > 0
                   ? formatMoney(deliveryFee, currency)
                   : 'Por confirmar'}
-            </span>
+            </dd>
           </div>
         ) : null}
-      </div>
+      </dl>
 
       {thresholdHints.length > 0 ? (
         <div className={styles.thresholdHints} role="status">
@@ -789,13 +785,38 @@ export function PublicMenuCheckoutSummary({
   const subtotalBefore = quote.subtotal_before_discount_cents / 100;
   const lineDiscountTotal =
     lineBreakdowns.reduce((sum, breakdown) => sum + breakdown.discountCents, 0) / 100;
-  const orderDiscount = quote.order_discount_cents / 100;
   const total = quote.total_cents / 100;
 
-  const orderPromo = quote.applied_order_promotion_id
-    ? promotionsById.get(quote.applied_order_promotion_id)
-    : undefined;
-  const orderPromoLabel = promotionDisplayName(orderPromo);
+  const orderDiscounts = (() => {
+    const fromQuote = (quote.applied_order_discounts ?? [])
+      .filter((entry) => entry.discount_cents > 0)
+      .map((entry, index) => {
+        const promo = entry.promotion_id
+          ? promotionsById.get(entry.promotion_id)
+          : undefined;
+        return {
+          key: entry.promotion_id ?? `order-discount-${index}`,
+          label: entry.label || promotionDisplayName(promo) || 'Promoción',
+          amount: entry.discount_cents / 100,
+        };
+      });
+    if (fromQuote.length > 0) {
+      return fromQuote;
+    }
+    if (quote.order_discount_cents <= 0) {
+      return [];
+    }
+    const fallbackPromo = quote.applied_order_promotion_id
+      ? promotionsById.get(quote.applied_order_promotion_id)
+      : undefined;
+    return [
+      {
+        key: quote.applied_order_promotion_id ?? 'order-discount',
+        label: promotionDisplayName(fallbackPromo) || 'Promoción',
+        amount: quote.order_discount_cents / 100,
+      },
+    ];
+  })();
   const freeShippingPromo = quote.applied_free_shipping_promotion_id
     ? promotionsById.get(quote.applied_free_shipping_promotion_id)
     : undefined;
@@ -1069,8 +1090,7 @@ export function PublicMenuCheckoutSummary({
               itemCount={itemCount}
               subtotalBefore={subtotalBefore}
               lineDiscountTotal={lineDiscountTotal}
-              orderDiscount={orderDiscount}
-              orderPromoLabel={orderPromoLabel}
+              orderDiscounts={orderDiscounts}
               couponDiscount={couponDiscount}
               couponLabel={couponLabel}
               total={total}
@@ -1127,8 +1147,7 @@ export function PublicMenuCheckoutSummary({
           itemCount={itemCount}
           subtotalBefore={subtotalBefore}
           lineDiscountTotal={lineDiscountTotal}
-          orderDiscount={orderDiscount}
-          orderPromoLabel={orderPromoLabel}
+          orderDiscounts={orderDiscounts}
           couponDiscount={couponDiscount}
           couponLabel={couponLabel}
           total={total}
