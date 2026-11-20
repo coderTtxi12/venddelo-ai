@@ -81,6 +81,7 @@ import {
   getPublicMenuViewportBand,
   type PublicMenuViewportBand,
 } from '@/lib/digital-menu/layout';
+import { resolveProductDetailBackTarget } from '@/lib/digital-menu/productDetailReturn';
 import menuStyles from './DigitalMenuPage.module.css';
 import styles from './PublicDigitalMenuPage.module.css';
 
@@ -158,6 +159,7 @@ export default function PublicDigitalMenuPage({
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const mobileScrollRafRef = useRef<number | null>(null);
   const pendingDesktopCategoryScrollRef = useRef<string | null>(null);
+  const productReturnPromotionIdRef = useRef<string | null>(null);
   const [viewportBand, setViewportBand] = useState<PublicMenuViewportBand>('mobile');
   const isDesktopLayout = viewportBand === 'desktop';
   const isTabletLayout = viewportBand === 'tablet';
@@ -495,6 +497,7 @@ export default function PublicDigitalMenuPage({
     (categoryId: string) => {
       if (selectedProductId || selectedPromotionId || showCart) {
         if (selectedProductId) {
+          productReturnPromotionIdRef.current = null;
           setSelectedProductId(null);
           setProductHeroCollapsed(false);
         }
@@ -633,6 +636,8 @@ export default function PublicDigitalMenuPage({
         }
       }
 
+      // Remember promo list so product back returns there instead of home.
+      productReturnPromotionIdRef.current = selectedPromotionId;
       setShowCart(false);
       setSelectedPromotionId(null);
       setSelectedProductId(productId);
@@ -640,16 +645,25 @@ export default function PublicDigitalMenuPage({
       scrollMenuTo(DOCUMENT_SCROLL_ROOT, { top: 0 });
       desktopScrollRef.current?.scrollTo({ top: 0 });
     },
-    [categoryIds, isDesktopLayout, products],
+    [categoryIds, isDesktopLayout, products, selectedPromotionId],
   );
 
   const closeProduct = useCallback(() => {
+    const backTarget = resolveProductDetailBackTarget(productReturnPromotionIdRef.current);
+    productReturnPromotionIdRef.current = null;
     setSelectedProductId(null);
     setProductHeroCollapsed(false);
+    if (backTarget.kind === 'promotion') {
+      setSelectedPromotionId(backTarget.promotionId);
+      setPromotionHeroCollapsed(false);
+      scrollMenuTo(DOCUMENT_SCROLL_ROOT, { top: 0 });
+      desktopScrollRef.current?.scrollTo({ top: 0 });
+    }
   }, []);
 
   const openPromotion = useCallback((promotionId: string) => {
     triggerHaptic('selection');
+    productReturnPromotionIdRef.current = null;
     setShowCart(false);
     setSelectedProductId(null);
     setProductHeroCollapsed(false);
@@ -660,11 +674,13 @@ export default function PublicDigitalMenuPage({
   }, []);
 
   const closePromotion = useCallback(() => {
+    productReturnPromotionIdRef.current = null;
     setSelectedPromotionId(null);
     setPromotionHeroCollapsed(false);
   }, []);
 
   const openCart = useCallback(() => {
+    productReturnPromotionIdRef.current = null;
     setSelectedProductId(null);
     setSelectedPromotionId(null);
     setProductHeroCollapsed(false);
