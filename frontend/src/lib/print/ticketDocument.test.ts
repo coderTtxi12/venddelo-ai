@@ -242,6 +242,50 @@ test('buildKitchenTicketDocument includes complements when the product catalog i
   );
 });
 
+test('buildKitchenTicketDocument itemizes each promo order discount', () => {
+  const doc = buildKitchenTicketDocument({
+    order: takeoutOrder({
+      subtotal_cents: 24000,
+      subtotal_before_discount_cents: 30000,
+      discount_cents: 6000,
+      total_cents: 24000,
+      applied_order_discounts: [
+        {
+          label: '2 x $110',
+          badge: null,
+          discount_cents: 3000,
+          applied: true,
+        },
+        {
+          label: '2 x $130',
+          badge: null,
+          discount_cents: 3000,
+          applied: true,
+        },
+      ],
+    }),
+    settings: DEFAULT_TICKET_PRINT_SETTINGS,
+    restaurantName: 'Taquería El Sol',
+  });
+
+  assert.ok(
+    doc.lines.some(
+      (line) =>
+        line.kind === 'total' &&
+        line.label === 'Descuento del pedido · 2 x $110' &&
+        line.value === '-$30.00',
+    ),
+  );
+  assert.ok(
+    doc.lines.some(
+      (line) =>
+        line.kind === 'total' &&
+        line.label === 'Descuento del pedido · 2 x $130' &&
+        line.value === '-$30.00',
+    ),
+  );
+});
+
 test('buildKitchenTicketDocument shows coupon savings without duplicating order discount', () => {
   const doc = buildKitchenTicketDocument({
     order: takeoutOrder({
