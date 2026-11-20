@@ -45,6 +45,7 @@ from app.modules.orders.schemas import (
 )
 from app.modules.promotions.effective import is_promotion_effective, resolve_timezone
 from app.modules.promotions.pricing import (
+    AppliedOrderDiscount,
     CATALOG_DISCOUNT_PREFIX,
     CartLineInput,
     PricedCartLine,
@@ -204,7 +205,20 @@ def _snapshot_order_discounts(
     order_discount_cents: int,
     order_promo_id: uuid.UUID | None,
     promotions: list[PromotionDTO],
+    quote_order_discounts: list[AppliedOrderDiscount] | None = None,
 ) -> list[AppliedDiscountSnapshot]:
+    if quote_order_discounts:
+        snapshots = [
+            AppliedDiscountSnapshot(
+                label=entry.label,
+                discount_cents=entry.discount_cents,
+                applied=True,
+            )
+            for entry in quote_order_discounts
+            if entry.discount_cents > 0
+        ]
+        if snapshots:
+            return snapshots
     if order_discount_cents <= 0:
         return []
     promo = next((p for p in promotions if p.id == order_promo_id), None)
@@ -490,6 +504,7 @@ class OrderService:
         dict[uuid.UUID, object],
         datetime,
         object,
+        list[AppliedOrderDiscount],
     ]:
         if not data.items:
             raise ValidationError("Order must contain at least one item")
@@ -573,6 +588,7 @@ class OrderService:
             products_by_id,
             now,
             tz,
+            list(quote.applied_order_discounts or []),
         )
 
     def create_public(
@@ -616,6 +632,7 @@ class OrderService:
             products_by_id,
             priced_now,
             priced_tz,
+            quote_order_discounts,
         ) = self._build_priced_order(restaurant.id, restaurant.timezone, data)
         lines_subtotal = lines_total + order_discount
 
@@ -635,6 +652,7 @@ class OrderService:
             order_discount,
             order_promo_id,
             promotions,
+            quote_order_discounts,
         )
         coupon_code = normalize_coupon_code(data.coupon_code)
         if coupon_code is not None:
