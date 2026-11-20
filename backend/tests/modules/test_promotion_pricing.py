@@ -944,3 +944,98 @@ def test_combo_pick_quantity_zero_keeps_fixed_set():
         tz=tz,
     )
     assert missing.order_discount_cents == 0
+
+
+def _combo_price_promo(
+    name: str,
+    combo_price_cents: int,
+    product_ids: list[uuid.UUID],
+    *,
+    pick: int = 2,
+) -> PromotionDTO:
+    return PromotionDTO(
+        id=uuid.uuid4(),
+        restaurant_id=uuid.uuid4(),
+        name=name,
+        type="combo",
+        scope="product",
+        percent=None,
+        amount_cents=None,
+        combo_price_cents=combo_price_cents,
+        min_order_cents=None,
+        starts_at=None,
+        ends_at=None,
+        bundle_get_quantity=pick,
+        bundle_pay_quantity=None,
+        recurrence_weekdays=None,
+        recurrence_start_time=None,
+        recurrence_end_time=None,
+        is_active=True,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        product_ids=product_ids,
+        category_ids=[],
+        option_item_ids=[],
+    )
+
+
+def test_two_independent_combo_price_promos_both_apply():
+    """Two satisfied combo packages in one cart must both discount (e.g. 2x110 + 2x130)."""
+    a1 = _product(7000)
+    a2 = _product(7000)
+    b1 = _product(8000)
+    b2 = _product(8000)
+    promo_110 = _combo_price_promo("2 x $110", 11000, [a1.id, a2.id], pick=2)
+    promo_130 = _combo_price_promo("2 x $130", 13000, [b1.id, b2.id], pick=2)
+    products = {item.id: item for item in (a1, a2, b1, b2)}
+    tz = resolve_timezone("America/Mexico_City")
+    now = datetime.now(UTC)
+
+    quote = price_cart(
+        lines=[
+            CartLineInput(product_id=a1.id, quantity=1),
+            CartLineInput(product_id=a2.id, quantity=1),
+            CartLineInput(product_id=b1.id, quantity=1),
+            CartLineInput(product_id=b2.id, quantity=1),
+        ],
+        products_by_id=products,
+        promotions=[promo_110, promo_130],
+        now_utc=now,
+        tz=tz,
+    )
+
+    # 70+70=140 → discount 30; 80+80=160 → discount 30; both apply.
+    assert quote.order_discount_cents == 3000 + 3000
+    assert quote.total_cents == 11000 + 13000
+    labels = {entry.label for entry in (quote.applied_order_discounts or [])}
+    assert labels == {"2 x $110", "2 x $130"}
+    assert sorted(entry.discount_cents for entry in (quote.applied_order_discounts or [])) == [
+        3000,
+        3000,
+    ]
+
+
+def test_overlapping_combo_pools_do_not_reuse_the_same_units():
+    """When two combos share products, each cart unit can only fill one package."""
+    shared_a = _product(7000)
+    shared_b = _product(7000)
+    promo_cheap = _combo_price_promo("2 x $110", 11000, [shared_a.id, shared_b.id], pick=2)
+    promo_pricey = _combo_price_promo("2 x $100", 10000, [shared_a.id, shared_b.id], pick=2)
+    products = {shared_a.id: shared_a, shared_b.id: shared_b}
+    tz = resolve_timezone("America/Mexico_City")
+    now = datetime.now(UTC)
+
+    quote = price_cart(
+        lines=[
+            CartLineInput(product_id=shared_a.id, quantity=1),
+            CartLineInput(product_id=shared_b.id, quantity=1),
+        ],
+        products_by_id=products,
+        promotions=[promo_cheap, promo_pricey],
+        now_utc=now,
+        tz=tz,
+    )
+
+    # Bases 140; best single package is 2x100 → discount 40. Not stacked.
+    assert quote.order_discount_cents == 4000
+    assert quote.total_cents == 10000
