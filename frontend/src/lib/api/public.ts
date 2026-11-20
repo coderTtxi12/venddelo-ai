@@ -67,6 +67,14 @@ export type CartQuoteCouponError = {
   message: string;
 };
 
+export type CartQuoteOrderDiscount = {
+  label: string;
+  badge?: string | null;
+  discount_cents: number;
+  applied?: boolean;
+  promotion_id?: string | null;
+};
+
 export type CartQuote = {
   server_now: string;
   timezone: string;
@@ -75,6 +83,7 @@ export type CartQuote = {
   order_discount_cents: number;
   total_cents: number;
   applied_order_promotion_id: string | null;
+  applied_order_discounts?: CartQuoteOrderDiscount[];
   applied_free_shipping_promotion_id?: string | null;
   delivery_fee_cents?: number;
   waived_delivery_cents?: number;
