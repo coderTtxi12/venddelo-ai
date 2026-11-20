@@ -192,11 +192,34 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
   const subtotalBefore = quote.subtotal_before_discount_cents / 100;
   const lineDiscountTotal =
     lineBreakdowns.reduce((sum, breakdown) => sum + breakdown.discountCents, 0) / 100;
-  const orderDiscount = quote.order_discount_cents / 100;
-  const orderPromo = quote.applied_order_promotion_id
-    ? promotionsById.get(quote.applied_order_promotion_id)
-    : undefined;
-  const orderPromoLabel = promotionDisplayName(orderPromo);
+  const orderDiscounts = (() => {
+    const fromQuote = (quote.applied_order_discounts ?? [])
+      .filter((entry) => entry.discount_cents > 0)
+      .map((entry) => {
+        const promo = entry.promotion_id
+          ? promotionsById.get(entry.promotion_id)
+          : undefined;
+        return {
+          label: entry.label || promotionDisplayName(promo) || null,
+          amount: entry.discount_cents / 100,
+        };
+      });
+    if (fromQuote.length > 0) {
+      return fromQuote;
+    }
+    if (quote.order_discount_cents <= 0) {
+      return [];
+    }
+    const fallbackPromo = quote.applied_order_promotion_id
+      ? promotionsById.get(quote.applied_order_promotion_id)
+      : undefined;
+    return [
+      {
+        label: promotionDisplayName(fallbackPromo),
+        amount: quote.order_discount_cents / 100,
+      },
+    ];
+  })();
   const freeShippingPromo = quote.applied_free_shipping_promotion_id
     ? promotionsById.get(quote.applied_free_shipping_promotion_id)
     : undefined;
@@ -276,9 +299,9 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
     parts.push(`Descuentos por artículo: -${formatMoney(lineDiscountTotal, currency)}`);
   }
 
-  if (orderDiscount > 0) {
-    const hint = orderPromoLabel ? ` (${orderPromoLabel})` : '';
-    parts.push(`Descuento del pedido${hint}: -${formatMoney(orderDiscount, currency)}`);
+  for (const discount of orderDiscounts) {
+    const hint = discount.label ? ` (${discount.label})` : '';
+    parts.push(`Descuento del pedido${hint}: -${formatMoney(discount.amount, currency)}`);
   }
 
   parts.push(...formatQuotePromotionWhatsAppLines(freeShippingPromo, currency));
