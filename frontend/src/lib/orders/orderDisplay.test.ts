@@ -7,6 +7,7 @@ import {
   formatOrderDisplayId,
   resolveOrderItemBaseUnitCents,
   resolveOrderItemOptions,
+  resolvePromoOrderLevelDiscounts,
 } from './orderDisplay.ts';
 
 const GROUP_ID = '11111111-1111-1111-1111-111111111111';
@@ -306,6 +307,39 @@ test('buildOrderTotalsBreakdown keeps promo order discount separate from coupon'
   assert.equal(totals.promoOrderDiscountCents, 1500);
   assert.equal(totals.couponDiscountCents, 2000);
   assert.equal(totals.restaurantSubtotalCents, 7500);
+});
+
+test('resolvePromoOrderLevelDiscounts itemizes each stacked promo discount', () => {
+  const discounts = resolvePromoOrderLevelDiscounts(
+    baseOrder({
+      discount_cents: 6000,
+      subtotal_cents: 24000,
+      total_cents: 24000,
+      coupon_discount_cents: 0,
+      applied_coupon_code: null,
+      applied_order_discounts: [
+        {
+          label: '2 x $110',
+          badge: null,
+          discount_cents: 3000,
+          applied: true,
+        },
+        {
+          label: '2 x $130',
+          badge: null,
+          discount_cents: 3000,
+          applied: true,
+        },
+      ],
+    }),
+  );
+  assert.deepEqual(
+    discounts.map((entry) => ({ label: entry.label, discount_cents: entry.discount_cents })),
+    [
+      { label: '2 x $110', discount_cents: 3000 },
+      { label: '2 x $130', discount_cents: 3000 },
+    ],
+  );
 });
 
 test('buildOrderTotalsBreakdown customer delivery is zero when waived', () => {
