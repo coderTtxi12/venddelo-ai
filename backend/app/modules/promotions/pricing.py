@@ -52,6 +52,13 @@ class PricedCartLine:
 
 
 @dataclass
+class AppliedOrderDiscount:
+    promotion_id: uuid.UUID | None
+    label: str
+    discount_cents: int
+
+
+@dataclass
 class CartQuoteResult:
     lines: list[PricedCartLine]
     subtotal_before_discount_cents: int
@@ -59,6 +66,7 @@ class CartQuoteResult:
     total_cents: int
     applied_order_promotion_id: uuid.UUID | None = None
     applied_free_shipping_promotion_id: uuid.UUID | None = None
+    applied_order_discounts: list[AppliedOrderDiscount] | None = None
 
 
 @dataclass
@@ -474,6 +482,26 @@ def _discount_for_combo_set(promo: PromotionDTO, set_base: int) -> int:
     return 0
 
 
+@dataclass
+class _ComboUnitSlot:
+    product_id: uuid.UUID
+    base_cents: int
+    available: bool = True
+
+
+def _combo_unit_slots(
+    lines: list[CartLineInput],
+    priced_lines: list[PricedCartLine],
+) -> list[_ComboUnitSlot]:
+    slots: list[_ComboUnitSlot] = []
+    for line, priced in zip(lines, priced_lines, strict=True):
+        for _ in range(line.quantity):
+            slots.append(
+                _ComboUnitSlot(product_id=line.product_id, base_cents=priced.unit_base_cents)
+            )
+    return slots
+
+
 def _combo_pool_discount(
     promo: PromotionDTO,
     lines: list[CartLineInput],
@@ -514,6 +542,90 @@ def _combo_discount_for_promo(
     if promo.amount_cents is not None:
         return min(promo.amount_cents * sets, set_base * sets)
     return 0
+
+
+def _combo_discount_and_slots_from_units(
+    promo: PromotionDTO,
+    slots: list[_ComboUnitSlot],
+) -> tuple[int, list[int]]:
+    """Preview discount for one combo using only still-available unit slots."""
+    required = set(promo.product_ids)
+    available_idxs = [
+        index
+        for index, slot in enumerate(slots)
+        if slot.available and slot.product_id in required
+    ]
+    pick = combo_pick_quantity(promo)
+    if pick is not None:
+        if len(available_idxs) < pick:
+            return 0, []
+        available_idxs.sort(key=lambda index: slots[index].base_cents, reverse=True)
+        sets = len(available_idxs) // pick
+        take = available_idxs[: sets * pick]
+        discount = 0
+        for index in range(sets):
+            chunk = take[index * pick : (index + 1) * pick]
+            discount += _discount_for_combo_set(
+                promo, sum(slots[slot_index].base_cents for slot_index in chunk)
+            )
+        return discount, take
+
+    if len(required) < 2:
+        return 0, []
+    counts: dict[uuid.UUID, list[int]] = {product_id: [] for product_id in required}
+    for index in available_idxs:
+        counts[slots[index].product_id].append(index)
+    if any(len(indexes) < 1 for indexes in counts.values()):
+        return 0, []
+    sets = min(len(indexes) for indexes in counts.values())
+    if sets < 1:
+        return 0, []
+    set_base = sum(
+        slots[counts[product_id][0]].base_cents for product_id in promo.product_ids
+    )
+    if set_base <= 0:
+        return 0, []
+    per_set = _discount_for_combo_set(promo, set_base)
+    take: list[int] = []
+    for set_index in range(sets):
+        for product_id in promo.product_ids:
+            take.append(counts[product_id][set_index])
+    return per_set * sets, take
+
+
+def _stack_combo_discounts(
+    combo_promos: list[PromotionDTO],
+    lines: list[CartLineInput],
+    priced_lines: list[PricedCartLine],
+) -> tuple[int, uuid.UUID | None, list[tuple[PromotionDTO, int]]]:
+    """Stack independent combo packages; each cart unit can fill at most one combo."""
+    slots = _combo_unit_slots(lines, priced_lines)
+    remaining = list(combo_promos)
+    total_discount = 0
+    first_promo_id: uuid.UUID | None = None
+    applied: list[tuple[PromotionDTO, int]] = []
+
+    while remaining:
+        best_promo: PromotionDTO | None = None
+        best_discount = 0
+        best_slots: list[int] = []
+        for promo in remaining:
+            discount, slot_indexes = _combo_discount_and_slots_from_units(promo, slots)
+            if discount > best_discount:
+                best_promo = promo
+                best_discount = discount
+                best_slots = slot_indexes
+        if best_promo is None or best_discount <= 0:
+            break
+        for slot_index in best_slots:
+            slots[slot_index].available = False
+        total_discount += best_discount
+        applied.append((best_promo, best_discount))
+        if first_promo_id is None:
+            first_promo_id = best_promo.id
+        remaining = [promo for promo in remaining if promo.id != best_promo.id]
+
+    return total_discount, first_promo_id, applied
 
 
 def _combo_grants_free_shipping(promo: PromotionDTO) -> bool:
@@ -628,14 +740,17 @@ def price_cart(
         )
 
     lines_subtotal = sum(pl.line_total_cents for pl in priced_lines)
-    best_order_discount = 0
-    best_order_promo_id: uuid.UUID | None = None
-
-    for promo in combo_promos:
-        discount = _combo_discount_for_promo(promo, lines, priced_lines)
-        if discount > best_order_discount:
-            best_order_discount = discount
-            best_order_promo_id = promo.id
+    best_order_discount, best_order_promo_id, stacked_combos = _stack_combo_discounts(
+        combo_promos, lines, priced_lines
+    )
+    applied_order_discounts = [
+        AppliedOrderDiscount(
+            promotion_id=promo.id,
+            label=promotion_display_name_from_raw(promo.name),
+            discount_cents=discount,
+        )
+        for promo, discount in stacked_combos
+    ]
 
     applied_free_shipping_promotion_id: uuid.UUID | None = None
     for promo in combo_promos:
@@ -658,6 +773,13 @@ def price_cart(
         if discount > best_order_discount:
             best_order_discount = discount
             best_order_promo_id = promo.id
+            applied_order_discounts = [
+                AppliedOrderDiscount(
+                    promotion_id=promo.id,
+                    label=promotion_display_name_from_raw(promo.name),
+                    discount_cents=discount,
+                )
+            ]
 
     if applied_free_shipping_promotion_id is None:
         for promo in free_shipping_promos:
@@ -675,4 +797,5 @@ def price_cart(
         total_cents=total,
         applied_order_promotion_id=best_order_promo_id,
         applied_free_shipping_promotion_id=applied_free_shipping_promotion_id,
+        applied_order_discounts=applied_order_discounts,
     )
