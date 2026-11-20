@@ -37,6 +37,7 @@ from app.modules.public.schemas import (
     CartQuoteDTO,
     CartQuoteInput,
     CartQuoteLineDTO,
+    CartQuoteOrderDiscountDTO,
     PublicCheckoutConfigDTO,
     PublicCheckoutPaymentMethodDTO,
     PublicDeliveryQuoteDTO,
@@ -447,6 +448,16 @@ def quote_public_cart(
         order_discount_cents=quote.order_discount_cents,
         total_cents=composed.food_total_cents,
         applied_order_promotion_id=quote.applied_order_promotion_id,
+        applied_order_discounts=[
+            CartQuoteOrderDiscountDTO(
+                label=entry.label,
+                discount_cents=entry.discount_cents,
+                applied=True,
+                promotion_id=entry.promotion_id,
+            )
+            for entry in (quote.applied_order_discounts or [])
+            if entry.discount_cents > 0
+        ],
         applied_free_shipping_promotion_id=quote.applied_free_shipping_promotion_id,
         coupon=coupon_dto,
         coupon_error=coupon_error,
