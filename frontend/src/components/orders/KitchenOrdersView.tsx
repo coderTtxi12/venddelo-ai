@@ -31,6 +31,7 @@ import {
   resolveOrderItemDiscounts,
   orderItemPreDiscountCents,
   buildOrderTotalsBreakdown,
+  resolvePromoOrderLevelDiscounts,
   splitOrderNote,
 } from '@/lib/orders/orderDisplay';
 import { collectOrderDiscountRows } from '@/lib/orders/orderItemDiscounts';
@@ -370,6 +371,10 @@ function OrderDetailContent({
     () => collectOrderDiscountRows(order.items, productsById, promotions),
     [order.items, productsById, promotions],
   );
+  const orderDiscountRows = useMemo(
+    () => resolvePromoOrderLevelDiscounts(order),
+    [order],
+  );
 
   const couponChip = formatKitchenCouponChip(order);
   const couponRemaining = couponRemainingQty(order.coupon_stock_qty, order.coupon_redeemed_count);
@@ -511,12 +516,19 @@ function OrderDetailContent({
                   <span>-{formatCents(totals.lineDiscountCents)}</span>
                 </div>
               ) : null}
-          {totals.promoOrderDiscountCents > 0 ? (
-            <div className={`${styles.totalRow} ${styles.totalRowDiscount}`}>
-              <span>Descuento del pedido</span>
-              <span>-{formatCents(totals.promoOrderDiscountCents)}</span>
+          {orderDiscountRows.map((discount, index) => (
+            <div
+              key={`${discount.label}-${discount.discount_cents}-${index}`}
+              className={`${styles.totalRow} ${styles.totalRowDiscount}`}
+            >
+              <span>
+                Descuento del pedido
+                {discount.label ? ` · ${discount.label}` : ''}
+                {discount.badge ? ` · ${discount.badge}` : ''}
+              </span>
+              <span>-{formatCents(discount.discount_cents)}</span>
             </div>
-          ) : null}
+          ))}
           {couponChip ? (
             <div className={`${styles.totalRow} ${styles.totalRowDiscount}`}>
               <span>{couponChip}</span>

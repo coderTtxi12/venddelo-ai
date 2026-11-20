@@ -26,6 +26,7 @@ import {
   resolveOrderItemBaseUnitCents,
   resolveOrderItemDiscounts,
   resolveOrderItemOptions,
+  resolvePromoOrderLevelDiscounts,
   splitOrderNote,
 } from '@/lib/orders/orderDisplay';
 import { ORDER_STATUS_META } from '@/lib/orders/orderStatus';
@@ -439,12 +440,18 @@ export function CouponOrderDetail({
               <span>−{formatCents(totals.lineDiscountCents)}</span>
             </div>
           ) : null}
-          {totals.promoOrderDiscountCents > 0 ? (
-            <div className={`${styles.totalRow} ${styles.totalRowDiscount}`}>
-              <span>Promoción</span>
-              <span>−{formatCents(totals.promoOrderDiscountCents)}</span>
+          {resolvePromoOrderLevelDiscounts(order).map((discount, index) => (
+            <div
+              key={`${discount.label}-${discount.discount_cents}-${index}`}
+              className={`${styles.totalRow} ${styles.totalRowDiscount}`}
+            >
+              <span>
+                Promoción
+                {discount.label ? ` · ${discount.label}` : ''}
+              </span>
+              <span>−{formatCents(discount.discount_cents)}</span>
             </div>
-          ) : null}
+          ))}
           {totals.appliedCouponCode ? (
             <div className={`${styles.totalRow} ${styles.totalRowDiscount}`}>
               <span>Cupón {totals.appliedCouponCode}</span>
