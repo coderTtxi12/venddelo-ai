@@ -9,6 +9,7 @@ import {
   formatOrderTypeLabel,
   orderItemPreDiscountCents,
   resolveOrderItemOptions,
+  resolvePromoOrderLevelDiscounts,
   splitOrderNote,
 } from '@/lib/orders/orderDisplay';
 import { splitDeliveryAddress } from '@/lib/orders/kitchenDispatch';
@@ -216,11 +217,12 @@ export function buildKitchenTicketDocument(opts: {
       value: `-${formatCents(totals.lineDiscountCents)}`,
     });
   }
-  if (totals.promoOrderDiscountCents > 0) {
+  for (const discount of resolvePromoOrderLevelDiscounts(opts.order)) {
+    const hint = discount.label ? ` · ${discount.label}` : '';
     lines.push({
       kind: 'total',
-      label: 'Descuento del pedido',
-      value: `-${formatCents(totals.promoOrderDiscountCents)}`,
+      label: `Descuento del pedido${hint}`,
+      value: `-${formatCents(discount.discount_cents)}`,
     });
   }
   if (totals.appliedCouponCode) {
